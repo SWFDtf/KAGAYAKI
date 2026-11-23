@@ -8,7 +8,9 @@ import de.swfdtf.graphics.SpriteNode;
 import de.swfdtf.graphics.TextTagParser;
 import de.swfdtf.math.ScreenShake;
 import de.swfdtf.math.Transform2D;
+import de.swfdtf.state.LocalizationManager;
 import de.swfdtf.state.PersistentAccess;
+import de.swfdtf.state.SaveSlotData;
 import de.swfdtf.state.SimplePersistentAccess;
 import de.swfdtf.state.SimpleStateStore;
 import de.swfdtf.state.StateStore;
@@ -248,6 +250,7 @@ public final class ScriptRuntime {
     private JavaBlockCompiler.CompiledProjectBlocks compiledBlocks;
     private AudioBridge audioBridge;
     private Runnable checkpointListener;
+    private LocalizationManager localizationManager;
 
     private Status status = Status.READY;
     private String currentLabel;
@@ -632,6 +635,141 @@ public final class ScriptRuntime {
         }
     }
 
+    /**
+     * Converts the current execution state into a disk-serializable {@link SaveSlotData.SavedScriptPosition}.
+     *
+     * @return serializable script position snapshot
+     */
+    public SaveSlotData.SavedScriptPosition toSavedPosition() {
+        List<SaveSlotData.SavedStackFrame> savedFrames = new ArrayList<>(callStack.size());
+        for (StackFrame frame : callStack) {
+            savedFrames.add(new SaveSlotData.SavedStackFrame(
+                    frame.labelName(),
+                    frame.statementIndex(),
+                    frame.isCallBoundary()
+            ));
+        }
+        return new SaveSlotData.SavedScriptPosition(
+                currentLabel,
+                statementIndex,
+                savedFrames,
+                status.name(),
+                activeDialogue != null ? activeDialogue.speakerId() : null,
+                activeDialogue != null ? activeDialogue.speakerName() : null,
+                activeDialogue != null ? activeDialogue.interpolatedText() : null,
+                nvlMode,
+                List.copyOf(nvlLines),
+                activeVoicePath,
+                sceneController.snapshotState()
+        );
+    }
+
+    /**
+     * Restores the interpreter and stage from a disk-loaded {@link SaveSlotData.SavedScriptPosition}.
+     *
+     * @param pos deserialized saved script position
+     */
+    public void restoreSavedPosition(SaveSlotData.SavedScriptPosition pos) {
+        Objects.requireNonNull(pos, "pos must not be null");
+        if (compiledBlocks == null) {
+            compile();
+        }
+        registerAssetsAndTransforms();
+
+        this.currentLabel = pos.currentLabel();
+        this.statementIndex = pos.statementIndex();
+        this.callStack.clear();
+        for (SaveSlotData.SavedStackFrame sf : pos.callStack()) {
+            List<VJavaAst.Statement> frameStmts = (sf.labelName() != null && projectAst.labels().containsKey(sf.labelName()))
+                    ? projectAst.labels().get(sf.labelName()).statements()
+                    : List.of();
+            this.callStack.add(new StackFrame(sf.labelName(), sf.statementIndex(), frameStmts, List.of(), sf.isCallBoundary()));
+        }
+
+        if (this.currentLabel != null && projectAst.labels().containsKey(this.currentLabel)) {
+            this.currentStatements = projectAst.labels().get(this.currentLabel).statements();
+        } else {
+            this.currentStatements = List.of();
+        }
+
+        this.nvlMode = pos.nvlMode();
+        this.nvlLines.clear();
+        this.nvlLines.addAll(pos.nvlLines());
+        this.activeVoicePath = pos.activeVoicePath();
+        this.pauseRemainingSeconds = 0.0;
+        this.pauseTimed = false;
+        this.activeDialogue = null;
+        this.activeMenu = null;
+        this.activeMenuAst = null;
+        this.activeInput = null;
+
+        Status restoredStatus = Status.READY;
+        if (pos.statusName() != null && !pos.statusName().isBlank()) {
+            try {
+                restoredStatus = Status.valueOf(pos.statusName());
+            } catch (IllegalArgumentException ignored) {
+                restoredStatus = Status.READY;
+            }
+        }
+        this.status = restoredStatus;
+
+        if (this.status == Status.WAITING_DIALOGUE) {
+            VJavaAst.Statement currentStmt = (statementIndex >= 0 && statementIndex < currentStatements.size())
+                    ? currentStatements.get(statementIndex)
+                    : null;
+            if (currentStmt instanceof VJavaAst.SayStatement say) {
+                String speakerId = (say.speakerId() != null && !say.speakerId().isBlank()) ? say.speakerId().trim() : pos.activeSpeakerId();
+                VJavaAst.CharacterDef charDef = speakerId != null ? projectAst.characters().get(speakerId) : null;
+                String speakerName = charDef != null ? interpolateText(charDef.displayName()) : pos.activeSpeakerName();
+                String speakerColor = charDef != null ? charDef.colorHex() : null;
+                String rawText = say.text() != null ? say.text() : "";
+                String localized = resolveLocalizedDialogue(say, rawText);
+                String interpolated = interpolateText(localized);
+                String lineId = buildLineId(say);
+                this.activeDialogue = new DialoguePrompt(
+                        lineId,
+                        speakerId,
+                        speakerName,
+                        speakerColor,
+                        rawText,
+                        interpolated,
+                        pos.activeVoicePath(),
+                        say.transitionExpr(),
+                        persistentAccess.isLineRead(lineId),
+                        pos.nvlMode()
+                );
+            } else {
+                String text = pos.activeDialogueText() != null ? pos.activeDialogueText() : "";
+                this.activeDialogue = new DialoguePrompt(
+                        currentLabel + ":" + statementIndex,
+                        pos.activeSpeakerId(),
+                        pos.activeSpeakerName(),
+                        null,
+                        text,
+                        text,
+                        pos.activeVoicePath(),
+                        null,
+                        true,
+                        pos.nvlMode()
+                );
+            }
+        } else if (this.status == Status.WAITING_MENU
+                && statementIndex >= 0
+                && statementIndex < currentStatements.size()
+                && currentStatements.get(statementIndex) instanceof VJavaAst.MenuStatement ms) {
+            buildMenuPrompt(ms);
+        } else if (this.status == Status.WAITING_INPUT
+                && statementIndex >= 0
+                && statementIndex < currentStatements.size()
+                && currentStatements.get(statementIndex) instanceof VJavaAst.InputStatement is) {
+            buildInputPrompt(is);
+        }
+
+        if (pos.stageSnapshot() != null) {
+            sceneController.restoreState(pos.stageSnapshot());
+        }
+    }
+
     // ---- Core Step Loop ----
 
     private void stepUntilPause() {
@@ -912,7 +1050,8 @@ public final class ScriptRuntime {
         String speakerColor = charDef != null ? charDef.colorHex() : null;
 
         String rawText = say.text() != null ? say.text() : "";
-        String interpolated = interpolateText(rawText);
+        String localizedText = resolveLocalizedDialogue(say, rawText);
+        String interpolated = interpolateText(localizedText);
         String lineId = buildLineId(say);
         boolean alreadyRead = persistentAccess.isLineRead(lineId);
 
@@ -946,6 +1085,11 @@ public final class ScriptRuntime {
     }
 
     private void enterMenuPrompt(VJavaAst.MenuStatement menu) {
+        buildMenuPrompt(menu);
+        notifyCheckpoint();
+    }
+
+    private void buildMenuPrompt(VJavaAst.MenuStatement menu) {
         List<ChoiceOption> options = new ArrayList<>(menu.choices().size());
         for (int i = 0; i < menu.choices().size(); i++) {
             VJavaAst.MenuChoice choice = menu.choices().get(i);
@@ -954,11 +1098,12 @@ public final class ScriptRuntime {
                     || ConditionEvaluator.evaluateBoolean(choice.conditionExpr(), stateStore, persistentAccess);
             boolean enabled = hasCondition ? condPassed : !choice.disabledWhenFalse();
             boolean visible = condPassed || choice.disabledWhenFalse();
-            String label = interpolateText(choice.text());
+            String labelText = resolveLocalizedUiText(choice.text());
+            String label = interpolateText(labelText);
             options.add(new ChoiceOption(i, label, enabled, visible, choice));
         }
 
-        String caption = menu.caption() != null ? interpolateText(menu.caption()) : null;
+        String caption = menu.caption() != null ? interpolateText(resolveLocalizedUiText(menu.caption())) : null;
         double initialRemaining = menu.timeoutSeconds() != null ? Math.max(0.0, menu.timeoutSeconds()) : 0.0;
 
         this.activeMenu = new MenuPrompt(caption, menu.timeoutSeconds(), initialRemaining, options);
@@ -966,12 +1111,15 @@ public final class ScriptRuntime {
         this.activeDialogue = null;
         this.activeInput = null;
         this.status = Status.WAITING_MENU;
-
-        notifyCheckpoint();
     }
 
     private void enterInputPrompt(VJavaAst.InputStatement input) {
-        String promptText = input.prompt() != null ? interpolateText(input.prompt()) : "";
+        buildInputPrompt(input);
+        notifyCheckpoint();
+    }
+
+    private void buildInputPrompt(VJavaAst.InputStatement input) {
+        String promptText = input.prompt() != null ? interpolateText(resolveLocalizedUiText(input.prompt())) : "";
         String defaultVal = input.defaultValue() != null ? interpolateText(input.defaultValue()) : "";
 
         this.activeInput = new InputPrompt(
@@ -985,8 +1133,6 @@ public final class ScriptRuntime {
         this.activeMenu = null;
         this.activeMenuAst = null;
         this.status = Status.WAITING_INPUT;
-
-        notifyCheckpoint();
     }
 
     private void executeTopLevelJavaBlocks() {
@@ -1272,6 +1418,38 @@ public final class ScriptRuntime {
      */
     public void setAudioBridge(AudioBridge audioBridge) {
         this.audioBridge = audioBridge;
+    }
+
+    /**
+     * Attaches a {@link LocalizationManager} for live dialogue and choice text translation.
+     *
+     * @param localizationManager localization manager (nullable)
+     */
+    public void setLocalizationManager(LocalizationManager localizationManager) {
+        this.localizationManager = localizationManager;
+    }
+
+    /** @return attached {@link LocalizationManager} or service-registered fallback, if any */
+    public LocalizationManager getLocalizationManager() {
+        return localizationManager != null ? localizationManager : engineApi.getService(LocalizationManager.class);
+    }
+
+    private String resolveLocalizedDialogue(VJavaAst.SayStatement say, String fallback) {
+        LocalizationManager lm = getLocalizationManager();
+        if (lm == null) {
+            return fallback;
+        }
+        String labelLineKey = (currentLabel != null ? currentLabel : "") + "_" + say.lineNumber();
+        String byLine = lm.translateDialogue(labelLineKey, fallback);
+        if (!Objects.equals(byLine, fallback)) {
+            return byLine;
+        }
+        return lm.translateDialogue(buildLineId(say), fallback);
+    }
+
+    private String resolveLocalizedUiText(String fallback) {
+        LocalizationManager lm = getLocalizationManager();
+        return lm != null ? lm.translateUi(fallback, fallback) : fallback;
     }
 
     /**
