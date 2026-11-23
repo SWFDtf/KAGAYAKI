@@ -572,6 +572,17 @@ public class SceneNode {
     }
 
     /**
+     * Returns whether {@link RenderPipeline2D} should draw the standard solid/rounded/textured
+     * quad for this node prior to invoking {@link #onCustomRender(RenderPipeline2D)}.
+     *
+     * @return {@code true} to emit the standard quad; {@code false} if drawing is handled wholly
+     * by {@link #onCustomRender(RenderPipeline2D)}
+     */
+    protected boolean shouldDrawStandardQuad() {
+        return true;
+    }
+
+    /**
      * Hook method invoked by {@link RenderPipeline2D} when rendering this node.
      * Subclasses may override this method for custom OpenGL / primitive drawing; the default
      * implementation delegates to {@link #customRenderer} if one is registered.

@@ -173,6 +173,12 @@ public final class RenderPipeline2D implements IRenderPipeline {
     private final Matrix4f modelMatrix = new Matrix4f();
 
     private Rect2f lastLetterboxViewport = new Rect2f(0.0f, 0.0f, 0.0f, 0.0f);
+    private Rect2f currentRenderBounds = null;
+    private float currentEffectiveAlpha = 1.0f;
+    private ColorMatrix4f currentEffectiveColorMatrix = ColorMatrix4f.identity();
+    private float currentRotationDegrees = 0.0f;
+    private float currentAnchorX = 0.0f;
+    private float currentAnchorY = 0.0f;
     private boolean initialized = false;
 
     /**
@@ -369,7 +375,7 @@ public final class RenderPipeline2D implements IRenderPipeline {
         float effectiveAlpha = Math.clamp(inheritedAlpha * transform.getAlpha(), 0.0f, 1.0f);
         ColorMatrix4f effectiveColorMatrix = combineColorMatrices(inheritedColorMatrix, transform.getColorMatrix());
 
-        if (drawW > 0.0f && drawH > 0.0f && effectiveAlpha > 0.0f) {
+        if (node.shouldDrawStandardQuad() && drawW > 0.0f && drawH > 0.0f && effectiveAlpha > 0.0f) {
             Rect2f effectiveUv = resolveEffectiveUv(node, transform);
             float[] fillPremul = node.getPremultipliedFillColor(effectiveAlpha);
             float[] borderPremul = node.getBorderThickness() > 0.0f
@@ -394,7 +400,29 @@ public final class RenderPipeline2D implements IRenderPipeline {
             );
         }
 
-        node.onCustomRender(this);
+        Rect2f prevBounds = currentRenderBounds;
+        float prevAlpha = currentEffectiveAlpha;
+        ColorMatrix4f prevColorMatrix = currentEffectiveColorMatrix;
+        float prevRotate = currentRotationDegrees;
+        float prevAnchorX = currentAnchorX;
+        float prevAnchorY = currentAnchorY;
+
+        currentRenderBounds = new Rect2f(drawX, drawY, drawW, drawH);
+        currentEffectiveAlpha = effectiveAlpha;
+        currentEffectiveColorMatrix = effectiveColorMatrix;
+        currentRotationDegrees = transform.getRotate();
+        currentAnchorX = transform.getXanchor();
+        currentAnchorY = transform.getYanchor();
+        try {
+            node.onCustomRender(this);
+        } finally {
+            currentRenderBounds = prevBounds;
+            currentEffectiveAlpha = prevAlpha;
+            currentEffectiveColorMatrix = prevColorMatrix;
+            currentRotationDegrees = prevRotate;
+            currentAnchorX = prevAnchorX;
+            currentAnchorY = prevAnchorY;
+        }
 
         List<SceneNode> children = node.getChildren();
         if (!children.isEmpty()) {
@@ -687,6 +715,93 @@ public final class RenderPipeline2D implements IRenderPipeline {
             float[] tintRgba,
             ColorMatrix4f colorMatrix
     ) {
+        drawTexturedQuad(
+                textureId,
+                x,
+                y,
+                width,
+                height,
+                uvRect,
+                tintRgba,
+                colorMatrix,
+                0.0f,
+                0.0f,
+                0.0f
+        );
+    }
+
+    /**
+     * Draws a textured quad rotated around a normalized local origin {@code (originX, originY)}.
+     *
+     * @param textureId     OpenGL texture ID
+     * @param x             left X coordinate in logical pixels
+     * @param y             top Y coordinate in logical pixels
+     * @param width         quad width in logical pixels
+     * @param height        quad height in logical pixels
+     * @param uvRect        UV sub-rectangle (defaults to {@code (0,0,1,1)} if {@code null})
+     * @param tintRgba      4-element straight RGBA tint color (defaults to opaque white if {@code null})
+     * @param colorMatrix   4x4 color matrix (defaults to identity if {@code null})
+     * @param rotateDegrees clockwise rotation angle in degrees
+     * @param originX       normalized horizontal rotation origin ({@code 0}=left, {@code 0.5}=center, {@code 1}=right)
+     * @param originY       normalized vertical rotation origin ({@code 0}=top, {@code 0.5}=center, {@code 1}=bottom)
+     */
+    public void drawTexturedQuad(
+            int textureId,
+            float x,
+            float y,
+            float width,
+            float height,
+            Rect2f uvRect,
+            float[] tintRgba,
+            ColorMatrix4f colorMatrix,
+            float rotateDegrees,
+            float originX,
+            float originY
+    ) {
+        drawTexturedQuadPivot(
+                textureId,
+                x,
+                y,
+                width,
+                height,
+                uvRect,
+                tintRgba,
+                colorMatrix,
+                rotateDegrees,
+                x + originX * width,
+                y + originY * height
+        );
+    }
+
+    /**
+     * Draws a textured quad rotated around an explicit pivot point {@code (pivotX, pivotY)} in
+     * logical canvas coordinates.
+     *
+     * @param textureId     OpenGL texture ID
+     * @param x             left X coordinate in logical pixels
+     * @param y             top Y coordinate in logical pixels
+     * @param width         quad width in logical pixels
+     * @param height        quad height in logical pixels
+     * @param uvRect        UV sub-rectangle (defaults to {@code (0,0,1,1)} if {@code null})
+     * @param tintRgba      4-element straight RGBA tint color (defaults to opaque white if {@code null})
+     * @param colorMatrix   4x4 color matrix (defaults to identity if {@code null})
+     * @param rotateDegrees clockwise rotation angle in degrees
+     * @param pivotX        pivot X coordinate in logical pixels
+     * @param pivotY        pivot Y coordinate in logical pixels
+     */
+    public void drawTexturedQuadPivot(
+            int textureId,
+            float x,
+            float y,
+            float width,
+            float height,
+            Rect2f uvRect,
+            float[] tintRgba,
+            ColorMatrix4f colorMatrix,
+            float rotateDegrees,
+            float pivotX,
+            float pivotY
+    ) {
         requireInitialized();
         if (textureId == 0 || width <= 0.0f || height <= 0.0f) {
             return;
@@ -700,15 +815,15 @@ public final class RenderPipeline2D implements IRenderPipeline {
             return;
         }
         float[] premulTint = new float[]{tint[0] * a, tint[1] * a, tint[2] * a, a};
-        drawQuadInternal(
+        drawQuadWithPivotInternal(
                 textureId,
                 x,
                 y,
                 width,
                 height,
-                0.0f,
-                0.0f,
-                0.0f,
+                pivotX,
+                pivotY,
+                rotateDegrees,
                 uvRect != null ? uvRect : FULL_UV_RECT,
                 premulTint,
                 colorMatrix != null ? colorMatrix : ColorMatrix4f.identity(),
@@ -734,16 +849,51 @@ public final class RenderPipeline2D implements IRenderPipeline {
             float borderThickness,
             float[] borderPremul
     ) {
-        float anchorPxX = xanchor * width;
-        float anchorPxY = yanchor * height;
+        drawQuadWithPivotInternal(
+                textureId,
+                x,
+                y,
+                width,
+                height,
+                x + xanchor * width,
+                y + yanchor * height,
+                rotateDeg,
+                uvRect,
+                fillPremul,
+                colorMatrix,
+                cornerRadius,
+                borderThickness,
+                borderPremul
+        );
+    }
 
-        modelMatrix.identity()
-                .translate(x + anchorPxX, y + anchorPxY, 0.0f);
+    private void drawQuadWithPivotInternal(
+            int textureId,
+            float x,
+            float y,
+            float width,
+            float height,
+            float pivotX,
+            float pivotY,
+            float rotateDeg,
+            Rect2f uvRect,
+            float[] fillPremul,
+            ColorMatrix4f colorMatrix,
+            float cornerRadius,
+            float borderThickness,
+            float[] borderPremul
+    ) {
         if (rotateDeg != 0.0f) {
-            modelMatrix.rotateZ((float) Math.toRadians(rotateDeg));
+            modelMatrix.identity()
+                    .translate(pivotX, pivotY, 0.0f)
+                    .rotateZ((float) Math.toRadians(rotateDeg))
+                    .translate(x - pivotX, y - pivotY, 0.0f)
+                    .scale(width, height, 1.0f);
+        } else {
+            modelMatrix.identity()
+                    .translate(x, y, 0.0f)
+                    .scale(width, height, 1.0f);
         }
-        modelMatrix.translate(-anchorPxX, -anchorPxY, 0.0f)
-                .scale(width, height, 1.0f);
 
         quadShader.bind();
         quadShader.setUniformMat4("uProjection", logicalProjection);
@@ -832,7 +982,78 @@ public final class RenderPipeline2D implements IRenderPipeline {
             offscreenFbo.dispose();
             offscreenFbo = null;
         }
+        currentRenderBounds = null;
+        currentEffectiveAlpha = 1.0f;
+        currentEffectiveColorMatrix = ColorMatrix4f.identity();
+        currentRotationDegrees = 0.0f;
+        currentAnchorX = 0.0f;
+        currentAnchorY = 0.0f;
         initialized = false;
+    }
+
+    /** @return defensive copy of the logical orthographic projection matrix */
+    public Matrix4f getLogicalProjection() {
+        return new Matrix4f(logicalProjection);
+    }
+
+    /**
+     * Returns the resolved logical bounds of the {@link SceneNode} currently executing
+     * {@link SceneNode#onCustomRender(RenderPipeline2D)}, or {@code null} outside scene-graph traversal.
+     *
+     * @return active node render bounds, or {@code null}
+     */
+    public Rect2f getCurrentRenderBounds() {
+        return currentRenderBounds;
+    }
+
+    /**
+     * Returns the effective inherited alpha of the {@link SceneNode} currently executing
+     * {@link SceneNode#onCustomRender(RenderPipeline2D)}, or {@code 1.0f} outside traversal.
+     *
+     * @return effective alpha in {@code [0, 1]}
+     */
+    public float getCurrentEffectiveAlpha() {
+        return currentEffectiveAlpha;
+    }
+
+    /**
+     * Returns the effective combined {@link ColorMatrix4f} of the {@link SceneNode} currently executing
+     * {@link SceneNode#onCustomRender(RenderPipeline2D)}, or identity outside traversal.
+     *
+     * @return effective color matrix
+     */
+    public ColorMatrix4f getCurrentEffectiveColorMatrix() {
+        return currentEffectiveColorMatrix;
+    }
+
+    /**
+     * Returns the rotation angle in degrees of the {@link SceneNode} currently executing
+     * {@link SceneNode#onCustomRender(RenderPipeline2D)}, or {@code 0.0f} outside traversal.
+     *
+     * @return rotation angle in degrees
+     */
+    public float getCurrentRotationDegrees() {
+        return currentRotationDegrees;
+    }
+
+    /**
+     * Returns the normalized X anchor of the {@link SceneNode} currently executing
+     * {@link SceneNode#onCustomRender(RenderPipeline2D)}, or {@code 0.0f} outside traversal.
+     *
+     * @return normalized horizontal anchor
+     */
+    public float getCurrentAnchorX() {
+        return currentAnchorX;
+    }
+
+    /**
+     * Returns the normalized Y anchor of the {@link SceneNode} currently executing
+     * {@link SceneNode#onCustomRender(RenderPipeline2D)}, or {@code 0.0f} outside traversal.
+     *
+     * @return normalized vertical anchor
+     */
+    public float getCurrentAnchorY() {
+        return currentAnchorY;
     }
 
     /** @return most recently computed letterbox/pillarbox destination rectangle from {@link #endFrame()} */
