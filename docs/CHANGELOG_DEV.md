@@ -1,0 +1,74 @@
+# KAGAYAKI — Entwicklungs-Changelog
+
+Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architektur-Änderungen und Meilensteine von **KAGAYAKI** (`de.swfdtf`).
+
+---
+
+## [M1 — Abgeschlossen] Grafik-Subsystem, WindowManager, `EngineApplication` & Einstiegspunkte
+
+### Paket `de.swfdtf` (Einstiegspunkte)
+* `Main`: Primärer Einstiegspunkt; startet `EngineApplication` standardmäßig in `EngineMode.STUDIO_DUAL_WINDOW`, sofern `--standalone` nicht explizit in den CLI-Argumenten angegeben wurde.
+* `StandaloneMain`: Dedizierter Einstiegspunkt für exportierte Standalone-Builds (`packageStandalone`); erzwingt `EngineMode.STANDALONE_GAME`.
+
+### Erweiterung `de.swfdtf.core`
+* `EngineApplication` (+ `EngineApplication.Updatable`): Top-Level-Laufzeitkoordinator (`AutoCloseable`) mit Initialisierung, deterministischer 60-Hz-Fixed-Timestep-Schleife (`run()`, `stepOnce(double)`), dynamischer `StudioBridge`-Einbindung (`de.swfdtf.tools.StudioWindowController`), `switchRenderPipeline(RenderMode)`, Service-Registrierung (`SceneGraph`, `EngineApplication`, `IRenderPipeline`), `--headless`- und `--smoke-test`-Unterstützung (5 Frames).
+* JUnit-6-Tests in `src/test/java/de/swfdtf/core/EngineApplicationTest.java` ergänzt.
+
+### Paket `de.swfdtf.graphics`
+* `RenderMode`: Backend-Modus-Enum (`MODE_2D`, `MODE_3D`) inklusive `fromString(String)`.
+* `IRenderPipeline`: Einheitliches Render-Pipeline-Interface (`init`, `beginFrame`, `renderSceneGraph`, `endFrame`, `getMode`, `dispose`).
+* `Framebuffer`: OpenGL-Offscreen-FBO mit `RGBA8`-Farbtextur (`GL_LINEAR`, `GL_CLAMP_TO_EDGE`), `resize` und Top-to-Bottom-Readback (`readPixelsRgba`).
+* `ShaderProgram`: OpenGL-3.3-Core-GLSL-Compiler/-Linker mit Uniform-Location-Caching und Matrix-/Vektor-/Skalar-Settern.
+* `GlfwWindow` & `WindowManager`: GLFW-Lebenszyklus-Management für Dual-Window (`initDualWindows` mit gemeinsamem OpenGL-Objekt-Namespace zwischen Game-Fenster B und Studio-Fenster A) sowie Standalone-Modus (`initStandaloneWindow`), inklusive HiDPI-Framebuffer-Tracking und per-Window-`GLCapabilities`.
+* `SceneGraph`, `SceneLayer` & `SceneNode`: Z-sortierter Szenengraph mit 8 vorregistrierten Standard-Ebenen (`-100` bis `1000`), `ScreenShake` auf Weltebenen (`< Z_SCREENS`), 2.5D-Maus-Parallax, hierarchischer Vererbung (Bounds, Alpha, `ColorMatrix4f`), SDF-Rounded-Rectangles/Borders, Hex-Farbparser (`parseHexRgba`) und `onCustomRender`-Hook.
+* `RenderPipeline2D`: Produktive OpenGL-3.3-Core-2D-Pipeline mit `1920×1080`-Offscreen-FBO, Premultiplied-Alpha-Blending (`GL_ONE, GL_ONE_MINUS_SRC_ALPHA`), SDF-Rechtecken, texturierten Quads und Letterbox-/Pillarbox-Blit auf `#0d0e15` (`computeLetterboxViewport`).
+* `RenderPipeline3DStub`: Architektonischer 3D-Stub (`FOV = 75.0f`, `Z_NEAR = 100.0f`, `Z_FAR = 100000.0f`, `computeCameraDistanceZ`) mit kontrolliertem Warning-Logging über `EngineLogger`.
+* JUnit-6-Tests in `src/test/java/de/swfdtf/graphics/` (`SceneGraphTest`, `RenderPipeline2DMathTest`, `RenderPipeline3DStubTest`) angelegt.
+
+### Dokumentation
+* `src/main/java/de/swfdtf/AGENT_CONTEXT.md` und `src/main/java/de/swfdtf/graphics/AGENT_CONTEXT.md` neu erstellt.
+* `src/main/java/de/swfdtf/core/AGENT_CONTEXT.md` um `EngineApplication`, `EngineApplication.Updatable` und interne Paketabhängigkeiten ergänzt.
+* `docs/ARCHITEKTUR.md`, `docs/API_REFERENZ.md` und `docs/CHANGELOG_DEV.md` auf den abgeschlossenen Stand von Meilenstein M1 aktualisiert.
+
+---
+
+## [M1 — Start] Fundament: Gradle-Build, `math`, `core` & `git` *(aktueller Arbeitsstand vor M1-Commit)*
+
+### Build- & Projekt-Setup (`build.gradle`, `settings.gradle`)
+* Java 21 Toolchain (`sourceCompatibility` / `targetCompatibility = 21`) mit UTF-8 Compiler-Encoding.
+* LWJGL `3.3.6` BOM und Plattform-Natives-Erkennung (`lwjgl`, `lwjgl-glfw`, `lwjgl-opengl`, `lwjgl-openal`, `lwjgl-stb`) für Windows, macOS (inkl. `-XstartOnFirstThread`) und Linux (x64 & arm64).
+* Abhängigkeiten: `org.joml:joml:1.10.8`, `com.google.code.gson:gson:2.11.0`, `org.junit:junit-bom:6.0.0` (JUnit Jupiter).
+* Gradle-Tasks in Gruppe `kagayaki`: `runStudio`, `runStandalone`, `packageStandalone` (schließt `StudioWindowController*` und `**/AGENT_CONTEXT.md` aus).
+
+### Paket `de.swfdtf.math`
+* `Vec2f`: Unveränderlicher 2D-Vektor mit `ZERO`, `ONE`, `HALF`, `add`, `sub`, `scale`, `lerp`, `length`, `distance`.
+* `Rect2f`: Achsenparalleles Rechteck mit `right`, `bottom`, `centerX`, `centerY`, `contains`, `intersects`, `translate`, `inset`.
+* `ColorMatrix4f`: Premultiplied-Alpha-4×4-Matrix (Column-Major) mit `identity`, `ofColumnMajor`, `ofRowMajor`, `brightness`, `contrast`, `saturation` (Rec. 709), `hueRotate` (Rodrigues), `tint`, `opacity`, `invert`, `multiply`, `lerp`, `toFloatArray`, `applyPremultiplied`.
+* `Easing` & `Easing.EaseType`: `linear`, `ease`, `easeIn`, `easeOut`, `easeInOut`, `smoothstep`, `cubicBezier`, `evaluate`.
+* `Transform2D`: Ren'Py-kompatibles 2D-Transformationsmodell (`xpos`/`ypos`, `xanchor`/`yanchor`, `xalign`/`yalign`, `zoom`/`xzoom`/`yzoom`, `rotate`, `alpha`, `blur`, `colorMatrix`, `crop`, `parallaxX`/`parallaxY`, `copy`, `lerpTo`, `resolveBounds`).
+* `ScreenShake`: Gedämpfte harmonische Oszillation (`vpunch`, `hpunch`, `custom`) mit Blueprint-Defaults (`A = 30.0f`, `lambda = 5.0f`, `omega = 40.0f`, `durationSeconds = 1.0f`).
+* JUnit-6-Tests in `src/test/java/de/swfdtf/math/` angelegt.
+
+### Paket `de.swfdtf.core`
+* `EngineMode`: `STUDIO_DUAL_WINDOW`, `STANDALONE_GAME`.
+* `EngineConfig` (+ `EngineConfig.Builder`): Unveränderliche Engine-Konfiguration mit CLI-Parser `fromArgs` (`--studio`, `--standalone`, `--project`, `--mode`/`--render-mode`, `--2d`/`--3d`, `--width`, `--height`, `--vsync`/`--no-vsync`, `--fps`/`--target-fps`, `--smoke-test`, `--headless`).
+* `ProjectDescriptor`: Gson-Persistenz für `project.vjava.json` (`load`, `save`, `createDefault`, `normalizeDefaults`).
+* `EngineLogger` (+ `Level`, `LogEntry`): Thread-sicherer Ringpuffer-Logger (`DEFAULT_CAPACITY = 2000`) mit Listener-Fan-Out und optionaler Konsolenausgabe.
+* `GameClock`: Deterministische 60-Hz-Fixed-Timestep-Simulation (`FIXED_TIMESTEP = 1.0 / 60.0`, `MAX_FRAME_DELTA = 0.25`, `MAX_STEPS_PER_FRAME = 15`), Pause, `timeScale`, Interpolations-Alpha und FPS-Messung.
+* `InputManager`: Zentralisiertes GLFW-Input-Tracking (Tastatur, Modifier, Unicode-Texteingabe via `drainTypedChars`, Letterbox-Viewport-Mausprojektion, Scroll-Deltas, Gamepads mit Deadzone) inklusive Headless-Test-Methoden.
+* `EngineAPI`: Öffentliche Skript-/UI-Fassade (`ENGINE_VERSION = "KAGAYAKI 1.0.0"`, `RENDER_BACKEND_NAME = "LWJGL 3 / OpenGL 3.3 Core"`) mit Properties und typisiertem Service-Locator.
+* `StudioBridge`: Entkopplungsschnittstelle zwischen Core-Runtime und Studio-UI (`tools`).
+* JUnit-6-Tests in `src/test/java/de/swfdtf/core/` angelegt.
+
+### Paket `de.swfdtf.git`
+* `GitController` (+ `CommandResult`): Nicht-interaktive Git-CLI-Steuerung (`init`, `status`, `add`, `commit`, `push`, `log`, `isGitRepository`) mit `GIT_TERMINAL_PROMPT=0`, 30-Sekunden-Default-Timeout und erzwungener Commit-Policy (`ALLOWED_COMMIT_TYPES`: `feat`, `fix`, `arch`, `render`, `parser`, `audio`, `ui`, `docs`, `test`, `build`).
+* JUnit-6-Tests in `src/test/java/de/swfdtf/git/` angelegt.
+
+### Dokumentation
+* Lokale `AGENT_CONTEXT.md` für `de.swfdtf.math`, `de.swfdtf.core` und `de.swfdtf.git` erstellt.
+* Globale Dokumentation in `/docs/` (`ARCHITEKTUR.md`, `VJAVA_SPEZIFIKATION.md`, `CHANGELOG_DEV.md`, `API_REFERENZ.md`) initialisiert.
+
+---
+
+## [Initial] Projekt-Initialisierung
+* Commit `178919a`: `Created Project KAGAYAKI` (Basis-Repository auf `main`).
