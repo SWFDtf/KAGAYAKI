@@ -1,13 +1,13 @@
 # Package `de.swfdtf.parser` — AGENT_CONTEXT
 
 ## Zweck des Pakets
-Vollständige `.vjava`-Skript-Pipeline von KAGAYAKI (Meilenstein M3): einrückungsbasierter Lexer (`VJavaLexer`), rekursiv-absteigender AST-Parser (`VJavaParser` / `VJavaAst`), rekursiver Projekt- und Asset-Scanner (`ProjectScanner`), In-Memory-Java-21-Compiler über `javax.tools.JavaCompiler` für `@->{ ... }<<`-Blöcke und benutzerdefinierte Klassen (`JavaBlockCompiler`, `VJavaExecutable`, `VJavaCompileException`), Expressions- und Bedingungs-Evaluator (`ConditionEvaluator`) sowie die nicht-blockierende State-Machine-Skript-Laufzeit (`ScriptRuntime`).
+Vollständige `.vjava`-Skript-Pipeline von KAGAYAKI (Meilenstein M3 + M4): einrückungsbasierter Lexer (`VJavaLexer`), rekursiv-absteigender AST-Parser (`VJavaParser` / `VJavaAst`), rekursiver Projekt- und Asset-Scanner (`ProjectScanner`), In-Memory-Java-21-Compiler über `javax.tools.JavaCompiler` für `@->{ ... }<<`-Blöcke und benutzerdefinierte Klassen (`JavaBlockCompiler`, `VJavaExecutable`, `VJavaCompileException`), Expressions- und Bedingungs-Evaluator (`ConditionEvaluator`), die nicht-blockierende State-Machine-Skript-Laufzeit (`ScriptRuntime`) sowie der M4-Sitzungskoordinator (`ScriptSession`) für 4-Tier-Persistenz, deterministisches Rollback/Roll-Forward, `HistoryLog`, Save/Load, Lokalisierung und Meta-Progression.
 
 ## Abhängigkeiten zu anderen `de.swfdtf.*`-Paketen
-- `de.swfdtf.core` (`ProjectDescriptor` in `VJavaAst`, `ProjectScanner`; `EngineAPI`, `EngineConfig` in `VJavaExecutable`, `JavaBlockCompiler`, `ScriptRuntime`)
-- `de.swfdtf.graphics` (`SceneController`, `SceneGraph`, `SpriteNode`, `TextTagParser` in `VJavaExecutable`, `JavaBlockCompiler`, `ScriptRuntime`)
+- `de.swfdtf.core` (`ProjectDescriptor` in `VJavaAst`, `ProjectScanner`, `ScriptSession`; `EngineAPI`, `EngineConfig` in `VJavaExecutable`, `JavaBlockCompiler`, `ScriptRuntime`, `ScriptSession`)
+- `de.swfdtf.graphics` (`SceneController`, `SceneGraph`, `SpriteNode`, `TextTagParser` in `VJavaExecutable`, `JavaBlockCompiler`, `ScriptRuntime`, `ScriptSession`; `TextureManager` in `ScriptSession`)
 - `de.swfdtf.math` (`Transform2D`, `ScreenShake` in `JavaBlockCompiler`, `ScriptRuntime`)
-- `de.swfdtf.state` (`StateStore`, `PersistentAccess`, `SimpleStateStore`, `SimplePersistentAccess` in `VJavaExecutable`, `JavaBlockCompiler`, `ConditionEvaluator`, `ScriptRuntime`)
+- `de.swfdtf.state` (`StateStore`, `PersistentAccess`, `SimpleStateStore`, `SimplePersistentAccess` in `VJavaExecutable`, `JavaBlockCompiler`, `ConditionEvaluator`, `ScriptRuntime`; `LocalizationManager`, `SaveSlotData` in `ScriptRuntime`, `ScriptSession`; `RevertableStateStore`, `PersistentState`, `PreferencesState`, `SessionState`, `HistoryLog`, `SaveManager`, `AchievementManager`, `GalleryManager`, `EndingsManager` in `ScriptSession`)
 - JDK-Module: `javax.tools.*` (`JavaCompiler`, `ForwardingJavaFileManager`, `DiagnosticCollector`) in `JavaBlockCompiler` und `VJavaCompileException`.
 
 ## Enthaltene Typen
@@ -38,13 +38,14 @@ Vollständige `.vjava`-Skript-Pipeline von KAGAYAKI (Meilenstein M3): einrückun
 | `JavaBlockCompiler` | `final class` | In-Memory-Java-21-Compiler; sammelt Imports, benutzerdefinierte Klassen/Typen (`VJavaUserTypes`) und Snippet-Klassen (`VJavaSnippet_<i>`). |
 | `JavaBlockCompiler.CompiledProjectBlocks` | `final class` | Registry aller kompilierten `VJavaExecutable`-Instanzen und des zugehörigen In-Memory-`ClassLoader` inklusive `loadUserType`/`findUserType`. |
 | `ConditionEvaluator` | `final class` | Rekursiv-absteigender Ausdrucks- und Bedingungs-Evaluator für Arithmetik, Vergleiche, Logik, Ternär-Operator, Reflexions-/Getter-Zugriff, Indexierung und Methodenaufrufe. |
-| `ScriptRuntime` | `final class` | Nicht-blockierende State-Machine-Skript-Laufzeit mit Dialogue/Menu/Input/Pause-Zuständen, ATL-/Scene-Anbindung, Audio-Bridge und M4-Snapshot-Hooks. |
+| `ScriptRuntime` | `final class` | Nicht-blockierende State-Machine-Skript-Laufzeit mit Dialogue/Menu/Input/Pause-Zuständen, ATL-/Scene-Anbindung, Audio-Bridge, Live-Lokalisierung (`LocalizationManager`), M4-Snapshot-Hooks und `SaveSlotData.SavedScriptPosition`-Serialisierung. |
 | `ScriptRuntime.Status` | `enum` | Laufzeitzustände: `READY`, `WAITING_DIALOGUE`, `WAITING_MENU`, `WAITING_INPUT`, `PAUSING`, `ENDED`. |
 | `ScriptRuntime.DialoguePrompt` | `record` | Aktive Dialogzeile während `WAITING_DIALOGUE` inklusive `lineId`, interpoliertem Text, Voice-Pfad, `alreadyRead` und `nvlMode`. |
 | `ScriptRuntime.ChoiceOption` & `MenuPrompt` | `record` | Evaluierte Auswahloptionen (`enabled`, `visible`) und aktiver Menü-Prompt (inklusive `timeoutSeconds` / `remainingSeconds`). |
 | `ScriptRuntime.InputPrompt` | `record` | Aktiver Texteingabe-Prompt (`targetVar`, `prompt`, `defaultValue`, `allowChars`, `maxLength`). |
 | `ScriptRuntime.AudioBridge` & `AudioEvent` | `interface` / `record` | Entkoppelte Audio-Rückrufschnittstelle (`play`, `queue`, `stop`, `voice`) und protokolliertes Audio-Ereignis. |
 | `ScriptRuntime.StackFrame` & `ExecutionSnapshot` | `record` | Call-/Block-Stackframe und unveränderlicher Ausführungs-Snapshot für Subroutinen und deterministisches M4-Rollback. |
+| `ScriptSession` | `final class` | M4-Laufzeitsitzungskoordinator, der `ScriptRuntime` mit 4-Tier-Persistenz (`SessionState`, `RevertableStateStore`, `PersistentState`, `PreferencesState`), `HistoryLog`, `SaveManager`, `LocalizationManager` und Meta-Managern (`AchievementManager`, `GalleryManager`, `EndingsManager`) verdrahtet. |
 
 ## Öffentliche API-Signaturen
 
@@ -273,6 +274,8 @@ public final class ScriptRuntime {
     public void jumpToLabel(String label)
     public ExecutionSnapshot snapshotExecution()
     public void restoreExecution(ExecutionSnapshot snapshot)
+    public SaveSlotData.SavedScriptPosition toSavedPosition()
+    public void restoreSavedPosition(SaveSlotData.SavedScriptPosition pos)
 
     public Status getStatus()
     public DialoguePrompt getActiveDialogue()
@@ -285,6 +288,8 @@ public final class ScriptRuntime {
     public VJavaAst.ProjectAst getProjectAst()
     public List<AudioEvent> getAudioEvents()
     public void setAudioBridge(AudioBridge audioBridge)
+    public void setLocalizationManager(LocalizationManager localizationManager)
+    public LocalizationManager getLocalizationManager()
     public void setCheckpointListener(Runnable checkpointListener)
     public JavaBlockCompiler.CompiledProjectBlocks getCompiledBlocks()
     public String getCurrentLabel()
@@ -294,5 +299,47 @@ public final class ScriptRuntime {
     public String getActiveVoicePath()
     public double getPauseRemainingSeconds()
     public String getWindowAction()
+}
+```
+
+### `ScriptSession`
+```java
+public final class ScriptSession {
+    public ScriptSession(VJavaAst.ProjectAst project, EngineAPI engineApi) throws IOException
+    public ScriptSession(VJavaAst.ProjectAst project, EngineAPI engineApi, SceneGraph sceneGraph, TextureManager textureManager, boolean glTextures, Path savesDir) throws IOException
+    public ScriptSession(VJavaAst.ProjectAst project, EngineAPI engineApi, SceneController sceneController, Path savesDir) throws IOException
+
+    public void start()
+    public void start(String entryLabel)
+    public void advance()
+    public void choose(int optionIndex)
+    public void submitInput(String text)
+    public void update(double dt)
+
+    public boolean rollback()
+    public boolean rollForward()
+    public boolean jumpToHistoryEntry(HistoryLog.HistoryEntry entry)
+
+    public SaveSlotData createSaveSlotData(String slotId, String customName, int thumbWidth, int thumbHeight, byte[] thumbRgba)
+    public void saveToSlot(String slotId, String customName, int thumbWidth, int thumbHeight, byte[] thumbRgba) throws IOException
+    public void quickSave() throws IOException
+    public void quickLoad() throws IOException
+    public String autoSave() throws IOException
+    public void loadFromSlot(String slotId) throws IOException
+    public void saveMetaState() throws IOException
+
+    public ScriptRuntime getRuntime()
+    public RevertableStateStore getStateStore()
+    public PersistentState getPersistentState()
+    public PreferencesState getPreferencesState()
+    public SessionState getSessionState()
+    public HistoryLog getHistoryLog()
+    public SaveManager getSaveManager()
+    public LocalizationManager getLocalizationManager()
+    public AchievementManager getAchievementManager()
+    public GalleryManager getGalleryManager()
+    public EndingsManager getEndingsManager()
+    public SceneController getSceneController()
+    public EngineAPI getEngineApi()
 }
 ```

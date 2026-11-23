@@ -1,6 +1,6 @@
-# KAGAYAKI — Öffentliche API-Referenz (M1 + M2 + M3)
+# KAGAYAKI — Öffentliche API-Referenz (M1 + M2 + M3 + M4)
 
-Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen der abgeschlossenen M1-, M2- und M3-Pakete (`de.swfdtf`, `de.swfdtf.core`, `de.swfdtf.graphics`, `de.swfdtf.math`, `de.swfdtf.git`, `de.swfdtf.parser`, `de.swfdtf.state`) sowie die Gradle-Tasks aus `build.gradle`.
+Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen der abgeschlossenen M1-, M2-, M3- und M4-Pakete (`de.swfdtf`, `de.swfdtf.core`, `de.swfdtf.graphics`, `de.swfdtf.math`, `de.swfdtf.git`, `de.swfdtf.parser`, `de.swfdtf.state`) sowie die Gradle-Tasks aus `build.gradle`.
 
 ---
 
@@ -9,7 +9,7 @@ Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen 
 | Task | Gruppe | Beschreibung |
 | :--- | :--- | :--- |
 | `./gradlew build` | `build` | Kompiliert Java 21 Quellen, führt JUnit-6-Tests aus und paketiert das Standard-JAR. |
-| `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`, 101 Tests laut `build/test-results/test/`) mit ausführlichem Event-Logging aus. |
+| `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`, 121 Tests laut `build/test-results/test/`) mit ausführlichem Event-Logging aus. |
 | `./gradlew run` | `application` | Startet `de.swfdtf.Main` (unter macOS automatisch mit `-XstartOnFirstThread`). |
 | `./gradlew runStudio` | `kagayaki` | Startet `de.swfdtf.Main` mit `--studio` (optional `-PprojectDir=<pfad>` ergänzt `--project <pfad>`). |
 | `./gradlew runStandalone` | `kagayaki` | Startet `de.swfdtf.StandaloneMain` (optional `-PprojectDir=<pfad>` ergänzt `--standalone <pfad>`). |
@@ -399,7 +399,7 @@ Gedämpfter harmonischer Oszillator: `Delta(t) = A * exp(-lambda * t) * sin(omeg
 
 ---
 
-## 7. Paket `de.swfdtf.parser` (M3)
+## 7. Paket `de.swfdtf.parser` (M3 + M4)
 
 ### `VJavaLexer` & `VJavaParseException`
 Einrückungs- und Java-Block-bewusster Lexer (`4` Leerzeichen bzw. Tabulator = `4` Spalten, `#`/`//`-Kommentare, `@->{ ... }<<` unter Beachtung von Java-Strings/Textblöcken/Kommentaren).
@@ -446,7 +446,7 @@ Ausdrucks- und Bedingungs-Evaluator für Arithmetik, Vergleiche, Logik (`&&`/`||
 * `public static boolean isTruthy(Object value)`
 
 ### `ScriptRuntime`
-Nicht-blockierende State-Machine-Skript-Laufzeit mit Dialogue-/Menu-/Input-/Pause-Zuständen, Audio-Bridge und M4-Snapshot-Hooks:
+Nicht-blockierende State-Machine-Skript-Laufzeit mit Dialogue-/Menu-/Input-/Pause-Zuständen, Audio-Bridge, Live-Lokalisierung und M4-Snapshot-/Save-Hooks:
 * **Enum**: `Status { READY, WAITING_DIALOGUE, WAITING_MENU, WAITING_INPUT, PAUSING, ENDED }`
 * **Records & Interfaces**: `DialoguePrompt`, `ChoiceOption`, `MenuPrompt`, `InputPrompt`, `AudioBridge`, `AudioEvent`, `StackFrame`, `ExecutionSnapshot`.
 * **Konstruktoren**:
@@ -454,22 +454,72 @@ Nicht-blockierende State-Machine-Skript-Laufzeit mit Dialogue-/Menu-/Input-/Paus
   * `public ScriptRuntime(VJavaAst.ProjectAst project, EngineAPI engineApi)`
   * `public ScriptRuntime(VJavaAst.ProjectAst project, EngineAPI engineApi, StateStore stateStore, PersistentAccess persistentAccess, SceneController sceneController)`
 * **Steuerung & Snapshots**:
-  * `compile()`, `start()`, `start(String entryLabel)`, `advance()`, `choose(int optionIndex)`, `submitInput(String text)`, `update(double dt)`, `jumpToLabel(String label)`, `snapshotExecution()`, `restoreExecution(ExecutionSnapshot)`
+  * `compile()`, `start()`, `start(String entryLabel)`, `advance()`, `choose(int optionIndex)`, `submitInput(String text)`, `update(double dt)`, `jumpToLabel(String label)`, `snapshotExecution()`, `restoreExecution(ExecutionSnapshot)`, `toSavedPosition()`, `restoreSavedPosition(SaveSlotData.SavedScriptPosition)`
 * **Getter & Hooks**:
-  * `getStatus()`, `getActiveDialogue()`, `getActiveMenu()`, `getActiveInput()`, `getStateStore()`, `getPersistentAccess()`, `getSceneController()`, `getEngineApi()`, `getProjectAst()`, `getAudioEvents()`, `setAudioBridge(AudioBridge)`, `setCheckpointListener(Runnable)`, `getCompiledBlocks()`, `getCurrentLabel()`, `getStatementIndex()`, `isNvlMode()`, `getNvlLines()`, `getActiveVoicePath()`, `getPauseRemainingSeconds()`, `getWindowAction()`.
+  * `getStatus()`, `getActiveDialogue()`, `getActiveMenu()`, `getActiveInput()`, `getStateStore()`, `getPersistentAccess()`, `getSceneController()`, `getEngineApi()`, `getProjectAst()`, `getAudioEvents()`, `setAudioBridge(AudioBridge)`, `setLocalizationManager(LocalizationManager)`, `getLocalizationManager()`, `setCheckpointListener(Runnable)`, `getCompiledBlocks()`, `getCurrentLabel()`, `getStatementIndex()`, `isNvlMode()`, `getNvlLines()`, `getActiveVoicePath()`, `getPauseRemainingSeconds()`, `getWindowAction()`.
+
+### `ScriptSession` (M4)
+High-Level-Sitzungskoordinator, der `ScriptRuntime` mit der 4-Tier-Persistenz (`SessionState`, `RevertableStateStore`, `PersistentState`, `PreferencesState`), `HistoryLog`, `SaveManager`, `LocalizationManager` sowie `AchievementManager`, `GalleryManager` und `EndingsManager` verbindet und automatisch im `EngineAPI`-Service-Locator registriert.
+* **Konstruktoren**:
+  * `public ScriptSession(VJavaAst.ProjectAst project, EngineAPI engineApi) throws IOException`
+  * `public ScriptSession(VJavaAst.ProjectAst project, EngineAPI engineApi, SceneGraph sceneGraph, TextureManager textureManager, boolean glTextures, Path savesDir) throws IOException`
+  * `public ScriptSession(VJavaAst.ProjectAst project, EngineAPI engineApi, SceneController sceneController, Path savesDir) throws IOException`
+* **Spielablauf & Rollback**:
+  * `start()`, `start(String entryLabel)`, `advance()`, `choose(int optionIndex)`, `submitInput(String text)`, `update(double dt)`
+  * `rollback()`, `rollForward()`, `jumpToHistoryEntry(HistoryLog.HistoryEntry entry)`
+* **Save / Load & Persistenz**:
+  * `createSaveSlotData(String slotId, String customName, int thumbWidth, int thumbHeight, byte[] thumbRgba)`
+  * `saveToSlot(String slotId, String customName, int thumbWidth, int thumbHeight, byte[] thumbRgba) throws IOException`
+  * `quickSave() throws IOException`, `quickLoad() throws IOException`, `autoSave() throws IOException`
+  * `loadFromSlot(String slotId) throws IOException`, `saveMetaState() throws IOException`
+* **Getter**:
+  * `getRuntime()`, `getStateStore()`, `getPersistentState()`, `getPreferencesState()`, `getSessionState()`, `getHistoryLog()`, `getSaveManager()`, `getLocalizationManager()`, `getAchievementManager()`, `getGalleryManager()`, `getEndingsManager()`, `getSceneController()`, `getEngineApi()`.
 
 ---
 
-## 8. Paket `de.swfdtf.state` (M3-Verträge & In-Memory-Basis)
+## 8. Paket `de.swfdtf.state` (M3 + M4)
 
 ### `StateStore` & `SimpleStateStore`
-Vertrag (Binding `state`) und thread-sichere M3-In-Memory-Implementierung für Sitzungsvariablen und Rollback-Barrieren:
+Vertrag (Binding `state`) und thread-sichere In-Memory-Basisimplementierung für Sitzungsvariablen und Rollback-Barrieren:
 * **Methoden (`StateStore`)**:
   * `set(String key, Object value)`, `get(String key)`, `getOrDefault(String key, Object defaultValue)`, `getString(String key, String defaultValue)`, `getInt(String key, int defaultValue)`, `getDouble(String key, double defaultValue)`, `getBoolean(String key, boolean defaultValue)`
   * `has(String key)`, `remove(String key)`, `keys()`, `snapshotMap()`, `restoreMap(Map<String, Object> snapshot)`, `blockRollback()`, `isRollbackBlocked()`, `clear()`
 * **Zusatz in `SimpleStateStore`**: `resetRollbackBlock()`.
 
 ### `PersistentAccess` & `SimplePersistentAccess`
-Vertrag (Binding `persistent`) und thread-sichere M3-In-Memory-Implementierung für spielstandübergreifende Persistenz:
+Vertrag (Binding `persistent`) und thread-sichere In-Memory-Basisimplementierung für spielstandübergreifende Persistenz:
 * **Variablen**: `set(String key, Object value)`, `get(String key)`, `getOrDefault(String key, Object defaultValue)`, `has(String key)`
 * **Read-Tracking & Freischaltungen**: `markLineRead(String)` / `isLineRead(String)`, `unlockCg(String)` / `isCgUnlocked(String)` / `getUnlockedCgs()`, `unlockTrack(String)` / `isTrackUnlocked(String)` / `getUnlockedTracks()`, `unlockEnding(String)` / `isEndingUnlocked(String)` / `getUnlockedEndings()`, `unlockAchievement(String)` / `isAchievementUnlocked(String)` / `getUnlockedAchievements()`.
+
+### `Revertable<S>`, `RevertableMap<K, V>`, `RevertableList<E>` & `RevertableStateStore` (M4)
+Deterministisches Rollback-/Roll-Forward-Subsystem mit Deep-Safe-Snapshot-Kloning und Checkpoint-Timeline:
+* **`Revertable<S>`**: `S captureState()`, `void restoreState(S snapshot)`.
+* **`RevertableMap<K, V>` (`extends AbstractMap<K, V> implements Revertable<Map<K, V>>`)**: Konstruktoren `RevertableMap()`, `RevertableMap(Map<? extends K, ? extends V>)`; `captureState()`, `restoreState(...)`; statische Helfer `cloneValue(Object)`, `deepEquals(Object, Object)`.
+* **`RevertableList<E>` (`extends AbstractList<E> implements Revertable<List<E>>`)**: Konstruktoren `RevertableList()`, `RevertableList(int)`, `RevertableList(Collection<? extends E>)`; `captureState()`, `restoreState(...)`.
+* **`RevertableStateStore` (`implements StateStore`)**:
+  * Record: `Checkpoint(long id, Map<String, Object> variablesSnapshot, Object runtimeSnapshot, String summary, boolean rollbackBarrierBefore)`.
+  * Methoden: `setRuntimeHooks(Supplier<Object>, Consumer<Object>)`, `recordCheckpoint(String)`, `recordCheckpoint(Object, String)`, `canRollback()`, `rollback()`, `canRollForward()`, `rollForward()`, `jumpToCheckpoint(long)`, `getCurrentCheckpoint()`, `getCheckpoints()`, `getCursorIndex()`, `clearCheckpoints()` sowie alle `StateStore`-Methoden.
+
+### `SessionState`, `PersistentState` & `PreferencesState` (M4)
+Tier-1-, Tier-3- und Tier-4-Zustandscontainer:
+* **`SessionState`** (Tier 1): `updatePlaytime(double)`, `setFlag(String, boolean)`, `getFlag(String)` / `getFlag(String, boolean)`, `hasFlag(String)`, `removeFlag(String)`, `getSessionFlags()`, `getSessionStartTime()` / `setSessionStartTime(Instant)`, `getPlaytimeSeconds()` / `setPlaytimeSeconds(double)`, `getActiveSaveSlotId()` / `setActiveSaveSlotId(String)`, `getLastAutoSaveTime()` / `setLastAutoSaveTime(Instant)`, `markAutoSaved()`, `reset()`.
+* **`PersistentState`** (Tier 3, `implements PersistentAccess`): Konstante `FILE_NAME = "persistent.dat"`; `load(Path)`, `load(Path, ClassLoader)`, `save(Path)`, `getReadLines()`, `getDataSnapshot()`, `clear()` sowie alle `PersistentAccess`-Methoden.
+* **`PreferencesState`** (Tier 4): Konstante `FILE_NAME = "preferences.json"`; `load(Path)`, `save(Path)`, `normalizeDefaults()`; Getter/Setter für `masterVolume`, `musicVolume`, `soundVolume`, `voiceVolume`, `ambientVolume`, `textSpeedCps`, `autoForwardDelaySeconds`, `skipUnread`, `skipAfterChoices`, `fullscreen`, `renderMode`, `language`, `dialogueMode`, `selfVoicing`, `highContrastDyslexiaFont`, `uiTextScale`.
+
+### `HistoryLog`, `SaveValueCodec`, `SaveSlotData` & `SaveManager` (M4)
+Dialog-Backlog und atomares GZIP-JSON-Save/Load-System:
+* **`HistoryLog`**: Konstante `DEFAULT_MAX_ENTRIES = 500`; Record `HistoryEntry(long entryId, long checkpointId, String lineId, String speakerName, String speakerColorHex, String text, String voicePath, Instant timestamp)`; Konstruktoren `HistoryLog()`, `HistoryLog(int)`; Methoden `append(...)`, `getEntries()`, `getRecentEntries(int)`, `truncateAfterCheckpoint(long)`, `clear()`, `snapshot()`, `restore(List<HistoryEntry>)`, `size()`, `isEmpty()`, `getMaxEntries()`.
+* **`SaveValueCodec`**: Konstanten `KEY_VJAVA_CLASS = "__vjavaClass"`, `KEY_FIELDS = "fields"`, `KEY_KTYPE = "__ktype"`; Methoden `createGson(boolean prettyPrinting)`, `encode(Object)`, `encodeMap(Map<String, ?>)`, `decode(JsonElement, ClassLoader)`, `decodeMap(JsonObject, ClassLoader)`.
+* **`SaveSlotData`**: Record `(SaveMetadata metadata, Map<String, Object> variables, SavedScriptPosition scriptPosition, List<HistoryLog.HistoryEntry> historyEntries)` mit `withMetadata(SaveMetadata)` sowie Sub-Records `SaveMetadata`, `SavedStackFrame`, `SavedScriptPosition`.
+* **`SaveManager`**: Konstanten `SAVE_EXTENSION = ".ksav"`, `QUICK_SAVE_SLOT = "quick"`, `AUTO_SAVE_PREFIX = "auto_"`, `DEFAULT_AUTO_SAVE_SLOTS = 3`; statische Helfer `encodeRgbaToPng(int, int, byte[])`, `encodeRgbaToPng(int, int, byte[], boolean)`, `slotIdForPage(int, int, int)`; Methoden `saveSlot(...)`, `loadSlot(...)`, `readSlotMetadata(String)`, `listPageSlots(int, int)`, `quickSave(SaveSlotData)`, `quickLoad(...)`, `autoSave(SaveSlotData)`, `deleteSlot(String)`, `slotExists(String)`, `getSavesDir()`, `getAutoSaveSlotCount()`.
+
+### `AchievementManager`, `GalleryManager` & `EndingsManager` (M4)
+Meta-Progression auf Basis von `PersistentAccess`:
+* **`AchievementManager`**: Records `AchievementDef(String id, String title, String description, String iconPath, boolean hidden)` und `AchievementToast(AchievementDef achievement, Instant unlockedAt)`; Methoden `register(AchievementDef)`, `unlock(String)`, `isUnlocked(String)`, `pollToast()`, `getAllAchievements()`, `getUnlockedCount()`, `getTotalCount()`, `setOnUnlockListener(Consumer<AchievementToast>)`.
+* **`GalleryManager`**: Record `GalleryEntry(String id, String title, String category, String thumbnailPath, List<String> variationPaths, String description)`; Methoden `register(GalleryEntry)`, `unlock(String)`, `isUnlocked(String)`, `getAllEntries()`, `getUnlockedEntries()`, `getEntry(String)`, `getUnlockedCount()`, `getTotalCount()`.
+* **`EndingsManager`**: Record `EndingDef(String id, String title, String description, String branchLabel, String parentEndingId)`; Methoden `register(EndingDef)`, `unlock(String)`, `isUnlocked(String)`, `getAllEndings()`, `getEnding(String)`, `getChildEndings(String)`, `getCompletionPercentage()`, `getUnlockedCount()`, `getTotalCount()`.
+
+### `LocalizationManager` (M4)
+Live-Lokalisierung, `tl/<lang>/`-Asset-Auflösung und Template-Extraktion:
+* Konstruktoren: `LocalizationManager()`, `LocalizationManager(String defaultLanguage)`.
+* Methoden: `setLanguage(String)`, `getCurrentLanguage()`, `getDefaultLanguage()`, `addLanguageChangeListener(Consumer<String>)`, `removeLanguageChangeListener(Consumer<String>)`, `indexProject(VJavaAst.ProjectAst)`, `registerTranslation(String language, String keyOrOriginal, String translatedText)`, `translateDialogue(String lineId, String originalText)`, `translateUi(String key, String fallbackText)`, `resolveLocalizedAsset(Path projectRoot, String assetPath)`, `getAvailableLanguages()`, `extractTranslationTemplate(VJavaAst.ProjectAst project, String targetLanguage)`.

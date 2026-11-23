@@ -1,9 +1,10 @@
-# `.vjava` Sprach- und Projekt-Spezifikation (M3-Stand)
+# `.vjava` Sprach- und Projekt-Spezifikation (M4-Stand)
 
-> **Implementierungsstand (Meilenstein M3 abgeschlossen)**: Alle in diesem Dokument beschriebenen `.vjava`-Sprachkonstrukte, Projektscan-Regeln, Ausdrucks- und Bedingungsgrammatiken sowie die In-Memory-Java-21-Kompilierung sind in `de.swfdtf.parser`, `de.swfdtf.state` und `de.swfdtf.graphics.SceneController` vollständig implementiert und verifiziert:
+> **Implementierungsstand (Meilenstein M4 abgeschlossen)**: Alle in diesem Dokument beschriebenen `.vjava`-Sprachkonstrukte, Projektscan-Regeln, Ausdrucks- und Bedingungsgrammatiken, die In-Memory-Java-21-Kompilierung sowie das 4-Tier-State-, Rollback-, Save/Load- und Lokalisierungssystem sind vollständig implementiert und verifiziert:
 > * **M1**: Projekt-Metadaten (`ProjectDescriptor` für `project.vjava.json`), Laufzeit-Konfiguration (`EngineConfig`) und Java-Skript-Fassade (`EngineAPI`, Binding `engine`).
 > * **M2**: Komplette Inline-Rich-Text-Syntax inklusive Variableninterpolation, Flow-Control-Cues, Furigana, Inline-Bildern, Hyperlinks und Text-Animationstags (`TextTagParser`, `StyledTextLayout`, `TypewriterController`, `FontAtlas`, `FontManager`) sowie `CustomDisplayable`.
 > * **M3**: Vollständiger Lexer (`VJavaLexer`), rekursiv-absteigender AST-Parser (`VJavaParser` / `VJavaAst`), rekursiver Projektscanner (`ProjectScanner`), In-Memory-Java-21-Compiler (`JavaBlockCompiler` / `VJavaExecutable`), Ausdrucks-Evaluator (`ConditionEvaluator`), nicht-blockierende Skript-Laufzeit (`ScriptRuntime`), Bühnensteuerung (`SceneController`, Binding `scene`) sowie State-Verträge (`StateStore` als `state`, `PersistentAccess` als `persistent`).
+> * **M4**: Sitzungskoordinator (`ScriptSession`), deterministischer Rollback-/Roll-Forward-Speicher (`RevertableStateStore`, `RevertableMap`, `RevertableList`), 4-Tier-Persistenz (`SessionState`, `PersistentState`, `PreferencesState`), `HistoryLog`, atomares GZIP-JSON-Save/Load mit PNG-Thumbnails und `__vjavaClass`-Codec (`SaveManager`, `SaveSlotData`, `SaveValueCodec`), Meta-Progression (`AchievementManager`, `GalleryManager`, `EndingsManager`) sowie Live-Lokalisierung (`LocalizationManager`).
 
 ---
 
@@ -22,8 +23,8 @@ mein_vn_projekt/
 │   ├── audio/                # Musik, SFX, Voice-Over
 │   ├── video/                # Cutscenes & animierte Hintergründe
 │   └── fonts/                # TTF/OTF-Schriftarten
-├── tl/                       # Übersetzungsdateien (M7)
-└── saves/                    # Spielstände & persistent.dat (M4)
+├── tl/                       # Übersetzungsdateien (.vjava translate) & tl/<lang>/-Assets (M4)
+└── saves/                    # Spielstände (*.ksav), persistent.dat & preferences.json (M4)
 ```
 
 ### Regeln des `ProjectScanner`
@@ -164,7 +165,7 @@ screen status_hud(titel):
 * Direktiven auf oberster Screen-Ebene: `modal true|false`, `zorder <int>`.
 * Erkannte Widget-Schlüsselwörter (`VJavaParser`): `vbox`, `hbox`, `grid` (inkl. `grid <cols> <rows>`), `fixed`, `frame`, `window`, `viewport`, `vpgrid`, `textbutton`, `imagebutton`, `text`, `label`, `bar`, `vbar`, `slider`, `input`, `hotspot`, `hotbar`, `imagemap`, `draggroup`, `drag`, `key`, `timer`, `custom`, `add`, `null`, `button`, `side`, `mousearea`, `use`, `on`, `if`, `elif`, `else`, `for` sowie eingebettete `@->{ ... }<<`-Blöcke (`keyword="java_block"`).
 
-### 3.6 `translate` (Lokalisierungsblöcke)
+### 3.6 `translate` (Lokalisierungsblöcke & M4-Laufzeitauflösung)
 ```vjava
 translate deutsch kapitel_1_01:
     # lena "Good morning!"
@@ -173,11 +174,17 @@ translate deutsch kapitel_1_01:
     old "Start Game"
     new "Spiel starten"
 ```
-* Kopfzeile: `translate <lang> <id>:`.
-* Unterstützt:
-  * String-Paare `old "..."` gefolgt von `new "..."`.
+* **Syntax & Parser (`VJavaParser`)**:
+  * Kopfzeile: `translate <lang> <id>:`.
+  * String-Paare `old "..."` gefolgt von `new "..."` (konventionsgemäß unter `translate <lang> strings:`).
   * Narrator-Einträge `"<übersetzt>"` (optional mit `# "<original>"` in der Kommentarzeile davor).
   * Sprecher-Einträge `<speaker> "<übersetzt>"` (optional mit `# <speaker> "<original>"` davor).
+* **Laufzeitauflösung (`LocalizationManager` & `ScriptRuntime`, M4)**:
+  * `LocalizationManager.indexProject(ProjectAst)` indiziert alle `TranslateBlock`-Einträge (case-insensitiv nach Sprachkennung) sowohl über `(language, id)` (sofern `id != "strings"`) als auch über `(language, originalText)`. Leere Übersetzungstexte (`""`, z. B. unausgefüllte Templates) werden übersprungen, sodass sauber auf den Originaltext zurückgefallen wird.
+  * **Dialog-Übersetzung**: Bei Eintritt in `WAITING_DIALOGUE` (und beim Laden über `restoreSavedPosition`) fragt `ScriptRuntime` den angehängten oder über `EngineAPI` bezogenen `LocalizationManager.translateDialogue(...)` zunächst mit `<currentLabel>_<lineNumber>` und anschließend mit der kanonischen `lineId` (`<sourceFile>:<lineNumber>:<hash>`) bzw. dem Originaltext ab, **bevor** `[var]`-Platzhalter interpoliert werden.
+  * **UI- & Menü-Übersetzung**: Menü-Captions, `MenuChoice`-Texte und `input`-Prompts werden analog über `LocalizationManager.translateUi(...)` aufgelöst.
+  * **Live-Sprachwechsel & Asset-Overrides**: `LocalizationManager.setLanguage(lang)` schaltet die aktive Sprache zur Laufzeit ohne Neustart um (inkl. Listener-Benachrichtigung). `resolveLocalizedAsset(projectRoot, assetPath)` prüft automatisch `tl/<lang>/<assetPath>` sowie bei `assets/...`-Pfaden `tl/<lang>/<ohne-assets-prefix>`, bevor auf das Original-Asset zurückgefallen wird.
+  * **Template-Extraktion**: `LocalizationManager.extractTranslationTemplate(project, targetLanguage)` scannt alle `LabelNode`s und `ScreenDef`s und erzeugt eine direkt von `VJavaParser` einlesbare `.vjava`-Übersetzungsvorlage (`translate <lang> <id>:` + `translate <lang> strings:`).
 
 ### 3.7 `label` & Top-Level-Java-Blöcke
 * `label <name>:` (oder `label <name>(...):`) definiert ein ausführbares Skript-Label mit eingerücktem Statement-Block (`LabelNode`).
@@ -257,7 +264,7 @@ menu "Was möchtest du tun?":
 | `call <label>` / `call <label>(arg1, arg2)` / `call expression <expr>` | Wertet optionale Argumente aus (abgelegt in `state.get("_call_args")`), legt ein `StackFrame(isCallBoundary=true)` auf den Call-Stack und springt ins Sub-Label. |
 | `return` / `return <expr>` | Speichert optionalen Rückgabewert in `state.get("_return")`. Kehrt zum Aufrufer zurück; ist der Call-Stack leer, endet das Skript (`Status.ENDED`). |
 | `input <var> "<prompt>" [default "..."] [allow "..."] [length <n>]` | Pausiert in `WAITING_INPUT`; `submitInput(text)` filtert anhand `allow` (Zeichen-Whitelist) und `length` (Maximalzeichenzahl) und schreibt nach `state`. |
-| `block_rollback` | Ruft `state.blockRollback()` auf und setzt eine unumkehrbare Rollback-Barriere. |
+| `block_rollback` | Ruft `state.blockRollback()` auf und setzt in `RevertableStateStore` eine unumkehrbare Rollback-Barriere (`pendingRollbackBarrier` → `Checkpoint.rollbackBarrierBefore`). Weder schrittweises `rollback()` noch `HistoryLog`-`jumpToCheckpoint(...)` können diese Grenze rückwärts überschreiten. |
 | `pass` | Expliziter No-Op-Platzhalter in ansonsten leeren Blöcken. |
 | `:: ... @->{ ... }<<` / `@->{ ... }<<` | Führt den kompilierten Java-Block mit `(state, persistent, engine, scene)` aus. |
 

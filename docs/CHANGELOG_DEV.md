@@ -4,6 +4,31 @@ Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architekt
 
 ---
 
+## [M4 — Abgeschlossen] 4-Tier-State, Deterministisches Rollback, Save/Load, `HistoryLog`, Meta-Manager, `LocalizationManager` & `ScriptSession`
+
+### Paket `de.swfdtf.state`
+* `Revertable<S>`, `RevertableMap<K, V>` & `RevertableList<E>`: Generischer Snapshot-Vertrag sowie zyklus- und tiefensichere Container (`cloneValue`, `deepEquals`) für Collections, Arrays, `Transform2D`, `Serializable` und Referenz-Erhalt für nicht-serialisierbare `@->{ ... }<<`-POJOs.
+* `RevertableStateStore` (+ `Checkpoint`): Transaktionale `StateStore`-Implementierung mit automatischer Checkpoint-Aufzeichnung, deterministischem `rollback()`/`rollForward()`, Erhalt der Roll-Forward-Spur bei identischem Replay, Branch-Trimming bei Verzweigung, `jumpToCheckpoint(long)` für `HistoryLog`-Jump-Back und unumkehrbaren `block_rollback`-Barrieren (`rollbackBarrierBefore`).
+* `SessionState` (Tier 1): Transiente Sitzungsverwaltung (Startzeit, `updatePlaytime(double)`, aktiver Save-Slot, Auto-Save-Zeitstempel, Session-Flags).
+* `PersistentState` (Tier 3): Atomar geschriebene GZIP-JSON-Persistenz (`saves/persistent.dat`) für globale Variablen, gelesene Dialogzeilen (`readLines`) sowie CG-/Track-/Ending-/Achievement-Freischaltungen (`implements PersistentAccess`).
+* `PreferencesState` (Tier 4): Menschenlesbare JSON-Konfiguration (`saves/preferences.json`) für Audio-Pegel, Textgeschwindigkeit, Auto-Forward-Delay, Skip-Verhalten, Render-Modus, Sprache, Dialogmodus und Barrierefreiheit (`normalizeDefaults()`).
+* `HistoryLog` (+ `HistoryEntry`): Kapazitätsbegrenzter (`DEFAULT_MAX_ENTRIES = 500`) Dialog-Backlog mit `checkpointId`-Korrelation, `getRecentEntries(int)`, `truncateAfterCheckpoint(long)` und `snapshot()`/`restore(...)`.
+* `SaveValueCodec`, `SaveSlotData` (+ `SaveMetadata`, `SavedStackFrame`, `SavedScriptPosition`) & `SaveManager` (Tier 2): Atomare GZIP-JSON-Spielstände (`saves/<slotId>.ksav`) mit LWJGL-STB-PNG-Thumbnails (`encodeRgbaToPng` ohne `java.awt`), Seitenabfrage (`listPageSlots`), Quick-Save (`"quick"`), rotierendem Auto-Save (`auto_1`..`auto_3`) und typerhaltender JSON-Serialisierung inklusive `__vjavaClass`-Rekonstruktion für benutzerdefinierte `@->{ ... }<<`-Klassen.
+* `AchievementManager` (+ `AchievementDef`, `AchievementToast`), `GalleryManager` (+ `GalleryEntry`) & `EndingsManager` (+ `EndingDef`): Thread-sichere Meta-Game-Manager auf Basis von `PersistentAccess` (inklusive Toast-Queue, CG-Variationen und Eltern-Kind-Endings-Baum mit Completion-Prozentwert).
+* `LocalizationManager`: Live-Sprachwechsel mit Listenern, Indizierung von `VJavaAst.TranslateBlock`-Einträgen (`translateDialogue`, `translateUi`), `tl/<lang>/`-Asset-Auflösung (`resolveLocalizedAsset`) und automatischer `.vjava`-Übersetzungsvorlagen-Generierung (`extractTranslationTemplate`).
+* JUnit-6-Tests in `src/test/java/de/swfdtf/state/` (`LocalizationManagerTest`, `MetaManagersTest`, `PersistenceAndHistoryTest`, `RevertableStateStoreTest`, `SaveManagerTest`).
+
+### Erweiterung `de.swfdtf.parser`
+* `ScriptRuntime`: Um Live-Lokalisierung (`setLocalizationManager`, `getLocalizationManager`, Übersetzung von Dialogen, Menü-Captions, Menü-Optionen und Input-Prompts vor `[var]`-Interpolation) sowie Save-Slot-Positionsexport/-import (`toSavedPosition`, `restoreSavedPosition`) erweitert.
+* `ScriptSession`: High-Level-Sitzungskoordinator, der `ScriptRuntime` mit `RevertableStateStore`, `PersistentState`, `PreferencesState`, `SessionState`, `HistoryLog`, `SaveManager`, `LocalizationManager`, `AchievementManager`, `GalleryManager` und `EndingsManager` verbindet, alle Services in `EngineAPI` registriert und Rollback-, History-, Quick-Save-/Quick-Load- sowie Auto-Save-Operationen bereitstellt.
+* JUnit-6-Integrationstest in `src/test/java/de/swfdtf/parser/ScriptRollbackAndSaveIntegrationTest.java` — insgesamt **121** grüne Tests laut `build/test-results/test/` über alle Pakete.
+
+### Dokumentation
+* `src/main/java/de/swfdtf/state/AGENT_CONTEXT.md` und `src/main/java/de/swfdtf/parser/AGENT_CONTEXT.md` vollständig auf M4 aktualisiert.
+* `docs/ARCHITEKTUR.md`, `docs/API_REFERENZ.md`, `docs/VJAVA_SPEZIFIKATION.md` und `docs/CHANGELOG_DEV.md` auf den abgeschlossenen Stand von Meilenstein M4 aktualisiert.
+
+---
+
 ## [M3 — Abgeschlossen] `.vjava`-Lexer, Parser, `ProjectScanner`, In-Memory-Java-Compiler, `SceneController`, `StateStore` & `ScriptRuntime`
 
 ### Paket `de.swfdtf.parser`
