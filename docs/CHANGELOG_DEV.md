@@ -4,6 +4,26 @@ Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architekt
 
 ---
 
+## [M2 — Abgeschlossen] Texturen (`STBImage`), 9-Slice, `SpriteNode`, `CustomDisplayable` & Rich-Text-/Typografie-Pipeline
+
+### Erweiterung `de.swfdtf.graphics` (ohne `java.awt`)
+* `Texture`: Premultiplied-`RGBA8`-OpenGL-Textur-Handle (`GL_LINEAR`, `GL_CLAMP_TO_EDGE`) inklusive `premultiplyRgba`, `createFromRgba`, `bind`/`unbind` und `isFallback()`-Flag.
+* `TextureManager`: Reiner `STBImage`/`STBImageWrite`-Asset-Loader und kanonischer Pfad-Cache (`loadTexture`, `readImageFileRgba`, `writePng`) mit prozeduraler `128×128`-Magenta/Dunkelviolett-Schraffur (`generateMissingAssetRgba`) und `EngineLogger`-Warnung bei fehlenden/defekten Dateien.
+* `NineSliceDrawable` (+ `SliceQuad`): 9-Slice-UI-Panel-Renderer (4 Ecken, 4 Kanten, 1 Zentrum) mit proportionalem Corner-Clamping bei kleinen Zielmaßen und Pivot-Rotation.
+* `CustomDisplayable` & `SpriteNode`: Erweiterbarer Displayable-Vertrag (`update`, `render`, `getPreferredWidth/Height`) und VN-Sprite-Knoten (`imageTag`, `attributes`, `assetPath`) mit direkter Unterstützung für `Texture`, `NineSliceDrawable` und `CustomDisplayable`.
+* `SceneNode` & `RenderPipeline2D`: `SceneNode.shouldDrawStandardQuad()`-Hook ergänzt; `RenderPipeline2D` um Pivot-Rotation (`drawTexturedQuad(..., rotateDegrees, originX, originY)` / `drawTexturedQuadPivot(...)`), `getLogicalProjection()` sowie Custom-Render-Kontext (`getCurrentRenderBounds`, `getCurrentEffectiveAlpha`, `getCurrentEffectiveColorMatrix`, `getCurrentRotationDegrees`, `getCurrentAnchorX/Y`) erweitert.
+* `TextTagParser`: Vollständiger Rich-Text-Parser (`interpolateVariables`, `parse`) für `[var]`-Interpolation, `[[`/`{{`-Escaping, Inline-Styles (`{b}`, `{i}`, `{u}`, `{s}`, `{sc}`, `{plain}`, `{color}`, `{alpha}`, `{size}`, `{font}`, `{k}`), Flow-Cues (`{w}`, `{w=t}`, `{p}`, `{p=t}`, `{nw}`, `{fast}`, `{cps=n}`), Furigana (`{rb}...{/rb}{rt}...{/rt}`), Inline-Bilder (`{image=...}` mit `\uFFFC`), Hyperlinks (`{a=...}...{/a}`) sowie Text-Shader-Tags (`{wave}`, `{jitter}`/`{shake}`, `{gradient=c1,c2}`).
+* `FontAtlas`: Dynamischer `STBTruetype`-Glyphenatlas (Premultiplied `RGBA8`, Shelf-Packing bis `4096×4096`, Kerning-Cache) inklusive autarkem CPU-Bitmap-Fallback (ASCII, `äöüÄÖÜß`, Typografie-Symbole, CJK-Boxen) für Headless/fehlende Fonts.
+* `FontManager`: Zentrale Font-Registry (In-Memory, Datei, Asset-Root, Klassenpfad-Ressourcen, optionale System-Font-Erkennung) und globale Barrierefreiheits-Einstellungen (`dyslexiaFriendlyMode`, `globalTextScale`).
+* `StyledTextLayout` (+ `TypewriterController`, `GlyphQuad`, `LineDecoration`, `RubyLayout`, `InlineImageLayout`, `HyperlinkHitbox`, `TextLine`): Wortumbruch (inkl. CJK), Drop-Shadow/Outline, zentrierte Furigana-Positionierung, Hyperlink-Hit-Testing, Echtzeit-Animation (`wave`, `jitter`, `gradient`) und deterministischer Typewriter-Controller.
+* JUnit-6-Tests in `src/test/java/de/swfdtf/graphics/` (`TextureMathTest`, `NineSliceDrawableTest`, `SpriteNodeTest`, `TextTagParserTest`, `StyledTextLayoutTest`) ergänzt — insgesamt **83** grüne Unit-Tests über alle Pakete.
+
+### Dokumentation
+* `src/main/java/de/swfdtf/graphics/AGENT_CONTEXT.md` um alle M2-Klassen, Records und aktualisierten Signaturen von `RenderPipeline2D`/`SceneNode` ergänzt.
+* `docs/ARCHITEKTUR.md`, `docs/API_REFERENZ.md`, `docs/VJAVA_SPEZIFIKATION.md` und `docs/CHANGELOG_DEV.md` auf den abgeschlossenen Stand von Meilenstein M2 aktualisiert.
+
+---
+
 ## [M1 — Abgeschlossen] Grafik-Subsystem, WindowManager, `EngineApplication` & Einstiegspunkte
 
 ### Paket `de.swfdtf` (Einstiegspunkte)

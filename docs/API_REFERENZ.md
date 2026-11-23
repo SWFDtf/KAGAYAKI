@@ -1,6 +1,6 @@
-# KAGAYAKI — Öffentliche API-Referenz (M1)
+# KAGAYAKI — Öffentliche API-Referenz (M1 + M2)
 
-Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen der abgeschlossenen M1-Pakete (`de.swfdtf`, `de.swfdtf.core`, `de.swfdtf.graphics`, `de.swfdtf.math`, `de.swfdtf.git`) sowie die Gradle-Tasks aus `build.gradle`.
+Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen der abgeschlossenen M1- und M2-Pakete (`de.swfdtf`, `de.swfdtf.core`, `de.swfdtf.graphics`, `de.swfdtf.math`, `de.swfdtf.git`) sowie die Gradle-Tasks aus `build.gradle`.
 
 ---
 
@@ -9,7 +9,7 @@ Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen 
 | Task | Gruppe | Beschreibung |
 | :--- | :--- | :--- |
 | `./gradlew build` | `build` | Kompiliert Java 21 Quellen, führt JUnit-6-Tests aus und paketiert das Standard-JAR. |
-| `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`) mit ausführlichem Event-Logging aus. |
+| `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`, 83 Tests) mit ausführlichem Event-Logging aus. |
 | `./gradlew run` | `application` | Startet `de.swfdtf.Main` (unter macOS automatisch mit `-XstartOnFirstThread`). |
 | `./gradlew runStudio` | `kagayaki` | Startet `de.swfdtf.Main` mit `--studio` (optional `-PprojectDir=<pfad>` ergänzt `--project <pfad>`). |
 | `./gradlew runStandalone` | `kagayaki` | Startet `de.swfdtf.StandaloneMain` (optional `-PprojectDir=<pfad>` ergänzt `--standalone <pfad>`). |
@@ -208,7 +208,7 @@ Einheitlicher Render-Pipeline-Vertrag für 2D- und 3D-Backends:
 * `void dispose()`
 
 ### `RenderPipeline2D`
-Produktive LWJGL-3-/OpenGL-3.3-Core-2D-Pipeline (`implements IRenderPipeline`) mit Offscreen-`Framebuffer`, Premultiplied-Alpha-Blending (`GL_ONE, GL_ONE_MINUS_SRC_ALPHA`), `ColorMatrix4f`, SDF-Rounded-Rectangles und Letterbox-Blit auf `#0d0e15`.
+Produktive LWJGL-3-/OpenGL-3.3-Core-2D-Pipeline (`implements IRenderPipeline`) mit Offscreen-`Framebuffer`, Premultiplied-Alpha-Blending (`GL_ONE, GL_ONE_MINUS_SRC_ALPHA`), `ColorMatrix4f`, SDF-Rounded-Rectangles, Pivot-Rotation und Letterbox-Blit auf `#0d0e15`.
 
 * **Konstanten**: `DEFAULT_LOGICAL_WIDTH = 1920`, `DEFAULT_LOGICAL_HEIGHT = 1080`, `CLEAR_R = 0x0D / 255.0f`, `CLEAR_G = 0x0E / 255.0f`, `CLEAR_B = 0x15 / 255.0f`, `CLEAR_A = 1.0f`.
 * **Statische Helfer**:
@@ -221,7 +221,10 @@ Produktive LWJGL-3-/OpenGL-3.3-Core-2D-Pipeline (`implements IRenderPipeline`) m
   * `public void drawTexturedQuad(int textureId, float x, float y, float width, float height)`
   * `public void drawTexturedQuad(int textureId, float x, float y, float width, float height, Rect2f uvRect, float alpha)`
   * `public void drawTexturedQuad(int textureId, float x, float y, float width, float height, Rect2f uvRect, float[] tintRgba, ColorMatrix4f colorMatrix)`
-* **Zustand**:
+  * `public void drawTexturedQuad(int textureId, float x, float y, float width, float height, Rect2f uvRect, float[] tintRgba, ColorMatrix4f colorMatrix, float rotateDegrees, float originX, float originY)`
+  * `public void drawTexturedQuadPivot(int textureId, float x, float y, float width, float height, Rect2f uvRect, float[] tintRgba, ColorMatrix4f colorMatrix, float rotateDegrees, float pivotX, float pivotY)`
+* **Zustand & Custom-Render-Kontext**:
+  * `public Matrix4f getLogicalProjection()`, `public Rect2f getCurrentRenderBounds()`, `public float getCurrentEffectiveAlpha()`, `public ColorMatrix4f getCurrentEffectiveColorMatrix()`, `public float getCurrentRotationDegrees()`, `public float getCurrentAnchorX()`, `public float getCurrentAnchorY()`
   * `public Rect2f getLastLetterboxViewport()`, `public Framebuffer getOffscreenFramebuffer()`, `public int getLogicalWidth()`, `public int getLogicalHeight()`, `public boolean isInitialized()`
 
 ### `RenderPipeline3DStub`
@@ -233,8 +236,8 @@ Architektonischer 3D-Bühnen-Stub (`implements IRenderPipeline`) mit Perspektiv-
   * `public static float computeCameraDistanceZ(int logicalWidth, float fovDegrees)`
   * `public Matrix4f getProjectionMatrix()`, `public Matrix4f getViewMatrix()`, `public float getCameraDistanceZ()`, `public float getFovDegrees()`, `public int getLogicalWidth()`, `public int getLogicalHeight()`, `public boolean isInitialized()`, `public boolean isWarningLogged()`
 
-### `SceneGraph`, `SceneLayer` & `SceneNode`
-Hierarchischer, Z-sortierter Szenengraph mit 8 vorregistrierten Standard-Ebenen:
+### `SceneGraph`, `SceneLayer`, `SceneNode`, `SpriteNode` & `CustomDisplayable`
+Hierarchischer, Z-sortierter Szenengraph mit 8 vorregistrierten Standard-Ebenen und erweiterbaren VN-Sprites:
 * **`SceneGraph`**:
   * Konstanten: `LAYER_BACKGROUND = "background"`, `LAYER_MASTER = "master"`, `LAYER_FOREGROUND = "foreground"`, `LAYER_SCREENS = "screens"`, `LAYER_OVERLAY = "overlay"`, `LAYER_MODAL = "modal"`, `LAYER_TOAST = "toast"`, `LAYER_INSPECTOR = "inspector"`.
   * Methoden: `getLayer(String)`, `getOrCreateLayer(String, int)`, `getLayersSorted()`, `addNode(String, SceneNode)`, `removeByTag(String, String)`, `clearAll()`, `getScreenShake()` / `setScreenShake(ScreenShake)`, `update(float dt)`, `setNormalizedMouse(float nx, float ny)`, `getNormalizedMouseX()`, `getNormalizedMouseY()`, `getNormalizedMouse()`.
@@ -245,7 +248,54 @@ Hierarchischer, Z-sortierter Szenengraph mit 8 vorregistrierten Standard-Ebenen:
   * Konstruktoren: `SceneNode()`, `SceneNode(String id)`, `SceneNode(String id, String tag)`.
   * Hilfsmethode: `public static float[] parseHexRgba(String hex)`.
   * Fluent-Eigenschaften: `id`, `tag`, `zOrder`, `visible`, `transform` (`Transform2D`), `width`/`height`/`setSize(w, h)`, `fillColor` (`setFillColorRgba`, `setFillColor`, `setFillColorPremultiplied`, `setColorHex`, `getPremultipliedFillColor`), `cornerRadius`, `borderThickness`, `borderColor` (`setBorderColorRgba`, `setBorderColor`, `setBorderColorHex`, `getPremultipliedBorderColor`), `textureId`, `uvRect` (`Rect2f`), `userData`.
-  * Hierarchie & Custom-Render: `getParent()`, `addChild(SceneNode)`, `removeChild(SceneNode)`, `clearChildren()`, `getChildren()`, `getCustomRenderer()` / `setCustomRenderer(BiConsumer<SceneNode, RenderPipeline2D>)`, `protected void onCustomRender(RenderPipeline2D pipeline)`.
+  * Hierarchie & Custom-Render: `getParent()`, `addChild(SceneNode)`, `removeChild(SceneNode)`, `clearChildren()`, `getChildren()`, `getCustomRenderer()` / `setCustomRenderer(BiConsumer<SceneNode, RenderPipeline2D>)`, `protected boolean shouldDrawStandardQuad()`, `protected void onCustomRender(RenderPipeline2D pipeline)`.
+* **`SpriteNode` (`extends SceneNode`)**:
+  * Konstruktoren: `SpriteNode()`, `SpriteNode(String id)`, `SpriteNode(String id, String tag)`, `SpriteNode(String id, String imageTag, List<String> attributes)`.
+  * Methoden: `getImageTag()` / `setImageTag(String)`, `getAttributes()` / `setAttributes(List<String>)`, `getAssetPath()` / `setAssetPath(String)`, `getTexture()` / `setTexture(Texture)`, `getNineSlice()` / `setNineSlice(NineSliceDrawable)`, `getCustomDisplayable()` / `setCustomDisplayable(CustomDisplayable)`, `update(double dt)`.
+* **`CustomDisplayable` (`interface`)**:
+  * `void update(double dt)`
+  * `void render(RenderPipeline2D pipeline, Rect2f bounds, float alpha, ColorMatrix4f colorMatrix)`
+  * `default float getPreferredWidth()` / `default float getPreferredHeight()`
+
+### `Texture`, `TextureManager` & `NineSliceDrawable`
+Reine STB-Texturpipeline (`STBImage` / `STBImageWrite`, Premultiplied `RGBA8`) ohne `java.awt`:
+* **`Texture`**:
+  * Konstruktoren: `Texture(int textureId, int width, int height, String name, boolean premultiplied, boolean fallback)`, `Texture(int textureId, int width, int height, String name, boolean premultiplied)`.
+  * Statisch: `premultiplyRgba(byte[] straightRgba)`, `createFromRgba(int width, int height, byte[] rgbaBytes, boolean alreadyPremultiplied, String name)`.
+  * Instanz: `bind(int textureUnit)`, `unbind()`, `dispose()`, `getTextureId()`, `getWidth()`, `getHeight()`, `getName()`, `isPremultiplied()`, `isFallback()`, `isDisposed()`.
+* **`TextureManager`**:
+  * Konstanten: `DEFAULT_FALLBACK_WIDTH = 128`, `DEFAULT_FALLBACK_HEIGHT = 128`.
+  * Konstruktoren: `TextureManager()`, `TextureManager(EngineLogger)`, `TextureManager(Path assetRoot)`, `TextureManager(EngineLogger, Path assetRoot)`.
+  * Statisch: `generateMissingAssetRgba(int width, int height)`, `writePng(Path destination, int width, int height, byte[] straightRgba)`, `readImageFileRgba(Path path, int[] outSize)`.
+  * Instanz: `loadTexture(String assetPath)`, `loadTexture(Path path)`, `getOrCreateFallbackTexture()`, `getCached(String assetPath)`, `getCached(Path path)`, `getCacheSize()`, `getAssetRoot()` / `setAssetRoot(Path)`, `getLogger()`, `clearCache()`, `dispose()`.
+* **`NineSliceDrawable`**:
+  * Record: `public record SliceQuad(Rect2f destRect, Rect2f uvRect)`.
+  * Konstruktoren: `NineSliceDrawable(Texture, float inset)`, `NineSliceDrawable(Texture, float left, float top, float right, float bottom)`, `NineSliceDrawable(int textureId, float texWidth, float texHeight, float left, float top, float right, float bottom)`.
+  * Methoden: `computeSlices(float x, float y, float width, float height)`, `render(RenderPipeline2D, float x, float y, float width, float height)`, `render(..., float[] tintRgba, ColorMatrix4f)`, `render(..., float[] tintRgba, ColorMatrix4f, float rotateDegrees, float anchorX, float anchorY)`, `getTexture()`, `getTextureId()`, `getTexWidth()`, `getTexHeight()`, `getLeft()`, `getTop()`, `getRight()`, `getBottom()`.
+
+### `TextTagParser`, `FontAtlas`, `FontManager` & `StyledTextLayout`
+Rich-Text-, Font-Atlas-, Furigana-, Barrierefreiheits- und Typewriter-Subsystem:
+* **`TextTagParser`**:
+  * Konstante: `public static final char OBJECT_REPLACEMENT_CHAR = '\uFFFC'`.
+  * Enum: `CueKind { WAIT_CLICK, WAIT_TIMED, PARAGRAPH, NO_WAIT, FAST }`.
+  * Records: `TextStyle` (+ `TextStyle.DEFAULT`, `resolveFontSize(float)`), `TextCue(int index, CueKind kind, double seconds)`, `RubyPair(int startIndex, int endIndex, String baseText, String rubyText)`, `InlineImageSpan(int charIndex, String imagePath, float width, float height)`, `TextSpan(String text, TextStyle style, String rubyReading, String inlineImagePath)` (+ `withRubyReading`), `ParsedRichText(String plainText, List<TextSpan> spans, List<TextCue> cues, int fastPrefixEndIndex, boolean hasNoWait)` (+ `rubyPairs()`, `inlineImages()`, `spokenText()`).
+  * Statische Methoden: `interpolateVariables(String raw, Function<String, Object> lookup)`, `parse(String raw)`, `parse(String raw, Function<String, Object> lookup)`.
+* **`FontAtlas` (`implements AutoCloseable`)**:
+  * Record: `GlyphMetrics(int codepoint, float advanceWidth, float leftSideBearing, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1)` (+ `width()`, `height()`).
+  * Fabriken: `createBuiltinFallback(float baseSize, boolean uploadGl)`, `fromTrueTypeBytes(byte[] fontBytes, float baseSize, boolean uploadGl)`, `fromTrueTypeFile(Path fontPath, float baseSize, boolean uploadGl) throws IOException`.
+  * Methoden: `uploadToOpenGl()`, `getGlyph(int codepoint)`, `ensureCodepoints(String text)`, `getKerning(int cp1, int cp2, float fontSize)`, `measureTextWidth(String text, float fontSize, float extraKerning)`, `hasGlyph(int codepoint)`, `getGlTextureId()`, `getBaseSize()`, `getAscent()`, `getAscent(float fontSize)`, `getDescent()`, `getLineGap()`, `getLineHeight()`, `getLineHeight(float fontSize)`, `getAtlasWidth()`, `getAtlasHeight()`, `isBuiltinFallback()`, `isDisposed()`, `getAtlasRgbaCopy()`, `dispose()`, `close()`.
+* **`FontManager` (`implements AutoCloseable`)**:
+  * Konstruktoren: `FontManager()`, `FontManager(Path assetRoot, boolean systemFontFallbackEnabled)`.
+  * Statisch: `discoverSystemFontPath(boolean dyslexiaFriendly)`.
+  * Registry & Auflösung: `registerFont(String fontKey, byte[] fontBytes)`, `registerFont(String fontKey, Path filePath) throws IOException`, `setAssetRoot(Path)` / `getAssetRoot()`, `setDefaultFontPath(String)` / `getDefaultFontPath()`, `setDyslexiaFontPath(String)` / `getDyslexiaFontPath()`, `setSystemFontFallbackEnabled(boolean)` / `isSystemFontFallbackEnabled()`.
+  * Barrierefreiheit & Caching: `setDyslexiaFriendlyMode(boolean)` / `isDyslexiaFriendlyMode()`, `setGlobalTextScale(float)` / `getGlobalTextScale()`, `scaleFontSize(float)`, `getAccessibilityExtraKerning()`, `getAccessibilityLineSpacingMultiplier()`, `getAtlas(String fontPath, float sizePx, boolean uploadGl)`, `getCachedAtlasCount()`, `isDisposed()`, `dispose()`, `close()`.
+* **`StyledTextLayout` & `StyledTextLayout.TypewriterController`**:
+  * Enum: `DecorationKind { UNDERLINE, STRIKETHROUGH, DROP_SHADOW, OUTLINE }`.
+  * Records: `GlyphQuad`, `LineDecoration`, `RubyLayout`, `InlineImageLayout`, `HyperlinkHitbox`, `TextLine`.
+  * Konstruktor / Fabrik: `StyledTextLayout(ParsedRichText, FontManager, float maxWidth, float baseFontSize, float lineSpacing, String baseColorHex, boolean uploadGl)`, `StyledTextLayout.layout(...)`.
+  * Rendering & Hit-Testing: `setDropShadow(float offsetX, float offsetY, String shadowColorHex)`, `setOutline(float thickness, String outlineColorHex)`, `render(RenderPipeline2D, TextureManager, float originX, float originY, double elapsedTimeSeconds)`, `render(..., int visibleCharLimit, float globalAlpha)`, `hitTestHyperlink(float localX, float localY)`, `hitTestHyperlink(float canvasX, float canvasY, float originX, float originY)`.
+  * Getter: `getRichText()`, `getMaxWidth()`, `getBaseFontSize()`, `getLineSpacing()`, `getGlyphQuads()`, `getDecorations()`, `getRubyLayouts()`, `getInlineImages()`, `getHyperlinkHitboxes()`, `getLines()`, `getLineCount()`, `getTotalWidth()`, `getTotalHeight()`, `getShadowOffsetX()`, `getShadowOffsetY()`, `getOutlineThickness()`.
+  * **`TypewriterController`**: `DEFAULT_CPS = 40.0f`; Konstruktoren `TypewriterController(ParsedRichText)` / `TypewriterController(ParsedRichText, float defaultCps)`; Steuerung `reset()`, `advance(double dt)`, `clickOrAdvance()`, `isWaiting()`, `isTimedWait()`, `getWaitRemainingSeconds()`, `getActiveWaitCue()`, `isFinished()`, `getVisibleCharCount()`, `getTotalCharCount()`, `hasNoWait()`, `shouldAutoAdvance()`, `getDefaultCps()`, `setDefaultCps(float)`.
 
 ### `ShaderProgram`, `Framebuffer`, `GlfwWindow` & `WindowManager`
 * **`ShaderProgram`**: OpenGL-3.3-Core-GLSL-Programm (`ShaderProgram()`, `ShaderProgram(vertexSrc, fragmentSrc)`, `compile`, `bind`, `unbind`, `setUniformMat4` (`float[]` / `Matrix4f`), `setUniformVec4`, `setUniformVec2`, `setUniformFloat`, `setUniformInt`, `getUniformLocation`, `getProgramId`, `isCompiled`, `dispose`).
