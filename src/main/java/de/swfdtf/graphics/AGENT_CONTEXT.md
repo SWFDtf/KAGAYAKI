@@ -1,0 +1,305 @@
+# Package `de.swfdtf.graphics` — AGENT_CONTEXT
+
+## Zweck des Pakets
+LWJGL-3 / OpenGL-3.3-Core-Grafiksubsystem von KAGAYAKI: Dual-Window- und Standalone-GLFW-Verwaltung mit gemeinsamen OpenGL-Objekt-Namespaces (`WindowManager`, `GlfwWindow`), Z-sortierter Szenengraph (`SceneGraph`, `SceneLayer`, `SceneNode`) mit 8 Standard-Ebenen (`-100` bis `1000`), Offscreen-Framebuffer (`Framebuffer`), GLSL-Shader-Compiler (`ShaderProgram`) sowie das einheitliche Pipeline-Interface `IRenderPipeline` mit `RenderPipeline2D` (Premultiplied Alpha, `ColorMatrix4f`, SDF-Rounded-Rectangles, Letterbox-Blit) und dem architektonischen `RenderPipeline3DStub`.
+
+## Abhängigkeiten zu anderen `de.swfdtf.*`-Paketen
+- `de.swfdtf.math` (`ColorMatrix4f`, `Rect2f`, `ScreenShake`, `Transform2D`, `Vec2f`)
+- `de.swfdtf.core` (`EngineLogger` in `WindowManager` und `RenderPipeline3DStub`)
+- Externe Bibliotheken: `org.lwjgl.glfw.*`, `org.lwjgl.opengl.*`, `org.lwjgl.system.*`, `org.joml.Matrix4f`.
+
+## Enthaltene Typen
+
+| Typ | Art | Beschreibung |
+| :--- | :--- | :--- |
+| `RenderMode` | `enum` | Definiert den aktiven Render-Backend-Modus (`MODE_2D`, `MODE_3D`) inklusive String-Parser `fromString`. |
+| `IRenderPipeline` | `interface` | Einheitlicher Render-Pipeline-Vertrag (`init`, `beginFrame`, `renderSceneGraph`, `endFrame`, `getMode`, `dispose`) zur Abstraktion von 2D- und 3D-Backends. |
+| `RenderPipeline2D` | `final class` | Produktive OpenGL-3.3-Core-2D-Pipeline mit `1920×1080`-Offscreen-FBO, Premultiplied-Alpha-Blending, `ColorMatrix4f`, SDF-Rounded-Rectangles und Letterbox-/Pillarbox-Blit. |
+| `RenderPipeline3DStub` | `final class` | Architektonischer 3D-Bühnen-Stub mit Perspektiv-Projektion (`FOV = 75°`, `Z_NEAR = 100`, `Z_FAR = 100000`), LookAt-Kamera und kontrolliertem Warning-Logging. |
+| `SceneGraph` | `final class` | Wurzel-Szenengraph mit 8 vorregistrierten Z-Order-Ebenen (`-100` bis `1000`), aktivem `ScreenShake` und normalisierten Mauskoordinaten für 2.5D-Parallax. |
+| `SceneLayer` | `final class` | Benannte, Z-sortierte Ebene im `SceneGraph` mit Sichtbarkeit, Parallax-Faktor, Tag-/ID-Suche und stabiler Z-Sortierung der Knoten. |
+| `SceneNode` | `class` | Hierarchischer Szenengraph-Knoten für texturierte Sprites, SDF-Rechtecke (mit Eckenradius und Rahmen), Container-Vererbung sowie `onCustomRender`-Hook. |
+| `ShaderProgram` | `final class` | GLSL-Shader-Compiler/-Linker für OpenGL 3.3 Core mit Uniform-Location-Caching und Typ-Helfern (`mat4`, `vec4`, `vec2`, `float`, `int`). |
+| `Framebuffer` | `final class` | Offscreen-OpenGL-FBO mit `RGBA8`-Farbtextur (`GL_LINEAR`, `GL_CLAMP_TO_EDGE`), Resize-Support und Top-to-Bottom-RGBA-Readback (`readPixelsRgba`). |
+| `GlfwWindow` | `final class` | Objektorientierter Wrapper um ein natives GLFW-Fenster inklusive OpenGL-3.3-Core-Kontext, HiDPI-Framebuffer-Tracking und per-Window-`GLCapabilities`. |
+| `WindowManager` | `final class` | Verwaltet den GLFW-Lebenszyklus und erzeugt entweder Dual-Windows (Studio A + Game B mit geteiltem Objekt-Namespace) oder ein einzelnes Standalone-Fenster. |
+
+## Öffentliche API-Signaturen
+
+### `RenderMode`
+```java
+public enum RenderMode {
+    MODE_2D,
+    MODE_3D;
+
+    public static RenderMode fromString(String s)
+}
+```
+
+### `IRenderPipeline`
+```java
+public interface IRenderPipeline {
+    void init(int logicalWidth, int logicalHeight);
+    void beginFrame(int windowWidth, int windowHeight);
+    void renderSceneGraph(SceneGraph graph);
+    void endFrame();
+    RenderMode getMode();
+    void dispose();
+}
+```
+
+### `RenderPipeline2D`
+```java
+public final class RenderPipeline2D implements IRenderPipeline {
+    public static final int DEFAULT_LOGICAL_WIDTH = 1920;
+    public static final int DEFAULT_LOGICAL_HEIGHT = 1080;
+    public static final float CLEAR_R = 0x0D / 255.0f;
+    public static final float CLEAR_G = 0x0E / 255.0f;
+    public static final float CLEAR_B = 0x15 / 255.0f;
+    public static final float CLEAR_A = 1.0f;
+
+    public static Rect2f computeLetterboxViewport(int windowW, int windowH, int logicalW, int logicalH)
+
+    @Override public void init(int logicalWidth, int logicalHeight)
+    @Override public void beginFrame(int windowWidth, int windowHeight)
+    @Override public void renderSceneGraph(SceneGraph graph)
+    @Override public void endFrame()
+    @Override public RenderMode getMode()
+    @Override public void dispose()
+
+    public void drawRect(float x, float y, float width, float height, float r, float g, float b, float a)
+    public void drawRect(float x, float y, float width, float height, float[] rgba)
+    public void drawRoundedRect(float x, float y, float width, float height, float cornerRadius, float r, float g, float b, float a)
+    public void drawRoundedRect(float x, float y, float width, float height, float cornerRadius, float[] fillRgba, float borderThickness, float[] borderRgba)
+    public void drawTexturedQuad(int textureId, float x, float y, float width, float height)
+    public void drawTexturedQuad(int textureId, float x, float y, float width, float height, Rect2f uvRect, float alpha)
+    public void drawTexturedQuad(int textureId, float x, float y, float width, float height, Rect2f uvRect, float[] tintRgba, ColorMatrix4f colorMatrix)
+
+    public Rect2f getLastLetterboxViewport()
+    public Framebuffer getOffscreenFramebuffer()
+    public int getLogicalWidth()
+    public int getLogicalHeight()
+    public boolean isInitialized()
+}
+```
+
+### `RenderPipeline3DStub`
+```java
+public final class RenderPipeline3DStub implements IRenderPipeline {
+    public static final float DEFAULT_FOV_DEGREES = 75.0f;
+    public static final float Z_NEAR = 100.0f;
+    public static final float Z_FAR = 100000.0f;
+
+    public RenderPipeline3DStub()
+    public RenderPipeline3DStub(EngineLogger logger)
+    public RenderPipeline3DStub(EngineLogger logger, boolean glEnabled)
+
+    public static float computeCameraDistanceZ(int logicalWidth, float fovDegrees)
+
+    @Override public void init(int logicalWidth, int logicalHeight)
+    @Override public void beginFrame(int windowWidth, int windowHeight)
+    @Override public void renderSceneGraph(SceneGraph graph)
+    @Override public void endFrame()
+    @Override public RenderMode getMode()
+    @Override public void dispose()
+
+    public Matrix4f getProjectionMatrix()
+    public Matrix4f getViewMatrix()
+    public float getCameraDistanceZ()
+    public float getFovDegrees()
+    public int getLogicalWidth()
+    public int getLogicalHeight()
+    public boolean isInitialized()
+    public boolean isWarningLogged()
+}
+```
+
+### `SceneGraph`
+```java
+public final class SceneGraph {
+    public static final String LAYER_BACKGROUND = "background";
+    public static final String LAYER_MASTER = "master";
+    public static final String LAYER_FOREGROUND = "foreground";
+    public static final String LAYER_SCREENS = "screens";
+    public static final String LAYER_OVERLAY = "overlay";
+    public static final String LAYER_MODAL = "modal";
+    public static final String LAYER_TOAST = "toast";
+    public static final String LAYER_INSPECTOR = "inspector";
+
+    public SceneGraph()
+    public SceneLayer getLayer(String name)
+    public SceneLayer getOrCreateLayer(String name, int zOrder)
+    public List<SceneLayer> getLayersSorted()
+    public void addNode(String layerName, SceneNode node)
+    public int removeByTag(String layerName, String tag)
+    public void clearAll()
+    public ScreenShake getScreenShake()
+    public void setScreenShake(ScreenShake screenShake)
+    public void update(float dt)
+    public void setNormalizedMouse(float nx, float ny)
+    public float getNormalizedMouseX()
+    public float getNormalizedMouseY()
+    public Vec2f getNormalizedMouse()
+}
+```
+
+### `SceneLayer`
+```java
+public final class SceneLayer {
+    public static final int Z_BACKGROUND = -100;
+    public static final int Z_MASTER = 0;
+    public static final int Z_FOREGROUND = 100;
+    public static final int Z_SCREENS = 200;
+    public static final int Z_OVERLAY = 300;
+    public static final int Z_MODAL = 400;
+    public static final int Z_TOAST = 500;
+    public static final int Z_INSPECTOR = 1000;
+
+    public SceneLayer(String name, int zOrder)
+    public SceneLayer(String name, int zOrder, float parallaxFactor)
+    public String getName()
+    public int getZOrder()
+    public SceneLayer setZOrder(int zOrder)
+    public boolean isVisible()
+    public SceneLayer setVisible(boolean visible)
+    public float getParallaxFactor()
+    public SceneLayer setParallaxFactor(float parallaxFactor)
+    public SceneLayer addNode(SceneNode node)
+    public boolean removeNode(SceneNode node)
+    public int removeByTag(String tag)
+    public List<SceneNode> findByTag(String tag)
+    public SceneNode findById(String id)
+    public void clear()
+    public int size()
+    public boolean isEmpty()
+    public List<SceneNode> getNodes()
+    public List<SceneNode> getSortedNodes()
+}
+```
+
+### `SceneNode`
+```java
+public class SceneNode {
+    public SceneNode()
+    public SceneNode(String id)
+    public SceneNode(String id, String tag)
+    public static float[] parseHexRgba(String hex)
+
+    public String getId() / public SceneNode setId(String id)
+    public String getTag() / public SceneNode setTag(String tag)
+    public int getZOrder() / public SceneNode setZOrder(int zOrder)
+    public boolean isVisible() / public SceneNode setVisible(boolean visible)
+    public Transform2D getTransform() / public SceneNode setTransform(Transform2D transform)
+    public float getWidth() / public SceneNode setWidth(float width)
+    public float getHeight() / public SceneNode setHeight(float height)
+    public SceneNode setSize(float width, float height)
+    public float[] getFillColorRgba() / public SceneNode setFillColorRgba(float[] rgba)
+    public SceneNode setFillColor(float r, float g, float b, float a)
+    public SceneNode setFillColorPremultiplied(float rPre, float gPre, float bPre, float a)
+    public SceneNode setColorHex(String hex)
+    public boolean isFillColorPremultiplied()
+    public float[] getPremultipliedFillColor(float additionalAlpha)
+    public float getCornerRadius() / public SceneNode setCornerRadius(float cornerRadius)
+    public float getBorderThickness() / public SceneNode setBorderThickness(float borderThickness)
+    public float[] getBorderColorRgba() / public SceneNode setBorderColorRgba(float[] rgba)
+    public SceneNode setBorderColor(float r, float g, float b, float a)
+    public SceneNode setBorderColorHex(String hex)
+    public float[] getPremultipliedBorderColor(float additionalAlpha)
+    public int getTextureId() / public SceneNode setTextureId(int textureId)
+    public Rect2f getUvRect() / public SceneNode setUvRect(Rect2f uvRect)
+    public Object getUserData() / public SceneNode setUserData(Object userData)
+    public SceneNode getParent()
+    public SceneNode addChild(SceneNode child)
+    public boolean removeChild(SceneNode child)
+    public void clearChildren()
+    public List<SceneNode> getChildren()
+    public BiConsumer<SceneNode, RenderPipeline2D> getCustomRenderer()
+    public SceneNode setCustomRenderer(BiConsumer<SceneNode, RenderPipeline2D> customRenderer)
+    protected void onCustomRender(RenderPipeline2D pipeline)
+}
+```
+
+### `ShaderProgram`
+```java
+public final class ShaderProgram {
+    public ShaderProgram()
+    public ShaderProgram(String vertexSrc, String fragmentSrc)
+    public void compile(String vertexSrc, String fragmentSrc)
+    public void bind()
+    public void unbind()
+    public void setUniformMat4(String name, float[] columnMajorMatrix)
+    public void setUniformMat4(String name, Matrix4f matrix)
+    public void setUniformVec4(String name, float x, float y, float z, float w)
+    public void setUniformVec2(String name, float x, float y)
+    public void setUniformFloat(String name, float value)
+    public void setUniformInt(String name, int value)
+    public int getUniformLocation(String name)
+    public int getProgramId()
+    public boolean isCompiled()
+    public void dispose()
+}
+```
+
+### `Framebuffer`
+```java
+public final class Framebuffer {
+    public Framebuffer()
+    public Framebuffer(int width, int height)
+    public void init()
+    public void resize(int width, int height)
+    public void bind()
+    public void unbind()
+    public byte[] readPixelsRgba()
+    public int getTextureId()
+    public int getFboId()
+    public int getWidth()
+    public int getHeight()
+    public boolean isInitialized()
+    public void dispose()
+}
+```
+
+### `GlfwWindow`
+```java
+public final class GlfwWindow {
+    public GlfwWindow(long handle, String title, int windowWidth, int windowHeight)
+    public void makeCurrent()
+    public void swapBuffers()
+    public boolean shouldClose()
+    public void setShouldClose(boolean close)
+    public void setTitle(String title)
+    public void setVsync(boolean vsync)
+    public void pollFramebufferSize()
+    public void show()
+    public void hide()
+    public void focus()
+    public void destroy()
+    public long getHandle()
+    public String getTitle()
+    public int getWindowWidth()
+    public int getWindowHeight()
+    public int getFramebufferWidth()
+    public int getFramebufferHeight()
+    public GLCapabilities getGlCapabilities()
+    public boolean isVsync()
+    public boolean isDestroyed()
+}
+```
+
+### `WindowManager`
+```java
+public final class WindowManager {
+    public WindowManager()
+    public WindowManager(EngineLogger logger)
+    public void initDualWindows(String studioTitle, String gameTitle, int gameWidth, int gameHeight, boolean vsync)
+    public void initDualWindows(String studioTitle, int studioWidth, int studioHeight, String gameTitle, int gameWidth, int gameHeight, boolean vsync)
+    public void initStandaloneWindow(String gameTitle, int width, int height, boolean vsync)
+    public GlfwWindow getGameWindow()
+    public GlfwWindow getStudioWindow()
+    public boolean hasStudioWindow()
+    public void pollEvents()
+    public boolean anyWindowShouldClose()
+    public boolean isGlfwInitialized()
+    public void dispose()
+}
+```
