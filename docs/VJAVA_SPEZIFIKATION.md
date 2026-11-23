@@ -1,22 +1,23 @@
-# `.vjava` Sprach- und Projekt-Spezifikation (M2-Stand)
+# `.vjava` Sprach- und Projekt-Spezifikation (M3-Stand)
 
-> **Hinweis zum Implementierungsstand**: Die in diesem Dokument beschriebene `.vjava`-Skriptsyntax bildet die verbindliche Zielspezifikation für Meilenstein **M3**. Bereits vollständig implementiert sind:
-> * **M1**: Projekt-Metadaten (`ProjectDescriptor` für `project.vjava.json`), Laufzeit-Konfiguration (`EngineConfig`) sowie die Java-Skript-Fassade (`EngineAPI`, zugänglich als `engine` in `@->{ ... }<<`-Blöcken).
-> * **M2**: Die komplette Inline-Rich-Text-Syntax inklusive Variableninterpolation, Flow-Control-Cues, Furigana, Inline-Bildern, Hyperlinks und Text-Animationstags (`TextTagParser`, `StyledTextLayout`, `StyledTextLayout.TypewriterController`, `FontAtlas`, `FontManager`) sowie das erweiterbare `CustomDisplayable`-Interface für prozedurale Grafik in `@->{ ... }<<`-Blöcken.
+> **Implementierungsstand (Meilenstein M3 abgeschlossen)**: Alle in diesem Dokument beschriebenen `.vjava`-Sprachkonstrukte, Projektscan-Regeln, Ausdrucks- und Bedingungsgrammatiken sowie die In-Memory-Java-21-Kompilierung sind in `de.swfdtf.parser`, `de.swfdtf.state` und `de.swfdtf.graphics.SceneController` vollständig implementiert und verifiziert:
+> * **M1**: Projekt-Metadaten (`ProjectDescriptor` für `project.vjava.json`), Laufzeit-Konfiguration (`EngineConfig`) und Java-Skript-Fassade (`EngineAPI`, Binding `engine`).
+> * **M2**: Komplette Inline-Rich-Text-Syntax inklusive Variableninterpolation, Flow-Control-Cues, Furigana, Inline-Bildern, Hyperlinks und Text-Animationstags (`TextTagParser`, `StyledTextLayout`, `TypewriterController`, `FontAtlas`, `FontManager`) sowie `CustomDisplayable`.
+> * **M3**: Vollständiger Lexer (`VJavaLexer`), rekursiv-absteigender AST-Parser (`VJavaParser` / `VJavaAst`), rekursiver Projektscanner (`ProjectScanner`), In-Memory-Java-21-Compiler (`JavaBlockCompiler` / `VJavaExecutable`), Ausdrucks-Evaluator (`ConditionEvaluator`), nicht-blockierende Skript-Laufzeit (`ScriptRuntime`), Bühnensteuerung (`SceneController`, Binding `scene`) sowie State-Verträge (`StateStore` als `state`, `PersistentAccess` als `persistent`).
 
 ---
 
-## 1. Projekt-Dateisystemstruktur
+## 1. Projekt-Dateisystemstruktur & `ProjectScanner`
 
 Ein KAGAYAKI-Projekt besitzt folgende Struktur:
 
 ```text
 mein_vn_projekt/
-├── project.vjava.json        # Projekt-Metadaten (geladen/gespeichert über ProjectDescriptor)
+├── project.vjava.json        # Projekt-Metadaten (geladen über ProjectDescriptor, sonst Defaults)
 ├── main.vjava                # Beliebig im Projektordner platzierbar
 ├── kapitel_1/
-│   └── szene_01.vjava        # Rekursiv gescannte .vjava-Dateien (M3)
-├── assets/                   # Feste Asset-Verzeichnisse
+│   └── szene_01.vjava        # Rekursiv gescannte *.vjava-Dateien in beliebiger Tiefe
+├── assets/                   # Feste Asset-Verzeichnisse (rekursiv durch ProjectScanner indiziert)
 │   ├── images/               # Hintergründe, Sprites, Layered-Parts, UI-9Slice
 │   ├── audio/                # Musik, SFX, Voice-Over
 │   ├── video/                # Cutscenes & animierte Hintergründe
@@ -25,7 +26,14 @@ mein_vn_projekt/
 └── saves/                    # Spielstände & persistent.dat (M4)
 ```
 
-### Verifizierte `project.vjava.json`-Felder (`ProjectDescriptor`, M1)
+### Regeln des `ProjectScanner`
+* **Rekursive Skriptsuche**: Alle `*.vjava`-Dateien unter `projectRoot` werden rekursiv gefunden, unabhängig von der Verzeichnistiefe.
+* **Ausgeschlossene Verzeichnisse (`ProjectScanner.SKIPPED_DIRECTORIES`)**: `.git`, `build`, `.gradle`, `saves`, `out`, `dist`.
+* **Deterministische Reihenfolge**: Gefundene Dateien werden lexikografisch nach ihrem relativen Unix-Pfad (`/`-getrennt) sortiert geparst.
+* **Duplikat-Semantik (Last-Wins)**: Doppelte Definitionen (`character`, `image`, `layeredimage`, `transform`, `label`, `screen`) erzeugen eine nicht-fatale Warnung in `ProjectAst.warnings()` (mit Datei- und Zeilenangabe) und werden deterministisch durch den späteren Eintrag überschrieben.
+* **`project.vjava.json`**: Fehlt die Datei, erzeugt `ProjectScanner` automatisch `ProjectDescriptor.createDefault(ordnername)`.
+
+### Verifizierte `project.vjava.json`-Felder (`ProjectDescriptor`)
 | JSON-Feld | Typ | Standardwert | Beschreibung |
 | :--- | :--- | :--- | :--- |
 | `title` | `String` | `"Untitled KAGAYAKI Project"` | Projekt-Titel |
@@ -42,50 +50,285 @@ mein_vn_projekt/
 
 ---
 
-## 2. Hybride `.vjava`-Syntax
+## 2. Lexikalische Regeln & Einrückung (`VJavaLexer`)
 
 `.vjava`-Dateien kombinieren zwei klar getrennte Syntaxebenen:
 
-### 2.1 Einrückungsbasierte VN-Skriptebene (ohne `{ }`-Blöcke)
-* Blöcke werden über konsistente Einrückung (4 Leerzeichen) strukturiert.
-* Geschweifte Klammern `{ ... }` werden auf VN-Ebene **ausschließlich** für Inline-Text-Tags (siehe Abschnitt 3) verwendet.
-* Geplante Schlüsselwörter (M3–M6):
-  * Deklaration: `define`, `layeredimage`, `transform`, `screen`, `translate`
-  * Ablauf & Dialog: `label`, `jump`, `call`, `return`, `menu`, `if`, `else`
-  * Szene & Audio: `scene`, `show`, `hide`, `with`, `play`, `queue`, `stop`, `voice`
-  * Deklarative UI: `vbox`, `hbox`, `grid`, `fixed`, `frame`, `window`, `viewport`, `vpgrid`, `textbutton`, `imagebutton`, `hotspot`, `hotbar`, `bar`, `vbar`, `slider`, `input`, `key`, `timer`, `draggroup`, `drag`
+### 2.1 Zeilen-, Kommentar- & Einrückungsregeln (VN-Skriptebene)
+* **Kodierung & Zeilenenden**: UTF-8 (ein optionales UTF-8-BOM `\uFEFF` wird entfernt); `\r\n` und `\r` werden zu `\n` normalisiert.
+* **Einrückung (`INDENT` / `DEDENT`)**:
+  * Blöcke nach `:` werden über konsistente Einrückung strukturiert (Konvention: **4 Leerzeichen**; ein Tabulator `\t` zählt als `4` Spalten).
+  * Ein `VJavaLexer` verwaltet einen Einrückungs-Stack (Start bei `0`). Jede tiefere Einrückung erzeugt `INDENT`, jedes Zurückspringen erzeugt ein oder mehrere `DEDENT`-Tokens bis zur passenden Stack-Tiefe.
+  * Passt ein Zurückspringen auf keine vorherige Einrückungsebene, wird sofort `VJavaParseException` mit Quelldatei und Zeilennummer geworfen.
+  * Leerzeilen und reine Kommentarzeilen beeinflussen den Einrückungs-Stack nicht.
+* **Kommentare (außerhalb von `@->{ ... }<<`)**:
+  * Sowohl `# ...` als auch `// ...` leiten Zeilen- bzw. Endkommentare außerhalb von Anführungszeichen (`"..."`, `'...'`) ein.
+  * `#`-Kommentare unmittelbar vor Einträgen in `translate`-Blöcken werden vom Lexer mitgeführt, sodass `VJavaParser` den Originaltext automatisch aus `# "..."` bzw. `# speaker "..."` extrahieren kann.
+* **Geschweifte Klammern `{ ... }`**: Auf VN-Skriptebene existieren **keine** `{}`-Codeblöcke; `{ ... }` innerhalb von Dialog-Strings sind ausschließlich Inline-Rich-Text-Tags (siehe Abschnitt 6).
 
 ### 2.2 Native Java-Ebene (`:: Kode für VN ... @->{ ... }<<`)
-* Java-Logik, Methoden und **eigene Klassen/Unterklassen** (z. B. Implementierungen von `de.swfdtf.graphics.CustomDisplayable`) stehen zwischen `@->{` und `}<<` (optional eingeleitet mit `:: Kode für VN: <Beschreibung>`).
-* Innerhalb von `@->{ ... }<<` gilt regulärer Java-21-Code **mit** geschweiften Klammern `{ ... }`, Imports und Hilfsklassen.
-* Kompilierung zur Laufzeit über die Java Compiler API (`javax.tools.JavaCompiler`, M3).
-
-#### Verifizierte `engine`-Fassade (`de.swfdtf.core.EngineAPI`, aktiv in M1)
-Java-Codeblöcke erhalten über die Variable `engine` direkten Zugriff auf `EngineAPI`:
-* Logging: `engine.logInfo(msg)`, `engine.logWarn(msg)`, `engine.logError(msg)`, `engine.logError(msg, t)`, `engine.logDebug(msg)`
-* Konfiguration & Projekt: `engine.getConfig()`, `engine.getProjectDescriptor()`, `engine.setProjectDescriptor(desc)`
-* Subsysteme: `engine.getClock()`, `engine.getInput()`, `engine.getLogger()`
-* Lebenszyklus: `engine.requestQuit()`, `engine.isQuitRequested()`, `engine.requestLiveReload()`, `engine.consumeLiveReloadRequested()`
-* Metadaten & Services: `engine.getEngineVersion()`, `engine.getRenderBackendName()`, `engine.getProperty(key)` / `setProperty(key, val)`, `engine.getService(type)` / `requireService(type)`
-
-Geplante weitere Bindings für M3–M4: `state` (Rollback-fähiger Sitzungszustand), `persistent` (globaler Zustand), `scene` (Szenen-Steuerung).
+* Eingebettete Java-21-Blöcke werden mit `@->{` geöffnet und mit `}<<` geschlossen:
+  * **Einzeilig**: `@->{ state.set("punkte", 10); }<<` oder `:: Punkte setzen @->{ state.set("punkte", 10); }<<`
+  * **Mehrzeilig mit Einzeilen-Header**:
+    ```vjava
+    :: Kode für VN: Eigene Logik @->{
+        state.set("besucht", true);
+    }<<
+    ```
+  * **Zweizeiliger Header** (`::` auf der Zeile unmittelbar vor `@->{`):
+    ```vjava
+    :: Kode für VN: Beschreibung
+    @->{
+        engine.logInfo("Hallo");
+    }<<
+    ```
+* Das Präfix `::` (mit optionalem `Kode für VN:` / `Kode fuer VN:`) wird bereinigt und als `JavaBlockNode.description()` gespeichert.
+* Innerhalb von `@->{ ... }<<` verfolgt `VJavaLexer` Java-Kommentare (`//`, `/* ... */`), String-Literale (`"..."`), Java-Textblöcke (`""" ... """`) und Zeichenliterale (`'...'`), sodass geschweifte Klammern `{ ... }` und selbst die Zeichenfolge `}<<` innerhalb von Strings oder Kommentaren den Block nicht vorzeitig schließen.
+* Nach `}<<` sind auf derselben Zeile nur noch Leerzeichen oder Kommentare (`//`, `#`) zulässig; alles andere wirft `VJavaParseException`. Ein fehlendes `}<<` vor Dateiende wirft ebenfalls `VJavaParseException`.
 
 ---
 
-## 3. Verifizierte Inline-Rich-Text-Tags & Interpolation (`TextTagParser`, aktiv in M2)
+## 3. Top-Level-Deklarationen (`VJavaParser`)
 
-Alle hier aufgeführten Tags, Interpolationen und Escape-Sequenzen sind in `de.swfdtf.graphics.TextTagParser`, `StyledTextLayout` und `StyledTextLayout.TypewriterController` vollständig implementiert und getestet.
+Auf Einrückungstiefe `0` sind folgende Deklarationen gültig:
 
-### 3.1 Variablen-Interpolation & Escaping
+### 3.1 `define`, `default` & Top-Level-`$`
+* **Charakterdefinition (`CharacterDef`)**:
+  ```vjava
+  define lena = Character("Lena", color="#58a6ff", outline_color="#000000", image="lena", voice_tag="lena", textbox="modern", voice_bleep="assets/audio/bleep.ogg")
+  define narrator = Character(None)
+  ```
+  * Erstes Positionsargument ist der Anzeigename (`None` oder `null` erzeugt einen leeren Anzeigenamen).
+  * Unterstützte benannte Felder: `name`, `color` / `who_color`, `outline_color` / `who_outline_color`, `image`, `voice_tag`, `textbox`, `voice_bleep` sowie beliebige Zusatz-Properties in `CharacterDef.properties()`.
+* **Konstanten / globale `define`-Werte**: `define max_punkte = 100` (wird als `SetVarStatement(..., isDefaultOnly=false)` gespeichert und vor Spielstart über `ConditionEvaluator` ausgewertet).
+* **Standardvariablen (`default`)**: `default punkte = 0` — setzt die Variable bei Spielstart nur, falls `state.has(varName)` noch `false` ist (`isDefaultOnly=true`).
+* **Top-Level-Zuweisung (`$`)**: `$ debug_modus = true` (unterstützt `=`, `+=`, `-=`, `*=`, `/=`).
+
+### 3.2 `image`
+```vjava
+image bg_akademie = "assets/images/bg/akademie.png"
+image lena happy winter = "assets/images/char/lena_happy_winter.png"
+```
+* Das erste Wort nach `image` ist `tag`, alle weiteren Wörter vor `=` sind `attributes`. Der zusammengesetzte Schlüssel (`ImageDef.fullKey()`) wird automatisch bei `SceneController.registerImageDefinition(...)` registriert.
+
+### 3.3 `layeredimage`
+```vjava
+layeredimage lena:
+    always "assets/images/char/lena_base.png"
+    group gesicht:
+        attribute neutral default "assets/images/char/lena_neutral.png"
+        attribute happy if stimmung > 0:
+            "assets/images/char/lena_happy.png"
+    if hat_brille:
+        "assets/images/char/lena_brille.png"
+    elif stimmung < 0:
+        "assets/images/char/lena_traurig.png"
+    else:
+        "assets/images/char/lena_normal.png"
+```
+* `always` akzeptiert sowohl einen direkten Pfad/Ausdruck als auch einen eingerückten Block (`always:`) mit optionalen `if`-Einträgen.
+* `group <name>:` enthält `attribute <name> [default] [if <cond>] ["<asset>" | : "<asset>"]`-Einträge.
+
+### 3.4 `transform` (ATL-Transformationsblöcke)
+```vjava
+transform center_zoom:
+    xalign 0.5 yalign 1.0
+    zoom 1.0 alpha 0.0
+    easein 0.5 zoom 1.1 alpha 1.0
+    pause 0.2
+    parallel:
+        linear 1.0 rotate 5.0
+    repeat
+```
+* Unterstützte ATL-Schritte (`VJavaAst.AtlStep`):
+  * **Property-Set (`set`)**: z. B. `xpos`, `ypos`, `xanchor`, `yanchor`, `xalign`, `yalign`, `zoom`, `xzoom`, `yzoom`, `rotate`, `alpha`, `blur`, `parallax_x`, `parallax_y` (Syntax `key val`, `key=val`, inkl. einfacher Rechenausdrücke wie `0.5 + 0.1`).
+  * **Warper-Interpolation (`interpolate`)**: `linear`, `ease`, `easein`, `easeout`, `easeinout`, `ease_in`, `ease_out`, `ease_in_out`, `smoothstep`, `ease_back`, `ease_bounce`, `ease_elastic` jeweils mit Dauer in Sekunden sowie optionalen Inline-Properties oder eingerücktem `:`-Block; alternativ `warp <warperExpr> <duration> [props]`.
+  * **Steuerung**: `pause <seconds>`, `repeat [count]`, `pass`.
+  * **Container**: `parallel:`, `block:`, `choice:`, `contains:`, `on <event>:`.
+* `ScriptRuntime` wendet numerische ATL-Eigenschaften auf `Transform2D` an und registriert benannte Transforms automatisch in `SceneController`.
+
+### 3.5 `screen` (Deklarative UI-Screens)
+```vjava
+screen status_hud(titel):
+    modal false
+    zorder 250
+    frame xpos 40 ypos 40:
+        vbox spacing 8:
+            text "[titel]" size 28
+            textbutton "Schließen" action "hide_screen"
+    :: Kode für VN: Screen-Hook @->{
+        engine.logDebug("Screen-Item ausgeführt");
+    }<<
+```
+* Kopfzeile: `screen <name>:` oder `screen <name>(param1, param2):`.
+* Direktiven auf oberster Screen-Ebene: `modal true|false`, `zorder <int>`.
+* Erkannte Widget-Schlüsselwörter (`VJavaParser`): `vbox`, `hbox`, `grid` (inkl. `grid <cols> <rows>`), `fixed`, `frame`, `window`, `viewport`, `vpgrid`, `textbutton`, `imagebutton`, `text`, `label`, `bar`, `vbar`, `slider`, `input`, `hotspot`, `hotbar`, `imagemap`, `draggroup`, `drag`, `key`, `timer`, `custom`, `add`, `null`, `button`, `side`, `mousearea`, `use`, `on`, `if`, `elif`, `else`, `for` sowie eingebettete `@->{ ... }<<`-Blöcke (`keyword="java_block"`).
+
+### 3.6 `translate` (Lokalisierungsblöcke)
+```vjava
+translate deutsch kapitel_1_01:
+    # lena "Good morning!"
+    lena "Guten Morgen!"
+
+    old "Start Game"
+    new "Spiel starten"
+```
+* Kopfzeile: `translate <lang> <id>:`.
+* Unterstützt:
+  * String-Paare `old "..."` gefolgt von `new "..."`.
+  * Narrator-Einträge `"<übersetzt>"` (optional mit `# "<original>"` in der Kommentarzeile davor).
+  * Sprecher-Einträge `<speaker> "<übersetzt>"` (optional mit `# <speaker> "<original>"` davor).
+
+### 3.7 `label` & Top-Level-Java-Blöcke
+* `label <name>:` (oder `label <name>(...):`) definiert ein ausführbares Skript-Label mit eingerücktem Statement-Block (`LabelNode`).
+* Top-Level-`@->{ ... }<<`-Blöcke werden vor Eintritt in das Entry-Label einmalig beim `ScriptRuntime.start(...)` in Deklarationsreihenfolge ausgeführt (ideal für Klassen-, Record- und Hilfsmethoden-Definitionen).
+
+---
+
+## 4. Label-Statements & Laufzeitsemantik (`VJavaParser` & `ScriptRuntime`)
+
+Innerhalb eines `label:`-Blocks (sowie verschachtelt in `if`/`elif`/`else` und `menu`-Auswahlblöcken) sind folgende Anweisungen verfügbar:
+
+### 4.1 Dialog & Textfenster
+| Syntax | AST-Typ / Bedeutung |
+| :--- | :--- |
+| `"<text>" [with <trans>]` | Narrator-Dialogzeile (`SayStatement` mit `speakerId = null`); wartet im Zustand `WAITING_DIALOGUE`. |
+| `<speakerId> "<text>" [with <trans>]` | Charakter-Dialogzeile; löst `CharacterDef.displayName()` und `colorHex()` auf. |
+| `nvl show` / `nvl hide` / `nvl clear` | Aktiviert/deaktiviert den kumulativen NVL-Puffer (`nvlMode`) bzw. leert `nvlLines`. |
+| `window show` / `window hide` / `window auto` | Steuert das Dialogfenster-Verhalten (`ScriptRuntime.getWindowAction()` und `EngineAPI`-Property `"dialogueWindowAction"`). |
+
+* Vor jeder Dialogzeile interpoliert `ScriptRuntime` `[var]`-Platzhalter über `TextTagParser.interpolateVariables` (Lookup in `state`, `persistent` und für `.`/`[`/`(`-Ausdrücke via `ConditionEvaluator`).
+* Jede Zeile erhält eine deterministische `lineId` (`<sourceFile>:<lineNumber>:<hash>`). `DialoguePrompt.alreadyRead()` gibt an, ob die Zeile vor Anzeige bereits in `persistent.isLineRead(lineId)` markiert war; danach wird `persistent.markLineRead(lineId)` aufgerufen.
+
+### 4.2 Bühne, Sprites, Transitions & Pausen (`SceneController`)
 | Syntax | Verhalten |
 | :--- | :--- |
-| `[variablenname]` | Ersetzt den Platzhalter vor dem Tag-Parsing über die Lookup-Funktion (`interpolateVariables`); unbekannte Schlüssel bleiben wörtlich als `[key]` stehen. |
+| `scene <bgTag> [with <trans>]` | Leert `LAYER_MASTER`, setzt den Hintergrund auf `LAYER_BACKGROUND` (`1920×1080`) und löst optionale Transition aus. |
+| `show <tag> [attrs...] [at <pos>] [with <trans>]` | Zeigt/aktualisiert ein Sprite auf `LAYER_MASTER`. Ist `tag` bereits sichtbar und wird kein `at <pos>` angegeben, bleibt Position/Transform erhalten; `at` und `with` dürfen in beliebiger Reihenfolge stehen. |
+| `show <tag> ... :` + ATL-Block | Wie `show`, wendet zusätzlich Inline-ATL-Schritte auf das `Transform2D` des erzeugten `SpriteNode` an. |
+| `hide <tag> [with <trans>]` | Entfernt das Sprite mit dem semantischen `tag` aus `LAYER_MASTER`. |
+| `with <transitionExpr>` | Löst Transitionseffekte aus (setzt `EngineAPI`-Property `"lastTransition"`; `vpunch` und `hpunch` starten `ScreenShake.vpunch()` / `ScreenShake.hpunch()` am `SceneGraph`). |
+| `pause` / `pause hard` | Pausiert im Zustand `PAUSING` bis `advance()`. |
+| `pause <seconds>` | Zeitgesteuerte Pause in `PAUSING`; läuft über `ScriptRuntime.update(dt)` ab oder wird per `advance()` übersprungen. |
+
+* **Eingebaute benannte Positionen in `SceneController`**:
+  * `left` (`xalign=0.15, yalign=1.0`)
+  * `center` (`xalign=0.5, yalign=1.0`, Standard bei neuem Sprite ohne `at`)
+  * `truecenter` (`xalign=0.5, yalign=0.5`)
+  * `right` (`xalign=0.85, yalign=1.0`)
+  * `offscreenleft` (`xpos=-600, yalign=1.0`)
+  * `offscreenright` (`xpos=2520, yalign=1.0`)
+  * `reset` (Standard-`Transform2D()`)
+* **Asset-Pfad-Auflösung in `SceneController`**: Prüft zuerst `image`-/`layeredimage`-Definitionen (`"<tag> <attrs...>"`, dann `"<tag>"`), danach direkte Pfade (enthält `/` oder endet auf `.png`/`.jpg`/`.webp`), ansonsten Fallback-Kandidaten unter `assets/images/`, `assets/images/bg/`, `assets/images/char/`, `assets/images/sprites/`.
+
+### 4.3 Audio (`play`, `queue`, `stop`, `voice`)
+| Syntax | Verhalten |
+| :--- | :--- |
+| `play <channel> "<asset>" [loop\|noloop] [fadein <sec>] [volume <vol>]` | Spielt Audio auf `<channel>` ab (`loop` ist standardmäßig `true` für `music` und `ambient`, sonst `false`). Bei `channel="music"` wird automatisch `persistent.unlockTrack(assetPath)` aufgerufen. |
+| `queue <channel> "<a.ogg>", "<b.ogg>"` / `queue <channel> ["a.ogg", "b.ogg"]` / `queue <channel>:` + eingerückte Liste | Reiht einen oder mehrere Audio-Pfade in die Kanal-Warteschlange ein. |
+| `stop <channel> [fadeout <sec>]` | Stoppt den Kanal (optional mit Fade-Out-Dauer). |
+| `voice "<asset>"` | Hinterlegt den Voice-Pfad für die nachfolgende Dialogzeile und meldet ihn an `AudioBridge.voice(...)`. |
+
+### 4.4 Auswahlmenüs (`menu`)
+`ScriptRuntime` wechselt in `Status.WAITING_MENU` und unterstützt sowohl **Inline-Sprünge** als auch **eingerückte Statement-Blöcke** sowie **Timeouts** und **Bedingungen**:
+```vjava
+menu "Was möchtest du tun?":
+    timeout 5.0 -> jump zeit_abgelaufen
+
+    "Den Flur untersuchen" -> jump flur_szene
+    "Mit Lena sprechen" if kennt_lena -> lena_gespraech
+    "Geheime Tür öffnen" disabled if hat_schluessel:
+        $ tuer_offen = true
+        "Die Tür öffnet sich knarrend."
+```
+* **Caption**: Optional direkt nach `menu` (`menu "Frage":`) oder als erste alleinstehende String-Zeile im `menu:`-Block.
+* **Timeout**: `timeout <sec> -> [jump] <label>` oder `timeout <sec>:` mit eingerücktem `jump <label>`. Läuft der Timer in `update(dt)` ab, springt die Laufzeit zum `timeoutJumpLabel` (oder wählt die erste sichtbare/aktive Option).
+* **Auswahloptionen**:
+  * Inline-Sprung: `"<text>" [qualifiers] -> [jump] <label>`
+  * Eingerückter Block: `"<text>" [qualifiers]:` gefolgt von beliebigen Statements.
+  * Qualifier: `if <cond>` (versteckt die Option bei `false`), `disabled` (dauerhaft deaktiviert), `disabled if <cond>` / `if <cond> disabled` (sichtbar, aber bei `false` nicht auswählbar).
+
+### 4.5 Bedingungen, Variablen, Sprünge, Subroutinen & Eingabe
+| Syntax | Verhalten |
+| :--- | :--- |
+| `if <cond>:` / `elif <cond>:` / `else:` | Wertet Zweige über `ConditionEvaluator.evaluateBoolean(...)` aus und betritt den ersten passenden Block. |
+| `$ <var> = <expr>` / `+=` / `-=` / `*=` / `/=` | Wertet `<expr>` via `ConditionEvaluator.evaluate(...)` aus und speichert das Ergebnis in `state`. Verbundoperatoren werden zu `<var> <op> <expr>` expandiert. |
+| `jump <label>` / `jump expression <expr>` | Leert lokale Block-Frames und springt direkt in das Ziel-Label (kein Call-Frame). |
+| `call <label>` / `call <label>(arg1, arg2)` / `call expression <expr>` | Wertet optionale Argumente aus (abgelegt in `state.get("_call_args")`), legt ein `StackFrame(isCallBoundary=true)` auf den Call-Stack und springt ins Sub-Label. |
+| `return` / `return <expr>` | Speichert optionalen Rückgabewert in `state.get("_return")`. Kehrt zum Aufrufer zurück; ist der Call-Stack leer, endet das Skript (`Status.ENDED`). |
+| `input <var> "<prompt>" [default "..."] [allow "..."] [length <n>]` | Pausiert in `WAITING_INPUT`; `submitInput(text)` filtert anhand `allow` (Zeichen-Whitelist) und `length` (Maximalzeichenzahl) und schreibt nach `state`. |
+| `block_rollback` | Ruft `state.blockRollback()` auf und setzt eine unumkehrbare Rollback-Barriere. |
+| `pass` | Expliziter No-Op-Platzhalter in ansonsten leeren Blöcken. |
+| `:: ... @->{ ... }<<` / `@->{ ... }<<` | Führt den kompilierten Java-Block mit `(state, persistent, engine, scene)` aus. |
+
+---
+
+## 5. Ausdrucks- & Bedingungssprache (`ConditionEvaluator`)
+
+`ConditionEvaluator` wird für `if`/`elif`, `menu`-`if`-Qualifier, `$`-Zuweisungen, `jump expression`, `return <expr>`, `call`-Argumente und komplexe `[...]`-Textinterpolationen verwendet.
+
+* **Literale**: Ganzzahlen (`int`/`long`, Dezimal & Hex `0x...`, `_`-Trennzeichen), Gleitkomma (`float`/`double`, z. B. `.5`, `1.25f`, `1e-3`), Strings (`"..."` und `'...'` mit Escapes `\n`, `\t`, `\r`, `\\`, `\"`, `\'`), `true`, `false`, `null`.
+* **Operatoren (nach Präzedenz)**:
+  1. Postfix: `.feld`, `.getFeld()`, `.isFeld()`, `.methode(args...)`, `[index]` (`Map`, `List`, `String`, Array, `array.length`)
+  2. Unär: `!`, `not`, `-`, `+`
+  3. Multiplikativ: `*`, `/`, `%`
+  4. Additiv: `+`, `-` (`+` unterstützt String-Konkatenation)
+  5. Relational: `<`, `<=`, `>`, `>=`
+  6. Gleichheit: `==`, `!=` (inkl. numerischer Typ-Coercion `int`/`long`/`double`)
+  7. Logisches UND: `&&`, `and` (Short-Circuit)
+  8. Logisches ODER: `||`, `or` (Short-Circuit)
+  9. Ternär: `<cond> ? <a_expr> : <b_expr>`
+* **Vordefinierte Bezeichner**: `state` (`StateStore`), `persistent` (`PersistentAccess`), `Math` (`java.lang.Math`), sowie jeder Variablenname direkt aus `state` (Priorität) bzw. `persistent`.
+* **KAGAYAKI-Truthiness (`isTruthy`)**:
+  * `null` → `false`
+  * `Boolean` → direkt `b`
+  * `Number` → `d != 0.0 && !Double.isNaN(d)`
+  * `String` → `!s.isEmpty()`
+  * `Character` → `c != '\0'`
+  * Jedes andere nicht-`null`-Objekt → `true`
+
+---
+
+## 6. Native Java-Kompilierung (`JavaBlockCompiler`) & Bindings
+
+`JavaBlockCompiler` kompiliert alle `@->{ ... }<<`-Blöcke (Top-Level sowie innerhalb von `label`, `if`, `menu`) zur Laufzeit über `javax.tools.ToolProvider.getSystemJavaCompiler()` vollständig im Arbeitsspeicher (ohne temporäre `.java`/`.class`-Dateien auf der Festplatte):
+
+1. **Segmentierung**: Jeder Block wird unter Berücksichtigung von Kommentaren, Strings, Textblöcken und Klammer-Tiefen in vier Kategorien zerlegt:
+   * `import`-Anweisungen (werden projektweit dedupliziert und allen Snippets sowie `VJavaUserTypes` vorangestellt)
+   * Benutzerdefinierte Typen (`class`, `interface`, `enum`, `record`, `@interface`, inkl. Unterklassen z. B. `extends CustomDisplayable`)
+   * Top-Level-Statik-Member (Methoden, Felder, `static { ... }`-Blöcke)
+   * Ausführbare Snippet-Anweisungen
+2. **Gemeinsamer Typ-Container (`de.swfdtf.vjava.gen.VJavaUserTypes`)**:
+   * Alle deklarierten Typen und statischen Hilfsmethoden werden als `public static ...` in `VJavaUserTypes` gebündelt und **vor** den Snippets kompiliert.
+   * Dadurch können nachfolgende `@->{ ... }<<`-Blöcke und `ConditionEvaluator`-Ausdrücke (z. B. `aktives_item.wert`) nahtlos auf eigene Klassen, Records, Enums und Methoden aus demselben oder anderen `.vjava`-Dateien zugreifen.
+   * Über `CompiledProjectBlocks.loadUserType(name)` / `findUserType(name)` sind diese Klassen auch direkt aus Java ladbar.
+3. **Snippet-Klassen (`de.swfdtf.vjava.gen.VJavaSnippet_<i>`)**:
+   * Implementieren `VJavaExecutable` (`execute(StateStore state, PersistentAccess persistent, EngineAPI engine, SceneController scene) throws Exception`).
+   * Automatisch importierte Pakete: `de.swfdtf.state.*`, `de.swfdtf.core.*`, `de.swfdtf.graphics.*`, `de.swfdtf.math.*`, `java.util.*`, `de.swfdtf.parser.VJavaExecutable` sowie `VJavaUserTypes.*` und `static VJavaUserTypes.*`.
+4. **Zeilen-gemappte Fehlerdiagnose**: Kompilierungsfehler werfen `VJavaCompileException` mit strukturierten `CompileDiagnostic`-Einträgen (`blockId`, `sourceFile`, auf die `.vjava`-Ursprungszeile zurückgemappte `lineNumber`, `columnNumber`, `kind`, `message`).
+
+### Verfügbare Bindings innerhalb von `@->{ ... }<<`
+| Binding | Typ | Verantwortung |
+| :--- | :--- | :--- |
+| `state` | `de.swfdtf.state.StateStore` | Veränderbare Spielvariablen (`set`, `get`, `getOrDefault`, `getString`, `getInt`, `getDouble`, `getBoolean`, `has`, `remove`, `keys`, `blockRollback`, `clear`). |
+| `persistent` | `de.swfdtf.state.PersistentAccess` | Globale spielstandübergreifende Daten (`set`, `get`, `has`, `markLineRead`/`isLineRead`, `unlockCg`, `unlockTrack`, `unlockEnding`, `unlockAchievement`). |
+| `engine` | `de.swfdtf.core.EngineAPI` | Engine-Logging (`logInfo`, `logWarn`, `logError`, `logDebug`), `getConfig()`, `getProjectDescriptor()`, `getClock()`, `getInput()`, `requestQuit()`, `requestLiveReload()`, Properties & Service-Locator. |
+| `scene` | `de.swfdtf.graphics.SceneController` | Programmatische Bühnensteuerung (`setScene`, `showSprite`, `hideSprite`, `registerImageDefinition`, `registerTransform`, `clearMasterSprites`, `getActiveSprite`, `getSceneGraph`). |
+
+---
+
+## 7. Verifizierte Inline-Rich-Text-Tags & Interpolation (`TextTagParser`, M2)
+
+Alle hier aufgeführten Tags, Interpolationen und Escape-Sequenzen sind in `de.swfdtf.graphics.TextTagParser`, `StyledTextLayout` und `StyledTextLayout.TypewriterController` aktiv und werden von `ScriptRuntime` automatisch für Dialoge, Sprechernamen, Menü-Captions, Menü-Optionen und Input-Prompts genutzt:
+
+### 7.1 Variablen-Interpolation & Escaping
+| Syntax | Verhalten |
+| :--- | :--- |
+| `[variablenname]` | Ersetzt den Platzhalter vor dem Tag-Parsing über `state`/`persistent` (oder via `ConditionEvaluator` bei `.`/`[`/`(`); unbekannte Schlüssel bleiben wörtlich als `[key]` stehen. |
 | `[[` | Erzeugt eine wörtliche öffnende eckige Klammer `[` ohne Interpolation. |
 | `{{` | Erzeugt eine wörtliche öffnende geschweifte Klammer `{` ohne Tag-Interpretation. |
 
-### 3.2 Formatierungs-, Farb- & Metrik-Tags
-Alle Style-Tags arbeiten stack-basiert (geschachtelte Tags werden beim Schließen sauber auf den vorherigen Wert zurückgesetzt):
-
+### 7.2 Formatierungs-, Farb- & Metrik-Tags
 | Tag | Schließen / Reset | Wirkung |
 | :--- | :--- | :--- |
 | `{b}` | `{/b}` | Fettdruck (Embolden-Pass im `StyledTextLayout`). |
@@ -100,7 +343,7 @@ Alle Style-Tags arbeiten stack-basiert (geschachtelte Tags werden beim Schließe
 | `{font=pfad}` | `{/font}` | Wechselt die Schriftart (Asset-Pfad oder registrierter `FontManager`-Schlüssel). |
 | `{k=2.5}` | `{/k}` | Zusätzlicher Zeichenabstand (Kerning) in logischen Pixeln. |
 
-### 3.3 Ablauf-, Pausen- & Typewriter-Cues
+### 7.3 Ablauf-, Pausen- & Typewriter-Cues
 | Tag | `CueKind` / Verhalten |
 | :--- | :--- |
 | `{w}` | `WAIT_CLICK` — pausiert den Typewriter bis zum Klick/Bestätigen des Spielers. |
@@ -110,7 +353,7 @@ Alle Style-Tags arbeiten stack-basiert (geschachtelte Tags werden beim Schließe
 | `{fast}` | `FAST` — deckt alle Zeichen vor dem Tag sofort und ohne Typewriter-Verzögerung auf. |
 | `{cps=60}` ... `{/cps}` | Lokale Typewriter-Geschwindigkeit in Zeichen/Sekunde (`0` = sofortige Ausgabe). |
 
-### 3.4 Furigana, Inline-Bilder, Hyperlinks & Echtzeit-Effekte
+### 7.4 Furigana, Inline-Bilder, Hyperlinks & Echtzeit-Effekte
 | Tag | Wirkung |
 | :--- | :--- |
 | `{rb}漢字{/rb}{rt}かんじ{/rt}` | Ordnet die Lautlesung (`RubyPair` / `RubyLayout`) zentriert oberhalb des Basistexts an und reserviert automatisch Zeilen-Headroom. |
@@ -122,12 +365,13 @@ Alle Style-Tags arbeiten stack-basiert (geschachtelte Tags werden beim Schließe
 
 ---
 
-## 4. Syntaktisches Referenzbeispiel (Zielformat M3)
+## 8. Verifiziertes Referenzbeispiel (M3)
 
 ```vjava
 define lena = Character("Lena", color="#58a6ff", image="lena", voice_tag="lena")
+default punktzahl = 0
 
-:: Kode für VN: Eigene Java-Klassen & CustomDisplayable definieren @->{
+:: Kode für VN: Eigene Java-Klasse definieren @->{
     public static class InventarItem {
         public final String name;
         public final int wert;
@@ -141,10 +385,15 @@ define lena = Character("Lena", color="#58a6ff", image="lena", voice_tag="lena")
 
 label start:
     scene bg_akademie_nacht with dissolve(0.8)
-    :: Kode für VN: Engine-Logging & Zustand setzen @->{
+    show lena happy at left with easeinleft
+    :: Kode für VN: Zustand, Persistent & Engine-API nutzen @->{
         engine.logInfo("Szene gestartet in " + engine.getEngineVersion());
-        // state.set(...) folgt in M3/M4
+        state.set("aktives_item", new InventarItem("Sternenschlüssel", 42));
+        persistent.unlockCg("cg_akademie_intro");
     }<<
-    lena "Willkommen in {gradient=#58a6ff,#f0f6fc}KAGAYAKI{/gradient}.{w=0.4} {rb}準備{/rb}{rt}じゅんび{/rt}はいい？"
+    lena "Willkommen in {gradient=#58a6ff,#f0f6fc}KAGAYAKI{/gradient}, du hast [aktives_item.name] ({w=0.4}{rb}準備{/rb}{rt}じゅんび{/rt})."
+    menu "Wie weiter?":
+        "Schlüssel einsetzen" if aktives_item.wert >= 40 -> jump geheimraum
+        "Zurückgehen" -> jump ende
     return
 ```

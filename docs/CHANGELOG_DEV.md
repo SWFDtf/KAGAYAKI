@@ -4,6 +4,32 @@ Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architekt
 
 ---
 
+## [M3 — Abgeschlossen] `.vjava`-Lexer, Parser, `ProjectScanner`, In-Memory-Java-Compiler, `SceneController`, `StateStore` & `ScriptRuntime`
+
+### Paket `de.swfdtf.parser`
+* `VJavaAst`: Unveränderliches AST-Modell mit `Statement`-Hierarchie (21 Record-Varianten), `JavaBlockNode`, `CharacterDef`, `ImageDef`, `LayeredImageDef` (`AlwaysLayerEntry`, `GroupLayerEntry`, `AttributeEntry`, `ConditionalLayerEntry`), `TransformDef` (`AtlStep`), `ScreenDef` (`ScreenItem`), `TranslateBlock` (`TranslateEntry`), `LabelNode`, `ScriptFileAst` und `ProjectAst`.
+* `VJavaLexer` (+ `TokenType`, `Token`) & `VJavaParseException`: Einrückungsbewusster Lexer (`INDENT`/`DEDENT`/`LINE`/`JAVA_BLOCK`/`EOF`, 4-Spalten-Tab-Expansion, `#`/`//`-Kommentare) mit sauberer Isolation eingebetteter `@->{ ... }<<`-Java-Blöcke (inklusive `:: Kode für VN: ...`-Header und Java-String-/Textblock-/Kommentar-Tracking).
+* `VJavaParser`: Rekursiv-absteigender Parser für alle `.vjava`-Top-Level-Deklarationen (`define`, `default`, `$`, `image`, `layeredimage`, `transform`, `screen`, `translate`, `label`, `@->{ ... }<<`) und Label-Statements (`scene`, `show`, `hide`, `with`, `play`, `queue`, `stop`, `voice`, `menu` inline/eingerückt/timed, `if`/`elif`/`else`, `jump`/`call`/`return`, `input`, `nvl`, `window`, `pause`, `block_rollback`, `pass`, `$`, Dialoge).
+* `ProjectScanner`: Rekursiver Scanner für `**/*.vjava` (unter Auslassung von `.git`, `build`, `.gradle`, `saves`, `out`, `dist`), `project.vjava.json` (`ProjectDescriptor`) und `assets/` mit lexikografischer Sortierung und Last-Wins-Duplikatwarnungen.
+* `JavaBlockCompiler` (+ `CompiledProjectBlocks`), `VJavaExecutable` & `VJavaCompileException` (+ `CompileDiagnostic`): In-Memory-Java-21-Compiler via `ToolProvider.getSystemJavaCompiler()` und `ForwardingJavaFileManager` (ohne temporäre Dateien). Kompiliert benutzerdefinierte Klassen/Records/Enums/Interfaces/Unterklassen und statische Helfer in `de.swfdtf.vjava.gen.VJavaUserTypes` sowie Snippets in `VJavaSnippet_<i>` mit Bindings `(state, persistent, engine, scene)` und zeilen-gemappten Compiler-Diagnosen.
+* `ConditionEvaluator`: Rekursiv-absteigender Ausdrucks- und Bedingungs-Evaluator (Arithmetik, Vergleiche, Logik `&&`/`||`/`!`/`and`/`or`/`not`, Ternär `?:`, Feld-/Record-/Getter-Zugriffe, Indexierung, Methodenaufrufe, `state`, `persistent`, `Math` und KAGAYAKI-Truthiness).
+* `ScriptRuntime` (+ `Status`, `DialoguePrompt`, `ChoiceOption`, `MenuPrompt`, `InputPrompt`, `AudioBridge`, `AudioEvent`, `StackFrame`, `ExecutionSnapshot`): Nicht-blockierende State-Machine-Skript-Laufzeit mit `[var]`-Interpolation (`TextTagParser`), NVL-Modus, Call-Stack, timed `menu`/`pause`-Countdowns, `AudioBridge`, `EngineAPI`-Service-Registrierung und M4-Snapshot-/Checkpoint-Hooks.
+* JUnit-6-Tests in `src/test/java/de/swfdtf/parser/` (`VJavaLexerAndParserTest`, `ProjectScannerTest`, `JavaBlockCompilerTest`, `ConditionEvaluatorTest`, `ScriptRuntimeIntegrationTest`) — insgesamt **101** Tests laut `build/test-results/test/` über alle Pakete.
+
+### Paket `de.swfdtf.state`
+* `StateStore` & `SimpleStateStore`: Vertragsinterface (`state`-Binding) inklusive Typ-Coercion, `snapshotMap`/`restoreMap` und `blockRollback` sowie thread-sichere M3-In-Memory-Implementierung.
+* `PersistentAccess` & `SimplePersistentAccess`: Vertragsinterface (`persistent`-Binding) für globale Variablen, Read-Tracking (`markLineRead`/`isLineRead`) sowie CG-/Track-/Ending-/Achievement-Freischaltungen inklusive thread-sicherer In-Memory-Implementierung.
+
+### Erweiterung `de.swfdtf.graphics`
+* `SceneController` (+ `StageEntry`, `StageSnapshot`): High-Level-Bühnensteuerung (`scene`-Binding) für `setScene`, `showSprite` (inklusive automatischem Positionserhalt bei wiederholtem Tag ohne `at`), `hideSprite`, eingebaute Positionen (`left`, `center`, `truecenter`, `right`, `offscreenleft`, `offscreenright`, `reset`), `image`/`transform`-Registrierung sowie `snapshotState`/`restoreState`.
+
+### Dokumentation
+* `src/main/java/de/swfdtf/parser/AGENT_CONTEXT.md` und `src/main/java/de/swfdtf/state/AGENT_CONTEXT.md` neu erstellt.
+* `src/main/java/de/swfdtf/graphics/AGENT_CONTEXT.md` um `SceneController`, `StageEntry` und `StageSnapshot` erweitert.
+* `docs/VJAVA_SPEZIFIKATION.md`, `docs/ARCHITEKTUR.md`, `docs/API_REFERENZ.md` und `docs/CHANGELOG_DEV.md` vollständig auf Meilenstein M3 aktualisiert.
+
+---
+
 ## [M2 — Abgeschlossen] Texturen (`STBImage`), 9-Slice, `SpriteNode`, `CustomDisplayable` & Rich-Text-/Typografie-Pipeline
 
 ### Erweiterung `de.swfdtf.graphics` (ohne `java.awt`)

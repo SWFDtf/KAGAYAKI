@@ -9,7 +9,7 @@
 * **Build-System**: Gradle (Groovy DSL) mit automatischer Plattform-/Architektur-Erkennung für LWJGL-Natives (`windows`, `windows-arm64`, `macos`, `macos-arm64`, `linux`, `linux-arm64`) und `-XstartOnFirstThread` auf macOS
 * **Grafik, Fenster & Audio**: LWJGL `3.3.6` (`lwjgl`, `lwjgl-glfw`, `lwjgl-opengl`, `lwjgl-openal`, `lwjgl-stb`)
 * **Mathematik & Serialisierung**: `org.joml:joml:1.10.8`, `com.google.code.gson:gson:2.11.0`
-* **Testing**: JUnit Jupiter `6.0.0` (`useJUnitPlatform()`) — aktuell **83** grüne Unit-Tests in `core`, `git`, `graphics` und `math`
+* **Testing**: JUnit Jupiter `6.0.0` (`useJUnitPlatform()`) — **101** Tests (laut `build/test-results/test/`) in `core`, `git`, `graphics`, `math` und `parser`
 
 ---
 
@@ -29,17 +29,17 @@ Die Engine trennt Entwicklungsbetrieb und Auslieferung über `EngineMode`:
 
 ---
 
-## 3. Paketstruktur & Status (Meilenstein M2 abgeschlossen)
+## 3. Paketstruktur & Status (Meilenstein M3 abgeschlossen)
 
 | Paket | Status | Verantwortung |
 | :--- | :--- | :--- |
 | `de.swfdtf` (`Main` / `StandaloneMain`) | **Implementiert (M1)** | `Main` (Standard `STUDIO_DUAL_WINDOW`, optional `--standalone`) und `StandaloneMain` (erzwingt `STANDALONE_GAME`) als CLI-Einstiegspunkte für `EngineApplication`. |
 | `de.swfdtf.math` | **Implementiert (M1)** | `Vec2f`, `Rect2f`, `ColorMatrix4f` (Premultiplied Alpha), `Easing` (`EaseType` + `cubicBezier`), `Transform2D`, `ScreenShake` (`vpunch`/`hpunch`/`custom`). |
 | `de.swfdtf.core` | **Implementiert (M1)** | `EngineMode`, `EngineConfig` (+ `Builder`, CLI-Parser), `ProjectDescriptor` (`project.vjava.json`), `EngineLogger` (Ringpuffer + Listener), `GameClock` (60 Hz Fixed-Timestep), `InputManager` (GLFW + Letterbox-Mapping + Gamepad), `EngineAPI` (Fassade + Service-Locator), `StudioBridge`, `EngineApplication` (+ `Updatable`). |
-| `de.swfdtf.graphics` | **Implementiert (M1 + M2)** | `RenderMode`, `IRenderPipeline`, `RenderPipeline2D` (OpenGL 3.3 Core, Offscreen-`Framebuffer`, `ShaderProgram`, SDF-Rounded-Rects, Pivot-Rotation, Letterbox-Blit), `RenderPipeline3DStub`, `SceneGraph`, `SceneLayer`, `SceneNode`, `SpriteNode`, `CustomDisplayable`, `GlfwWindow`, `WindowManager`, `Texture`, `TextureManager` (`STBImage`/`STBImageWrite`, Fallback-Schraffur), `NineSliceDrawable`, `TextTagParser`, `FontAtlas` (`STBTruetype` + CPU-Fallback), `FontManager`, `StyledTextLayout` (+ `TypewriterController`). |
+| `de.swfdtf.graphics` | **Implementiert (M1 + M2 + M3)** | `RenderMode`, `IRenderPipeline`, `RenderPipeline2D` (OpenGL 3.3 Core, Offscreen-`Framebuffer`, `ShaderProgram`, SDF-Rounded-Rects, Pivot-Rotation, Letterbox-Blit), `RenderPipeline3DStub`, `SceneGraph`, `SceneLayer`, `SceneNode`, `SpriteNode`, `SceneController` (+ `StageEntry`, `StageSnapshot`), `CustomDisplayable`, `GlfwWindow`, `WindowManager`, `Texture`, `TextureManager` (`STBImage`/`STBImageWrite`, Fallback-Schraffur), `NineSliceDrawable`, `TextTagParser`, `FontAtlas` (`STBTruetype` + CPU-Fallback), `FontManager`, `StyledTextLayout` (+ `TypewriterController`). |
 | `de.swfdtf.git` | **Implementiert (M1)** | `GitController` (nicht-interaktive Git-CLI-Steuerung mit Commit-Policy-Validierung). |
-| `de.swfdtf.parser` *(geplant)* | Geplant (M3) | Rekursiver `.vjava`-Scanner, einrückungsbasierter VN-Parser und In-Memory-Java-Compiler (`@->{ ... }<<`). |
-| `de.swfdtf.state` *(geplant)* | Geplant (M4) | Deterministischer Rollback-Speicher (`RevertableMap`, `RevertableList`), Save/Load-System, `HistoryLog`. |
+| `de.swfdtf.parser` | **Implementiert (M3)** | `VJavaLexer`, `VJavaParser`, `VJavaAst`, `VJavaParseException`, `ProjectScanner`, `JavaBlockCompiler` (`VJavaUserTypes` + `VJavaSnippet_<i>` via `javax.tools.JavaCompiler`), `VJavaExecutable`, `VJavaCompileException`, `ConditionEvaluator`, `ScriptRuntime`. |
+| `de.swfdtf.state` | **Implementiert (M3-Basis; M4 folgt)** | M3-Verträge `StateStore` / `PersistentAccess` und thread-sichere In-Memory-Implementierungen `SimpleStateStore` / `SimplePersistentAccess`. Deterministischer Rollback-Speicher (`RevertableStateStore`, `RevertableMap`/`RevertableList`), Save/Load-System und `HistoryLog` folgen in M4. |
 | `de.swfdtf.audio` *(geplant)* | Geplant (M5) | OpenAL-Audio-Mixer (`music`, `sound`, `voice`, `ambient`), Crossfades und RMS-Lip-Sync. |
 | `de.swfdtf.ui` *(geplant)* | Geplant (M6) | Deklarative Screens, Layout-Container, Widgets, ADV/NVL/Sprechblasen-Modi. |
 | `de.swfdtf.tools` *(geplant)* | Geplant (M7) | `StudioWindowController`, Vorlagen-Generator, Live-Regisseur, Lint und `.vpak`-Packager. |
@@ -48,7 +48,7 @@ Die Engine trennt Entwicklungsbetrieb und Auslieferung über `EngineMode`:
 
 ## 4. Service-Entkopplung über `EngineAPI`
 
-Um zyklische Paketabhängigkeiten zu vermeiden, stellt `EngineAPI` einen Thread-sicheren, typisierten Service-Locator (`registerService`, `getService`, `requireService`, `hasService`, `unregisterService`) sowie eine atomare Property-Map (`getProperty`, `setProperty`, `removeProperty`, `getPropertiesSnapshot`) bereit. `EngineApplication` registriert beim Start automatisch `SceneGraph`, sich selbst (`EngineApplication`) sowie bei `switchRenderPipeline(...)` die aktive `IRenderPipeline` (inklusive Property `"renderMode"`). Höhere Subsysteme (`state`, `audio`, `scene`, `scriptRuntime`) können sich analog registrieren, ohne dass `de.swfdtf.core` diese Pakete importieren muss.
+Um zyklische Paketabhängigkeiten zu vermeiden, stellt `EngineAPI` einen Thread-sicheren, typisierten Service-Locator (`registerService`, `getService`, `requireService`, `hasService`, `unregisterService`) sowie eine atomare Property-Map (`getProperty`, `setProperty`, `removeProperty`, `getPropertiesSnapshot`) bereit. `EngineApplication` registriert beim Start automatisch `SceneGraph`, sich selbst (`EngineApplication`) sowie bei `switchRenderPipeline(...)` die aktive `IRenderPipeline` (inklusive Property `"renderMode"`). `ScriptRuntime` registriert bei Konstruktion automatisch `StateStore`, `PersistentAccess`, `SceneController` und sich selbst (`ScriptRuntime`), ohne dass `de.swfdtf.core` diese Pakete importieren muss.
 
 ---
 
@@ -106,7 +106,27 @@ Um zyklische Paketabhängigkeiten zu vermeiden, stellt `EngineAPI` einen Thread-
 
 ---
 
-## 8. Laufzeit-Koordination (`EngineApplication` & `GlfwWindow`)
+## 8. `.vjava`-Skript-Pipeline, In-Memory-Compiler, Bühne & State (M3)
+
+### Projekt-Scanning, Lexing & Parsing (`de.swfdtf.parser`)
+* **`ProjectScanner`**: Durchsucht `projectRoot` rekursiv (unter Auslassung von `.git`, `build`, `.gradle`, `saves`, `out`, `dist`), lädt `project.vjava.json` (`ProjectDescriptor`), indiziert `assets/` und führt alle `*.vjava`-Dateien in deterministischer lexikografischer Pfadreihenfolge zu `VJavaAst.ProjectAst` zusammen (Last-Wins-Überschreibung mit Warnungen in `ProjectAst.warnings()`).
+* **`VJavaLexer` & `VJavaParser`**: Einrückungsbewusster Lexer (`INDENT`/`DEDENT`-Stack, `4` Spalten/Tab, `#`/`//`-Kommentare, präzise Trennung von `@->{ ... }<<` unter Beachtung von Java-Strings, Textblöcken und Kommentaren) und rekursiv-absteigender AST-Parser für `define`, `default`, `$`, `image`, `layeredimage`, `transform` (ATL), `screen`, `translate`, `label` sowie alle 21 `VJavaAst.Statement`-Typen. Fehler liefern `VJavaParseException` mit Datei- und Zeilenangabe.
+
+### In-Memory-Java-21-Kompilierung (`JavaBlockCompiler` & `VJavaExecutable`)
+* Nutzt `javax.tools.ToolProvider.getSystemJavaCompiler()` mit `ForwardingJavaFileManager` und eigenem `InMemoryClassLoader` (ohne temporäre Dateien).
+* Zerlegt jeden `@->{ ... }<<`-Block in `import`-Direktiven, benutzerdefinierte Typen (`class`, `interface`, `record`, `enum`, `@interface`), statische Hilfsmember/Initialisierer und ausführbare Snippet-Statements.
+* Alle Typen und statischen Helfer werden als `public static` in `de.swfdtf.vjava.gen.VJavaUserTypes` vorab kompiliert; jedes ausführbare Snippet wird als `de.swfdtf.vjava.gen.VJavaSnippet_<i> implements VJavaExecutable` generiert und erhält direkten Zugriff auf `state` (`StateStore`), `persistent` (`PersistentAccess`), `engine` (`EngineAPI`) und `scene` (`SceneController`).
+* Kompilierungsfehler werden über `VJavaCompileException` / `CompileDiagnostic` exakt auf Block-ID, `.vjava`-Dateipfad und Ursprungszeile zurückgemappt.
+
+### Ausdrucks-Evaluator, Bühne & State-Machine (`ConditionEvaluator`, `SceneController`, `ScriptRuntime`, `de.swfdtf.state`)
+* **`ConditionEvaluator`**: Rekursiv-absteigender Tokenizer/Parser/Evaluator für arithmetische, relationale, logische (`&&`/`||`/`!`, `and`/`or`/`not`) und ternäre Ausdrücke, Feld-/Record-/Getter-Zugriffe, Array-/List-/Map-Indexierung und Methodenaufrufe auf `state`, `persistent`, `Math` und benutzerdefinierten `VJavaUserTypes`-Objekten.
+* **`SceneController` (`de.swfdtf.graphics`)**: Steuert `LAYER_BACKGROUND` und `LAYER_MASTER` des `SceneGraph`, löst `image`/`layeredimage`-Definitionen sowie eingebaute Positionen (`left`, `center`, `truecenter`, `right`, `offscreenleft`, `offscreenright`, `reset`) und benannte `Transform2D`-Presets auf, bewahrt bei wiederholtem `show <tag>` ohne `at` die bestehende Position und liefert `StageSnapshot` für Rollback/Save.
+* **`StateStore` & `PersistentAccess` (`de.swfdtf.state`)**: Definieren die stabilen M3/M4-Verträge (in M3 über die thread-sicheren In-Memory-Klassen `SimpleStateStore` und `SimplePersistentAccess` realisiert).
+* **`ScriptRuntime`**: Nicht-blockierender State-Machine-Interpreter (`READY`, `WAITING_DIALOGUE`, `WAITING_MENU`, `WAITING_INPUT`, `PAUSING`, `ENDED`) mit `[var]`-Interpolation (`TextTagParser`), NVL-Puffer, Call-Stack für `call`/`return` (`_call_args`/`_return`), zeitgesteuerten `menu`-Timeouts und `pause`-Countdowns (`update(double dt)`), `AudioBridge`-Integration sowie M4-Vorbereitung über `ExecutionSnapshot` (`snapshotExecution` / `restoreExecution`) und `setCheckpointListener`.
+
+---
+
+## 9. Laufzeit-Koordination (`EngineApplication` & `GlfwWindow`)
 
 * **`EngineApplication`**: Implementiert `AutoCloseable`, verwaltet `EngineAPI`, `SceneGraph`, `WindowManager`, registrierte `EngineApplication.Updatable`-Hooks, die aktive `IRenderPipeline` sowie die optionale `StudioBridge`.
 * **Deterministische Schleife (`run()` / `stepOnce(double)`)**: Pollt Eingabe- und Fensterereignisse, verarbeitet `api.consumeLiveReloadRequested()`, führt `GameClock.advanceFrame(realDelta)` in deterministischen `1/60 s`-Schritten für `SceneGraph.update`, `Updatable.update` und `StudioBridge.update` aus und rendert anschließend Game-Fenster B und (im Studio-Modus) Studio-Fenster A.

@@ -1,11 +1,11 @@
 # Package `de.swfdtf.graphics` — AGENT_CONTEXT
 
 ## Zweck des Pakets
-LWJGL-3 / OpenGL-3.3-Core-Grafik- und Textsubsystem von KAGAYAKI (Meilensteine M1 + M2, vollständig ohne `java.awt`): Dual-Window- und Standalone-GLFW-Verwaltung mit gemeinsamen OpenGL-Objekt-Namespaces (`WindowManager`, `GlfwWindow`), Z-sortierter Szenengraph (`SceneGraph`, `SceneLayer`, `SceneNode`, `SpriteNode`, `CustomDisplayable`) mit 8 Standard-Ebenen (`-100` bis `1000`), Offscreen-Framebuffer (`Framebuffer`), GLSL-Shader-Compiler (`ShaderProgram`), das einheitliche Pipeline-Interface `IRenderPipeline` mit `RenderPipeline2D` (Premultiplied Alpha, `ColorMatrix4f`, SDF-Rounded-Rectangles, Pivot-Rotation, Letterbox-Blit) und `RenderPipeline3DStub`, reine STB-Bild-/Texturverwaltung (`Texture`, `TextureManager`, `NineSliceDrawable`) sowie die Rich-Text-, Typografie-, Furigana- und Typewriter-Engine (`TextTagParser`, `FontAtlas`, `FontManager`, `StyledTextLayout`).
+LWJGL-3 / OpenGL-3.3-Core-Grafik- und Textsubsystem von KAGAYAKI (Meilensteine M1–M3, vollständig ohne `java.awt`): Dual-Window- und Standalone-GLFW-Verwaltung mit gemeinsamen OpenGL-Objekt-Namespaces (`WindowManager`, `GlfwWindow`), Z-sortierter Szenengraph (`SceneGraph`, `SceneLayer`, `SceneNode`, `SpriteNode`, `CustomDisplayable`) mit 8 Standard-Ebenen (`-100` bis `1000`), High-Level-Bühnensteuerung (`SceneController` inklusive `StageEntry`/`StageSnapshot` für Skript-Laufzeit und Rollback), Offscreen-Framebuffer (`Framebuffer`), GLSL-Shader-Compiler (`ShaderProgram`), das einheitliche Pipeline-Interface `IRenderPipeline` mit `RenderPipeline2D` (Premultiplied Alpha, `ColorMatrix4f`, SDF-Rounded-Rectangles, Pivot-Rotation, Letterbox-Blit) und `RenderPipeline3DStub`, reine STB-Bild-/Texturverwaltung (`Texture`, `TextureManager`, `NineSliceDrawable`) sowie die Rich-Text-, Typografie-, Furigana- und Typewriter-Engine (`TextTagParser`, `FontAtlas`, `FontManager`, `StyledTextLayout`).
 
 ## Abhängigkeiten zu anderen `de.swfdtf.*`-Paketen
 - `de.swfdtf.math` (`ColorMatrix4f`, `Rect2f`, `ScreenShake`, `Transform2D`, `Vec2f`)
-- `de.swfdtf.core` (`EngineLogger` in `WindowManager`, `RenderPipeline3DStub`, `TextureManager`)
+- `de.swfdtf.core` (`EngineLogger` in `WindowManager`, `RenderPipeline3DStub`, `TextureManager`, `SceneController`)
 - Externe Bibliotheken: `org.lwjgl.glfw.*`, `org.lwjgl.opengl.*`, `org.lwjgl.stb.*` (`STBImage`, `STBImageWrite`, `STBTruetype`, `STBTTFontinfo`), `org.lwjgl.system.*`, `org.joml.Matrix4f`.
 
 ## Enthaltene Typen
@@ -20,6 +20,8 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik- und Textsubsystem von KAGAYAKI (Meilensteine M
 | `SceneLayer` | `final class` | Benannte, Z-sortierte Ebene im `SceneGraph` mit Sichtbarkeit, Parallax-Faktor, Tag-/ID-Suche und stabiler Z-Sortierung der Knoten. |
 | `SceneNode` | `class` | Hierarchischer Szenengraph-Knoten für texturierte Sprites, SDF-Rechtecke (mit Eckenradius und Rahmen), Container-Vererbung sowie `shouldDrawStandardQuad`/`onCustomRender`-Hooks. |
 | `SpriteNode` | `class` | VN-Sprite-Knoten (`extends SceneNode`) mit `imageTag`/`attributes`/`assetPath`-Metadaten sowie nativer Unterstützung für `Texture`, `NineSliceDrawable` und `CustomDisplayable`. |
+| `SceneController` | `final class` | High-Level-Bühnensteuerung (`scene` in `@->{ ... }<<`) für tag-basiertes `setScene`, `showSprite` (mit Positions-/Transform-Erhalt) und `hideSprite` auf `SceneGraph`-Ebenen inklusive Bild-/Transform-Registry. |
+| `SceneController.StageEntry` & `StageSnapshot` | `record` | Unveränderliche Schnappschüsse einzelner Bühnen-Sprites und des gesamten Bühnenzustands (Hintergrund + aktive Sprites) für deterministisches M4-Rollback und Save/Load. |
 | `CustomDisplayable` | `interface` | Erweiterbarer Vertrag (`update`, `render`, `getPreferredWidth`, `getPreferredHeight`) für prozedurale Grafik, Partikel oder Live-Gauges in Java oder `.vjava`-`@->{ ... }<<`-Blöcken. |
 | `Texture` | `final class` | OpenGL-2D-Textur-Handle im Premultiplied-`RGBA8`-Format (`GL_LINEAR`, `GL_CLAMP_TO_EDGE`) inklusive CPU-Premultiplication (`premultiplyRgba`) und Fallback-Markierung. |
 | `TextureManager` | `final class` | Reiner `STBImage`/`STBImageWrite`-Textur-Loader, kanonischer Pfad-Cache, PNG-Exporter (`writePng`) und prozeduraler Magenta/Dunkelviolett-Schraffur-Fallback bei fehlenden/defekten Assets. |
@@ -256,6 +258,35 @@ public class SpriteNode extends SceneNode {
 
     @Override protected boolean shouldDrawStandardQuad()
     @Override protected void onCustomRender(RenderPipeline2D pipeline)
+}
+```
+
+### `SceneController`
+```java
+public final class SceneController {
+    public record StageEntry(String tag, List<String> attributes, String positionName, String assetPath, Transform2D transform) {}
+    public record StageSnapshot(String backgroundTag, String backgroundAssetPath, Transform2D backgroundTransform, Map<String, StageEntry> activeSprites) {}
+
+    public SceneController(SceneGraph sceneGraph)
+    public SceneController(SceneGraph sceneGraph, TextureManager textureManager, EngineLogger logger, Path projectRoot, boolean glTextureUploadEnabled)
+
+    public void setScene(String sceneName, String transitionExpr)
+    public SpriteNode showSprite(String tag, List<String> attributes, String positionOrTransform, String transitionExpr)
+    public boolean hideSprite(String tag, String transitionExpr)
+    public void registerImageDefinition(String key, String assetPath)
+    public void registerTransform(String name, Transform2D transform)
+    public StageSnapshot snapshotState()
+    public void restoreState(StageSnapshot snapshot)
+    public void clearMasterSprites()
+
+    public SpriteNode getActiveSprite(String tag)
+    public Map<String, SpriteNode> getActiveSprites()
+    public String getBackgroundTag()
+    public SpriteNode getBackgroundNode()
+    public String getLastTransitionExpr()
+    public SceneGraph getSceneGraph()
+    public void setTransitionListener(BiConsumer<String, String> listener)
+    public void setProjectRoot(Path projectRoot)
 }
 ```
 

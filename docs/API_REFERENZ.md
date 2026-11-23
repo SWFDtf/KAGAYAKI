@@ -1,6 +1,6 @@
-# KAGAYAKI — Öffentliche API-Referenz (M1 + M2)
+# KAGAYAKI — Öffentliche API-Referenz (M1 + M2 + M3)
 
-Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen der abgeschlossenen M1- und M2-Pakete (`de.swfdtf`, `de.swfdtf.core`, `de.swfdtf.graphics`, `de.swfdtf.math`, `de.swfdtf.git`) sowie die Gradle-Tasks aus `build.gradle`.
+Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen der abgeschlossenen M1-, M2- und M3-Pakete (`de.swfdtf`, `de.swfdtf.core`, `de.swfdtf.graphics`, `de.swfdtf.math`, `de.swfdtf.git`, `de.swfdtf.parser`, `de.swfdtf.state`) sowie die Gradle-Tasks aus `build.gradle`.
 
 ---
 
@@ -9,7 +9,7 @@ Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen 
 | Task | Gruppe | Beschreibung |
 | :--- | :--- | :--- |
 | `./gradlew build` | `build` | Kompiliert Java 21 Quellen, führt JUnit-6-Tests aus und paketiert das Standard-JAR. |
-| `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`, 83 Tests) mit ausführlichem Event-Logging aus. |
+| `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`, 101 Tests laut `build/test-results/test/`) mit ausführlichem Event-Logging aus. |
 | `./gradlew run` | `application` | Startet `de.swfdtf.Main` (unter macOS automatisch mit `-XstartOnFirstThread`). |
 | `./gradlew runStudio` | `kagayaki` | Startet `de.swfdtf.Main` mit `--studio` (optional `-PprojectDir=<pfad>` ergänzt `--project <pfad>`). |
 | `./gradlew runStandalone` | `kagayaki` | Startet `de.swfdtf.StandaloneMain` (optional `-PprojectDir=<pfad>` ergänzt `--standalone <pfad>`). |
@@ -257,6 +257,27 @@ Hierarchischer, Z-sortierter Szenengraph mit 8 vorregistrierten Standard-Ebenen 
   * `void render(RenderPipeline2D pipeline, Rect2f bounds, float alpha, ColorMatrix4f colorMatrix)`
   * `default float getPreferredWidth()` / `default float getPreferredHeight()`
 
+### `SceneController` (M3, Binding `scene`)
+High-Level-Bühnensteuerung für `scene`/`show`/`hide` auf `SceneGraph` (`LAYER_BACKGROUND`, `LAYER_MASTER`) inklusive Positionserhalt beim Tag-Wechsel und deterministischer Stage-Snapshots.
+* **Records**:
+  * `public record StageEntry(String tag, List<String> attributes, String positionName, String assetPath, Transform2D transform)`
+  * `public record StageSnapshot(String backgroundTag, String backgroundAssetPath, Transform2D backgroundTransform, Map<String, StageEntry> activeSprites)`
+* **Konstruktoren**:
+  * `public SceneController(SceneGraph sceneGraph)`
+  * `public SceneController(SceneGraph sceneGraph, TextureManager textureManager, EngineLogger logger, Path projectRoot, boolean glTextureUploadEnabled)`
+* **Bühnensteuerung & Registry**:
+  * `public void setScene(String sceneName, String transitionExpr)`
+  * `public SpriteNode showSprite(String tag, List<String> attributes, String positionOrTransform, String transitionExpr)`
+  * `public boolean hideSprite(String tag, String transitionExpr)`
+  * `public void registerImageDefinition(String key, String assetPath)`
+  * `public void registerTransform(String name, Transform2D transform)`
+  * `public void clearMasterSprites()`
+* **Snapshots & Abfragen**:
+  * `public StageSnapshot snapshotState()` / `public void restoreState(StageSnapshot snapshot)`
+  * `public SpriteNode getActiveSprite(String tag)` / `public Map<String, SpriteNode> getActiveSprites()`
+  * `public String getBackgroundTag()` / `public SpriteNode getBackgroundNode()` / `public String getLastTransitionExpr()` / `public SceneGraph getSceneGraph()`
+  * `public void setTransitionListener(BiConsumer<String, String> listener)` / `public void setProjectRoot(Path projectRoot)`
+
 ### `Texture`, `TextureManager` & `NineSliceDrawable`
 Reine STB-Texturpipeline (`STBImage` / `STBImageWrite`, Premultiplied `RGBA8`) ohne `java.awt`:
 * **`Texture`**:
@@ -375,3 +396,80 @@ Gedämpfter harmonischer Oszillator: `Delta(t) = A * exp(-lambda * t) * sin(omeg
 ### Weitere Typen in `de.swfdtf.math`
 * `Vec2f(float x, float y)`: `ZERO`, `ONE`, `HALF`, `add`, `sub`, `scale`, `lerp`, `length`, `distance`.
 * `Rect2f(float x, float y, float width, float height)`: `right`, `bottom`, `centerX`, `centerY`, `contains`, `intersects`, `translate`, `inset`.
+
+---
+
+## 7. Paket `de.swfdtf.parser` (M3)
+
+### `VJavaLexer` & `VJavaParseException`
+Einrückungs- und Java-Block-bewusster Lexer (`4` Leerzeichen bzw. Tabulator = `4` Spalten, `#`/`//`-Kommentare, `@->{ ... }<<` unter Beachtung von Java-Strings/Textblöcken/Kommentaren).
+* **`VJavaLexer.TokenType`**: `INDENT`, `DEDENT`, `LINE`, `JAVA_BLOCK`, `EOF`.
+* **`VJavaLexer.Token`**: `Token(TokenType type, String sourceFile, int lineNumber, int indentColumns, String text, String description, String code)` mit Accessoren `type()`, `sourceFile()`, `lineNumber()`, `indentColumns()`, `text()`, `description()`, `code()`.
+* **Methoden**:
+  * `public static List<Token> tokenize(Path file) throws IOException`
+  * `public static List<Token> tokenize(String source, String sourceFile)`
+* **`VJavaParseException` (`extends RuntimeException`)**: Konstruktoren `(String sourceFile, int lineNumber, String message)` und `(..., Throwable cause)`; Getter `getSourceFile()`, `getLineNumber()`.
+
+### `VJavaParser` & `VJavaAst`
+Rekursiv-absteigender `.vjava`-Parser und unveränderliche AST-Datenstrukturen:
+* **`VJavaParser`**:
+  * `public static ScriptFileAst parse(Path filePath) throws IOException`
+  * `public static ScriptFileAst parse(Path filePath, String source)`
+  * `public static ScriptFileAst parse(List<Token> tokens)`
+  * `public static ScriptFileAst parse(Path filePath, List<Token> tokens)`
+* **`VJavaAst`**:
+  * `Statement` (`sealed interface` mit `sourceFile()`, `lineNumber()`): `JavaBlockStatement`, `SceneStatement`, `ShowStatement`, `HideStatement`, `SayStatement`, `JumpStatement`, `CallStatement`, `ReturnStatement`, `PlayStatement`, `QueueStatement`, `StopStatement`, `VoiceStatement`, `NvlStatement`, `BlockRollbackStatement`, `InputStatement`, `MenuStatement` (+ `MenuChoice`), `IfStatement` (+ `IfBranch`), `SetVarStatement`, `PauseStatement`, `WithStatement`, `WindowStatement`.
+  * Top-Level-Records: `JavaBlockNode`, `CharacterDef`, `ImageDef` (`fullKey()`), `LayeredImageDef` (`LayeredEntry`: `AlwaysLayerEntry`, `GroupLayerEntry` mit `AttributeEntry`, `ConditionalLayerEntry`), `TransformDef` (`AtlStep`), `ScreenDef` (`ScreenItem`), `TranslateBlock` (`TranslateEntry`), `LabelNode`, `ScriptFileAst`, `ProjectAst`.
+
+### `ProjectScanner`
+Rekursiver `.vjava`-Projekt- und Asset-Scanner.
+* **Konstante**: `public static final Set<String> SKIPPED_DIRECTORIES = Set.of(".git", "build", ".gradle", "saves", "out", "dist")`
+* **Methode**: `public static ProjectAst scan(Path projectRoot)`
+
+### `JavaBlockCompiler`, `VJavaExecutable` & `VJavaCompileException`
+In-Memory-Java-21-Compiler via `javax.tools.JavaCompiler` für `@->{ ... }<<`-Blöcke und benutzerdefinierte Typen (`de.swfdtf.vjava.gen.VJavaUserTypes` + `VJavaSnippet_<i>`).
+* **`VJavaExecutable` (`@FunctionalInterface`)**:
+  * `void execute(StateStore state, PersistentAccess persistent, EngineAPI engine, SceneController scene) throws Exception;`
+* **`JavaBlockCompiler`**:
+  * Konstanten: `GENERATED_PACKAGE = "de.swfdtf.vjava.gen"`, `USER_TYPES_SIMPLE_NAME = "VJavaUserTypes"`, `USER_TYPES_BINARY_NAME = GENERATED_PACKAGE + "." + USER_TYPES_SIMPLE_NAME`.
+  * Methoden: `compile(VJavaAst.ProjectAst)`, `compile(List<VJavaAst.JavaBlockNode>)`, `collectJavaBlocks(VJavaAst.ProjectAst)`.
+  * **`CompiledProjectBlocks`**: `getExecutable(String)`, `requireExecutable(String)`, `hasExecutable(String)`, `getExecutables()`, `getClassLoader()`, `loadUserType(String)`, `findUserType(String)`, `hasUserTypes()`, `size()`.
+* **`VJavaCompileException` (`extends RuntimeException`)**:
+  * Record: `CompileDiagnostic(String blockId, String sourceFile, int lineNumber, long columnNumber, String kind, String message)` (+ `format()`).
+  * Getter: `getBlockId()`, `getSourceFile()`, `getLineNumber()`, `getDiagnosticMessages()`, `getDiagnostics()`, `getGeneratedSource()`.
+
+### `ConditionEvaluator`
+Ausdrucks- und Bedingungs-Evaluator für Arithmetik, Vergleiche, Logik (`&&`/`||`/`!`, `and`/`or`/`not`), Ternär-Ausdrücke (`?:`), Feld-/Getter-Zugriffe, Indexierung und Methodenaufrufe:
+* `public ConditionEvaluator()`
+* `public static Object evaluate(String expr, StateStore state, PersistentAccess persistent)`
+* `public static boolean evaluateBoolean(String expr, StateStore state, PersistentAccess persistent)`
+* `public static boolean isTruthy(Object value)`
+
+### `ScriptRuntime`
+Nicht-blockierende State-Machine-Skript-Laufzeit mit Dialogue-/Menu-/Input-/Pause-Zuständen, Audio-Bridge und M4-Snapshot-Hooks:
+* **Enum**: `Status { READY, WAITING_DIALOGUE, WAITING_MENU, WAITING_INPUT, PAUSING, ENDED }`
+* **Records & Interfaces**: `DialoguePrompt`, `ChoiceOption`, `MenuPrompt`, `InputPrompt`, `AudioBridge`, `AudioEvent`, `StackFrame`, `ExecutionSnapshot`.
+* **Konstruktoren**:
+  * `public ScriptRuntime(VJavaAst.ProjectAst project)`
+  * `public ScriptRuntime(VJavaAst.ProjectAst project, EngineAPI engineApi)`
+  * `public ScriptRuntime(VJavaAst.ProjectAst project, EngineAPI engineApi, StateStore stateStore, PersistentAccess persistentAccess, SceneController sceneController)`
+* **Steuerung & Snapshots**:
+  * `compile()`, `start()`, `start(String entryLabel)`, `advance()`, `choose(int optionIndex)`, `submitInput(String text)`, `update(double dt)`, `jumpToLabel(String label)`, `snapshotExecution()`, `restoreExecution(ExecutionSnapshot)`
+* **Getter & Hooks**:
+  * `getStatus()`, `getActiveDialogue()`, `getActiveMenu()`, `getActiveInput()`, `getStateStore()`, `getPersistentAccess()`, `getSceneController()`, `getEngineApi()`, `getProjectAst()`, `getAudioEvents()`, `setAudioBridge(AudioBridge)`, `setCheckpointListener(Runnable)`, `getCompiledBlocks()`, `getCurrentLabel()`, `getStatementIndex()`, `isNvlMode()`, `getNvlLines()`, `getActiveVoicePath()`, `getPauseRemainingSeconds()`, `getWindowAction()`.
+
+---
+
+## 8. Paket `de.swfdtf.state` (M3-Verträge & In-Memory-Basis)
+
+### `StateStore` & `SimpleStateStore`
+Vertrag (Binding `state`) und thread-sichere M3-In-Memory-Implementierung für Sitzungsvariablen und Rollback-Barrieren:
+* **Methoden (`StateStore`)**:
+  * `set(String key, Object value)`, `get(String key)`, `getOrDefault(String key, Object defaultValue)`, `getString(String key, String defaultValue)`, `getInt(String key, int defaultValue)`, `getDouble(String key, double defaultValue)`, `getBoolean(String key, boolean defaultValue)`
+  * `has(String key)`, `remove(String key)`, `keys()`, `snapshotMap()`, `restoreMap(Map<String, Object> snapshot)`, `blockRollback()`, `isRollbackBlocked()`, `clear()`
+* **Zusatz in `SimpleStateStore`**: `resetRollbackBlock()`.
+
+### `PersistentAccess` & `SimplePersistentAccess`
+Vertrag (Binding `persistent`) und thread-sichere M3-In-Memory-Implementierung für spielstandübergreifende Persistenz:
+* **Variablen**: `set(String key, Object value)`, `get(String key)`, `getOrDefault(String key, Object defaultValue)`, `has(String key)`
+* **Read-Tracking & Freischaltungen**: `markLineRead(String)` / `isLineRead(String)`, `unlockCg(String)` / `isCgUnlocked(String)` / `getUnlockedCgs()`, `unlockTrack(String)` / `isTrackUnlocked(String)` / `getUnlockedTracks()`, `unlockEnding(String)` / `isEndingUnlocked(String)` / `getUnlockedEndings()`, `unlockAchievement(String)` / `isAchievementUnlocked(String)` / `getUnlockedAchievements()`.
