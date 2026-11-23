@@ -4,6 +4,9 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 .kotlin
+dist/
+*.vpak
+saves/
 
 ### IntelliJ IDEA ###
 .idea/modules.xml
