@@ -1,0 +1,175 @@
+// ============================================================================
+// Datei: main.vjava
+// Zentrale Deklarationen für das vJava-Demo-Projekt "Schneewittchen"
+// Enthält Charaktere, Zustandsvariablen, Assets, LayeredImage, ATL-Transforms,
+// eingebettete Java-21-Domänenklassen (@->{ ... }<<) und das Entry-Label.
+// ============================================================================
+
+// --- 1. Charakterdefinitionen ---
+define koenigin_mutter = Character("Die gute Königin", color="#d2a8ff", image="koenigin_mutter")
+define stiefmutter = Character("Die böse Königin", color="#f85149", image="stiefmutter")
+define spiegel = Character("Zauberspiegel", color="#a371f7", image="spiegel")
+define schneewittchen = Character("Schneewittchen", color="#f0f6fc", image="schneewittchen", voice_tag="schneewittchen")
+define jaeger = Character("Der Jäger", color="#3fb950", image="jaeger")
+define zwerg_meister = Character("Ältester Zwerg", color="#d29922", image="zwerge")
+define zwerge = Character("Die sieben Zwerge", color="#f0883e", image="zwerge")
+define prinz = Character("Der Königssohn", color="#58a6ff", image="prinz")
+
+// --- 2. Standardvariablen für Ablauf und HUD ---
+default schneewittchen_status = "LEBENDIG"
+default kapitel_nr = 1
+default kapitel_titel = "Vorgeschichte & Wunsch der Königin"
+default fortschritt = 1
+default anschlags_zaehler = 0
+default spiegel_antwort = "Ihr seid die Schönste hier"
+default spiegel_abfragen = 0
+default vorsicht_bonus = false
+default hat_schutzversprechen = false
+
+// --- 3. Bühnen-Bilder (Hintergründe & Figuren) ---
+image bg_schloss_winter = "assets/images/bg/bg_schloss_winter.png"
+image bg_spiegel_saal = "assets/images/bg/bg_spiegel_saal.png"
+image bg_wald = "assets/images/bg/bg_wald.png"
+image bg_zwergenhaus = "assets/images/bg/bg_zwergenhaus.png"
+image bg_berg_glassarg = "assets/images/bg/bg_berg_glassarg.png"
+image bg_hochzeitssaal = "assets/images/bg/bg_hochzeitssaal.png"
+
+image koenigin_mutter = "assets/images/char/koenigin_mutter.png"
+image stiefmutter normal = "assets/images/char/stiefmutter_normal.png"
+image stiefmutter wuetend = "assets/images/char/stiefmutter_wuetend.png"
+image stiefmutter kraemerin = "assets/images/char/stiefmutter_kraemerin.png"
+image stiefmutter baeuerin = "assets/images/char/stiefmutter_baeuerin.png"
+image spiegel = "assets/images/char/spiegel.png"
+image jaeger = "assets/images/char/jaeger.png"
+image zwerge = "assets/images/char/zwerge.png"
+image prinz = "assets/images/char/prinz.png"
+image glassarg = "assets/images/char/glassarg.png"
+
+// --- 4. Mehrstufiges LayeredImage für Schneewittchen (inkl. Lip-Sync-Gruppe) ---
+layeredimage schneewittchen:
+    always:
+        "assets/images/char/sw_base.png"
+    group kleid:
+        attribute alltag default:
+            "assets/images/char/sw_kleid_alltag.png"
+        attribute prinzessin:
+            "assets/images/char/sw_kleid_prinzessin.png"
+        attribute braut:
+            "assets/images/char/sw_kleid_braut.png"
+    group zustand:
+        attribute gesund default:
+            "assets/images/char/sw_zustand_gesund.png"
+        attribute schlafend:
+            "assets/images/char/sw_zustand_schlafend.png"
+        attribute ohnmaechtig:
+            "assets/images/char/sw_zustand_ohnmaechtig.png"
+        attribute vergiftet:
+            "assets/images/char/sw_zustand_vergiftet.png"
+        attribute erloest:
+            "assets/images/char/sw_zustand_erloest.png"
+    group mouth:
+        attribute closed default:
+            "assets/images/char/sw_mouth_closed.png"
+        attribute half:
+            "assets/images/char/sw_mouth_half.png"
+        attribute open:
+            "assets/images/char/sw_mouth_open.png"
+    if anschlags_zaehler >= 3:
+        "assets/images/char/sw_apfel_aura.png"
+
+// --- 5. ATL-Transformationsblöcke (Animationen) ---
+transform spiegel_erscheinen:
+    xalign 0.5 yalign 0.5
+    alpha 0.0 zoom 0.85
+    easein 0.8 alpha 1.0 zoom 1.0
+
+transform fall_zu_boden:
+    xalign 0.5 yalign 1.0
+    easeout 0.45 ypos 640 rotate 10.0 alpha 0.85
+
+transform sarg_erschuetterung:
+    xalign 0.5 yalign 1.0
+    linear 0.12 xpos 930
+    linear 0.12 xpos 990
+    linear 0.12 xpos 960
+
+transform tanz_strafe:
+    xalign 0.5 yalign 1.0
+    linear 0.15 rotate -8.0
+    linear 0.15 rotate 8.0
+    repeat 3
+
+// --- 6. Eingebettete Java-21-Klassen (werden von JavaBlockCompiler in VJavaUserTypes kompiliert) ---
+:: Kode für VN: Märchen-Domänenmodell und Zustandshelfer in Java 21 @->{
+    import java.io.Serializable;
+    import java.util.ArrayList;
+    import java.util.List;
+
+    public static enum FigurZustand {
+        LEBENDIG("Lebendig"),
+        SCHLAFEND("Tief schlafend"),
+        OHNMAECHTIG("Ohnmächtig"),
+        VERGIFTET("Tödlich vergiftet"),
+        ERLOEST("Erlöst und erwacht"),
+        BESTRAFT("Gerecht bestraft");
+
+        public final String anzeigeText;
+
+        FigurZustand(String anzeigeText) {
+            this.anzeigeText = anzeigeText;
+        }
+    }
+
+    public static class AnschlagProtokoll implements Serializable {
+        public final int versuchsNummer;
+        public final String verkleidung;
+        public final String giftMittel;
+        public final boolean gerettet;
+
+        public AnschlagProtokoll(int versuchsNummer, String verkleidung, String giftMittel, boolean gerettet) {
+            this.versuchsNummer = versuchsNummer;
+            this.verkleidung = verkleidung;
+            this.giftMittel = giftMittel;
+            this.gerettet = gerettet;
+        }
+    }
+
+    public static class MaerchenStatus implements Serializable {
+        public FigurZustand schneewittchenZustand;
+        public FigurZustand stiefmutterZustand;
+        public String aktuellerOrt;
+        public int ueberstandeneAnschlaege;
+        public final List<AnschlagProtokoll> chronik;
+
+        public MaerchenStatus() {
+            this.schneewittchenZustand = FigurZustand.LEBENDIG;
+            this.stiefmutterZustand = FigurZustand.LEBENDIG;
+            this.aktuellerOrt = "Königliches Schloss";
+            this.ueberstandeneAnschlaege = 0;
+            this.chronik = new ArrayList<>();
+        }
+
+        public void setzeZustand(FigurZustand neuerZustand, String ort) {
+            this.schneewittchenZustand = neuerZustand;
+            this.aktuellerOrt = ort;
+        }
+
+        public void registriereAnschlag(int nr, String verkleidung, String mittel, boolean gerettet) {
+            this.chronik.add(new AnschlagProtokoll(nr, verkleidung, mittel, gerettet));
+            if (gerettet) {
+                this.ueberstandeneAnschlaege++;
+            }
+        }
+    }
+}<<
+
+// --- 7. Einstiegs-Label ---
+label start:
+    :: Kode für VN: Märchenzustand beim Spielstart initialisieren @->{
+        MaerchenStatus maerchen = new MaerchenStatus();
+        state.set("maerchen_status", maerchen);
+        state.set("schneewittchen_status", maerchen.schneewittchenZustand.name());
+        state.set("letzter_anschlag", new AnschlagProtokoll(0, "Keine", "Keines", true));
+        engine.logInfo("Schneewittchen-Demo gestartet in " + engine.getEngineVersion());
+    }<<
+    jump kapitel_1_vorgeschichte

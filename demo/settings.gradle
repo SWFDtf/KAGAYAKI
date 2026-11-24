@@ -1,0 +1,4 @@
+rootProject.name = 'schneewittchen-vjava-demo'
+
+// Bindet das Hauptprojekt KAGAYAKI (vJava-Engine) als Composite Build ein
+includeBuild('..')

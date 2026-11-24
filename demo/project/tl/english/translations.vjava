@@ -1,0 +1,18 @@
+// ============================================================================
+// Datei: tl/english/translations.vjava
+// Englische Live-Übersetzung für den LocalizationManager-Demonstrator
+// ============================================================================
+
+translate english strings:
+    old "Vorsichtig bleiben und niemanden leichtfertig einlassen"
+    new "Stay cautious and never let strangers inside carelessly"
+    old "Den sieben Zwergen dankbar das Versprechen geben"
+    new "Gratefully give the seven dwarfs your promise"
+
+translate english spiegel_01:
+    # spiegel "Frau Königin, Ihr seid die Schönste hier, doch Schneewittchen ist tausendmal schöner als Ihr!"
+    spiegel "O Queen, thou art fairest of all I see, but Snow White is a thousand times fairer than thee!"
+
+translate english prolog_01:
+    # koenigin_mutter "Ach, hätte ich doch ein Kind, so weiß wie Schnee, so rot wie Blut und so schwarz wie Ebenholz!"
+    koenigin_mutter "Oh, if only I had a child as white as snow, as red as blood, and as black as ebony!"

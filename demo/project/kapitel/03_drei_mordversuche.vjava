@@ -1,0 +1,122 @@
+// ============================================================================
+// Kapitel 5: Die drei Mordversuche der bösen Königin
+// ============================================================================
+
+label kapitel_5_mordversuche:
+    $ kapitel_nr = 5
+    $ kapitel_titel = "Die drei Mordversuche der Königin"
+    $ fortschritt = 5
+    scene bg_spiegel_saal with fade(0.6)
+    play music "assets/audio/music/gefahr_thema.wav" fadein 1.0
+
+    show stiefmutter normal at center with dissolve(0.4)
+    "Im Schloss trat die Stiefmutter erneut vor ihren Zauberspiegel und erschrak bis ins Mark:"
+    $ spiegel_abfragen = 3
+    call zauberspiegel_befragen
+
+    show stiefmutter wuetend at center with hpunch
+    stiefmutter "So lebt es noch! Dann soll es nicht länger atmen — ich ziehe selbst über die sieben Berge!"
+    jump anschlag_1_schnuerriemen
+
+label anschlag_1_schnuerriemen:
+    scene bg_zwergenhaus with wipeleft(0.6)
+    show schneewittchen alltag gesund at left with dissolve(0.3)
+    show stiefmutter kraemerin at right with easein(0.5)
+
+    "Verkleidet als alte Krämerin klopfte die Königin an das Zwergenhäuschen und rief: ‚Schöne Ware feil! Schöne bunte Schnürriemen!‘"
+    if vorsicht_bonus:
+        schneewittchen "Eigentlich darf ich niemanden einlassen... Aber eine alte Krämerin mit bunten Schnürriemen scheint doch harmlos."
+    else:
+        schneewittchen "Die arme alte Frau kann ich gewiss einlassen und mir einen schönen Riemen kaufen!"
+
+    stiefmutter "Komm, mein Kind, ich will dich einmal ordentlich mit dem neuen Schnürriemen einschnüren!"
+    play sound "assets/audio/sfx/fall.wav"
+    "Sie schnürte so geschwind und so fest, dass Schneewittchen der Atem verging und es wie tot zu Boden fiel." with vpunch
+
+    :: Kode für VN: Anschlag 1 (Schnürriemen) -> OHNMAECHTIG @->{
+        MaerchenStatus maerchen = (MaerchenStatus) state.get("maerchen_status");
+        maerchen.setzeZustand(FigurZustand.OHNMAECHTIG, "Häuschen der sieben Zwerge");
+        maerchen.registriereAnschlag(1, "Alte Krämerin", "Bunter Schnürriemen", false);
+        state.set("schneewittchen_status", maerchen.schneewittchenZustand.name());
+        state.set("letzter_anschlag", new AnschlagProtokoll(1, "Alte Krämerin", "Bunter Schnürriemen", false));
+        state.set("anschlags_zaehler", 1);
+    }<<
+
+    show schneewittchen alltag ohnmaechtig at fall_zu_boden
+    hide stiefmutter with easeout(0.4)
+    "Am Abend kamen die sieben Zwerge heim, sahen das arme Schneewittchen auf der Erde liegen und schnitten rasch den Schnürriemen durch."
+    show zwerge at right with easein(0.3)
+    zwerge "Die alte Krämerin war niemand anderes als die gottlose Königin! Hüte dein Leben und lass keinen Menschen herein!"
+
+    :: Kode für VN: Rettung nach Anschlag 1 -> LEBENDIG @->{
+        MaerchenStatus maerchen = (MaerchenStatus) state.get("maerchen_status");
+        maerchen.setzeZustand(FigurZustand.LEBENDIG, "Häuschen der sieben Zwerge");
+        maerchen.registriereAnschlag(1, "Alte Krämerin", "Bunter Schnürriemen (durchgeschnitten)", true);
+        state.set("schneewittchen_status", maerchen.schneewittchenZustand.name());
+        state.set("letzter_anschlag", new AnschlagProtokoll(1, "Alte Krämerin", "Bunter Schnürriemen", true));
+    }<<
+
+    show schneewittchen alltag gesund at left with dissolve(0.3)
+    jump anschlag_2_giftkamm
+
+label anschlag_2_giftkamm:
+    hide zwerge with dissolve(0.3)
+    "Da der Zauberspiegel der Königin verriet, dass Schneewittchen wieder lebte, schuf sie mit Hexenkünsten einen {color=#a371f7}vergifteten Kamm{/color}."
+    show stiefmutter kraemerin at right with easein(0.4)
+    stiefmutter "Gute Ware feil! Schau nur diesen herrlichen Kamm, mein liebes Kind!"
+    play sound "assets/audio/sfx/fall.wav"
+    "Kaum hatte die alte Frau Schneewittchen den Kamm ins Haar gesteckt, wirkte das Gift, und das Mädchen fiel besinnungslos nieder." with hpunch
+
+    :: Kode für VN: Anschlag 2 (Giftkamm) -> VERGIFTET @->{
+        MaerchenStatus maerchen = (MaerchenStatus) state.get("maerchen_status");
+        maerchen.setzeZustand(FigurZustand.VERGIFTET, "Häuschen der sieben Zwerge");
+        state.set("schneewittchen_status", maerchen.schneewittchenZustand.name());
+        state.set("letzter_anschlag", new AnschlagProtokoll(2, "Anderes altes Weib", "Vergifteter Kamm", false));
+        state.set("anschlags_zaehler", 2);
+    }<<
+
+    show schneewittchen alltag vergiftet at fall_zu_boden
+    hide stiefmutter with easeout(0.4)
+    "Zum Glück nahte bald der Abend. Die sieben Zwerge fanden den giftigen Kamm im Haar und zogen ihn sogleich heraus — da kam Schneewittchen wieder zu sich."
+    show zwerge at right with easein(0.3)
+    zwerg_meister "Das war das zweite Mal! Wenn wir fort sind, öffne niemandem — auch nicht durch ein Spaltbreit!"
+
+    :: Kode für VN: Rettung nach Anschlag 2 -> LEBENDIG @->{
+        MaerchenStatus maerchen = (MaerchenStatus) state.get("maerchen_status");
+        maerchen.setzeZustand(FigurZustand.LEBENDIG, "Häuschen der sieben Zwerge");
+        maerchen.registriereAnschlag(2, "Anderes altes Weib", "Vergifteter Kamm (entfernt)", true);
+        state.set("schneewittchen_status", maerchen.schneewittchenZustand.name());
+        state.set("letzter_anschlag", new AnschlagProtokoll(2, "Anderes altes Weib", "Vergifteter Kamm", true));
+    }<<
+
+    show schneewittchen alltag gesund at left with dissolve(0.3)
+    jump anschlag_3_apfel
+
+label anschlag_3_apfel:
+    hide zwerge with dissolve(0.3)
+    "Voller Wut zog sich die Königin in ihre geheimste Kammer zurück und fertigte einen wunderschönen, halb weißen und halb roten {color=#f85149}Giftapfel{/color}."
+    "Nur die rote Wange war tödlich vergiftet. Als Bäuerin verkleidet trat sie ein drittes Mal vor das Häuschen."
+    show stiefmutter baeuerin at right with easein(0.4)
+
+    schneewittchen "Ich darf niemanden einlassen, die sieben Zwerge haben es mir streng verboten!"
+    stiefmutter "Mir ist’s recht, so esse ich die weiße Hälfte selbst — schau, da ist kein Gift! Die schöne rote Backe aber schenke ich dir."
+    play sound "assets/audio/sfx/fall.wav"
+    "Da hatte Schneewittchen Lust auf den schönen Apfel, biss in die {color=#f85149}vergiftete rote Hälfte{/color} — und fiel im selben Augenblick tot zur Erde nieder." with vpunch
+
+    :: Kode für VN: Anschlag 3 (Vergifteter Apfel) -> VERGIFTET (kein Gegenmittel) @->{
+        MaerchenStatus maerchen = (MaerchenStatus) state.get("maerchen_status");
+        maerchen.setzeZustand(FigurZustand.VERGIFTET, "Häuschen der sieben Zwerge");
+        maerchen.registriereAnschlag(3, "Bäuerin", "Halb weißer, halb roter Giftapfel", false);
+        state.set("schneewittchen_status", maerchen.schneewittchenZustand.name());
+        state.set("letzter_anschlag", new AnschlagProtokoll(3, "Bäuerin", "Vergifteter Apfel", false));
+        state.set("anschlags_zaehler", 3);
+        persistent.unlockCg("cg_giftapfel");
+        persistent.unlockAchievement("ach_drei_anschlaege");
+    }<<
+
+    show schneewittchen prinzessin vergiftet at fall_zu_boden
+    hide stiefmutter with fade(0.4)
+    show zwerge at center with dissolve(0.4)
+    "Als die sieben Zwerge abends nach Hause kamen, schnürten sie auf, kämmten das Haar und wuschen es mit Wasser und Wein — doch alles war vergebens."
+    zwerge "Unser liebes Schneewittchen ist dahin... Aber es sieht noch immer so frisch und lebendig aus, wir können es nicht in die schwarze Erde versenken!"
+    jump kapitel_6_glassarg_und_erloesung

@@ -1,0 +1,81 @@
+// ============================================================================
+// Kapitel 3 & 4: Flucht in den Wald & das Haus der sieben Zwerge
+// ============================================================================
+
+label kapitel_3_flucht_in_den_wald:
+    $ kapitel_nr = 3
+    $ kapitel_titel = "Die Flucht in den tiefen Wald"
+    $ fortschritt = 3
+    scene bg_wald with wipeleft(0.7)
+    play music "assets/audio/music/wald_thema.wav" fadein 1.2
+
+    show stiefmutter wuetend at left with dissolve(0.3)
+    show jaeger at right with easein(0.4)
+    stiefmutter "Jäger, führe das Kind hinaus in den Wald! Ich will es nicht mehr vor Augen sehen. Du sollst es töten und mir Lunge und Leber als Wahrzeichen bringen."
+    hide stiefmutter with dissolve(0.4)
+
+    show schneewittchen alltag gesund at left with easein(0.5)
+    "Im tiefen, finsteren Wald zog der Jäger sein Messer. Doch Schneewittchen begann bitterlich zu weinen und bat um sein Leben."
+    voice "assets/audio/voice/sw_bitte.wav"
+    schneewittchen "Ach, lieber Jäger, lass mir mein Leben! Ich will in den wilden Wald laufen und nimmermehr wieder heimkommen."
+
+    jaeger "So lauf hin, du armes Kind! Die wilden Tiere werden dich ohnehin bald verschlingen — ich bringe der Königin stattdessen Lunge und Leber eines jungen Frischlings."
+    hide jaeger with easeout(0.5)
+
+    :: Kode für VN: Schneewittchen flieht in den Wald @->{
+        MaerchenStatus maerchen = (MaerchenStatus) state.get("maerchen_status");
+        maerchen.setzeZustand(FigurZustand.LEBENDIG, "Tiefer Wald");
+        state.set("schneewittchen_status", maerchen.schneewittchenZustand.name());
+        persistent.unlockAchievement("ach_flucht");
+    }<<
+
+    "Und die böse Königin glaubte dem Jäger, als er ihr die Organe des Frischlings überbrachte."
+    jump kapitel_4_haus_der_zwerge
+
+label kapitel_4_haus_der_zwerge:
+    $ kapitel_nr = 4
+    $ kapitel_titel = "Das Haus der sieben Zwerge"
+    $ fortschritt = 4
+    scene bg_zwergenhaus with dissolve(0.8)
+
+    show schneewittchen alltag gesund at center with easein(0.4)
+    "Schneewittchen irrte allein durch den großen Wald, bis es am Abend zu einem kleinen Häuschen gelangte."
+    "Dort war alles winzig, aber überaus reinlich: ein Tischchen mit sieben kleinen Tellern, sieben Löffelchen, sieben Messerlein und sieben Becherlein, und an der Wand sieben Bettchen."
+    "Hungrig und durstig aß Schneewittchen von jedem Teller ein wenig Gemüse und Brot und trank aus jedem Becher ein Tröpfchen Wein."
+
+    :: Kode für VN: Schneewittchen schläft im siebten Bettchen ein @->{
+        MaerchenStatus maerchen = (MaerchenStatus) state.get("maerchen_status");
+        maerchen.setzeZustand(FigurZustand.SCHLAFEND, "Häuschen der sieben Zwerge");
+        state.set("schneewittchen_status", maerchen.schneewittchenZustand.name());
+    }<<
+
+    show schneewittchen alltag schlafend at center with dissolve(0.4)
+    "Danach versuchte es ein Bettchen nach dem anderen, bis endlich das siebte genau passte — und dort schlief es ein (Status: {color=#58a6ff}[schneewittchen_status]{/color})."
+
+    show zwerge at right with easein(0.5)
+    "Als es dunkel war, kehrten die sieben Zwerge zurück, die in den Bergen nach Erz hackten und gruben."
+    zwerg_meister "Wer hat auf meinem Stühlchen gesessen? Wer hat von meinem Tellerchen gegessen? Und schaut dort — wer liegt in meinem Bettchen?!"
+    zwerge "{gradient=#f0883e,#f0f6fc}Ei du mein Gott! Was ist das Kind so wunderschön!{/gradient}"
+
+    :: Kode für VN: Schneewittchen erwacht bei den Zwergen @->{
+        MaerchenStatus maerchen = (MaerchenStatus) state.get("maerchen_status");
+        maerchen.setzeZustand(FigurZustand.LEBENDIG, "Häuschen der sieben Zwerge");
+        state.set("schneewittchen_status", maerchen.schneewittchenZustand.name());
+        persistent.unlockCg("cg_zwergenhaus");
+    }<<
+
+    show schneewittchen alltag gesund at left with dissolve(0.3)
+    "Am Morgen erzählte Schneewittchen alles. Die Zwerge hatten Mitleid und boten ihm an zu bleiben, wenn es koche, wasche, nähe und alles sauber halte."
+    zwerg_meister "Hüte dich aber vor deiner Stiefmutter! Sie wird bald erfahren, dass du hier bist. Lass ja niemanden herein!"
+
+    menu "Wie reagiert Schneewittchen auf die Warnung der Zwerge?":
+        "Vorsichtig bleiben und niemanden leichtfertig einlassen":
+            $ vorsicht_bonus = true
+            $ wald_mut = 2
+            schneewittchen "Ich verspreche es fest: Solange ihr im Bergwerk arbeitet, öffne ich keinem Fremden die Tür!"
+            jump kapitel_5_mordversuche
+        "Den sieben Zwergen dankbar das Versprechen geben":
+            $ hat_schutzversprechen = true
+            $ wald_mut = 1
+            schneewittchen "Habt tausend Dank, ihr lieben Zwerge! Ich will euer kleines Haus treu behüten."
+            jump kapitel_5_mordversuche
