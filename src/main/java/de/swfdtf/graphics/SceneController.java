@@ -2,6 +2,9 @@ package de.swfdtf.graphics;
 
 import de.swfdtf.core.EngineLogger;
 import de.swfdtf.math.Transform2D;
+import de.swfdtf.parser.VJavaAst;
+import de.swfdtf.state.PersistentAccess;
+import de.swfdtf.state.StateStore;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -80,9 +83,12 @@ public final class SceneController {
     private final Map<String, SpriteNode> activeSprites = new LinkedHashMap<>();
     private final Map<String, String> spritePositionNames = new LinkedHashMap<>();
     private final Map<String, String> imageDefinitions = new LinkedHashMap<>();
+    private final Map<String, VJavaAst.LayeredImageDef> layeredImageDefinitions = new LinkedHashMap<>();
     private final Map<String, Transform2D> namedTransforms = new LinkedHashMap<>();
 
     private Path projectRoot;
+    private StateStore stateStore;
+    private PersistentAccess persistentAccess;
     private SpriteNode backgroundNode;
     private String backgroundTag;
     private String lastTransitionExpr;
@@ -200,11 +206,34 @@ public final class SceneController {
         String resolvedAsset = resolveImageAssetPath(tag, attrList);
         SpriteNode sprite = new SpriteNode("sprite:" + tag, tag, attrList);
         sprite.setTransform(transform);
-        sprite.setAssetPath(resolvedAsset);
         sprite.setSize(600.0f, 960.0f);
-        if (glTextureUploadEnabled && textureManager != null) {
-            Texture tex = textureManager.loadTexture(resolvedAsset);
-            sprite.setTexture(tex);
+
+        VJavaAst.LayeredImageDef layeredDef = layeredImageDefinitions.get(tag);
+        if (layeredDef != null) {
+            LayeredImage layered;
+            if (existing != null
+                    && existing.getCustomDisplayable() instanceof LayeredImage existingLayered
+                    && layeredDef.name().equals(existingLayered.getName())) {
+                layered = existingLayered;
+                if (glTextureUploadEnabled && textureManager != null && layered.getTextureManager() == null) {
+                    layered.setTextureManager(textureManager);
+                }
+            } else {
+                layered = new LayeredImage(layeredDef, glTextureUploadEnabled ? textureManager : null);
+            }
+            layered.setAttributes(attrList, stateStore, persistentAccess);
+            sprite.setCustomDisplayable(layered);
+            if (!hasExplicitImageDefinition(tag, attrList) && !layered.getResolvedLayerAssets().isEmpty()) {
+                List<String> resolvedLayers = layered.getResolvedLayerAssets();
+                resolvedAsset = resolvedLayers.get(resolvedLayers.size() - 1);
+            }
+            sprite.setAssetPath(resolvedAsset);
+        } else {
+            sprite.setAssetPath(resolvedAsset);
+            if (glTextureUploadEnabled && textureManager != null) {
+                Texture tex = textureManager.loadTexture(resolvedAsset);
+                sprite.setTexture(tex);
+            }
         }
 
         activeSprites.put(tag, sprite);
@@ -260,6 +289,55 @@ public final class SceneController {
     public void registerTransform(String name, Transform2D transform) {
         if (name != null && transform != null) {
             namedTransforms.put(name.trim(), transform.copy());
+        }
+    }
+
+    /**
+     * Registers a composite {@link VJavaAst.LayeredImageDef} definition by its tag name so
+     * subsequent {@link #showSprite(String, List, String, String)} calls create/update a
+     * {@link LayeredImage}-backed {@link SpriteNode}.
+     *
+     * @param def layered image AST definition
+     */
+    public void registerLayeredImage(VJavaAst.LayeredImageDef def) {
+        if (def != null && def.name() != null && !def.name().isBlank()) {
+            layeredImageDefinitions.put(def.name().trim(), def);
+        }
+    }
+
+    /**
+     * Returns a registered {@link VJavaAst.LayeredImageDef} for {@code name}, or {@code null}.
+     *
+     * @param name layered image tag name
+     * @return registered definition or {@code null}
+     */
+    public VJavaAst.LayeredImageDef getLayeredImageDefinition(String name) {
+        return name != null ? layeredImageDefinitions.get(name.trim()) : null;
+    }
+
+    /**
+     * Binds optional {@link StateStore} and {@link PersistentAccess} context used when evaluating
+     * conditional layers inside {@link LayeredImage} sprites.
+     *
+     * @param stateStore       mutable variable store (nullable)
+     * @param persistentAccess persistent storage (nullable)
+     */
+    public void setStateContext(StateStore stateStore, PersistentAccess persistentAccess) {
+        this.stateStore = stateStore;
+        this.persistentAccess = persistentAccess;
+    }
+
+    /**
+     * Advances time-dependent displayables on active stage sprites and the background node.
+     *
+     * @param dt elapsed frame delta in seconds
+     */
+    public void update(double dt) {
+        if (backgroundNode != null) {
+            backgroundNode.update(dt);
+        }
+        for (SpriteNode sprite : activeSprites.values()) {
+            sprite.update(dt);
         }
     }
 
@@ -389,6 +467,13 @@ public final class SceneController {
         }
         logger.warn("Scene", "Unknown position/transform '" + name + "', using default Transform2D.");
         return new Transform2D();
+    }
+
+    private boolean hasExplicitImageDefinition(String tag, List<String> attributes) {
+        if (!attributes.isEmpty() && imageDefinitions.containsKey(tag + " " + String.join(" ", attributes))) {
+            return true;
+        }
+        return imageDefinitions.containsKey(tag);
     }
 
     private String resolveImageAssetPath(String tag, List<String> attributes) {

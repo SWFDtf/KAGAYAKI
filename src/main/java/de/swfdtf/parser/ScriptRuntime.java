@@ -332,6 +332,7 @@ public final class ScriptRuntime {
         if (project.projectRoot() != null) {
             this.sceneController.setProjectRoot(project.projectRoot());
         }
+        this.sceneController.setStateContext(this.stateStore, this.persistentAccess);
         registerServices();
     }
 
@@ -1171,6 +1172,7 @@ public final class ScriptRuntime {
     }
 
     private void registerLayeredImage(VJavaAst.LayeredImageDef layered) {
+        sceneController.registerLayeredImage(layered);
         String basePath = null;
         String defaultFallback = null;
         for (VJavaAst.LayeredEntry entry : layered.entries()) {
