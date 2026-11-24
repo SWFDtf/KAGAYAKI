@@ -1,0 +1,17 @@
+// ============================================================================
+// Datei: ui/screens.vjava
+// Deklarativer Dark-Slate-HUD-Screen für das Schneewittchen-Märchen
+// ============================================================================
+
+screen maerchen_hud:
+    zorder 50
+    frame xpos 28 ypos 24:
+        background "#161822d9"
+        border_color "#2e334a"
+        padding 14
+        vbox spacing 6:
+            text "Schneewittchen — Kapitel [kapitel_nr]/7" size 20 color "#f0f6fc"
+            text "[kapitel_titel]" size 16 color "#8b949e"
+            text "Zustand: [schneewittchen_status]" size 17 color "#58a6ff"
+            text "Überstandene Anschläge: [anschlags_zaehler]/3" size 15 color "#f0883e"
+            bar value VariableValue("fortschritt", 7)

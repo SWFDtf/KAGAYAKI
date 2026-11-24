@@ -1,0 +1,81 @@
+// ============================================================================
+// Kapitel 6 & 7: Der Glassarg, die Erlösung durch den Prinzen & das Ende
+// ============================================================================
+
+label kapitel_6_glassarg_und_erloesung:
+    $ kapitel_nr = 6
+    $ kapitel_titel = "Der Glassarg & die Erlösung"
+    $ fortschritt = 6
+    scene bg_berg_glassarg with dissolve(0.9)
+    play music "assets/audio/music/wald_thema.wav" fadein 1.0
+
+    show glassarg at center with dissolve(0.6)
+    show schneewittchen prinzessin vergiftet at center with dissolve(0.5)
+    show zwerge at left with dissolve(0.4)
+    "Sie ließen einen durchsichtigen {color=#58a6ff}Sarg aus Glas{/color} fertigen, schrieben in goldenen Buchstaben darauf, dass es eine Königstochter war, und trugen ihn hinaus auf den Berg."
+    "Immer hielt einer der sieben Zwerge Wache. Lange, lange Zeit lag Schneewittchen im Sarg und veränderte sich nicht."
+
+    show prinz at right with easein(0.6)
+    "Eines Tages verirrte sich ein {b}Königssohn{/b} in den Wald und kam zu dem Berg. Als er Schneewittchen im gläsernen Sarg erblickte, verliebte er sich sogleich."
+    prinz "Ich kann nicht leben, ohne Schneewittchen zu sehen! Überlasst mir den Sarg, ich will es ehren und hochachten als mein Liebstes."
+    zwerg_meister "Die sieben Zwerge hatten Mitleid mit dem Prinzen und schenkten ihm den Glassarg."
+
+    "Die Diener des Königssohns hoben den Sarg auf ihre Schultern und trugen ihn den Berg hinunter."
+    play sound "assets/audio/sfx/stolpern.wav"
+    show glassarg at sarg_erschuetterung with vpunch
+    "Da geschah es, dass die Diener über einen Strauch stolperten! Durch den heftigen Stoß fuhr das giftige Apfelstück, das Schneewittchen abgebissen hatte, aus seinem Hals."
+
+    :: Kode für VN: Errettung aus dem Todesschlaf -> ERLOEST @->{
+        MaerchenStatus maerchen = (MaerchenStatus) state.get("maerchen_status");
+        maerchen.setzeZustand(FigurZustand.ERLOEST, "Berg mit dem Glassarg");
+        state.set("schneewittchen_status", maerchen.schneewittchenZustand.name());
+        state.set("anschlags_zaehler", 0);
+        persistent.unlockCg("cg_erloesung");
+        persistent.unlockAchievement("ach_erloest");
+        engine.logInfo("Schneewittchen wurde durch das Stolpern über den Strauch erlöst!");
+    }<<
+
+    show schneewittchen prinzessin erloest at center with dissolve(0.4)
+    voice "assets/audio/voice/sw_erwacht.wav"
+    schneewittchen "Ach Gott, wo bin ich?!"
+    prinz "{gradient=#58a6ff,#f0f6fc}Du bist bei mir!{/gradient} Ich habe dich lieber als alles auf der Welt — komm mit auf meines Vaters Schloss und werde meine Gemahlin."
+
+    jump kapitel_7_hochzeit_und_ende
+
+label kapitel_7_hochzeit_und_ende:
+    $ kapitel_nr = 7
+    $ kapitel_titel = "Hochzeit & Strafe der bösen Königin"
+    $ fortschritt = 7
+
+    // Unumkehrbare Schicksalswende: Ab hier greift die Rollback-Barriere von KAGAYAKI!
+    block_rollback
+
+    scene bg_hochzeitssaal with fade(0.8)
+    play music "assets/audio/music/finale_hochzeit.wav" fadein 1.2
+    play sound "assets/audio/sfx/jubel.wav"
+
+    show schneewittchen braut erloest at left with easein(0.5)
+    show prinz at right with easein(0.5)
+    "Mit großer Pracht und Herrlichkeit wurde die Hochzeit gefeiert. Auch die böse Stiefmutter war zu dem Fest geladen, ohne zu ahnen, wer die Braut war."
+
+    show stiefmutter wuetend at center with dissolve(0.4)
+    "Als sie in den Festsaal trat und Schneewittchen lebendig vor sich stehen sah, erstarrte sie vor Schreck und Wut und konnte sich nicht regen."
+    stiefmutter "{shake}Nein... das ist unmöglich!{/shake}"
+
+    show stiefmutter wuetend at tanz_strafe with hpunch
+    "Aber es waren schon {color=#f85149}eiserne Pantoffeln{/color} über Kohlenfeuer gestellt und wurden mit Zangen hereingetragen. Sie musste in die rotglühenden Schuhe treten und so lange tanzen, bis sie tot zur Erde fiel."
+
+    :: Kode für VN: Märchenabschluss & Ending/Achievements freischalten @->{
+        MaerchenStatus maerchen = (MaerchenStatus) state.get("maerchen_status");
+        maerchen.stiefmutterZustand = FigurZustand.BESTRAFT;
+        maerchen.aktuellerOrt = "Hochzeitssaal des Königssohns";
+        state.set("stiefmutter_status", maerchen.stiefmutterZustand.name());
+        persistent.unlockEnding("ending_hochzeit");
+        persistent.unlockAchievement("ach_happy_end");
+        engine.logInfo("Finale abgeschlossen: Schneewittchen und der Prinz leben glücklich.");
+    }<<
+
+    hide stiefmutter with irisout(0.7)
+    "{wave}Und Schneewittchen und der Prinz regierten lange in Frieden und Glück.{/wave} — {b}Ende des Märchens.{/b}"
+    stop music fadeout 1.5
+    return

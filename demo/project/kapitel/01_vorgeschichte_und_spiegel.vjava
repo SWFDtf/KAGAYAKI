@@ -1,0 +1,79 @@
+// ============================================================================
+// Kapitel 1 & 2: Vorgeschichte, Wunsch der Königin & der Zauberspiegel
+// ============================================================================
+
+label kapitel_1_vorgeschichte:
+    $ kapitel_nr = 1
+    $ kapitel_titel = "Vorgeschichte & Wunsch der Königin"
+    $ fortschritt = 1
+    scene bg_schloss_winter with dissolve(0.8)
+    play music "assets/audio/music/winter_prolog.wav" fadein 1.5
+
+    "Es war einmal mitten im Winter, als die Schneeflocken wie Federn vom Himmel fielen."
+    show koenigin_mutter at center with easein(0.5)
+    "Eine gute Königin saß an einem Fenster mit einem Rahmen aus schwarzem Ebenholz und nähte."
+    play sound "assets/audio/sfx/stich.wav"
+    "Dabei stach sie sich mit der Nadel in den Finger, und drei Tropfen rotes Blut fielen in den weißen Schnee." with vpunch
+
+    koenigin_mutter "Ach, hätte ich doch ein Kind, so weiß wie Schnee, so rot wie Blut und so schwarz wie Ebenholz!"
+
+    :: Kode für VN: Geburt Schneewittchens und CG freischalten @->{
+        MaerchenStatus maerchen = (MaerchenStatus) state.get("maerchen_status");
+        maerchen.setzeZustand(FigurZustand.LEBENDIG, "Königliches Schloss");
+        state.set("schneewittchen_status", maerchen.schneewittchenZustand.name());
+        persistent.unlockCg("cg_winter_wunsch");
+        persistent.unlockAchievement("ach_prolog");
+        engine.logInfo("Kapitel 1 abgeschlossen: Schneewittchen wurde geboren.");
+    }<<
+
+    "Bald darauf bekam sie ein Töchterlein, das {b}Schneewittchen{/b} genannt wurde. Doch kaum war das Kind geboren, starb die Königin."
+    hide koenigin_mutter with fade(0.6)
+    jump kapitel_2_stiefmutter_spiegel
+
+label kapitel_2_stiefmutter_spiegel:
+    $ kapitel_nr = 2
+    $ kapitel_titel = "Die böse Stiefmutter & der Zauberspiegel"
+    $ fortschritt = 2
+    scene bg_spiegel_saal with fade(0.7)
+    play music "assets/audio/music/spiegel_thema.wav" fadein 1.0
+
+    "Über ein Jahr nahm sich der König eine neue Gemahlin. Sie war wunderschön, aber stolz, eitel und übermütig."
+    show stiefmutter normal at left with easein(0.4)
+    show spiegel at spiegel_erscheinen with dissolve(0.6)
+
+    "Sie besaß einen {color=#a371f7}wunderbaren Zauberspiegel{/color}. Wenn sie vor ihn trat, fragte sie ihn stets:"
+    $ spiegel_abfragen = 1
+    $ spiegel_antwort = "Frau Königin, Ihr seid die Schönste im Land!"
+    call zauberspiegel_befragen
+
+    "Lange Zeit war die Königin zufrieden, denn der Spiegel sprach die Wahrheit. Doch die Jahre vergingen, und Schneewittchen wuchs heran und wurde immer schöner."
+
+    show schneewittchen alltag gesund at right with dissolve(0.5)
+    voice "assets/audio/voice/sw_hallo.wav"
+    schneewittchen "Die Jahre vergehen im Schloss, und die Sonne scheint so hell über die Türme."
+
+    $ spiegel_abfragen = 2
+    $ spiegel_antwort = "Frau Königin, Ihr seid die Schönste hier, aber Schneewittchen ist tausendmal schöner als Ihr!"
+    call zauberspiegel_befragen
+
+    show stiefmutter wuetend at left with hpunch
+    stiefmutter "{shake}Was?!{/shake} Schneewittchen schöner als ich?! Mein Herz dreht sich vor Neid und Hass!"
+
+    :: Kode für VN: Spiegel-Verrat protokollieren @->{
+        persistent.unlockCg("cg_zauberspiegel");
+        engine.logInfo("Zauberspiegel-Abfrage #2 löst den Neid der Stiefmutter aus.");
+    }<<
+
+    jump kapitel_3_flucht_in_den_wald
+
+// Wiederverwendbare Subroutine für jede Zauberspiegel-Abfrage (demonstriert call/return)
+label zauberspiegel_befragen:
+    play sound "assets/audio/sfx/spiegel_klang.wav"
+    stiefmutter "Spieglein, Spieglein an der Wand, wer ist die Schönste im ganzen Land?"
+    if spiegel_abfragen == 1:
+        spiegel "[spiegel_antwort]"
+    elif spiegel_abfragen == 2:
+        spiegel "Frau Königin, Ihr seid die Schönste hier, doch Schneewittchen ist tausendmal schöner als Ihr!"
+    else:
+        spiegel "Frau Königin, Ihr seid die Schönste hier, doch Schneewittchen über den sieben Bergen bei den sieben Zwergen ist noch tausendmal schöner als Ihr!"
+    return
