@@ -1,6 +1,6 @@
-# KAGAYAKI — Öffentliche API-Referenz (M1–M6)
+# KAGAYAKI — Öffentliche API-Referenz (M1–M7)
 
-Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen der abgeschlossenen M1- bis M6-Pakete (`de.swfdtf`, `de.swfdtf.core`, `de.swfdtf.graphics`, `de.swfdtf.math`, `de.swfdtf.git`, `de.swfdtf.parser`, `de.swfdtf.state`, `de.swfdtf.audio`, `de.swfdtf.ui`) sowie die Gradle-Tasks aus `build.gradle`.
+Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen aller abgeschlossenen KAGAYAKI-Pakete (`de.swfdtf`, `de.swfdtf.core`, `de.swfdtf.graphics`, `de.swfdtf.math`, `de.swfdtf.git`, `de.swfdtf.parser`, `de.swfdtf.state`, `de.swfdtf.audio`, `de.swfdtf.ui`, `de.swfdtf.tools`) sowie die Gradle-Tasks aus `build.gradle`.
 
 ---
 
@@ -9,7 +9,7 @@ Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen 
 | Task | Gruppe | Beschreibung |
 | :--- | :--- | :--- |
 | `./gradlew build` | `build` | Kompiliert Java 21 Quellen, führt JUnit-6-Tests aus und paketiert das Standard-JAR. |
-| `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`, **157** Tests in **43** Suites laut `build/test-results/test/`) mit ausführlichem Event-Logging aus. |
+| `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`) mit ausführlichem Event-Logging aus (M1–M6-Basis: **157** Tests in **43** Suites, ergänzt um die M7-Suites `DirectorAndInspectorsTest`, `ToolsPackagerAndTemplateTest` und `EndToEndEngineTest` unter `de.swfdtf.tools`). |
 | `./gradlew run` | `application` | Startet `de.swfdtf.Main` (unter macOS automatisch mit `-XstartOnFirstThread`). |
 | `./gradlew runStudio` | `kagayaki` | Startet `de.swfdtf.Main` mit `--studio` (optional `-PprojectDir=<pfad>` ergänzt `--project <pfad>`). |
 | `./gradlew runStandalone` | `kagayaki` | Startet `de.swfdtf.StandaloneMain` (optional `-PprojectDir=<pfad>` ergänzt `--standalone <pfad>`). |
@@ -20,7 +20,7 @@ Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen 
 ## 2. Paket `de.swfdtf` (Einstiegspunkte)
 
 ### `Main`
-Primärer Anwendungs-Einstiegspunkt. Startet `EngineApplication` standardmäßig im `EngineMode.STUDIO_DUAL_WINDOW`-Modus, sofern `--standalone` nicht explizit übergeben wurde.
+Primärer Anwendungs-Einstiegspunkt. Verarbeitet optional `--create-template <dir>` bzw. `--create-template=<dir>` (erzeugt ein Starterprojekt via `ProjectTemplateGenerator.generate(...)` und ergänzt `--project <dir>`) und startet `EngineApplication` standardmäßig im `EngineMode.STUDIO_DUAL_WINDOW`-Modus, sofern `--standalone` nicht explizit übergeben wurde.
 * `public static void main(String[] args)`
 
 ### `StandaloneMain`
@@ -161,13 +161,14 @@ Zentralisierter GLFW-Eingabemanager (auch direkt im Headless-Modus testbar).
   * `setGamepadDeadzone(float gamepadDeadzone)`, `getGamepadDeadzone()`
 
 ### `EngineApplication` & `EngineApplication.Updatable`
-Top-Level-Laufzeitkoordinator (`implements AutoCloseable`) für Initialisierung, 60-Hz-Fixed-Timestep-Simulation, 2D/3D-Pipeline-Umschaltung, Input-Routing und Dual-Window-/Standalone-Ausführung.
+Top-Level-Laufzeitkoordinator (`implements AutoCloseable`) für Initialisierung, 60-Hz-Fixed-Timestep-Simulation, 2D/3D-Pipeline-Umschaltung, Input-Routing, `GameHost`-Lebenszyklus und Dual-Window-/Standalone-Ausführung.
 
 * **Funktionales Sub-Interface**:
   * `@FunctionalInterface public interface Updatable { void update(double fixedDeltaSeconds); }`
 * **Konstruktoren**:
   * `public EngineApplication(EngineConfig config)`
   * `public EngineApplication(EngineConfig config, StudioBridge studioBridge)`
+  * `public EngineApplication(EngineConfig config, StudioBridge studioBridge, GameHost gameHost)`
 * **Lebenszyklus & Schleife**:
   * `public void initialize()`
   * `public void run()`
@@ -183,10 +184,12 @@ Top-Level-Laufzeitkoordinator (`implements AutoCloseable`) für Initialisierung,
   * `public WindowManager getWindowManager()`
   * `public IRenderPipeline getActivePipeline()`
   * `public boolean isInitialized()`
+  * `public GameHost getGameHost()`
 
 ### Weitere Typen in `de.swfdtf.core`
 * `EngineLogger`: Thread-sicherer Ringpuffer-Logger (`DEFAULT_CAPACITY = 2000`, `Level`, `LogEntry`, `addListener`, `getRecentEntries`, `setMinimumLevel`).
-* `StudioBridge`: Entkopplungsinterface (`init`, `update`, `render`, `onReload`, `dispose`).
+* `StudioBridge`: Entkopplungsinterface (`init`, `update`, `render`, `onReload`, `dispose`) für `StudioWindowController`.
+* `GameHost`: Lebenszyklus-Interface (`init(EngineApplication, boolean)`, `update(double, InputManager)`, `renderUi(double)`, `onReload()`, `dispose()`) zur Entkopplung von `GameRuntimeCoordinator`.
 
 ---
 
@@ -672,4 +675,59 @@ Nicht-blockierender Self-Voicing-TTS-Dienst auf einem Java-21-Virtual-Thread mit
 * **`EndingsTreeScreen`** (`SCREEN_NAME = "endings_tree"`): Record `TreeNodeView(EndingsManager.EndingDef, int depth, boolean unlocked, TextWidget titleLabel, TextWidget statusLabel)`; `EndingsTreeScreen(ScriptSession, ScreenManager)`, `refreshTree()`, `getNodeViews()`, `getCompletionBar()`, `getCompletionLabel()`.
 * **`AchievementsScreen`** (`SCREEN_NAME = "achievements"`): Record `AchievementRowView(AchievementManager.AchievementDef, boolean unlocked, TextWidget titleLabel, TextWidget descriptionLabel, TextWidget statusLabel)`; `AchievementsScreen(ScriptSession, ScreenManager)`, `refreshAchievements()`, `getRows()`, `getSummaryLabel()`, `getProgressBar()`.
 * **`NotificationToastOverlay`** (`SCREEN_NAME = "notification_toast"`, `DEFAULT_TOAST_DURATION = 4.0`): Record `ToastPayload(String title, String subtitle)`; `NotificationToastOverlay(ScriptSession, ScreenManager)`, `pushToast(String, String)`, `setSkipPillActive(boolean)`, `setAutoPillActive(boolean)`, `isToastVisible()`, `getActiveToast()`, `getPendingToastCount()`, `getToastCard()`, `getStatusPill()`, `getStatusPillText()`.
+* **`GameRuntimeCoordinator`** (`implements GameHost`): `GameRuntimeCoordinator()`, `GameRuntimeCoordinator(boolean autoStartMainMenu)`, `init(EngineApplication, boolean)`, `update(double, InputManager)`, `renderUi(double)`, `onReload()`, `dispose()`, sowie Getter `getSession()`, `getScreenManager()`, `getAudioEngine()`, `getFontManager()`, `getTextureManager()`, `getAnimationEngine()`, `getTransitionManager()`, `getLipSyncAnalyzer()`, `getTtsService()`, `getMainMenuScreen()`, `getAdvScreen()`, `getNvlScreen()`, `getBubbleScreen()`, `getChoiceMenuScreen()`, `getPreferencesScreen()`, `getToastOverlay()`.
 * *(Paketintern)*: `UiRenderSupport` (GL-Scissor-Stack, Scrollbar-Rendering, Headless-`FontManager`-Fallback) und `UiMediaSupport` (Dark-Slate-Karten-/Button-Helfer, Zeitformatierung, `PreviewImageNode` mit STB-PNG-Dekodierung).
+
+---
+
+## 11. Paket `de.swfdtf.tools` (M7)
+
+### `ProjectTemplateGenerator`
+Erzeugt vollständige, Lint-saubere Starterprojekte inklusive prozeduraler PNG-/WAV-Assets (ohne `java.awt`).
+* `public static Path generate(Path targetDir) throws IOException`
+* `public static Path generate(Path targetDir, String title, String renderMode) throws IOException`
+
+### `VJavaLinter`
+Statischer Analyzer und Java-21-Compiler-Validator für KAGAYAKI-`.vjava`-Projekte:
+* **Enum & Records**:
+  * `public enum Severity { ERROR, WARNING }`
+  * `public record LintIssue(Severity severity, String code, String message, String sourceFile, int lineNumber)`
+  * `public record LintReport(List<LintIssue> issues, int errorCount, int warningCount)` mit `isClean()`, `hasErrors()`
+* **Methoden**:
+  * `public static LintReport lint(Path projectDir)`
+  * `public static LintReport lint(VJavaAst.ProjectAst project)`
+
+### `VpakArchiver`
+Binärer `.vpak`-Packer und -Reader (`MAGIC = "VPAK"`, `FORMAT_VERSION = 1`) mit Deflate-Kompression und CRC32-Prüfung:
+* **Record**: `public record VpakEntryInfo(String path, long uncompressedSize, long compressedSize, long crc32)`
+* **Statische Methoden**: `pack(Path projectDir, Path outputVpak) throws IOException`, `open(Path vpakFile) throws IOException`
+* **`VpakArchive` (`implements AutoCloseable`)**: `listEntries()`, `contains(String path)`, `readEntry(String path) throws IOException`, `extractAll(Path targetDir) throws IOException`, `close()`.
+
+### `StandaloneBuilder`
+Exportiert lint-geprüfte Projekte in eigenständige Distributionen (`game.vpak`, `run_game.sh`/`run_game.bat`, optionales `kagayaki-standalone.jar`, `standalone-packaging.json`):
+* **Record**: `public record BuildResult(Path outputDir, Path vpakFile, Path standaloneJar, Path launcherScript, Path packagingDescriptor, int packagedEntries)`
+* **Methode**: `public static BuildResult build(Path projectDir, Path outputDir, Path optionalStandaloneJar) throws IOException`
+
+### `LiveDirectorOverlay` (`extends Screen`)
+In-Engine-Live-Regie-Overlay (`SCREEN_NAME = "live_director"`, `Z = 1000`, `D`-Toggle) mit atomarem `.vjava`-Write-Back:
+* **Konstruktoren**: `LiveDirectorOverlay(ScriptSession)`, `LiveDirectorOverlay(ScriptSession, ScreenManager)`
+* **Steuerung & Write-Back**: `toggle()`, `setVisible(boolean)`, `onShow()`, `triggerKeyBindings(int, int)`, `refreshFromStage()`, `selectSprite(String)`, `commitCurrentSpriteEdit(String)`, `public static boolean updateShowLineInScript(Path vjavaFile, int oneBasedLine, String tag, List<String> attributes, String positionExpr)`
+* **Zugriffsmethoden**: `getSession()`, `setSession(ScriptSession)`, `getSelectedSpriteTag()`, `getPanelBox()`, `getXposSlider()`, `getYposSlider()`, `getZoomSlider()`, `getAlphaSlider()`, `getAttributesInput()`, `getApplyButton()`, `getRefreshButton()`, `getStatusLabel()`, `getSpriteButtons()`.
+
+### `DeveloperInspectors` (`extends Screen`)
+Einheitliche Entwickler-Inspektor-Suite (`SCREEN_NAME = "developer_inspectors"`, `Z = 1000`):
+* **Records**:
+  * `StyleInspectionResult(String screenName, String nodeClass, String nodeId, Rect2f bounds, String backgroundColorHex, String borderColorHex, float borderThickness, float cornerRadius, boolean visible, boolean enabled, boolean hovered, boolean focused)` mit `formatReport()`
+  * `PickedCoordinate(float x, float y, float normalizedX, float normalizedY, String xposYposSnippet, String alignSnippet)`
+  * `ConsoleExecutionResult(boolean success, String code, String output, String errorMessage)`
+* **Konstruktoren**: `DeveloperInspectors(ScriptSession)`, `DeveloperInspectors(ScriptSession, ScreenManager)`
+* **Live Reload (`Shift+R`)**: `triggerLiveReload()`, `triggerLiveReload(ScriptSession)`
+* **Style Inspector (`Shift+I`)**: `toggleStyleInspector()`, `setStyleInspectorActive(boolean)`, `isStyleInspectorActive()`, `inspectAt(float, float)`, `getLastInspectedStyle()`
+* **Coordinate Picker (`Shift+C`)**: `toggleCoordinatePicker()`, `setCoordinatePickerActive(boolean)`, `isCoordinatePickerActive()`, `updateCursorPosition(float, float)`, `pickCoordinate(float, float)`, `pickCurrentCoordinate()`, `getPickedHistory()`, `clearPickedHistory()`, `formatPosSnippet(float, float)`, `formatAlignSnippet(float, float)`
+* **Live Java Console (`Shift+O`) & Warp**: `toggleConsole()`, `setConsoleActive(boolean)`, `isConsoleActive()`, `executeConsoleSnippet(String)`, `executeConsoleSnippet(ScriptSession, String)`, `getConsoleLog()`, `clearConsoleLog()`, `warpToLabel(String)`, `warpToLabel(ScriptSession, String)`, `getAvailableLabels()`
+* **Konfiguration & UI-Getter**: `getSession()`, `setSession(ScriptSession)`, `setLinkedDirector(LiveDirectorOverlay)`, `setOnLiveReload(Consumer<ScriptSession>)`, `getCursorX()`, `getCursorY()`, `getNormalizedX()`, `getNormalizedY()`, `getStyleInspectorBox()`, `getCoordinatePickerBox()`, `getConsoleBox()`, `getConsoleInput()`, `getConsoleExecuteButton()`, `getWarpLabelInput()`, `getWarpButton()`, `getReloadButton()`.
+
+### `StudioWindowController` (`implements StudioBridge`)
+Dual-Window-Studio-Controller für Fenster A:
+* **Konstruktor & `StudioBridge`**: `StudioWindowController()`, `init(EngineAPI, long, long)`, `update(double)`, `render(int, int)`, `onReload()`, `dispose()`
+* **Studio-Aktionen & Getter**: `generateStarterProject(Path, String, String)`, `runLint()`, `switchRenderMode(RenderMode)`, `exportStandalone(Path, Path)`, `refreshInspectors()`, `getLastScannedAst()`, `getLastLintReport()`, `getLastExportResult()`, `getStudioWindowHandle()`, `getGameWindowHandle()`, `isGlReady()`, `isDisposed()`, `getStudioScreenManager()`.

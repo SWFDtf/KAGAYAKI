@@ -1,15 +1,15 @@
 # Package `de.swfdtf.ui` — AGENT_CONTEXT
 
 ## Zweck des Pakets
-Vollständiges Dark-Slate-UI-, Screen-Management-, Widget-, `screen`-AST-Builder-, `LayeredImage`-Widget- sowie eingebautes VN-Menü- und 3-Modi-Dialog-Subsystem von KAGAYAKI (Meilenstein M6): `ThemePalette` definiert das kanonische Dark-Slate-Farbschema (`#0d0e15` bis `#f85149`); `UiNode`, `Screen` und `ScreenManager` bilden den Z-sortierten Screen-Stack mit Modal-Blockierung, Tastatur-Shortcuts, Timern und Focus-Traversal; 8 Layout-Container (`VBox`, `HBox`, `Grid`, `Fixed`, `Frame`, `WindowBox`, `Viewport`, `VpGrid`) und 13 interaktive Widgets (`TextWidget`, `TextButton`, `ImageButton`, `Hotspot`, `Hotbar`, `Imagemap`, `Bar`, `VBar`, `Slider`, `TextInput`, `DragItem`, `DragGroup`, `CustomDisplayableWidget`) unterstützen `ScreenAstBuilder` zur direkten Instanziierung geparster `.vjava`-`screen`-Definitionen; zudem enthält das Paket die 3 umschaltbaren Dialogmodi (`AdvDialogueScreen`, `NvlDialogueScreen`, `BubbleDialogueScreen` inkl. `Shift+B`-Editor), Quick-Menu/Choice/Input-Overlays (`QuickMenuScreen`, `ChoiceMenuScreen`, `InputOverlayScreen`), sämtliche eingebauten Meta-/System-Screens (`MainMenuScreen`, `SaveLoadScreen`, `PreferencesScreen`, `ControlsScreen`, `AboutScreen`, `HistoryLogScreen`, `GalleryScreen`, `MusicRoomScreen`, `EndingsTreeScreen`, `AchievementsScreen`) sowie `NotificationToastOverlay`.
+Vollständiges Dark-Slate-UI-, Screen-Management-, Widget-, `screen`-AST-Builder-, `LayeredImage`-Widget-, Spiel-Laufzeitkoordinations- (`GameRuntimeCoordinator`) sowie eingebautes VN-Menü- und 3-Modi-Dialog-Subsystem von KAGAYAKI (Meilensteine M6–M7): `ThemePalette` definiert das kanonische Dark-Slate-Farbschema (`#0d0e15` bis `#f85149`); `UiNode`, `Screen` und `ScreenManager` bilden den Z-sortierten Screen-Stack mit Modal-Blockierung, Tastatur-Shortcuts, Timern und Focus-Traversal; 8 Layout-Container (`VBox`, `HBox`, `Grid`, `Fixed`, `Frame`, `WindowBox`, `Viewport`, `VpGrid`) und 13 interaktive Widgets (`TextWidget`, `TextButton`, `ImageButton`, `Hotspot`, `Hotbar`, `Imagemap`, `Bar`, `VBar`, `Slider`, `TextInput`, `DragItem`, `DragGroup`, `CustomDisplayableWidget`) unterstützen `ScreenAstBuilder` zur direkten Instanziierung geparster `.vjava`-`screen`-Definitionen; zudem enthält das Paket die 3 umschaltbaren Dialogmodi (`AdvDialogueScreen`, `NvlDialogueScreen`, `BubbleDialogueScreen` inkl. `Shift+B`-Editor), Quick-Menu/Choice/Input-Overlays (`QuickMenuScreen`, `ChoiceMenuScreen`, `InputOverlayScreen`), sämtliche eingebauten Meta-/System-Screens (`MainMenuScreen`, `SaveLoadScreen`, `PreferencesScreen`, `ControlsScreen`, `AboutScreen`, `HistoryLogScreen`, `GalleryScreen`, `MusicRoomScreen`, `EndingsTreeScreen`, `AchievementsScreen`), `NotificationToastOverlay` sowie `GameRuntimeCoordinator` (`implements GameHost`) zur Verdrahtung aller Laufzeit-Subsysteme mit `EngineApplication`.
 
 ## Abhängigkeiten zu anderen `de.swfdtf.*`-Paketen
-- `de.swfdtf.core` (`InputManager` in `ScreenManager`; `ProjectDescriptor` in `MainMenuScreen`, `AboutScreen`; `EngineAPI` in `AboutScreen`)
-- `de.swfdtf.graphics` (`SceneNode` in `ThemePalette`; `FontManager`, `RenderPipeline2D`, `TextureManager`, `Texture`, `NineSliceDrawable`, `SceneLayer`, `SceneController`, `SpriteNode`, `StyledTextLayout`, `TextTagParser`, `CustomDisplayable`, `RenderMode` in Widgets, `Screen`, `ScreenAstBuilder`, `UiRenderSupport`, `UiMediaSupport`, Dialogue-/Meta-Screens)
+- `de.swfdtf.core` (`InputManager` in `ScreenManager`, `GameRuntimeCoordinator`; `ProjectDescriptor` in `MainMenuScreen`, `AboutScreen`; `EngineAPI`, `EngineApplication`, `GameHost` in `AboutScreen`, `GameRuntimeCoordinator`)
+- `de.swfdtf.graphics` (`SceneNode` in `ThemePalette`; `FontManager`, `RenderPipeline2D`, `TextureManager`, `Texture`, `NineSliceDrawable`, `SceneLayer`, `SceneController`, `SpriteNode`, `StyledTextLayout`, `TextTagParser`, `CustomDisplayable`, `RenderMode`, `AnimationEngine`, `TransitionManager`, `IRenderPipeline`, `SceneGraph` in Widgets, `Screen`, `ScreenAstBuilder`, `UiRenderSupport`, `UiMediaSupport`, Dialogue-/Meta-Screens, `GameRuntimeCoordinator`)
 - `de.swfdtf.math` (`Rect2f`, `Vec2f`, `ColorMatrix4f`)
-- `de.swfdtf.parser` (`VJavaAst`, `ConditionEvaluator`, `JavaBlockCompiler`, `ScriptRuntime`, `ScriptSession`)
+- `de.swfdtf.parser` (`VJavaAst`, `ConditionEvaluator`, `JavaBlockCompiler`, `ProjectScanner`, `ScriptRuntime`, `ScriptSession`)
 - `de.swfdtf.state` (`StateStore`, `PersistentAccess`, `PreferencesState`, `LocalizationManager`, `SaveManager`, `SaveSlotData`, `HistoryLog`, `GalleryManager`, `EndingsManager`, `AchievementManager`)
-- `de.swfdtf.audio` (`AudioEngine`, `TextToSpeechService`)
+- `de.swfdtf.audio` (`AudioEngine`, `LipSyncAnalyzer`, `TextToSpeechService`)
 - Externe Bibliotheken: `org.lwjgl.glfw.GLFW`, `org.lwjgl.opengl.GL11`, `org.lwjgl.stb.STBImage`, `org.lwjgl.system.*`, `com.google.gson.*`.
 
 ## Enthaltene Typen
@@ -85,6 +85,7 @@ Vollständiges Dark-Slate-UI-, Screen-Management-, Widget-, `screen`-AST-Builder
 | `AchievementsScreen.AchievementRowView` | `record` | View-Model einer einzelnen Achievement-Zeile. |
 | `NotificationToastOverlay` | `class` | Nicht-modales Toast-Overlay (`Z = 500`), das `AchievementManager.pollToast()` animiert ein-/ausblendet (`4.0s`) und eine `SKIPPING >>`/`AUTO >`-Status-Pill anzeigt. |
 | `NotificationToastOverlay.ToastPayload` | `record` | Toast-Nachrichten-Nutzlast `(title, subtitle)`. |
+| `GameRuntimeCoordinator` | `final class` | Vollständiger Spiel-Laufzeitkoordinator (`implements GameHost`) für `EngineApplication`, der `ScriptSession`, `AudioEngine`, `LipSyncAnalyzer`, `TextToSpeechService`, `AnimationEngine`, `TransitionManager`, `ScreenManager`, alle Dialog-/System-Screens, globale Shortcuts und (im Studio-Modus) `LiveDirectorOverlay`/`DeveloperInspectors` integriert. |
 
 ### Paketinterne Render- & Medienhelfer
 | Typ | Art | Beschreibung |
@@ -612,5 +613,32 @@ public class NotificationToastOverlay extends Screen {
     public void pushToast(String title, String subtitle)
     public void setSkipPillActive(boolean active) / void setAutoPillActive(boolean active)
     public boolean isToastVisible() / ToastPayload getActiveToast() / int getPendingToastCount() / Frame getToastCard() / Frame getStatusPill() / TextWidget getStatusPillText()
+}
+
+public final class GameRuntimeCoordinator implements GameHost {
+    public GameRuntimeCoordinator()
+    public GameRuntimeCoordinator(boolean autoStartMainMenu)
+    @Override public void init(EngineApplication app, boolean glEnabled)
+    @Override public void update(double dt, InputManager input)
+    @Override public void renderUi(double elapsedSeconds)
+    @Override public void onReload()
+    @Override public void dispose()
+
+    public ScriptSession getSession()
+    public ScreenManager getScreenManager()
+    public AudioEngine getAudioEngine()
+    public FontManager getFontManager()
+    public TextureManager getTextureManager()
+    public AnimationEngine getAnimationEngine()
+    public TransitionManager getTransitionManager()
+    public LipSyncAnalyzer getLipSyncAnalyzer()
+    public TextToSpeechService getTtsService()
+    public MainMenuScreen getMainMenuScreen()
+    public AdvDialogueScreen getAdvScreen()
+    public NvlDialogueScreen getNvlScreen()
+    public BubbleDialogueScreen getBubbleScreen()
+    public ChoiceMenuScreen getChoiceMenuScreen()
+    public PreferencesScreen getPreferencesScreen()
+    public NotificationToastOverlay getToastOverlay()
 }
 ```

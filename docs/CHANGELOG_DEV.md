@@ -4,6 +4,31 @@ Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architekt
 
 ---
 
+## [M7 — Abgeschlossen] Dual-Window-Studio, Live-Regisseur, Entwickler-Inspektoren, VJavaLinter, Starter-Generator, VPAK-Export & Gesamtintegration
+
+### Erweiterung `de.swfdtf`, `de.swfdtf.core` & `de.swfdtf.ui`
+* `Main`: Um `--create-template <dir>` / `--create-template=<dir>` erweitert; generiert über `ProjectTemplateGenerator` ein vollständiges Starterprojekt und übergibt `--project <dir>` an `EngineConfig.fromArgs(...)`.
+* `GameHost` (`de.swfdtf.core`): Neues Lifecycle-Interface (`init`, `update`, `renderUi`, `onReload`, `dispose`), das `EngineApplication` von der Spiel-Laufzeit in `de.swfdtf.ui` entkoppelt.
+* `EngineApplication`: Um `EngineApplication(EngineConfig, StudioBridge, GameHost)`, `getGameHost()`, automatische Reflection-Instanziierung von `GameRuntimeCoordinator` (sofern `project.vjava.json` vorhanden) sowie Integration von `gameHost.update`/`renderUi`/`onReload`/`dispose` in den 60-Hz-Loop erweitert.
+* `GameRuntimeCoordinator` (`de.swfdtf.ui`, `implements GameHost`): Verdrahtet `ProjectScanner`, `ScriptSession`, `AudioEngine`, `LipSyncAnalyzer`, `TextToSpeechService`, `AnimationEngine`, `TransitionManager`, `ScreenManager`, alle 3 Dialog-Modi, alle eingebauten System-/Meta-Screens, globale Spiel-Shortcuts und (im Studio-Modus) `LiveDirectorOverlay` sowie `DeveloperInspectors`.
+
+### Paket `de.swfdtf.tools`
+* `ProjectTemplateGenerator`: Erzeugt ohne `java.awt` lauffähige, Lint-saubere Starterprojekte (`project.vjava.json`, `main.vjava` mit eingebetteten Java-Klassen, `layeredimage` inkl. Lip-Sync-`mouth`-Gruppe und Verzweigung, `ui/screens.vjava`, `tl/english/translations.vjava` sowie prozedurale PNG- und WAV-Assets).
+* `VJavaLinter` (+ `Severity`, `LintIssue`, `LintReport`): Statischer Projekt-Validator für `MISSING_ENTRY_LABEL`, `MISSING_JUMP_TARGET`, `MISSING_CALL_TARGET`, `MISSING_MENU_TARGET`, `MISSING_TIMEOUT_TARGET`, `UNREACHABLE_LABEL`, `MISSING_ASSET`, `UNDEFINED_SPEAKER`, `DUPLICATE_DEFINITION`, `PARSE_ERROR` und In-Memory-Java-21-Kompilierung (`JAVA_COMPILE_ERROR`).
+* `VpakArchiver` (+ `VpakEntryInfo`, `VpakArchive`): Binärer `.vpak`-Container (`MAGIC = "VPAK"`, `FORMAT_VERSION = 1`) mit Deflate-Kompression, CRC32-Integritätsprüfung, Pfad-Traversal-Schutz beim Entpacken (`extractAll`) und deterministischer Archivierungsreihenfolge.
+* `StandaloneBuilder` (+ `BuildResult`): Exportiert lint-geprüfte Projekte mit `game.vpak`, `run_game.sh` (inkl. `-XstartOnFirstThread` auf macOS), `run_game.bat` (`de.swfdtf.StandaloneMain --standalone .`), optionalem `kagayaki-standalone.jar` und `standalone-packaging.json` (`jlink`/`jpackage`-Deskriptor).
+* `LiveDirectorOverlay` (`extends Screen`, `Z = 1000`, `D`-Toggle): Live-Bühneninspektor für aktive Sprites, Attribute und Transform-Slider (`xpos`, `ypos`, `zoom`, `alpha`) inklusive atomarem Zurückschreiben von `show <tag>` in `.vjava`-Dateien (`updateShowLineInScript`).
+* `DeveloperInspectors` (`extends Screen`, `Z = 1000`): Live-Reload (`Shift+R`), Style-Inspector (`Shift+I`, `StyleInspectionResult`), Coordinate-Picker (`Shift+C`, `PickedCoordinate`), Live-Java-Konsole (`Shift+O`, `ConsoleExecutionResult`) und Label-Warping (`warpToLabel`).
+* `StudioWindowController` (`implements StudioBridge`): Dual-Window-Studio-Controller für Fenster A mit Toolbar, Projekt-Explorer, Lint-Zusammenfassung, Live-Variableninspektor, `EngineLogger`-Konsole, 2D/3D-RenderMode-Umschaltung und Standalone-Export.
+* JUnit-6-Tests in `src/test/java/de/swfdtf/tools/` (`DirectorAndInspectorsTest`, `ToolsPackagerAndTemplateTest`, `EndToEndEngineTest`).
+
+### Dokumentation
+* `src/main/java/de/swfdtf/tools/AGENT_CONTEXT.md` neu erstellt.
+* `src/main/java/de/swfdtf/AGENT_CONTEXT.md`, `src/main/java/de/swfdtf/core/AGENT_CONTEXT.md` und `src/main/java/de/swfdtf/ui/AGENT_CONTEXT.md` auf den finalen M7-Stand aktualisiert.
+* `docs/ARCHITEKTUR.md`, `docs/API_REFERENZ.md`, `docs/VJAVA_SPEZIFIKATION.md` und `docs/CHANGELOG_DEV.md` auf den abgeschlossenen Projekt-Endstand von Meilenstein M7 aktualisiert.
+
+---
+
 ## [M6 — Abgeschlossen] `LayeredImage`, Dark-Slate-UI-System, `ScreenAstBuilder`, 3 Dialog-Modi & Eingebaute System-/Meta-Screens
 
 ### Erweiterung `de.swfdtf.graphics` & `de.swfdtf.parser`

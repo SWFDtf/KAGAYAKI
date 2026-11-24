@@ -1,7 +1,7 @@
 # Package `de.swfdtf.core` — AGENT_CONTEXT
 
 ## Zweck des Pakets
-Zentrales Laufzeit-Fundament von KAGAYAKI: Ausführungsmodi (`STUDIO_DUAL_WINDOW` vs. `STANDALONE_GAME`), unveränderliche Engine-Konfiguration inklusive CLI-Parser, JSON-Projektmetadaten (`project.vjava.json`), Thread-sicheres strukturiertes Logging, deterministische 60-Hz-Simulationsuhr, zentralisiertes GLFW-Input-Tracking mit Letterbox-Mausprojektion, öffentliche Skript-/UI-Fassade (`EngineAPI`) mit typisiertem Service-Locator, die Entkopplungsschnittstelle `StudioBridge` für Standalone-Builds sowie der Top-Level-Laufzeitkoordinator `EngineApplication`.
+Zentrales Laufzeit-Fundament von KAGAYAKI: Ausführungsmodi (`STUDIO_DUAL_WINDOW` vs. `STANDALONE_GAME`), unveränderliche Engine-Konfiguration inklusive CLI-Parser, JSON-Projektmetadaten (`project.vjava.json`), Thread-sicheres strukturiertes Logging, deterministische 60-Hz-Simulationsuhr, zentralisiertes GLFW-Input-Tracking mit Letterbox-Mausprojektion, öffentliche Skript-/UI-Fassade (`EngineAPI`) mit typisiertem Service-Locator, die Entkopplungsschnittstellen `StudioBridge` (für Studio-Fenster A) und `GameHost` (für Spiel-Laufzeitkoordination in `de.swfdtf.ui`) sowie der Top-Level-Laufzeitkoordinator `EngineApplication`.
 
 ## Abhängigkeiten zu anderen `de.swfdtf.*`-Paketen
 - `de.swfdtf.graphics` (`GlfwWindow`, `IRenderPipeline`, `RenderMode`, `RenderPipeline2D`, `RenderPipeline3DStub`, `SceneGraph`, `WindowManager`) in `EngineApplication`
@@ -23,7 +23,8 @@ Zentrales Laufzeit-Fundament von KAGAYAKI: Ausführungsmodi (`STUDIO_DUAL_WINDOW
 | `InputManager` | `final class` | Zentraler GLFW-Eingabemanager für Tastatur, Modifier, Unicode-Texteingabe, Letterbox-gemappte logische Mauskoordinaten, Scroll-Deltas und Gamepads (inkl. Headless-Test-Hooks). |
 | `EngineAPI` | `final class` | Öffentliche Engine-Fassade für `@->{ ... }<<`-Java-Blöcke (`engine`), UI-Screens und Studio-Werkzeuge inklusive Properties und typisiertem Service-Locator. |
 | `StudioBridge` | `interface` | Entkopplungsschnittstelle zwischen `EngineApplication` und `StudioWindowController` (`tools`-Paket) zum sauberen Ausschluss in Standalone-Builds. |
-| `EngineApplication` | `final class` | Top-Level-Laufzeitkoordinator (`AutoCloseable`) für Initialisierung, 60-Hz-Fixed-Timestep-Loop, 2D/3D-Pipeline-Umschaltung, Input-Routing und Dual-Window-/Standalone-Ausführung. |
+| `GameHost` | `interface` | Lebenszyklus-Brücke, die `EngineApplication` von Spielablauf, UI-Screens, Audio-Mixing und Skript-Ausführung in `de.swfdtf.ui` (`GameRuntimeCoordinator`) entkoppelt. |
+| `EngineApplication` | `final class` | Top-Level-Laufzeitkoordinator (`AutoCloseable`) für Initialisierung, 60-Hz-Fixed-Timestep-Loop, 2D/3D-Pipeline-Umschaltung, Input-Routing, `GameHost`-Lebenszyklus und Dual-Window-/Standalone-Ausführung. |
 | `EngineApplication.Updatable` | `@FunctionalInterface` | Funktionaler Callback für deterministische Fixed-Timestep-Subsysteme (`update(double fixedDeltaSeconds)`). |
 
 ## Öffentliche API-Signaturen
@@ -270,6 +271,17 @@ public interface StudioBridge {
 }
 ```
 
+### `GameHost`
+```java
+public interface GameHost {
+    void init(EngineApplication app, boolean glEnabled);
+    void update(double dt, InputManager input);
+    void renderUi(double elapsedSeconds);
+    void onReload();
+    void dispose();
+}
+```
+
 ### `EngineApplication` & `EngineApplication.Updatable`
 ```java
 public final class EngineApplication implements AutoCloseable {
@@ -280,6 +292,7 @@ public final class EngineApplication implements AutoCloseable {
 
     public EngineApplication(EngineConfig config)
     public EngineApplication(EngineConfig config, StudioBridge studioBridge)
+    public EngineApplication(EngineConfig config, StudioBridge studioBridge, GameHost gameHost)
     public void initialize()
     public void run()
     public void stepOnce(double realDeltaSeconds)
@@ -291,6 +304,7 @@ public final class EngineApplication implements AutoCloseable {
     public WindowManager getWindowManager()
     public IRenderPipeline getActivePipeline()
     public boolean isInitialized()
+    public GameHost getGameHost()
     @Override public void close()
 }
 ```

@@ -1,12 +1,13 @@
-# `.vjava` Sprach- und Projekt-Spezifikation (M6-Stand)
+# `.vjava` Sprach- und Projekt-Spezifikation (M7-Stand)
 
-> **Implementierungsstand (Meilenstein M6 abgeschlossen)**: Alle in diesem Dokument beschriebenen `.vjava`-Sprachkonstrukte, Projektscan-Regeln, Ausdrucks- und Bedingungsgrammatiken, die In-Memory-Java-21-Kompilierung, das 4-Tier-State-/Rollback-/Save-/Lokalisierungssystem, die Audio-, ATL-Animations-, Transitions-, Partikel-, Video- und TTS-Subsysteme sowie `LayeredImage` und das deklarative Dark-Slate-UI-Subsystem (`de.swfdtf.ui`) sind implementiert und verifiziert:
+> **Implementierungsstand (Meilenstein M7 abgeschlossen — Gesamtlieferung)**: Alle in diesem Dokument beschriebenen `.vjava`-Sprachkonstrukte, Projektscan-Regeln, Ausdrucks- und Bedingungsgrammatiken, die In-Memory-Java-21-Kompilierung, das 4-Tier-State-/Rollback-/Save-/Lokalisierungssystem, die Audio-, ATL-Animations-, Transitions-, Partikel-, Video- und TTS-Subsysteme, `LayeredImage`, das deklarative Dark-Slate-UI-Subsystem (`de.swfdtf.ui`) sowie die komplette Studio-/Tooling-/Packager-Pipeline (`de.swfdtf.tools`) sind implementiert und verifiziert:
 > * **M1**: Projekt-Metadaten (`ProjectDescriptor` für `project.vjava.json`), Laufzeit-Konfiguration (`EngineConfig`) und Java-Skript-Fassade (`EngineAPI`, Binding `engine`).
 > * **M2**: Komplette Inline-Rich-Text-Syntax inklusive Variableninterpolation, Flow-Control-Cues, Furigana, Inline-Bildern, Hyperlinks und Text-Animationstags (`TextTagParser`, `StyledTextLayout`, `TypewriterController`, `FontAtlas`, `FontManager`) sowie `CustomDisplayable`.
 > * **M3**: Vollständiger Lexer (`VJavaLexer`), rekursiv-absteigender AST-Parser (`VJavaParser` / `VJavaAst`), rekursiver Projektscanner (`ProjectScanner`), In-Memory-Java-21-Compiler (`JavaBlockCompiler` / `VJavaExecutable`), Ausdrucks-Evaluator (`ConditionEvaluator`), nicht-blockierende Skript-Laufzeit (`ScriptRuntime`), Bühnensteuerung (`SceneController`, Binding `scene`) sowie State-Verträge (`StateStore` als `state`, `PersistentAccess` als `persistent`).
 > * **M4**: Sitzungskoordinator (`ScriptSession`), deterministischer Rollback-/Roll-Forward-Speicher (`RevertableStateStore`, `RevertableMap`, `RevertableList`), 4-Tier-Persistenz (`SessionState`, `PersistentState`, `PreferencesState`), `HistoryLog`, atomares GZIP-JSON-Save/Load mit PNG-Thumbnails und `__vjavaClass`-Codec (`SaveManager`, `SaveSlotData`, `SaveValueCodec`), Meta-Progression (`AchievementManager`, `GalleryManager`, `EndingsManager`) sowie Live-Lokalisierung (`LocalizationManager`).
 > * **M5**: OpenAL-/Virtual-Mixer-Audio-Engine (`AudioEngine`, `AudioChannel`, `AudioDecoder`, `AudioDsp`, `LipSyncAnalyzer`, `TextToSpeechService`), zeitgesteuerte ATL-Animationsausführung (`ATLTransform`, `AnimationEngine`), Dual-FBO-Transitions-Compositor (`Transition`, `TransitionManager`), 2D-Partikelsystem (`ParticleSystem`) sowie Video-Playback (`VideoPlayer`, `MovieSprite`).
 > * **M6**: Mehrstufige Composite-Sprites (`LayeredImage` + `SceneController`-Anbindung), Dark-Slate-UI-Framework (`ThemePalette`, `Screen`, `ScreenManager`, Container, Widgets, `ScreenAstBuilder` für `screen`-ASTs), 3 Dialog-Modi (`AdvDialogueScreen`, `NvlDialogueScreen`, `BubbleDialogueScreen` inkl. `Shift+B`-Editor) sowie alle eingebauten System-, Meta- und Toast-Screens.
+> * **M7**: Starterprojekt-Generator (`ProjectTemplateGenerator`, `--create-template`), statischer Validator (`VJavaLinter`), `.vpak`-Archiver (`VpakArchiver`), Standalone-Exporter (`StandaloneBuilder`), Live-Regie-Overlay (`LiveDirectorOverlay` mit atomarem `show`-Write-Back), Entwickler-Inspektoren (`DeveloperInspectors`: Live-Reload, Style-Inspektor, Koordinaten-Picker, Live-Java-Konsole, Warp), Dual-Window-Studio (`StudioWindowController`) sowie Spiel-Laufzeitkoordinator (`GameRuntimeCoordinator` via `GameHost`).
 
 ---
 
@@ -427,3 +428,17 @@ label start:
         "Zurückgehen" -> jump ende
     return
 ```
+
+---
+
+## 9. Werkzeugkette, Starter-Vorlage, Linting, Live-Regie & Standalone-Export (M7)
+
+* **Starter-Vorlage (`ProjectTemplateGenerator` & `--create-template <dir>`)**:
+  * Generiert `project.vjava.json`, `main.vjava` (mit eigenen Java-Klassen/Unterklassen in `@->{ ... }<<`, `layeredimage lena` mit `outfit`/`face`/`mouth`-Gruppen, Verzweigung und Übergang in Dialog 2), `ui/screens.vjava` (`screen hud_badge`), `tl/english/translations.vjava` sowie prozedurale PNG- und WAV-Assets ohne `java.awt`.
+* **Statisches Linting (`VJavaLinter`)**:
+  * Prüft `ProjectAst` vor Start oder Export auf `MISSING_ENTRY_LABEL`, `MISSING_JUMP_TARGET`, `MISSING_CALL_TARGET`, `MISSING_MENU_TARGET`, `MISSING_TIMEOUT_TARGET`, `UNREACHABLE_LABEL` (Graph-Traversierung ab `entryLabel` inkl. `Screen`-`Jump`/`Call`-Aktionen), `MISSING_ASSET` (über `assets/`-Index), `UNDEFINED_SPEAKER`, `DUPLICATE_DEFINITION`, `PARSE_ERROR` und `JAVA_COMPILE_ERROR` (`JavaBlockCompiler`).
+* **In-Engine-Regie & Inspektoren (nur im Studio-Modus)**:
+  * **`LiveDirectorOverlay` (`D`)**: Passt aktive Bühnen-Sprites (`xpos`, `ypos`, `zoom`, `alpha`, Attribute) live an und schreibt Änderungen über `updateShowLineInScript(...)` atomar zurück in die `.vjava`-Quelldatei (unter Erhalt von Einrückung, `with`-Klauseln und Kommentaren).
+  * **`DeveloperInspectors`**: `Shift+R` (Live-Reload mit Erhalt von Label, Statement-Index und `StateStore`), `Shift+I` (Style-Inspektor), `Shift+C` (Koordinaten-Picker für `xpos/ypos` & `xalign/yalign`), `Shift+O` (Live-Java-Konsole gegen `VJavaUserTypes` und Label-Warp).
+* **`.vpak`-Archiv & Standalone-Export (`VpakArchiver`, `StandaloneBuilder`)**:
+  * `StandaloneBuilder.build(...)` verweigert den Export bei Lint-Fehlern und bündelt `project.vjava.json`, `**/*.vjava`, `assets/**` und `tl/**` (ohne `saves/`, `.git/`, `build/`, `dist/`) in ein Deflate-/CRC32-geprüftes `game.vpak` samt `run_game.sh`, `run_game.bat`, optionalem `kagayaki-standalone.jar` (`de.swfdtf.StandaloneMain --standalone .`) und `standalone-packaging.json`.

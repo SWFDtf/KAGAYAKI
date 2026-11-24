@@ -1,16 +1,17 @@
 # Package `de.swfdtf` — AGENT_CONTEXT
 
 ## Zweck des Pakets
-Wurzelpaket mit den Anwendungs-Einstiegspunkten von KAGAYAKI: `Main` für den standardmäßigen Studio-Dual-Window-Start (mit optionalem `--standalone`-Override) und `StandaloneMain` als dedizierter Einstiegspunkt für exportierte Standalone-Builds (`packageStandalone`).
+Wurzelpaket mit den Anwendungs-Einstiegspunkten von KAGAYAKI: `Main` für den standardmäßigen Studio-Dual-Window-Start (mit optionalem `--standalone`-Override und `--create-template <dir>` zur Starterprojekt-Generierung) und `StandaloneMain` als dedizierter Einstiegspunkt für exportierte Standalone-Builds (`packageStandalone`).
 
 ## Abhängigkeiten zu anderen `de.swfdtf.*`-Paketen
 - `de.swfdtf.core` (`EngineApplication`, `EngineConfig`, `EngineMode`)
+- `de.swfdtf.tools` (`ProjectTemplateGenerator` in `Main` für `--create-template`)
 
 ## Enthaltene Typen
 
 | Typ | Art | Beschreibung |
 | :--- | :--- | :--- |
-| `Main` | `final class` | Primärer Anwendungs-Einstiegspunkt; startet `EngineApplication` standardmäßig im `STUDIO_DUAL_WINDOW`-Modus, sofern `--standalone` nicht explizit übergeben wurde. |
+| `Main` | `final class` | Primärer Anwendungs-Einstiegspunkt; verarbeitet optional `--create-template <dir>` / `--create-template=<dir>` über `ProjectTemplateGenerator` und startet `EngineApplication` standardmäßig im `STUDIO_DUAL_WINDOW`-Modus, sofern `--standalone` nicht explizit übergeben wurde. |
 | `StandaloneMain` | `final class` | Dedizierter Einstiegspunkt für exportierte Standalone-JARs; erzwingt `EngineMode.STANDALONE_GAME` (nur Live-Game-Fenster B ohne Studio-Werkzeuge). |
 
 ## Öffentliche API-Signaturen
