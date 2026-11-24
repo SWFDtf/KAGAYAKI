@@ -4,6 +4,33 @@ Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architekt
 
 ---
 
+## [M5 — Abgeschlossen] OpenAL-Audio-Mixer, DSP, Lip-Sync, TTS, ATL-Animationen, Dual-FBO-Transitions, Partikel & Video-Playback
+
+### Paket `de.swfdtf.audio`
+* `AudioDsp` (+ `FilterType`, `BiquadFilter`): Direct-Form-II-Transposed Second-Order-IIR-Biquad-Filter (`createLowpass`, `createHighpass`, `createBandpass`), RMS-Berechnung (`computeRms`), Hann-gefensterte logarithmische Radix-2-DFT-Spektrumbänder (`computeSpectrumBands`) und Goertzel-Analyse (`computeGoertzelMagnitude`).
+* `AudioDecoder` (+ `DecodedAudio`): Dekodierung von `.ogg` (`STBVorbis`) und `.wav` (8/16-Bit PCM, 32-Bit IEEE-Float), 16-Bit-WAV-Encoder (`encodeWav`), Sample-Konverter (`floatToPcm16`, `pcm16ToFloat`) sowie prozedurale Synthese (`synthesizeTone`, `synthesizeChord`, `synthesizeVoiceBleep`).
+* `AudioChannel` (+ `ChannelSnapshot`): Benannter Mixer-Kanal mit Fade-In/Fade-Out, Dual-Slot-Crossfading, FIFO-Queue, optionalem `BiquadFilter`, Echtzeit-RMS/-Spektrum, optionaler OpenAL-Source-Verwaltung und Rollback-Snapshots.
+* `AudioEngine`: Zentraler OpenAL-Audio-Manager (`implements AutoCloseable, ScriptRuntime.AudioBridge`) für `music`, `sound`, `voice`, `ambient` und benutzerdefinierte Kanäle mit Headless-Virtual-Mixer-Fallback, `PreferencesState`-Lautstärkekopplung, `LocalizationManager`-`tl/<lang>/`-Auflösung, `playVoiceBleep` und `snapshotAllChannels`/`restoreAllChannels`.
+* `LipSyncAnalyzer` (+ `MouthShape`): Attack/Release-Hüllkurven-Glättung vom Voice-RMS (`AudioEngine.getActiveVoiceRms()`) zu `openness` (`[0, 1]`) und `MouthShape` (`CLOSED`, `HALF_OPEN`, `OPEN`).
+* `TextToSpeechService`: Nicht-blockierender Virtual-Thread-Self-Voicing-Dienst (`implements AutoCloseable`) mit `TextTagParser`-Markup-Bereinigung (`stripRichTextTags`) und plattformspezifischer OS-Sprachausgabe (`say`, `spd-say`/`espeak`, PowerShell `SpeechSynthesizer`).
+* JUnit-6-Tests in `src/test/java/de/swfdtf/audio/` (`AudioDecoderAndChannelTest`, `AudioDspTest`, `AudioEngineAndLipSyncTest`).
+
+### Erweiterung `de.swfdtf.graphics`
+* `ATLTransform` (+ `Builder`): Ausführbare ATL-Transformations-Timelines aus `VJavaAst.AtlStep` / `TransformDef` (`fromAst`) oder Fluent-`Builder` mit `set`, `linear`/`ease*`/`cubicBezier`-Interpolation, `pause`, `repeat`, `parallel`, `block`, `choice`, `crop` und `matrixcolor`-Ausdrücken (`parseColorMatrix`) auf `Transform2D`.
+* `AnimationEngine`: Zentraler Timeline-Manager für aktive, per ID an `SceneNode`s gebundene `ATLTransform`-Instanzen inklusive Abschluss-Callbacks.
+* `Transition` (+ `Kind`): Unveränderlicher Deskriptor und Ausdrucksparser (`Transition.parse`) für 20 Übergangstypen (`NONE`, `DISSOLVE`, `FADE`, `PIXELLATE`, `MOVE`, `EASE`, `WIPE_*`, `SLIDE_*`, `PUSH_*`, `IRIS_*`, `BLINDS`, `SQUARES`, `IMAGE_DISSOLVE`, `MULTIPLE`).
+* `TransitionManager`: Headless-Transitions-Timeline-State-Machine (inklusive `MULTIPLE`-Sub-Step-Tracking) und OpenGL-3.3-Core-Dual-FBO-Shader-Compositor (`initGl`, `captureFromFbo`, `renderComposite`, `disposeGl`).
+* `ParticleSystem` (+ `EmitterKind`, `Particle`, `ParticleEmitter`): GPU-batchbares und headless simulierbares 2D-Partikelsystem (`implements CustomDisplayable`) mit 5 Presets (`snowBlossom`, `rain`, `cherryBlossoms`, `sparks`, `dust`) zur Anbindung an `SceneGraph.LAYER_FOREGROUND`.
+* `VideoPlayer` (+ `State`, `FrameSource`, `ProceduralTestFrameSource`, `FfmpegProcessFrameSource`) & `MovieSprite`: FPS-genauer Video-Playback-Controller mit Virtual-Thread-FFmpeg-Streaming und Szenengraph-Sprite-Wrapper (`extends SpriteNode`).
+* JUnit-6-Tests in `src/test/java/de/swfdtf/graphics/` (`ATLAndAnimationTest`, `ParticleAndVideoTest`, `TransitionManagerTest`) — insgesamt **140** grüne Tests laut `build/test-results/test/` über alle Pakete (`audio`, `core`, `git`, `graphics`, `math`, `parser`, `state`).
+
+### Dokumentation
+* `src/main/java/de/swfdtf/audio/AGENT_CONTEXT.md` neu erstellt.
+* `src/main/java/de/swfdtf/graphics/AGENT_CONTEXT.md` um `ATLTransform`, `AnimationEngine`, `Transition`, `TransitionManager`, `ParticleSystem`, `VideoPlayer` und `MovieSprite` erweitert.
+* `docs/ARCHITEKTUR.md`, `docs/API_REFERENZ.md`, `docs/VJAVA_SPEZIFIKATION.md` und `docs/CHANGELOG_DEV.md` auf den abgeschlossenen Stand von Meilenstein M5 aktualisiert.
+
+---
+
 ## [M4 — Abgeschlossen] 4-Tier-State, Deterministisches Rollback, Save/Load, `HistoryLog`, Meta-Manager, `LocalizationManager` & `ScriptSession`
 
 ### Paket `de.swfdtf.state`

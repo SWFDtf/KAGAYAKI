@@ -9,7 +9,7 @@
 * **Build-System**: Gradle (Groovy DSL) mit automatischer Plattform-/Architektur-Erkennung für LWJGL-Natives (`windows`, `windows-arm64`, `macos`, `macos-arm64`, `linux`, `linux-arm64`) und `-XstartOnFirstThread` auf macOS
 * **Grafik, Fenster & Audio**: LWJGL `3.3.6` (`lwjgl`, `lwjgl-glfw`, `lwjgl-opengl`, `lwjgl-openal`, `lwjgl-stb`)
 * **Mathematik & Serialisierung**: `org.joml:joml:1.10.8`, `com.google.code.gson:gson:2.11.0`
-* **Testing**: JUnit Jupiter `6.0.0` (`useJUnitPlatform()`) — **121** Tests (laut `build/test-results/test/`) in `core`, `git`, `graphics`, `math`, `parser` und `state`
+* **Testing**: JUnit Jupiter `6.0.0` (`useJUnitPlatform()`) — **140** Tests (laut `build/test-results/test/`) in `audio`, `core`, `git`, `graphics`, `math`, `parser` und `state`
 
 ---
 
@@ -29,18 +29,18 @@ Die Engine trennt Entwicklungsbetrieb und Auslieferung über `EngineMode`:
 
 ---
 
-## 3. Paketstruktur & Status (Meilenstein M4 abgeschlossen)
+## 3. Paketstruktur & Status (Meilenstein M5 abgeschlossen)
 
 | Paket | Status | Verantwortung |
 | :--- | :--- | :--- |
 | `de.swfdtf` (`Main` / `StandaloneMain`) | **Implementiert (M1)** | `Main` (Standard `STUDIO_DUAL_WINDOW`, optional `--standalone`) und `StandaloneMain` (erzwingt `STANDALONE_GAME`) als CLI-Einstiegspunkte für `EngineApplication`. |
 | `de.swfdtf.math` | **Implementiert (M1)** | `Vec2f`, `Rect2f`, `ColorMatrix4f` (Premultiplied Alpha), `Easing` (`EaseType` + `cubicBezier`), `Transform2D`, `ScreenShake` (`vpunch`/`hpunch`/`custom`). |
 | `de.swfdtf.core` | **Implementiert (M1)** | `EngineMode`, `EngineConfig` (+ `Builder`, CLI-Parser), `ProjectDescriptor` (`project.vjava.json`), `EngineLogger` (Ringpuffer + Listener), `GameClock` (60 Hz Fixed-Timestep), `InputManager` (GLFW + Letterbox-Mapping + Gamepad), `EngineAPI` (Fassade + Service-Locator), `StudioBridge`, `EngineApplication` (+ `Updatable`). |
-| `de.swfdtf.graphics` | **Implementiert (M1 + M2 + M3)** | `RenderMode`, `IRenderPipeline`, `RenderPipeline2D` (OpenGL 3.3 Core, Offscreen-`Framebuffer`, `ShaderProgram`, SDF-Rounded-Rects, Pivot-Rotation, Letterbox-Blit), `RenderPipeline3DStub`, `SceneGraph`, `SceneLayer`, `SceneNode`, `SpriteNode`, `SceneController` (+ `StageEntry`, `StageSnapshot`), `CustomDisplayable`, `GlfwWindow`, `WindowManager`, `Texture`, `TextureManager` (`STBImage`/`STBImageWrite`, Fallback-Schraffur), `NineSliceDrawable`, `TextTagParser`, `FontAtlas` (`STBTruetype` + CPU-Fallback), `FontManager`, `StyledTextLayout` (+ `TypewriterController`). |
+| `de.swfdtf.graphics` | **Implementiert (M1 + M2 + M3 + M5)** | `RenderMode`, `IRenderPipeline`, `RenderPipeline2D` (OpenGL 3.3 Core, Offscreen-`Framebuffer`, `ShaderProgram`, SDF-Rounded-Rects, Pivot-Rotation, Letterbox-Blit), `RenderPipeline3DStub`, `SceneGraph`, `SceneLayer`, `SceneNode`, `SpriteNode`, `SceneController` (+ `StageEntry`, `StageSnapshot`), `CustomDisplayable`, `GlfwWindow`, `WindowManager`, `Texture`, `TextureManager` (`STBImage`/`STBImageWrite`, Fallback-Schraffur), `NineSliceDrawable`, `TextTagParser`, `FontAtlas` (`STBTruetype` + CPU-Fallback), `FontManager`, `StyledTextLayout` (+ `TypewriterController`), `ATLTransform`, `AnimationEngine`, `Transition`, `TransitionManager`, `ParticleSystem`, `VideoPlayer` und `MovieSprite`. |
 | `de.swfdtf.git` | **Implementiert (M1)** | `GitController` (nicht-interaktive Git-CLI-Steuerung mit Commit-Policy-Validierung). |
 | `de.swfdtf.parser` | **Implementiert (M3 + M4)** | `VJavaLexer`, `VJavaParser`, `VJavaAst`, `VJavaParseException`, `ProjectScanner`, `JavaBlockCompiler` (`VJavaUserTypes` + `VJavaSnippet_<i>` via `javax.tools.JavaCompiler`), `VJavaExecutable`, `VJavaCompileException`, `ConditionEvaluator`, `ScriptRuntime` und `ScriptSession`. |
 | `de.swfdtf.state` | **Implementiert (M3 + M4)** | Verträge `StateStore` / `PersistentAccess` / `Revertable`, In-Memory-Implementierungen (`SimpleStateStore`, `SimplePersistentAccess`), deterministischer Rollback-Speicher (`RevertableMap`, `RevertableList`, `RevertableStateStore`), 4-Tier-Persistenz (`SessionState`, `PersistentState`, `PreferencesState`), `HistoryLog`, `SaveValueCodec`, `SaveSlotData`, `SaveManager`, Meta-Manager (`AchievementManager`, `GalleryManager`, `EndingsManager`) und `LocalizationManager`. |
-| `de.swfdtf.audio` *(geplant)* | Geplant (M5) | OpenAL-Audio-Mixer (`music`, `sound`, `voice`, `ambient`), Crossfades und RMS-Lip-Sync. |
+| `de.swfdtf.audio` | **Implementiert (M5)** | `AudioDsp` (`BiquadFilter`, RMS, DFT-Spektrumbänder, Goertzel), `AudioDecoder` (`STBVorbis`-OGG, WAV-Codec, Ton-/Akkord-/Bleep-Synthese), `AudioChannel` (Crossfade, Queue, Filter, `ChannelSnapshot`), `AudioEngine` (OpenAL + Headless-Virtual-Mixer, `ScriptRuntime.AudioBridge`, `tl/<lang>/`-Auflösung), `LipSyncAnalyzer` (`MouthShape`) und `TextToSpeechService` (Virtual-Thread-Self-Voicing). |
 | `de.swfdtf.ui` *(geplant)* | Geplant (M6) | Deklarative Screens, Layout-Container, Widgets, ADV/NVL/Sprechblasen-Modi. |
 | `de.swfdtf.tools` *(geplant)* | Geplant (M7) | `StudioWindowController`, Vorlagen-Generator, Live-Regisseur, Lint und `.vpak`-Packager. |
 
@@ -144,7 +144,22 @@ Um zyklische Paketabhängigkeiten zu vermeiden, stellt `EngineAPI` einen Thread-
 
 ---
 
-## 10. Laufzeit-Koordination (`EngineApplication` & `GlfwWindow`)
+## 10. Audio-, ATL-Animations-, Transitions-, Partikel-, Video- & TTS-Architektur (M5)
+
+### 10.1 OpenAL-Audio-Mixer, DSP, Lip-Sync & Self-Voicing (`de.swfdtf.audio`)
+* **`AudioDecoder` & `AudioDsp`**: Dekodiert `.ogg` (Ogg Vorbis via `STBVorbis`) und `.wav` (8/16-Bit PCM, 32-Bit IEEE-Float) in normalisierte Float- und 16-Bit-PCM-Puffer (`DecodedAudio`), kodiert WAVs (`encodeWav`) und synthetisiert Sinustöne, Akkorde sowie Charakter-Voice-Bleeps (`synthesizeVoiceBleep`). `AudioDsp` stellt zustandsbehaftete Second-Order-IIR-`BiquadFilter` (`LOWPASS`, `HIGHPASS`, `BANDPASS`), RMS-Berechnung (`computeRms`), Hann-gefensterte logarithmische Radix-2-DFT-Spektrumbänder (`computeSpectrumBands`) und Goertzel-Analyse (`computeGoertzelMagnitude`) bereit.
+* **`AudioChannel` & `AudioEngine`**: `AudioEngine` verwaltet die vier Standardkanäle `music`, `sound`, `voice` und `ambient` (plus beliebige Zusatzkanäle) über `AudioChannel` mit Dual-Slot-Crossfading, linearem Fade-In/Fade-Out, FIFO-Playlist (`queue`), DSP-Filterung, `PreferencesState`-Lautstärkekopplung (`masterVolume * channelVolume`), `tl/<lang>/`-Asset-Auflösung via `LocalizationManager`, `ScriptRuntime.AudioBridge`-Implementierung sowie vollständigem Snapshot/Restore (`ChannelSnapshot`, `snapshotAllChannels`/`restoreAllChannels`). Im Headless-Modus oder ohne Audiogerät arbeitet der Mixer deterministisch im Virtual-Mixer-Modus weiter.
+* **`LipSyncAnalyzer` & `TextToSpeechService`**: `LipSyncAnalyzer` glättet die Echtzeit-Voice-RMS-Amplitude (`AudioEngine.getActiveVoiceRms()`) per asymmetrischer Attack-/Release-Hüllkurve zu `openness` (`[0, 1]`) und diskreten `MouthShape`-Zuständen (`CLOSED`, `HALF_OPEN`, `OPEN`). `TextToSpeechService` betreibt eine nicht-blockierende Virtual-Thread-Queue für Barrierefreiheits-Self-Voicing (`selfVoicing` / `V`), bereinigt Dialogzeilen über `TextTagParser.parse(rawText).spokenText()` und unterstützt OS-native Sprachsynthese (`say`, `spd-say`/`espeak`, PowerShell `SpeechSynthesizer`).
+
+### 10.2 ATL-Animationen, GPU-Transitions, Partikel & Video (`de.swfdtf.graphics`)
+* **`ATLTransform` & `AnimationEngine`**: `ATLTransform` interpretiert `VJavaAst.AtlStep`-Listen (`fromAst`) sowie programmatische `ATLTransform.Builder`-Timelines (`set`, `linear`/`ease*`/`cubicBezier`-Interpolation, `pause`, endliches/unendliches `repeat`, `parallel`, `block`, `choice`, `crop`, `matrixcolor`-Ausdrücke mit `*`-Verkettung) direkt auf `Transform2D`. `AnimationEngine` verwaltet aktive, per String-ID an `SceneNode`s gebundene `ATLTransform`-Instanzen inklusive Abschluss-Callbacks.
+* **`Transition` & `TransitionManager`**: `Transition` beschreibt und parst (`Transition.parse(expr)`) 20 Übergangsarten (`NONE`, `DISSOLVE`, `FADE`, `PIXELLATE`, `MOVE`, `EASE`, `WIPE_LEFT/RIGHT/UP/DOWN`, `SLIDE_LEFT/RIGHT`, `PUSH_LEFT/RIGHT`, `IRIS_IN/OUT`, `BLINDS`, `SQUARES`, `IMAGE_DISSOLVE` mit `ramplen`/`reverse`, `MULTIPLE`). `TransitionManager` kombiniert eine headless testbare Timeline-State-Machine (inklusive `MULTIPLE`-Sub-Step-Tracking) mit einem OpenGL-3.3-Core-Dual-FBO-Shader-Compositor (`captureFromFbo`, `renderComposite`).
+* **`ParticleSystem`**: Implementiert `CustomDisplayable` für GPU-fähige und headless simulierbare 2D-Wetter-/FX-Partikel (`Particle`, `ParticleEmitter` mit Wind, Sinus-Swinging, Rotation, Lebensdauer-Respawn und Wrap-Around) inklusive 5 Presets (`snowBlossom`, `rain`, `cherryBlossoms`, `sparks`, `dust`) zur direkten Einbindung auf `SceneGraph.LAYER_FOREGROUND` (`Z = 100`).
+* **`VideoPlayer` & `MovieSprite`**: `VideoPlayer` treibt austauschbare `FrameSource`-Streams (`ProceduralTestFrameSource` für Tests/Fallbacks, Virtual-Thread-`FfmpegProcessFrameSource` mit `ffprobe`-Erkennung und fehlertolerantem Fallback bei fehlendem `ffmpeg`), steuert FPS-genaues Frame-Pacing, Looping und OpenGL-`glTexSubImage2D`-Updates. `MovieSprite` (`extends SpriteNode`) integriert `VideoPlayer` direkt in den `SceneGraph`.
+
+---
+
+## 11. Laufzeit-Koordination (`EngineApplication` & `GlfwWindow`)
 
 * **`EngineApplication`**: Implementiert `AutoCloseable`, verwaltet `EngineAPI`, `SceneGraph`, `WindowManager`, registrierte `EngineApplication.Updatable`-Hooks, die aktive `IRenderPipeline` sowie die optionale `StudioBridge`.
 * **Deterministische Schleife (`run()` / `stepOnce(double)`)**: Pollt Eingabe- und Fensterereignisse, verarbeitet `api.consumeLiveReloadRequested()`, führt `GameClock.advanceFrame(realDelta)` in deterministischen `1/60 s`-Schritten für `SceneGraph.update`, `Updatable.update` und `StudioBridge.update` aus und rendert anschließend Game-Fenster B und (im Studio-Modus) Studio-Fenster A.

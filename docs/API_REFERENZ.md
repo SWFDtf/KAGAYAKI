@@ -1,6 +1,6 @@
-# KAGAYAKI — Öffentliche API-Referenz (M1 + M2 + M3 + M4)
+# KAGAYAKI — Öffentliche API-Referenz (M1–M5)
 
-Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen der abgeschlossenen M1-, M2-, M3- und M4-Pakete (`de.swfdtf`, `de.swfdtf.core`, `de.swfdtf.graphics`, `de.swfdtf.math`, `de.swfdtf.git`, `de.swfdtf.parser`, `de.swfdtf.state`) sowie die Gradle-Tasks aus `build.gradle`.
+Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen der abgeschlossenen M1-, M2-, M3-, M4- und M5-Pakete (`de.swfdtf`, `de.swfdtf.core`, `de.swfdtf.graphics`, `de.swfdtf.math`, `de.swfdtf.git`, `de.swfdtf.parser`, `de.swfdtf.state`, `de.swfdtf.audio`) sowie die Gradle-Tasks aus `build.gradle`.
 
 ---
 
@@ -9,7 +9,7 @@ Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen 
 | Task | Gruppe | Beschreibung |
 | :--- | :--- | :--- |
 | `./gradlew build` | `build` | Kompiliert Java 21 Quellen, führt JUnit-6-Tests aus und paketiert das Standard-JAR. |
-| `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`, 121 Tests laut `build/test-results/test/`) mit ausführlichem Event-Logging aus. |
+| `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`, 140 Tests laut `build/test-results/test/`) mit ausführlichem Event-Logging aus. |
 | `./gradlew run` | `application` | Startet `de.swfdtf.Main` (unter macOS automatisch mit `-XstartOnFirstThread`). |
 | `./gradlew runStudio` | `kagayaki` | Startet `de.swfdtf.Main` mit `--studio` (optional `-PprojectDir=<pfad>` ergänzt `--project <pfad>`). |
 | `./gradlew runStandalone` | `kagayaki` | Startet `de.swfdtf.StandaloneMain` (optional `-PprojectDir=<pfad>` ergänzt `--standalone <pfad>`). |
@@ -324,6 +324,42 @@ Rich-Text-, Font-Atlas-, Furigana-, Barrierefreiheits- und Typewriter-Subsystem:
 * **`GlfwWindow`**: Wrapper um natives GLFW-Fenster (`GlfwWindow(handle, title, w, h)`, `makeCurrent`, `swapBuffers`, `shouldClose`, `setShouldClose`, `setTitle`, `setVsync`, `pollFramebufferSize`, `show`, `hide`, `focus`, `destroy`, `getHandle`, `getTitle`, `getWindowWidth`, `getWindowHeight`, `getFramebufferWidth`, `getFramebufferHeight`, `getGlCapabilities`, `isVsync`, `isDestroyed`).
 * **`WindowManager`**: GLFW-Lebenszyklus & Fenstererzeugung (`WindowManager()`, `WindowManager(EngineLogger)`, `initDualWindows(...)`, `initStandaloneWindow(...)`, `getGameWindow()`, `getStudioWindow()`, `hasStudioWindow()`, `pollEvents()`, `anyWindowShouldClose()`, `isGlfwInitialized()`, `dispose()`).
 
+### `ATLTransform` & `AnimationEngine` (M5)
+Deklarative ATL-Transformations-Timelines und knotengebundene Animationsverwaltung:
+* **`ATLTransform`**:
+  * Fabriken & Parser: `fromAst(List<VJavaAst.AtlStep>)`, `fromAst(VJavaAst.TransformDef)`, `builder()`, `parseColorMatrix(String)`, `parseCropRect(String)`.
+  * Ablaufsteuerung: `start(Transform2D)`, `update(double dt, Transform2D)`, `isFinished()`, `isStarted()`, `getElapsedSeconds()`, `reset()`.
+  * **`ATLTransform.Builder`**: `set()`, `set(String, String)`, `linear(double)`, `ease(double)`, `easein(double)` / `easeIn(double)`, `easeout(double)` / `easeOut(double)`, `easeInOut(double)`, `smoothstep(double)`, `interpolate(double, Easing.EaseType)`, `cubicBezier(double, float, float, float, float)`, `pause(double)`, `repeat()`, `repeat(int)`, `repeat(int, ATLTransform)`, `parallel(...)`, `block(...)`, `choice(...)`, `step(VJavaAst.AtlStep)`, Property-Methoden (`xpos`, `ypos`, `xanchor`, `yanchor`, `xalign`, `yalign`, `zoom`, `xzoom`, `yzoom`, `rotate`, `alpha`, `blur`, `parallaxX`, `parallaxY`, `crop`, `colorMatrix`, `matrixcolor`, `property`), `build()`.
+* **`AnimationEngine`**:
+  * Methoden: `play(String id, SceneNode node, ATLTransform anim)`, `play(String id, SceneNode node, ATLTransform anim, Runnable onComplete)`, `stop(String id)`, `stopAll()`, `update(double dt)`, `isPlaying(String id)`, `getActiveCount()`, `getAnimation(String id)`, `getActiveIds()`.
+
+### `Transition` & `TransitionManager` (M5)
+Szenenübergangs-Deskriptoren und Dual-FBO-OpenGL-Compositor:
+* **`Transition`**:
+  * Enum `Kind`: `NONE`, `DISSOLVE`, `FADE`, `PIXELLATE`, `MOVE`, `EASE`, `WIPE_LEFT`, `WIPE_RIGHT`, `WIPE_UP`, `WIPE_DOWN`, `SLIDE_LEFT`, `SLIDE_RIGHT`, `PUSH_LEFT`, `PUSH_RIGHT`, `IRIS_IN`, `IRIS_OUT`, `BLINDS`, `SQUARES`, `IMAGE_DISSOLVE`, `MULTIPLE`.
+  * Konstanten: `DEFAULT_DURATION_SECONDS = 0.5f`, `DEFAULT_FADE_COLOR_HEX = "#000000"`, `DEFAULT_RAMP_LENGTH = 8.0f`, `DEFAULT_SLICE_COUNT = 16`.
+  * Fabriken & Parser: `none()`, `dissolve(float)`, `fade(float)`, `fade(float, String)`, `pixellate(float)`, `move(float)`, `ease(float)`, `ease(float, Easing.EaseType)`, `wipeLeft(float)`, `wipeRight(float)`, `wipeUp(float)`, `wipeDown(float)`, `slideLeft(float)`, `slideRight(float)`, `pushLeft(float)`, `pushRight(float)`, `irisIn(float)`, `irisOut(float)`, `blinds(float, int)`, `squares(float, int)`, `imageDissolve(String, float, float, boolean)`, `multiple(Transition...)`, `multiple(List<Transition>)`, `parse(String)`.
+  * Getter: `getKind()`, `getDurationSeconds()`, `getFadeColorHex()`, `getFadeColorRgba()`, `getMaskImagePath()`, `getRampLength()`, `isReverseMask()`, `getSliceCount()`, `getSubTransitions()`, `getEaseType()`.
+* **`TransitionManager`**:
+  * Timeline: `startTransition(Transition)`, `update(double dt)`, `cancel()`, `isActive()`, `getProgress()`, `getActiveTransition()`, `getActiveStepIndex()`, `getActiveStepProgress()`, `getCurrentEffectiveTransition()`.
+  * OpenGL-Compositor: `initGl(int logicalW, int logicalH)`, `captureFromFbo(Framebuffer src)`, `renderComposite(Framebuffer toFbo, TextureManager texMgr, int targetWidth, int targetHeight)`, `disposeGl()`, `isGlInitialized()`, `getFromFramebuffer()`.
+
+### `ParticleSystem`, `VideoPlayer` & `MovieSprite` (M5)
+2D-Partikelsystem (`CustomDisplayable`) und Video-Playback:
+* **`ParticleSystem` (`implements CustomDisplayable`)**:
+  * Konstanten: `DEFAULT_WIDTH = RenderPipeline2D.DEFAULT_LOGICAL_WIDTH`, `DEFAULT_HEIGHT = RenderPipeline2D.DEFAULT_LOGICAL_HEIGHT`.
+  * Enum `EmitterKind`: `SNOW_BLOSSOM`, `RAIN`, `CHERRY_BLOSSOM`, `SPARKS`, `DUST`.
+  * Innere Klassen: `Particle`, `ParticleEmitter` (`update`, `render`, `getKind`, `getParticles`, `getParticleCount`, `setBounds`, `setWindX`, `setSpeed`, `setTexture`, `setActive`).
+  * Presets: `snowBlossom(int, float, float[, Random])`, `rain(int, float, float[, Random])`, `cherryBlossoms(int[, Random])`, `sparks(int[, Random])`, `dust(int[, Random])`.
+  * System & Szene: `ParticleSystem()`, `ParticleSystem(float, float)`, `addEmitter`, `removeEmitter`, `clearEmitters`, `getEmitters`, `getTotalParticleCount`, `update`, `render`, `getPreferredWidth`, `getPreferredHeight`, `toSceneNode(String)`, `attachToForeground(SceneGraph)`.
+* **`VideoPlayer` (`implements AutoCloseable`)**:
+  * Enum `State { STOPPED, PLAYING, PAUSED, ENDED }`; Interface `FrameSource extends AutoCloseable`; Implementierungen `ProceduralTestFrameSource` und `FfmpegProcessFrameSource` (`isFfmpegAvailable()`).
+  * Konstruktoren: `VideoPlayer()`, `VideoPlayer(boolean glEnabled)`, `VideoPlayer(EngineLogger logger, boolean glEnabled)`.
+  * Methoden: `play(Path)`, `play(FrameSource)`, `pause()`, `resume()`, `stop()`, `setLoop(boolean)` / `isLoop()`, `update(double dt)`, `close()`, `getCurrentTexture()`, `getLatestFrameRgba()`, `getFrameSource()`, `getState()`, `isPlaying()`, `isPaused()`, `isStopped()`, `isEnded()`, `getCurrentFrameIndex()`, `getWidth()`, `getHeight()`, `getFps()`, `isGlEnabled()` / `setGlEnabled(boolean)`.
+* **`MovieSprite` (`extends SpriteNode implements AutoCloseable`)**:
+  * Konstruktoren: `MovieSprite()`, `MovieSprite(String id)`, `MovieSprite(boolean glEnabled)`, `MovieSprite(String id, boolean glEnabled)`, `MovieSprite(String id, VideoPlayer)`, `MovieSprite(String id, String tag, VideoPlayer)`.
+  * Methoden: `play(Path)`, `play(VideoPlayer.FrameSource)`, `pause()`, `resume()`, `stop()`, `setLoop(boolean)` / `isLoop()`, `update(double dt)`, `getVideoPlayer()`, `close()`.
+
 ---
 
 ## 5. Paket `de.swfdtf.git`
@@ -523,3 +559,52 @@ Meta-Progression auf Basis von `PersistentAccess`:
 Live-Lokalisierung, `tl/<lang>/`-Asset-Auflösung und Template-Extraktion:
 * Konstruktoren: `LocalizationManager()`, `LocalizationManager(String defaultLanguage)`.
 * Methoden: `setLanguage(String)`, `getCurrentLanguage()`, `getDefaultLanguage()`, `addLanguageChangeListener(Consumer<String>)`, `removeLanguageChangeListener(Consumer<String>)`, `indexProject(VJavaAst.ProjectAst)`, `registerTranslation(String language, String keyOrOriginal, String translatedText)`, `translateDialogue(String lineId, String originalText)`, `translateUi(String key, String fallbackText)`, `resolveLocalizedAsset(Path projectRoot, String assetPath)`, `getAvailableLanguages()`, `extractTranslationTemplate(VJavaAst.ProjectAst project, String targetLanguage)`.
+
+
+---
+
+## 9. Paket `de.swfdtf.audio` (M5)
+
+### `AudioDsp`
+DSP-Helferklasse für Biquad-IIR-Filter, RMS-Messung, logarithmische Spektrumbänder und Goertzel-Frequenzanalyse:
+* **Konstante**: `public static final float DEFAULT_SAMPLE_RATE = 44100.0f`
+* **Enum**: `FilterType { LOWPASS, HIGHPASS, BANDPASS }`
+* **`BiquadFilter`**: `createLowpass(float sampleRate, float cutoffHz, float q)`, `createHighpass(...)`, `createBandpass(...)`; Instanzmethoden `processSample(float)`, `processBuffer(float[])`, `processBuffer(float[], int, int)`, `reset()`, `copy()`, `getType()`, `getSampleRate()`, `getCutoffHz()`, `getQ()`.
+* **Statische Analyse-Methoden**: `computeRms(float[], int, int)`, `computeRms(float[])`, `computeSpectrumBands(float[], int, int, int)`, `computeSpectrumBands(float[], int, int, int, float)`, `computeGoertzelMagnitude(float[], int, int, float targetFreqHz, float sampleRate)`.
+
+### `AudioDecoder`
+Reiner LWJGL-/Java-Audiodekoder (`STBVorbis` + RIFF WAVE), WAV-Encoder und prozeduraler Synthesizer:
+* **Record**: `DecodedAudio(float[] monoOrInterleavedFloat, short[] pcm16, int channels, int sampleRate, double durationSeconds)` (+ `frameCount()`, `toMonoFloat()`).
+* **Dekodierung & Kodierung**: `decode(Path) throws IOException`, `decodeOgg(byte[]) throws IOException`, `decodeWav(byte[]) throws IOException`, `encodeWav(short[], int channels, int sampleRate)`, `floatToPcm16(float[])`, `pcm16ToFloat(short[])`.
+* **Synthese**: `synthesizeTone(double freqHz, double durationSeconds, int sampleRate, float amplitude)`, `synthesizeChord(double[] freqsHz, double durationSeconds, int sampleRate, float amplitude)`, `synthesizeVoiceBleep(double baseFreqHz, double durationSeconds, int sampleRate)`.
+
+### `AudioChannel`
+Benannter logischer Mixer-Kanal mit Fade-Envelopes, Dual-Slot-Crossfade, Queue, optionalem DSP-Filter, OpenAL-Source-Verwaltung und Snapshot/Restore:
+* **Record**: `ChannelSnapshot(String assetPath, boolean loop, float targetVolume, boolean playing, double playbackSeconds)`.
+* **Konstruktoren**: `AudioChannel(String name)`, `AudioChannel(String name, boolean openAlEnabled)`.
+* **Wiedergabe & Queue**: `play(String assetPath, AudioDecoder.DecodedAudio audio, boolean loop, double fadeInSeconds, float targetVolume)`, `queue(List<String>)`, `pollNextQueued()`, `clearQueue()`, `getQueuedPaths()`, `stop(double fadeOutSeconds)`, `update(double dt)`.
+* **DSP & Telemetrie**: `setFilter(AudioDsp.BiquadFilter)`, `getFilter()`, `getPlaybackSeconds()`, `getCurrentRms()`, `getCurrentSpectrumBands(int bands)`.
+* **Snapshots & Status**: `captureSnapshot()`, `restoreSnapshot(ChannelSnapshot)`, `restoreSnapshot(ChannelSnapshot, AudioDecoder.DecodedAudio)`, `getName()`, `isPlaying()`, `isLooping()`, `isCrossfading()`, `isFadingOut()`, `getAssetPath()`, `getTargetVolume()`, `getFadeGain()`, `getOutgoingFadeGain()`, `getChannelMixGain()`, `setChannelMixGain(float)`, `getCurrentEffectiveVolume()`, `isOpenAlEnabled()`, `setOpenAlEnabled(boolean)`, `dispose()`.
+
+### `AudioEngine` (`implements AutoCloseable, ScriptRuntime.AudioBridge`)
+Zentraler OpenAL-Audio-Mixer mit Headless-Virtual-Mixer-Fallback, `PreferencesState`-Synchronisation und `tl/<lang>/`-Pfadauflösung:
+* **Konstanten**: `CHANNEL_MUSIC = "music"`, `CHANNEL_SOUND = "sound"`, `CHANNEL_VOICE = "voice"`, `CHANNEL_AMBIENT = "ambient"`, `DEFAULT_VOICE_BLEEP_DURATION = 0.055`, `DEFAULT_SYNTH_SAMPLE_RATE = 44100`.
+* **Konstruktoren**: `AudioEngine()`, `AudioEngine(Path projectRoot, boolean headless)`, `AudioEngine(Path projectRoot, PreferencesState, LocalizationManager, EngineLogger, boolean headless)`.
+* **Lebenszyklus & Kanäle**: `init()`, `getChannel(String name)`, `getChannels()`, `resolveAudioPath(String assetPath)`, `registerInMemoryAudio(String assetPath, AudioDecoder.DecodedAudio)`, `syncVolumesFromPreferences()`, `createScriptAudioBridge()`, `update(double dt)`, `dispose()`, `close()`.
+* **`ScriptRuntime.AudioBridge` & Bleeps**: `play(String ch, String path, boolean loop, double fadeIn, double vol)`, `queue(String ch, List<String> paths)`, `stop(String ch, double fadeOut)`, `voice(String path)`, `playVoiceBleep(double freqHz)`, `playVoiceBleep(double freqHz, double durationSeconds)`.
+* **Telemetrie & Snapshots**: `getMusicSpectrumBands(int bandCount)`, `getActiveVoiceRms()`, `snapshotAllChannels()`, `restoreAllChannels(Map<String, AudioChannel.ChannelSnapshot>)`.
+* **Zustand & Konfiguration**: `isOpenAlActive()`, `isInitialized()`, `isDisposed()`, `isHeadless()`, `getProjectRoot()` / `setProjectRoot(Path)`, `getPreferencesState()` / `setPreferencesState(PreferencesState)`, `getLocalizationManager()` / `setLocalizationManager(LocalizationManager)`, `getLogger()`.
+
+### `LipSyncAnalyzer`
+Attack-/Release-Hüllkurven-Analysator für Voice-RMS-gesteuertes Lip-Syncing:
+* **Konstanten**: `DEFAULT_ATTACK_SECONDS = 0.025`, `DEFAULT_RELEASE_SECONDS = 0.12`, `DEFAULT_NOISE_FLOOR_RMS = 0.01f`, `DEFAULT_MAX_RMS = 0.50f`, `DEFAULT_HALF_OPEN_THRESHOLD = 0.08f`, `DEFAULT_OPEN_THRESHOLD = 0.45f`.
+* **Enum**: `MouthShape { CLOSED, HALF_OPEN, OPEN }`.
+* **Konstruktoren**: `LipSyncAnalyzer()`, `LipSyncAnalyzer(double attackSeconds, double releaseSeconds, float halfOpenThreshold, float openThreshold)`, `LipSyncAnalyzer(double attackSeconds, double releaseSeconds, float noiseFloorRms, float maxRms, float halfOpenThreshold, float openThreshold)`.
+* **Methoden**: `update(AudioEngine, double dt)`, `updateFromRms(float rms, double dt)`, `reset()`, `getMouthShape()`, `getOpenness()`, Getter/Setter für `attackSeconds`, `releaseSeconds`, `noiseFloorRms`, `maxRms`, `halfOpenThreshold`, `openThreshold`.
+
+### `TextToSpeechService` (`implements AutoCloseable`)
+Nicht-blockierender Self-Voicing-TTS-Dienst auf einem Java-21-Virtual-Thread mit Rich-Text-Bereinigung (`TextTagParser`):
+* **Konstante**: `DEFAULT_MAX_HISTORY = 500`.
+* **Konstruktoren**: `TextToSpeechService()`, `TextToSpeechService(EngineLogger logger, boolean osCommandExecutionEnabled)`.
+* **Statische Helfer**: `stripRichTextTags(String rawText)`, `buildSpeechCommand(String osName, String utterance)`.
+* **Methoden**: `setEnabled(boolean)` / `isEnabled()`, `setOsCommandExecutionEnabled(boolean)` / `isOsCommandExecutionEnabled()`, `speak(String text)`, `stop()`, `getSpokenHistory()`, `clearSpokenHistory()`, `setOnSpeakListener(Consumer<String>)`, `getPendingCount()`, `awaitIdle(long timeoutMillis)`, `isDisposed()`, `dispose()`, `close()`.

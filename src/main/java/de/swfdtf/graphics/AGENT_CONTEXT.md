@@ -1,11 +1,12 @@
 # Package `de.swfdtf.graphics` — AGENT_CONTEXT
 
 ## Zweck des Pakets
-LWJGL-3 / OpenGL-3.3-Core-Grafik- und Textsubsystem von KAGAYAKI (Meilensteine M1–M3, vollständig ohne `java.awt`): Dual-Window- und Standalone-GLFW-Verwaltung mit gemeinsamen OpenGL-Objekt-Namespaces (`WindowManager`, `GlfwWindow`), Z-sortierter Szenengraph (`SceneGraph`, `SceneLayer`, `SceneNode`, `SpriteNode`, `CustomDisplayable`) mit 8 Standard-Ebenen (`-100` bis `1000`), High-Level-Bühnensteuerung (`SceneController` inklusive `StageEntry`/`StageSnapshot` für Skript-Laufzeit und Rollback), Offscreen-Framebuffer (`Framebuffer`), GLSL-Shader-Compiler (`ShaderProgram`), das einheitliche Pipeline-Interface `IRenderPipeline` mit `RenderPipeline2D` (Premultiplied Alpha, `ColorMatrix4f`, SDF-Rounded-Rectangles, Pivot-Rotation, Letterbox-Blit) und `RenderPipeline3DStub`, reine STB-Bild-/Texturverwaltung (`Texture`, `TextureManager`, `NineSliceDrawable`) sowie die Rich-Text-, Typografie-, Furigana- und Typewriter-Engine (`TextTagParser`, `FontAtlas`, `FontManager`, `StyledTextLayout`).
+LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- und Textsubsystem von KAGAYAKI (Meilensteine M1–M3 & M5, vollständig ohne `java.awt`): Dual-Window- und Standalone-GLFW-Verwaltung mit gemeinsamen OpenGL-Objekt-Namespaces (`WindowManager`, `GlfwWindow`), Z-sortierter Szenengraph (`SceneGraph`, `SceneLayer`, `SceneNode`, `SpriteNode`, `CustomDisplayable`) mit 8 Standard-Ebenen (`-100` bis `1000`), High-Level-Bühnensteuerung (`SceneController` inklusive `StageEntry`/`StageSnapshot` für Skript-Laufzeit und Rollback), Offscreen-Framebuffer (`Framebuffer`), GLSL-Shader-Compiler (`ShaderProgram`), das einheitliche Pipeline-Interface `IRenderPipeline` mit `RenderPipeline2D` (Premultiplied Alpha, `ColorMatrix4f`, SDF-Rounded-Rectangles, Pivot-Rotation, Letterbox-Blit) und `RenderPipeline3DStub`, reine STB-Bild-/Texturverwaltung (`Texture`, `TextureManager`, `NineSliceDrawable`), Rich-Text-, Typografie-, Furigana- und Typewriter-Engine (`TextTagParser`, `FontAtlas`, `FontManager`, `StyledTextLayout`), deklarative ATL-Animationen (`ATLTransform`, `AnimationEngine`), GPU-Dual-FBO-Szenenübergänge (`Transition`, `TransitionManager`), prozedurales 2D-Partikelsystem (`ParticleSystem`) sowie Video-Playback (`VideoPlayer`, `MovieSprite`).
 
 ## Abhängigkeiten zu anderen `de.swfdtf.*`-Paketen
-- `de.swfdtf.math` (`ColorMatrix4f`, `Rect2f`, `ScreenShake`, `Transform2D`, `Vec2f`)
-- `de.swfdtf.core` (`EngineLogger` in `WindowManager`, `RenderPipeline3DStub`, `TextureManager`, `SceneController`)
+- `de.swfdtf.math` (`ColorMatrix4f`, `Easing`, `Rect2f`, `ScreenShake`, `Transform2D`, `Vec2f`)
+- `de.swfdtf.core` (`EngineLogger` in `WindowManager`, `RenderPipeline3DStub`, `TextureManager`, `SceneController`, `VideoPlayer`)
+- `de.swfdtf.parser` (`VJavaAst` in `ATLTransform`)
 - Externe Bibliotheken: `org.lwjgl.glfw.*`, `org.lwjgl.opengl.*`, `org.lwjgl.stb.*` (`STBImage`, `STBImageWrite`, `STBTruetype`, `STBTTFontinfo`), `org.lwjgl.system.*`, `org.joml.Matrix4f`.
 
 ## Enthaltene Typen
@@ -34,6 +35,13 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik- und Textsubsystem von KAGAYAKI (Meilensteine M
 | `FontAtlas` | `final class` | Dynamischer Premultiplied-`RGBA8`-Glyphenatlas auf Basis von `STBTruetype` mit integriertem prozeduralen CPU-Bitmap-Fallback (inkl. Umlauten) für Headless/fehlende Fonts. |
 | `FontManager` | `final class` | Zentrale Font-Registry und `FontAtlas`-Cache mit In-Memory-/Datei-/Ressourcen-/System-Font-Auflösung sowie globalen Barrierefreiheits-Einstellungen (`dyslexiaFriendlyMode`, `globalTextScale`). |
 | `StyledTextLayout` | `final class` | Wortumbruch-, Metrik-, Furigana-, Hyperlink-Hitbox- und Animations-Renderer (`GlyphQuad`, `LineDecoration`, `RubyLayout`, `InlineImageLayout`, `HyperlinkHitbox`, `TextLine`) inklusive `TypewriterController`. |
+| `ATLTransform` | `final class` | Deklarative ATL-Transformations-Timeline (`fromAst`, `Builder`) mit `set`, `linear`/`ease*`/`cubicBezier`-Interpolation, `pause`, `repeat`, `parallel`, `block`, `choice`, `crop` und `matrixcolor`-Ausdrücken gegen `Transform2D`. |
+| `AnimationEngine` | `final class` | Zentraler Timeline-Manager für aktive, per String-ID an `SceneNode`s gebundene `ATLTransform`-Animationen inklusive Abschluss-Callbacks. |
+| `Transition` | `final class` | Unveränderlicher Deskriptor für 20 Szenenübergangsarten (`Kind`: `DISSOLVE`, `FADE`, `PIXELLATE`, `MOVE`, `EASE`, `WIPE_*`, `SLIDE_*`, `PUSH_*`, `IRIS_*`, `BLINDS`, `SQUARES`, `IMAGE_DISSOLVE`, `MULTIPLE`) inklusive `Transition.parse(String)`. |
+| `TransitionManager` | `final class` | Headless-fähige Transitions-Timeline-State-Machine und OpenGL-3.3-Core-Dual-FBO-Shader-Compositor (`captureFromFbo`, `renderComposite`) inklusive `MULTIPLE`-Sequenzierung. |
+| `ParticleSystem` | `final class` | GPU-batchbares und headless simulierbares 2D-Partikel- und Wettersystem (`implements CustomDisplayable`) mit `Particle`, `ParticleEmitter` und 5 Presets (`SNOW_BLOSSOM`, `RAIN`, `CHERRY_BLOSSOM`, `SPARKS`, `DUST`). |
+| `VideoPlayer` | `final class` | Video-Playback-Controller (`implements AutoCloseable`) mit austauschbaren `FrameSource`-Streams (`ProceduralTestFrameSource`, Virtual-Thread-`FfmpegProcessFrameSource`) und optionalem OpenGL-Textur-Upload. |
+| `MovieSprite` | `class` | Animierter `SpriteNode` (`extends SpriteNode implements AutoCloseable`), der einen `VideoPlayer` für Cutscenes und Video-Hintergründe in den Szenengraph einbindet. |
 
 ## Öffentliche API-Signaturen
 
@@ -639,5 +647,284 @@ public final class StyledTextLayout {
     public float getShadowOffsetX()
     public float getShadowOffsetY()
     public float getOutlineThickness()
+}
+```
+
+### `ATLTransform`
+```java
+public final class ATLTransform {
+    public static final class Builder {
+        public Builder set()
+        public Builder set(String property, String value)
+        public Builder linear(double durationSeconds)
+        public Builder ease(double durationSeconds)
+        public Builder easein(double durationSeconds)
+        public Builder easeIn(double durationSeconds)
+        public Builder easeout(double durationSeconds)
+        public Builder easeOut(double durationSeconds)
+        public Builder easeInOut(double durationSeconds)
+        public Builder smoothstep(double durationSeconds)
+        public Builder interpolate(double durationSeconds, Easing.EaseType easeType)
+        public Builder cubicBezier(double durationSeconds, float p1x, float p1y, float p2x, float p2y)
+        public Builder pause(double durationSeconds)
+        public Builder repeat()
+        public Builder repeat(int count)
+        public Builder repeat(int count, ATLTransform body)
+        public Builder parallel(ATLTransform... branches)
+        public Builder parallel(List<ATLTransform> branches)
+        public Builder block(ATLTransform... children)
+        public Builder block(List<ATLTransform> children)
+        public Builder choice(List<ATLTransform> children)
+        public Builder choice(List<ATLTransform> children, RandomGenerator random)
+        public Builder choice(RandomGenerator random, ATLTransform... children)
+        public Builder step(VJavaAst.AtlStep astStep)
+        public Builder xpos(float xpos) / public Builder ypos(float ypos)
+        public Builder xanchor(float xanchor) / public Builder yanchor(float yanchor)
+        public Builder xalign(float xalign) / public Builder yalign(float yalign)
+        public Builder zoom(float zoom) / public Builder xzoom(float xzoom) / public Builder yzoom(float yzoom)
+        public Builder rotate(float rotateDegrees) / public Builder alpha(float alpha) / public Builder blur(float blur)
+        public Builder parallaxX(float parallaxX) / public Builder parallaxY(float parallaxY)
+        public Builder crop(Rect2f crop) / public Builder crop(float x, float y, float width, float height)
+        public Builder colorMatrix(ColorMatrix4f colorMatrix) / public Builder matrixcolor(String expr)
+        public Builder property(String key, String value)
+        public ATLTransform build()
+    }
+
+    public static ATLTransform fromAst(List<VJavaAst.AtlStep> steps)
+    public static ATLTransform fromAst(VJavaAst.TransformDef transformDef)
+    public static Builder builder()
+    public static ColorMatrix4f parseColorMatrix(String expr)
+    public static Rect2f parseCropRect(String expr)
+
+    public void start(Transform2D target)
+    public void update(double dt, Transform2D target)
+    public boolean isFinished()
+    public boolean isStarted()
+    public double getElapsedSeconds()
+    public void reset()
+}
+```
+
+### `AnimationEngine`
+```java
+public final class AnimationEngine {
+    public void play(String id, SceneNode node, ATLTransform anim)
+    public void play(String id, SceneNode node, ATLTransform anim, Runnable onComplete)
+    public boolean stop(String id)
+    public void stopAll()
+    public void update(double dt)
+    public boolean isPlaying(String id)
+    public int getActiveCount()
+    public ATLTransform getAnimation(String id)
+    public List<String> getActiveIds()
+}
+```
+
+### `Transition`
+```java
+public final class Transition {
+    public enum Kind {
+        NONE, DISSOLVE, FADE, PIXELLATE, MOVE, EASE,
+        WIPE_LEFT, WIPE_RIGHT, WIPE_UP, WIPE_DOWN,
+        SLIDE_LEFT, SLIDE_RIGHT, PUSH_LEFT, PUSH_RIGHT,
+        IRIS_IN, IRIS_OUT, BLINDS, SQUARES, IMAGE_DISSOLVE, MULTIPLE
+    }
+
+    public static final float DEFAULT_DURATION_SECONDS = 0.5f;
+    public static final String DEFAULT_FADE_COLOR_HEX = "#000000";
+    public static final float DEFAULT_RAMP_LENGTH = 8.0f;
+    public static final int DEFAULT_SLICE_COUNT = 16;
+
+    public static Transition none()
+    public static Transition dissolve(float durationSeconds)
+    public static Transition fade(float durationSeconds)
+    public static Transition fade(float durationSeconds, String fadeColorHex)
+    public static Transition pixellate(float durationSeconds)
+    public static Transition move(float durationSeconds)
+    public static Transition ease(float durationSeconds)
+    public static Transition ease(float durationSeconds, Easing.EaseType easeType)
+    public static Transition wipeLeft(float durationSeconds) / public static Transition wipeRight(float durationSeconds)
+    public static Transition wipeUp(float durationSeconds) / public static Transition wipeDown(float durationSeconds)
+    public static Transition slideLeft(float durationSeconds) / public static Transition slideRight(float durationSeconds)
+    public static Transition pushLeft(float durationSeconds) / public static Transition pushRight(float durationSeconds)
+    public static Transition irisIn(float durationSeconds) / public static Transition irisOut(float durationSeconds)
+    public static Transition blinds(float durationSeconds, int sliceCount)
+    public static Transition squares(float durationSeconds, int sliceCount)
+    public static Transition imageDissolve(String maskImagePath, float durationSeconds, float rampLength, boolean reverseMask)
+    public static Transition multiple(Transition... subTransitions)
+    public static Transition multiple(List<Transition> subTransitions)
+    public static Transition parse(String expr)
+
+    public Kind getKind()
+    public float getDurationSeconds()
+    public String getFadeColorHex()
+    public float[] getFadeColorRgba()
+    public String getMaskImagePath()
+    public float getRampLength()
+    public boolean isReverseMask()
+    public int getSliceCount()
+    public List<Transition> getSubTransitions()
+    public Easing.EaseType getEaseType()
+}
+```
+
+### `TransitionManager`
+```java
+public final class TransitionManager {
+    public void startTransition(Transition transition)
+    public void update(double dt)
+    public void cancel()
+    public boolean isActive()
+    public float getProgress()
+    public Transition getActiveTransition()
+    public int getActiveStepIndex()
+    public float getActiveStepProgress()
+    public Transition getCurrentEffectiveTransition()
+
+    public void initGl(int logicalW, int logicalH)
+    public void captureFromFbo(Framebuffer src)
+    public void renderComposite(Framebuffer toFbo, TextureManager texMgr, int targetWidth, int targetHeight)
+    public void disposeGl()
+    public boolean isGlInitialized()
+    public Framebuffer getFromFramebuffer()
+}
+```
+
+### `ParticleSystem`
+```java
+public final class ParticleSystem implements CustomDisplayable {
+    public static final float DEFAULT_WIDTH = RenderPipeline2D.DEFAULT_LOGICAL_WIDTH;
+    public static final float DEFAULT_HEIGHT = RenderPipeline2D.DEFAULT_LOGICAL_HEIGHT;
+
+    public enum EmitterKind { SNOW_BLOSSOM, RAIN, CHERRY_BLOSSOM, SPARKS, DUST }
+
+    public static final class Particle {
+        public float x, y, vx, vy, rotation, angularVelocity, size, alpha, life, maxLife;
+        public final float[] colorRgba;
+        public float swayPhase, swayAmplitude, swayFrequency;
+
+        public Particle(float x, float y, float vx, float vy, float rotation, float angularVelocity, float size, float alpha, float life, float maxLife, float[] colorRgba)
+        public float getX() / public float getY() / public float getVx() / public float getVy()
+        public float getRotation() / public float getAngularVelocity() / public float getSize()
+        public float getAlpha() / public float getLife() / public float getMaxLife() / public float[] getColorRgba()
+    }
+
+    public static final class ParticleEmitter {
+        public ParticleEmitter(EmitterKind kind, List<Particle> particles, float boundsWidth, float boundsHeight, float speed, float windX, Random random)
+        public void update(double dt)
+        public void render(RenderPipeline2D pipeline, Rect2f bounds, float alpha, ColorMatrix4f colorMatrix)
+        public EmitterKind getKind() / public List<Particle> getParticles() / public int getParticleCount()
+        public float getBoundsWidth() / public float getBoundsHeight() / public ParticleEmitter setBounds(float width, float height)
+        public float getWindX() / public ParticleEmitter setWindX(float windX)
+        public float getSpeed() / public ParticleEmitter setSpeed(float speed)
+        public Texture getTexture() / public ParticleEmitter setTexture(Texture texture)
+        public boolean isActive() / public ParticleEmitter setActive(boolean active)
+    }
+
+    public ParticleSystem()
+    public ParticleSystem(float width, float height)
+
+    public static ParticleEmitter snowBlossom(int count, float speed, float windX)
+    public static ParticleEmitter snowBlossom(int count, float speed, float windX, Random random)
+    public static ParticleEmitter rain(int count, float speed, float windX)
+    public static ParticleEmitter rain(int count, float speed, float windX, Random random)
+    public static ParticleEmitter cherryBlossoms(int count)
+    public static ParticleEmitter cherryBlossoms(int count, Random random)
+    public static ParticleEmitter sparks(int count)
+    public static ParticleEmitter sparks(int count, Random random)
+    public static ParticleEmitter dust(int count)
+    public static ParticleEmitter dust(int count, Random random)
+
+    public ParticleSystem addEmitter(ParticleEmitter emitter)
+    public boolean removeEmitter(ParticleEmitter emitter)
+    public void clearEmitters()
+    public List<ParticleEmitter> getEmitters()
+    public int getTotalParticleCount()
+    @Override public void update(double dt)
+    public void render(RenderPipeline2D pipeline)
+    @Override public void render(RenderPipeline2D pipeline, Rect2f bounds, float alpha, ColorMatrix4f colorMatrix)
+    @Override public float getPreferredWidth()
+    @Override public float getPreferredHeight()
+    public SpriteNode toSceneNode(String id)
+    public SpriteNode attachToForeground(SceneGraph sceneGraph)
+}
+```
+
+### `VideoPlayer`
+```java
+public final class VideoPlayer implements AutoCloseable {
+    public enum State { STOPPED, PLAYING, PAUSED, ENDED }
+
+    public interface FrameSource extends AutoCloseable {
+        int getWidth();
+        int getHeight();
+        double getFps();
+        byte[] nextRgbaFrame();
+        void reset();
+        @Override void close();
+    }
+
+    public static final class ProceduralTestFrameSource implements FrameSource {
+        public ProceduralTestFrameSource(int width, int height, double fps)
+        public ProceduralTestFrameSource(int width, int height, double fps, int totalFrames)
+        @Override public int getWidth() / @Override public int getHeight() / @Override public double getFps()
+        @Override public byte[] nextRgbaFrame() / @Override public void reset() / @Override public void close()
+        public int getFrameIndex() / public int getTotalFrames()
+    }
+
+    public static final class FfmpegProcessFrameSource implements FrameSource {
+        public FfmpegProcessFrameSource(Path videoPath)
+        public FfmpegProcessFrameSource(Path videoPath, int width, int height, double fps)
+        public FfmpegProcessFrameSource(Path videoPath, int width, int height, double fps, EngineLogger logger)
+        public static boolean isFfmpegAvailable()
+        @Override public int getWidth() / @Override public int getHeight() / @Override public double getFps()
+        @Override public byte[] nextRgbaFrame() / @Override public void reset() / @Override public void close()
+        public boolean isAvailable() / public String getErrorMessage()
+    }
+
+    public VideoPlayer()
+    public VideoPlayer(boolean glEnabled)
+    public VideoPlayer(EngineLogger logger, boolean glEnabled)
+
+    public void play(Path videoPath)
+    public void play(FrameSource source)
+    public void pause()
+    public void resume()
+    public void stop()
+    public void setLoop(boolean loop) / public boolean isLoop()
+    public void update(double dt)
+    @Override public void close()
+
+    public Texture getCurrentTexture()
+    public byte[] getLatestFrameRgba()
+    public FrameSource getFrameSource()
+    public State getState()
+    public boolean isPlaying() / public boolean isPaused() / public boolean isStopped() / public boolean isEnded()
+    public long getCurrentFrameIndex()
+    public int getWidth() / public int getHeight() / public double getFps()
+    public boolean isGlEnabled() / public void setGlEnabled(boolean glEnabled)
+}
+```
+
+### `MovieSprite`
+```java
+public class MovieSprite extends SpriteNode implements AutoCloseable {
+    public MovieSprite()
+    public MovieSprite(String id)
+    public MovieSprite(boolean glEnabled)
+    public MovieSprite(String id, boolean glEnabled)
+    public MovieSprite(String id, VideoPlayer videoPlayer)
+    public MovieSprite(String id, String tag, VideoPlayer videoPlayer)
+
+    public MovieSprite play(Path videoPath)
+    public MovieSprite play(VideoPlayer.FrameSource source)
+    public void pause()
+    public void resume()
+    public void stop()
+    public MovieSprite setLoop(boolean loop)
+    public boolean isLoop()
+    @Override public void update(double dt)
+    public VideoPlayer getVideoPlayer()
+    @Override public void close()
 }
 ```

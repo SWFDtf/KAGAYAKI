@@ -1,10 +1,11 @@
-# `.vjava` Sprach- und Projekt-Spezifikation (M4-Stand)
+# `.vjava` Sprach- und Projekt-Spezifikation (M5-Stand)
 
-> **Implementierungsstand (Meilenstein M4 abgeschlossen)**: Alle in diesem Dokument beschriebenen `.vjava`-Sprachkonstrukte, Projektscan-Regeln, Ausdrucks- und Bedingungsgrammatiken, die In-Memory-Java-21-Kompilierung sowie das 4-Tier-State-, Rollback-, Save/Load- und Lokalisierungssystem sind vollständig implementiert und verifiziert:
+> **Implementierungsstand (Meilenstein M5 abgeschlossen)**: Alle in diesem Dokument beschriebenen `.vjava`-Sprachkonstrukte, Projektscan-Regeln, Ausdrucks- und Bedingungsgrammatiken, die In-Memory-Java-21-Kompilierung, das 4-Tier-State-/Rollback-/Save-/Lokalisierungssystem sowie die Audio-, ATL-Animations-, Transitions-, Partikel-, Video- und TTS-Subsysteme sind implementiert und verifiziert:
 > * **M1**: Projekt-Metadaten (`ProjectDescriptor` für `project.vjava.json`), Laufzeit-Konfiguration (`EngineConfig`) und Java-Skript-Fassade (`EngineAPI`, Binding `engine`).
 > * **M2**: Komplette Inline-Rich-Text-Syntax inklusive Variableninterpolation, Flow-Control-Cues, Furigana, Inline-Bildern, Hyperlinks und Text-Animationstags (`TextTagParser`, `StyledTextLayout`, `TypewriterController`, `FontAtlas`, `FontManager`) sowie `CustomDisplayable`.
 > * **M3**: Vollständiger Lexer (`VJavaLexer`), rekursiv-absteigender AST-Parser (`VJavaParser` / `VJavaAst`), rekursiver Projektscanner (`ProjectScanner`), In-Memory-Java-21-Compiler (`JavaBlockCompiler` / `VJavaExecutable`), Ausdrucks-Evaluator (`ConditionEvaluator`), nicht-blockierende Skript-Laufzeit (`ScriptRuntime`), Bühnensteuerung (`SceneController`, Binding `scene`) sowie State-Verträge (`StateStore` als `state`, `PersistentAccess` als `persistent`).
 > * **M4**: Sitzungskoordinator (`ScriptSession`), deterministischer Rollback-/Roll-Forward-Speicher (`RevertableStateStore`, `RevertableMap`, `RevertableList`), 4-Tier-Persistenz (`SessionState`, `PersistentState`, `PreferencesState`), `HistoryLog`, atomares GZIP-JSON-Save/Load mit PNG-Thumbnails und `__vjavaClass`-Codec (`SaveManager`, `SaveSlotData`, `SaveValueCodec`), Meta-Progression (`AchievementManager`, `GalleryManager`, `EndingsManager`) sowie Live-Lokalisierung (`LocalizationManager`).
+> * **M5**: OpenAL-/Virtual-Mixer-Audio-Engine (`AudioEngine`, `AudioChannel`, `AudioDecoder`, `AudioDsp`, `LipSyncAnalyzer`, `TextToSpeechService`), zeitgesteuerte ATL-Animationsausführung (`ATLTransform`, `AnimationEngine`), Dual-FBO-Transitions-Compositor (`Transition`, `TransitionManager`), 2D-Partikelsystem (`ParticleSystem`) sowie Video-Playback (`VideoPlayer`, `MovieSprite`).
 
 ---
 
@@ -130,7 +131,7 @@ layeredimage lena:
 * `always` akzeptiert sowohl einen direkten Pfad/Ausdruck als auch einen eingerückten Block (`always:`) mit optionalen `if`-Einträgen.
 * `group <name>:` enthält `attribute <name> [default] [if <cond>] ["<asset>" | : "<asset>"]`-Einträge.
 
-### 3.4 `transform` (ATL-Transformationsblöcke)
+### 3.4 `transform` (ATL-Transformationsblöcke, `ATLTransform` & `AnimationEngine`)
 ```vjava
 transform center_zoom:
     xalign 0.5 yalign 1.0
@@ -141,12 +142,12 @@ transform center_zoom:
         linear 1.0 rotate 5.0
     repeat
 ```
-* Unterstützte ATL-Schritte (`VJavaAst.AtlStep`):
-  * **Property-Set (`set`)**: z. B. `xpos`, `ypos`, `xanchor`, `yanchor`, `xalign`, `yalign`, `zoom`, `xzoom`, `yzoom`, `rotate`, `alpha`, `blur`, `parallax_x`, `parallax_y` (Syntax `key val`, `key=val`, inkl. einfacher Rechenausdrücke wie `0.5 + 0.1`).
-  * **Warper-Interpolation (`interpolate`)**: `linear`, `ease`, `easein`, `easeout`, `easeinout`, `ease_in`, `ease_out`, `ease_in_out`, `smoothstep`, `ease_back`, `ease_bounce`, `ease_elastic` jeweils mit Dauer in Sekunden sowie optionalen Inline-Properties oder eingerücktem `:`-Block; alternativ `warp <warperExpr> <duration> [props]`.
-  * **Steuerung**: `pause <seconds>`, `repeat [count]`, `pass`.
-  * **Container**: `parallel:`, `block:`, `choice:`, `contains:`, `on <event>:`.
-* `ScriptRuntime` wendet numerische ATL-Eigenschaften auf `Transform2D` an und registriert benannte Transforms automatisch in `SceneController`.
+* **Unterstützte ATL-Schritte (`VJavaAst.AtlStep` / `ATLTransform`)**:
+  * **Property-Set (`set`)**: `xpos`, `ypos`, `pos` (`(x, y)`), `xanchor`, `yanchor`, `anchor`, `xalign`, `yalign`, `align` (inkl. `none`/`null`), `zoom`, `xzoom`, `yzoom`, `rotate`, `alpha`, `blur`, `parallax_x`/`parallaxX`, `parallax_y`/`parallaxY`, `crop` (`(x, y, w, h)` oder `none`), sowie `matrixcolor` (Syntax `key val`, `key=val`, inkl. einfacher Rechenausdrücke im Parser).
+  * **`matrixcolor`-Ausdrücke (`ATLTransform.parseColorMatrix`)**: `identity()`/`IdentityMatrix`, `brightness(b)`/`BrightnessMatrix`, `contrast(c)`/`ContrastMatrix`, `saturation(s)`/`SaturationMatrix`, `hue(deg)`/`hueRotate(deg)`/`HueMatrix`, `opacity(a)`/`OpacityMatrix`, `invert([t])`/`InvertMatrix`, `tint(r, g, b[, a])` / `tint("#hex")`/`TintMatrix` sowie verkettete `*`-Matrixprodukte.
+  * **Warper-Interpolation (`interpolate`)**: `linear`, `ease`, `easein`/`ease_in`, `easeout`/`ease_out`, `easeinout`/`ease_in_out`, `smoothstep`, `ease_back`/`easeback`, sowie `cubic_bezier(p1x, p1y, p2x, p2y)` jeweils mit Dauer in Sekunden sowie optionalen Inline-Properties oder eingerücktem `:`-Block; alternativ `warp <warperExpr> <duration> [props]`.
+  * **Steuerung & Container**: `pause <seconds>`, `repeat [count|infinite|forever]` (`<= 0` = endlos), `pass`, `parallel:` (alle Zweige gleichzeitig), `block:`, `choice:` (zufällige Auswahl eines Zweigs), `contains:`, `on <event>:`.
+* **Ausführung zur Laufzeit**: `ATLTransform.fromAst(transformDef)` überführt beliebige `VJavaAst.TransformDef`-/`AtlStep`-Bäume in zeitgesteuerte Timelines auf `Transform2D`, die über `AnimationEngine.play(id, sceneNode, atl)` pro Frame (`update(dt)`) aktualisiert werden können. `ScriptRuntime` wendet numerische ATL-Schritte beim `show`/`transform`-Aufruf zusätzlich unmittelbar auf die registrierten/initialen `Transform2D`-Werte an.
 
 ### 3.5 `screen` (Deklarative UI-Screens)
 ```vjava
@@ -207,7 +208,7 @@ Innerhalb eines `label:`-Blocks (sowie verschachtelt in `if`/`elif`/`else` und `
 * Vor jeder Dialogzeile interpoliert `ScriptRuntime` `[var]`-Platzhalter über `TextTagParser.interpolateVariables` (Lookup in `state`, `persistent` und für `.`/`[`/`(`-Ausdrücke via `ConditionEvaluator`).
 * Jede Zeile erhält eine deterministische `lineId` (`<sourceFile>:<lineNumber>:<hash>`). `DialoguePrompt.alreadyRead()` gibt an, ob die Zeile vor Anzeige bereits in `persistent.isLineRead(lineId)` markiert war; danach wird `persistent.markLineRead(lineId)` aufgerufen.
 
-### 4.2 Bühne, Sprites, Transitions & Pausen (`SceneController`)
+### 4.2 Bühne, Sprites, Transitions & Pausen (`SceneController`, `Transition`, `TransitionManager`)
 | Syntax | Verhalten |
 | :--- | :--- |
 | `scene <bgTag> [with <trans>]` | Leert `LAYER_MASTER`, setzt den Hintergrund auf `LAYER_BACKGROUND` (`1920×1080`) und löst optionale Transition aus. |
@@ -218,6 +219,12 @@ Innerhalb eines `label:`-Blocks (sowie verschachtelt in `if`/`elif`/`else` und `
 | `pause` / `pause hard` | Pausiert im Zustand `PAUSING` bis `advance()`. |
 | `pause <seconds>` | Zeitgesteuerte Pause in `PAUSING`; läuft über `ScriptRuntime.update(dt)` ab oder wird per `advance()` übersprungen. |
 
+* **Deklarative Transition-Ausdrücke (`Transition.parse(expr)` & `TransitionManager`, M5)**:
+  * Standard-Dauer bei weggelassener Sekundenzahl: `0.5s` (`Transition.DEFAULT_DURATION_SECONDS`), Standard-Fade-Farbe: `#000000`.
+  * **Überblendung & Farbe**: `none`, `dissolve(t)`, `fade(t)` / `fade(t, #RRGGBB)` / `fade(out, hold, in, color=#RRGGBB)`, `pixellate(t)` / `pixelate(t)`, `move(t)`, `ease(t)`, `easein(t)`, `easeout(t)`, `easeinout(t)`.
+  * **Geometrische Blenden & Verschiebungen**: `wipeleft(t)`, `wiperight(t)`, `wipeup(t)`, `wipedown(t)`, `slideleft(t)`, `slideright(t)`, `pushleft(t)`, `pushright(t)`, `irisin(t)`, `irisout(t)`, `blinds(t[, slices])` (Standard `16`), `squares(t[, slices])` (Standard `16`).
+  * **Masken-Dissolve & Verkettung**: `imagedissolve("mask.png", t[, ramplen=8][, reverse=true])` (Graustufen-Luma-Rampenübergang via `TextureManager`), `multiple(t1, t2, ...)` / `MultipleTransition([t1, t2, ...])` (sequenzielle Sub-Transitions über `TransitionManager.getActiveStepIndex()` / `getActiveStepProgress()`).
+  * **Screen-Shake-Presets**: `vpunch` (`ScreenShake.vpunch()`), `hpunch` (`ScreenShake.hpunch()`).
 * **Eingebaute benannte Positionen in `SceneController`**:
   * `left` (`xalign=0.15, yalign=1.0`)
   * `center` (`xalign=0.5, yalign=1.0`, Standard bei neuem Sprite ohne `at`)
@@ -228,13 +235,18 @@ Innerhalb eines `label:`-Blocks (sowie verschachtelt in `if`/`elif`/`else` und `
   * `reset` (Standard-`Transform2D()`)
 * **Asset-Pfad-Auflösung in `SceneController`**: Prüft zuerst `image`-/`layeredimage`-Definitionen (`"<tag> <attrs...>"`, dann `"<tag>"`), danach direkte Pfade (enthält `/` oder endet auf `.png`/`.jpg`/`.webp`), ansonsten Fallback-Kandidaten unter `assets/images/`, `assets/images/bg/`, `assets/images/char/`, `assets/images/sprites/`.
 
-### 4.3 Audio (`play`, `queue`, `stop`, `voice`)
+### 4.3 Audio (`play`, `queue`, `stop`, `voice`, `AudioEngine`)
 | Syntax | Verhalten |
 | :--- | :--- |
-| `play <channel> "<asset>" [loop\|noloop] [fadein <sec>] [volume <vol>]` | Spielt Audio auf `<channel>` ab (`loop` ist standardmäßig `true` für `music` und `ambient`, sonst `false`). Bei `channel="music"` wird automatisch `persistent.unlockTrack(assetPath)` aufgerufen. |
-| `queue <channel> "<a.ogg>", "<b.ogg>"` / `queue <channel> ["a.ogg", "b.ogg"]` / `queue <channel>:` + eingerückte Liste | Reiht einen oder mehrere Audio-Pfade in die Kanal-Warteschlange ein. |
-| `stop <channel> [fadeout <sec>]` | Stoppt den Kanal (optional mit Fade-Out-Dauer). |
-| `voice "<asset>"` | Hinterlegt den Voice-Pfad für die nachfolgende Dialogzeile und meldet ihn an `AudioBridge.voice(...)`. |
+| `play <channel> "<asset>" [loop\|noloop] [fadein <sec>] [volume <vol>]` | Spielt Audio auf `<channel>` ab (`loop` ist standardmäßig `true` für `music` und `ambient`, sonst `false`). Bei `channel="music"` wird automatisch `persistent.unlockTrack(assetPath)` aufgerufen. `AudioEngine` löst relative Pfade (inkl. `assets/`- und `tl/<lang>/`-Overrides) auf, dekodiert `.ogg`/`.wav` und startet bei `fadein > 0` einen Dual-Slot-Crossfade auf dem `AudioChannel`. |
+| `queue <channel> "<a.ogg>", "<b.ogg>"` / `queue <channel> ["a.ogg", "b.ogg"]` / `queue <channel>:` + eingerückte Liste | Reiht einen oder mehrere Audio-Pfade in die FIFO-Warteschlange des Kanals ein; `AudioEngine.update(dt)` startet den nächsten Eintrag automatisch nach Abschluss des aktuellen Tracks. |
+| `stop <channel> [fadeout <sec>]` | Stoppt den Kanal (`channel="all"` stoppt alle registrierten Kanäle) sofort oder mit linearem Fade-Out und leert die Kanal-Queue. |
+| `voice "<asset>"` | Hinterlegt den Voice-Pfad für die nachfolgende Dialogzeile und spielt ihn über `AudioBridge.voice(...)` auf dem `voice`-Kanal ab (inklusive Echtzeit-RMS-Auswertung für `LipSyncAnalyzer`). |
+
+* **Mixer-Verhalten in `AudioEngine` (M5)**:
+  * **Standardkanäle**: `music`, `sound`, `voice`, `ambient` (beliebige benutzerdefinierte Kanalnamen werden bei Bedarf automatisch angelegt).
+  * **Lautstärkekopplung**: Jeder Kanal multipliziert `fadeGain * targetVolume * (masterVolume * channelVolume)` aus `PreferencesState`.
+  * **DSP, Voice-Bleeps & Self-Voicing**: `AudioChannel.setFilter(AudioDsp.BiquadFilter)` erlaubt Lowpass/Highpass/Bandpass-Effekte pro Kanal; `AudioEngine.playVoiceBleep(freqHz[, duration])` synthetisiert Typografie-Voice-Bleeps; `TextToSpeechService` spricht bei aktivem `selfVoicing` Dialogzeilen nicht-blockierend nach Bereinigung über `TextTagParser`.
 
 ### 4.4 Auswahlmenüs (`menu`)
 `ScriptRuntime` wechselt in `Status.WAITING_MENU` und unterstützt sowohl **Inline-Sprünge** als auch **eingerückte Statement-Blöcke** sowie **Timeouts** und **Bedingungen**:
