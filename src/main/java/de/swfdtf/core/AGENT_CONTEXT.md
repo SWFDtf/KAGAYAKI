@@ -24,8 +24,17 @@ Zentrales Laufzeit-Fundament von KAGAYAKI: Ausführungsmodi (`STUDIO_DUAL_WINDOW
 | `EngineAPI` | `final class` | Öffentliche Engine-Fassade für `@->{ ... }<<`-Java-Blöcke (`engine`), UI-Screens und Studio-Werkzeuge inklusive Properties und typisiertem Service-Locator. |
 | `StudioBridge` | `interface` | Entkopplungsschnittstelle zwischen `EngineApplication` und `StudioWindowController` (`tools`-Paket) zum sauberen Ausschluss in Standalone-Builds. |
 | `GameHost` | `interface` | Lebenszyklus-Brücke, die `EngineApplication` von Spielablauf, UI-Screens, Audio-Mixing und Skript-Ausführung in `de.swfdtf.ui` (`GameRuntimeCoordinator`) entkoppelt. |
-| `EngineApplication` | `final class` | Top-Level-Laufzeitkoordinator (`AutoCloseable`) für Initialisierung, 60-Hz-Fixed-Timestep-Loop, 2D/3D-Pipeline-Umschaltung, Input-Routing, `GameHost`-Lebenszyklus und Dual-Window-/Standalone-Ausführung. |
+| `EngineApplication` | `final class` | Top-Level-Laufzeitkoordinator (`AutoCloseable`) für Initialisierung, 60-Hz-Fixed-Timestep-Loop, 2D/3D-Pipeline-Umschaltung, OpenGL-Kontextwechsel zwischen Fenster A/B, Input-Routing, `GameHost`-Lebenszyklus und Dual-Window-/Standalone-Ausführung. |
 | `EngineApplication.Updatable` | `@FunctionalInterface` | Funktionaler Callback für deterministische Fixed-Timestep-Subsysteme (`update(double fixedDeltaSeconds)`). |
+| `EngineEvent` | `interface` | Basisvertrag für Ereignisse im `EngineEventBus` (`default long timestampNanos()`). |
+| `EventSubscription` | `interface` | `AutoCloseable`-Handle zum Prüfen (`isActive()`) und Abbestellen (`unsubscribe()`) eines Listeners. |
+| `EngineEventBus` | `final class` | Thread-sicherer typisierter Pub/Sub-Event-Bus mit Prioritätsreihenfolge und Fehlerisolation pro Listener. |
+| `EngineCommand` | `interface` | Command-Pattern-Vertrag (`description()`, `execute()`, `undo()`) für rückgängig machbare Editor-/Engine-Aktionen. |
+| `CommandStack` | `final class` | Undo-/Redo-Verlauf mit konfigurierbarer Maximaltiefe, `Optional<String>`-Vorschau und Beschreibungsverlauf. |
+| `EnginePlugin` | `interface` | Lebenszyklus-Vertrag (`id()`, `displayName()`, `version()`, `onEnable`, `onDisable`) für Engine-Erweiterungen. |
+| `PluginRegistry` | `final class` | Registrierungs- und Lebenszyklus-Manager für `EnginePlugin`-Instanzen mit `Optional`-Suche und unveränderlichen Listen. |
+| `KeybindingRemapper` | `final class` | Konfigurierbares Action-zu-GLFW-Tastenzuordnungssystem mit Konflikterkennung, Swap-Unterstützung und Gson-JSON-Persistenz. |
+| `GamepadNavigationRouter` | `final class` | Übersetzt `InputManager`-D-Pad-/Stick-Eingaben inklusive Deadzone und Wiederholungsrate in diskrete `NavigationDirection`-Ereignisse. |
 
 ## Öffentliche API-Signaturen
 

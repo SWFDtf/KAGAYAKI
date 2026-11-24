@@ -46,6 +46,12 @@ Vollständige `.vjava`-Skript-Pipeline von KAGAYAKI (Meilenstein M3 + M4): einr�
 | `ScriptRuntime.AudioBridge` & `AudioEvent` | `interface` / `record` | Entkoppelte Audio-Rückrufschnittstelle (`play`, `queue`, `stop`, `voice`) und protokolliertes Audio-Ereignis. |
 | `ScriptRuntime.StackFrame` & `ExecutionSnapshot` | `record` | Call-/Block-Stackframe und unveränderlicher Ausführungs-Snapshot für Subroutinen und deterministisches M4-Rollback. |
 | `ScriptSession` | `final class` | M4-Laufzeitsitzungskoordinator, der `ScriptRuntime` mit 4-Tier-Persistenz (`SessionState`, `RevertableStateStore`, `PersistentState`, `PreferencesState`), `HistoryLog`, `SaveManager`, `LocalizationManager` und Meta-Managern (`AchievementManager`, `GalleryManager`, `EndingsManager`) verdrahtet. |
+| `ScriptProfiler` | `final class` | Laufzeit-Profiler für Label-/Statement-Ausführungszeiten (`LabelProfile`, Hit-Counts, `hottestLabel()`, `topLabels(int)`, Bericht). |
+| `WatchpointEvent` | `record` | Unveränderliches Änderungsereignis für überwachte `StateStore`-Schlüssel (`previousOptional()`, `newOptional()`). |
+| `VariableWatchpointManager` | `final class` | Überwacht `StateStore`-Variablen auf Änderungen oder Bedingungserfüllung (`watchKey`, `watchWhen`, `checkAll`) inklusive Historie. |
+| `MacroRegistry` | `final class` | Text-Makro-Registry (`{{macro}}`) mit Zyklus-/Tiefenprüfung (`IllegalStateException`) und `Optional`-Lookup. |
+| `TypeSafeStateView` | `final class` | Typsichere Lese-Fassade über `StateStore` mit `Optional<String|Integer|Long|Double|Boolean|BigDecimal|T>`-Methoden. |
+| `HotReloadWatcher` | `final class` | Nicht-blockierender Polling-Dateiwächter für `**/*.vjava` und `project.vjava.json` (`ReloadDelta` mit `added`/`modified`/`deleted`). |
 
 ## Öffentliche API-Signaturen
 

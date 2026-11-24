@@ -4,6 +4,37 @@ Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architekt
 
 ---
 
+## [Welle 1 & GUI-/Demo-Reparatur — Abgeschlossen] Dual-Window-Reparatur & 15 Fundament-Features
+
+### GUI-, Kontext- & Einstiegspunkt-Reparaturen (`main` & `demo`)
+* `EngineApplication`: Sauberes OpenGL-Kontext-Switching (`studioWindow.makeCurrent()` / `gameWindow.makeCurrent()`) bei Studio-Bridge-Initialisierung, Render-Pipeline-Umschaltung und `close()`, damit VAOs/FBOs von Fenster A und Fenster B strikt im jeweiligen OpenGL-Kontext leben.
+* `StudioWindowController`: Eigenen `InputManager` (`getStudioInput()`) für Fenster A mit Retina/HiDPI-Viewport-Skalierung an `GLFW` und `ScreenManager` verdrahtet, sodass Studio-Toolbar und Panels auf Klicks reagieren.
+* `Main` & `StandaloneMain`: Automatischer Projekt-Fallback auf `demo/project`, falls kein explizites `--project` / `--standalone` übergeben wurde und im Arbeitsverzeichnis keine `project.vjava.json` liegt.
+* `build.gradle`: `mockito-core` & `mockito-junit-jupiter` (`5.14.2`) ergänzt; verifiziert durch `MainEntryPointsTest` und erweiterte Tests in `EngineApplicationTest` & `EndToEndEngineTest`.
+
+### 15 Neue Fundament-Features (Welle 1)
+* **`de.swfdtf.core` (`Wave1CoreFeaturesTest`)**:
+  1. `EngineEvent`, `EventSubscription`, `EngineEventBus` (typisierter Pub/Sub-Bus mit Prioritäten & Fehlerisolation).
+  2. `EngineCommand`, `CommandStack` (Undo/Redo-Verlauf mit Max-Tiefe & `Optional<String>`-Vorschau).
+  3. `EnginePlugin`, `PluginRegistry` (Plugin-Lebenszyklus gegen `EngineAPI`).
+  4. `KeybindingRemapper` (konfigurierbare GLFW-Tastenbelegung mit Konflikterkennung, Swap & JSON-Export/-Import).
+  5. `GamepadNavigationRouter` (D-Pad/Stick-UI-Navigation mit Deadzone & Repeat-Timing).
+* **`de.swfdtf.parser` (`Wave1ParserFeaturesTest`)**:
+  6. `ScriptProfiler` (Label-/Statement-Timing-Profiling, Hit-Counts, `hottestLabel()`, Bericht).
+  7. `WatchpointEvent`, `VariableWatchpointManager` (`StateStore`-Überwachung mit Prädikaten & Historie).
+  8. `MacroRegistry` (`{{macro}}`-Ersetzung mit Zyklus- & Tiefenerkennung).
+  9. `TypeSafeStateView` (typsichere `Optional`-Lese-Fassade inkl. `BigDecimal`).
+  10. `HotReloadWatcher` (nicht-blockierender Dateisystem-Poller für `.vjava` und `project.vjava.json`).
+* **`de.swfdtf.state` (`Wave1StateFeaturesTest`)**:
+  11. `AutoSaveScheduler` (rotierende Auto-Saves nach Zeit oder Dialogschritten).
+  12. `SaveSlotQueryService` (Tagging, Suche, Filterung & Sortierung über `SaveSlotData`).
+  13. `SaveMigrationStep`, `SaveMigrationService` (versionierte Save-Migrations-Pipeline).
+* **`de.swfdtf.tools` (`Wave1ToolsFeaturesTest`)**:
+  14. `AssetChecksumVerifier` (SHA-256-Manifest & Integritätsprüfung für `assets/**`).
+  15. `DiagnosticBundleExporter` (atomarer JSON-Diagnoseexport mit Log, Config, Lint & Metriken).
+
+---
+
 ## [M7 — Abgeschlossen] Dual-Window-Studio, Live-Regisseur, Entwickler-Inspektoren, VJavaLinter, Starter-Generator, VPAK-Export & Gesamtintegration
 
 ### Erweiterung `de.swfdtf`, `de.swfdtf.core` & `de.swfdtf.ui`

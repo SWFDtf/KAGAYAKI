@@ -32,7 +32,9 @@ Entwickler-Werkzeuge, Dual-Window-Studio-UI und Standalone-Build-Pipeline von KA
 | `DeveloperInspectors.StyleInspectionResult` | `record` | Schnappschuss-Bericht eines inspizierten `UiNode` inklusive `formatReport()`. |
 | `DeveloperInspectors.PickedCoordinate` | `record` | Erfasste Koordinate im logischen `1920x1080`- und normierten `[0..1]`-Raum samt ATL-Snippets. |
 | `DeveloperInspectors.ConsoleExecutionResult` | `record` | Ergebnis einer Ad-hoc-Java-Ausführung in der Live-Java-Konsole (`success`, `code`, `output`, `errorMessage`). |
-| `StudioWindowController` | `final class` | Dual-Window-Studio-Controller (`implements StudioBridge`) für Fenster A mit Projekt-Explorer, Template-Generator, Live-Linter, State-Variablen-Inspektor, Konsole, 2D/3D-RenderMode-Umschalter, Live-Reload und Standalone-Exporter. |
+| `StudioWindowController` | `final class` | Dual-Window-Studio-Controller (`implements StudioBridge`) für Fenster A mit dediziertem `InputManager`, Projekt-Explorer, Template-Generator, Live-Linter, State-Variablen-Inspektor, Konsole, 2D/3D-RenderMode-Umschalter, Live-Reload und Standalone-Exporter. |
+| `AssetChecksumVerifier` | `final class` | SHA-256-Manifest-Erzeugung (`AssetManifest`) und Integritätsprüfung (`VerificationReport`) für `assets/**`. |
+| `DiagnosticBundleExporter` | `final class` | Atomarer JSON-Diagnosebundle-Export (`DiagnosticReport`: Engine-Version, Konfiguration, `EngineLogger`-Einträge, optionaler `LintReport`, Metriken). |
 
 ## Öffentliche API-Signaturen
 

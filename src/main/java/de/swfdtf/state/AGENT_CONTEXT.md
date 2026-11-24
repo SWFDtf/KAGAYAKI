@@ -41,6 +41,10 @@ Vollständige 4-Schichten-State-, Rollback-, Save/Load-, Verlaufs-, Meta-Progres
 | `GalleryManager` | `class` | Verwaltet CG-Galerie-Einträge (`GalleryEntry` mit Variationen/Kategorien) und deren persistenten Unlock-Status. |
 | `EndingsManager` | `class` | Verwaltet verzweigte Story-Endings (`EndingDef` mit `parentEndingId`-Baumstruktur) inklusive Completion-Prozentwert. |
 | `LocalizationManager` | `class` | Verwaltet Live-Sprachwechsel mit Listenern, Indizierung von `VJavaAst.TranslateBlock`s, `translateDialogue`/`translateUi`, `tl/<lang>/`-Asset-Auflösung und `.vjava`-Template-Generierung (`extractTranslationTemplate`). |
+| `AutoSaveScheduler` | `final class` | Konfigurierbarer Zeit-/Schritt-Scheduler für rotierende Auto-Saves (`auto_1`..`auto_<maxSlots>`) über `SaveManager`. |
+| `SaveSlotQueryService` | `final class` | Tagging, Volltextsuche, Filterung nach Tag/Label und Sortierung (Zeitstempel/Spielzeit) über `SaveSlotData` mit `Optional`- und unveränderlichen Listen-Ergebnissen. |
+| `SaveMigrationStep` | `interface` | Versionsschritt (`fromVersion()`, `toVersion()`, `migrate(SaveSlotData)`) für abwärtskompatible Spielstand-Migrationen. |
+| `SaveMigrationService` | `final class` | Validierte Migrations-Pipeline für `SaveSlotData` inklusive Versions-Tracking (`__saveVersion`) und Migrationsprotokoll (`__migrationTrail`). |
 
 ## Öffentliche API-Signaturen
 
