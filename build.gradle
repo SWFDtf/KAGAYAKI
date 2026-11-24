@@ -80,8 +80,8 @@ tasks.register('runStudio', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'de.swfdtf.Main'
     def studioArgs = ['--studio']
-    if (project.hasProperty('projectDir')) {
-        studioArgs.addAll(['--project', project.property('projectDir').toString()])
+    if (project.hasProperty('kagayakiProject')) {
+        studioArgs.addAll(['--project', project.property('kagayakiProject').toString()])
     }
     args studioArgs
     if (isMac) {
@@ -94,8 +94,8 @@ tasks.register('runStandalone', JavaExec) {
     description = 'Starts KAGAYAKI in Standalone Game mode (Window B only).'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'de.swfdtf.StandaloneMain'
-    if (project.hasProperty('projectDir')) {
-        args '--standalone', project.property('projectDir').toString()
+    if (project.hasProperty('kagayakiProject')) {
+        args '--standalone', project.property('kagayakiProject').toString()
     }
     if (isMac) {
         jvmArgs '-XstartOnFirstThread'

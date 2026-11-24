@@ -11,8 +11,8 @@ Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen 
 | `./gradlew build` | `build` | Kompiliert Java 21 Quellen, führt JUnit-6-Tests aus und paketiert das Standard-JAR. |
 | `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`) mit ausführlichem Event-Logging aus (M1–M6-Basis: **157** Tests in **43** Suites, ergänzt um die M7-Suites `DirectorAndInspectorsTest`, `ToolsPackagerAndTemplateTest` und `EndToEndEngineTest` unter `de.swfdtf.tools`). |
 | `./gradlew run` | `application` | Startet `de.swfdtf.Main` (unter macOS automatisch mit `-XstartOnFirstThread`). |
-| `./gradlew runStudio` | `kagayaki` | Startet `de.swfdtf.Main` mit `--studio` (optional `-PprojectDir=<pfad>` ergänzt `--project <pfad>`). |
-| `./gradlew runStandalone` | `kagayaki` | Startet `de.swfdtf.StandaloneMain` (optional `-PprojectDir=<pfad>` ergänzt `--standalone <pfad>`). |
+| `./gradlew runStudio` | `kagayaki` | Startet `de.swfdtf.Main` mit `--studio` (optional `-PkagayakiProject=<pfad>` ergänzt `--project <pfad>`). |
+| `./gradlew runStandalone` | `kagayaki` | Startet `de.swfdtf.StandaloneMain` (optional `-PkagayakiProject=<pfad>` ergänzt `--standalone <pfad>`). |
 | `./gradlew packageStandalone` | `kagayaki` | Erstellt ein ausführbares Fat-JAR `build/dist/kagayaki-standalone-<version>.jar` mit `Main-Class: de.swfdtf.StandaloneMain` und schließt `de/swfdtf/tools/StudioWindowController*` sowie `**/AGENT_CONTEXT.md` aus. |
 
 ---

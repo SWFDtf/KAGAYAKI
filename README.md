@@ -30,7 +30,7 @@ A Java 21 & LWJGL 3 game engine and dual-window Studio environment.
 ```
 Optionally pass a project directory:
 ```bash
-./gradlew runStudio -PprojectDir=/path/to/project
+./gradlew runStudio -PkagayakiProject=/path/to/project
 ```
 
 ### Run in Standalone Mode
