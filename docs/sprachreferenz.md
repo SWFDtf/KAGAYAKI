@@ -2,7 +2,7 @@
 
 Vollständige Referenz aller Schlüsselwörter, Anweisungen, Operatoren und Inline-Tags der Skriptsprache **vjava** (Dateiendung `.vjava`).
 
-> **Was ist vjava?** vjava ist die Skriptsprache der Visual-Novel-Engine **KAGAYAKI** (Java 21 + LWJGL 3). Sie kombiniert eine einrückungsbasierte, deklarative Story-Syntax (ähnlich Ren'Py) mit eingebettetem **Java 21**, das zur Laufzeit im Arbeitsspeicher kompiliert wird. Es gibt keinen separaten Compiler-Befehl: Die Engine lädt, parst und führt `.vjava`-Dateien direkt aus (siehe [getting-started.md](getting-started.md)).
+> **Was ist vjava?** vjava ist die Skriptsprache der Visual-Novel-Engine **KAGAYAKI** (Java 21 + LWJGL 3). Sie kombiniert eine einrückungsbasierte, deklarative Story-Syntax mit eingebettetem **Java 21**, das zur Laufzeit im Arbeitsspeicher kompiliert wird. Es gibt keinen separaten Compiler-Befehl: Die Engine lädt, parst und führt `.vjava`-Dateien direkt aus (siehe [getting-started.md](getting-started.md)).
 
 > **Verifikation:** Alle Syntaxregeln wurden gegen `VJavaLexer`, `VJavaParser`, `ScriptRuntime` und `ObjectMotionController` abgeglichen. Die Beispiele wurden mit dem eingebauten Linter (`VJavaLinter`) geprüft (0 Fehler, 0 Warnungen). Ergänzende Detailtiefe: [VJAVA_SPEZIFIKATION.md](VJAVA_SPEZIFIKATION.md).
 
