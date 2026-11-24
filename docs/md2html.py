@@ -28,7 +28,6 @@ NAV = [
     ("anleitungen", "Anleitungen &amp; FAQ"),
     ("getting-started", "vjava Setup"),
     ("sprachreferenz", "Sprachreferenz"),
-    ("mitmachen", "Mitmachen"),
 ]
 LINK_MAP = {"getting-started.md": "getting-started.html", "sprachreferenz.md": "sprachreferenz.html"}
 
@@ -255,7 +254,7 @@ def add_nav_to_existing():
         text = open(f, encoding="utf-8", newline="").read()
         if "getting-started.html" in text:
             continue
-        pattern = re.compile(r'^([ \t]*)<li><a href="mitmachen\.html"( aria-current="page")?>', re.M)
+        pattern = re.compile(r'^([ \t]*)<li><a href="md/', re.M)
         text = pattern.sub(
             lambda m: f'{m.group(1)}<li><a href="getting-started.html">vjava Setup</a></li>\n'
                       f'{m.group(1)}<li><a href="sprachreferenz.html">Sprachreferenz</a></li>\n'

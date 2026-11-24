@@ -30,4 +30,4 @@ Wir gestalten diese Dokumentation so zugänglich wie möglich für alle Menschen
 - Hohe Farbkontraste im hellen und dunklen Design.
 - Alle Inhalte stehen zusätzlich als schlichte [Markdown-Dateien](index.md) bereit.
 
-Dir fällt trotzdem eine Hürde auf? Melde sie uns gern über die Kontaktdaten im [Impressum](impressum.md) oder über einen Beitrag unter [Mitmachen](mitmachen.md).
+Dir fällt trotzdem eine Hürde auf? Melde sie uns gern über die Kontaktdaten im [Impressum](impressum.md).

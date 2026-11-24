@@ -20,7 +20,6 @@ Viele Werkzeuge für Spieleentwicklung zwingen Autorinnen und Autoren in komplex
 - [Erste Schritte](erste-schritte.md) — Voraussetzungen installieren, Studio starten und die erste Szene schreiben.
 - [Konzepte](konzepte.md) — Philosophie, Zwei-Fenster-Prinzip und Projektstruktur verständlich erklärt.
 - [Anleitungen & FAQ](anleitungen.md) — Schritt-für-Schritt-Hilfen für Dialoge, Bilder, Musik, Export und häufige Fragen.
-- [Mitmachen](mitmachen.md) — Wie du Texte verbessern, Fehler melden oder Code beisteuern kannst.
 
 ---
 
