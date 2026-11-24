@@ -16,7 +16,7 @@ Vollständige Referenz aller Schlüsselwörter, Anweisungen, Operatoren und Inli
 4. [Bewegung, Steuerung & Physik](#4-bewegung-steuerung--physik)
    `move` · `move_by` · `wasd_init` · `wasd_stop` · `physics_init` · `physics_stop` · `on_collide`
 5. [Ausdrücke & Operatoren](#5-ausdrücke--operatoren)
-6. [Eingebettetes Java](#6-eingebettetes-java-)
+6. [Eingebettetes Java](#6-eingebettetes-java----)
 7. [Transitions](#7-transitions)
 8. [Inline-Text-Tags](#8-inline-text-tags)
 9. [Screen-Sprache (UI)](#9-screen-sprache-ui)
@@ -329,7 +329,7 @@ label kapitel_2:
 
 ### 2.10 `@->{ … }<<` – Java-Block (Top-Level)
 
-Siehe [Abschnitt 6](#6-eingebettetes-java-). Top-Level-Blöcke laufen **einmal beim Start** in Deklarationsreihenfolge und eignen sich für Klassen, Records und Hilfsmethoden.
+Siehe [Abschnitt 6](#6-eingebettetes-java----). Top-Level-Blöcke laufen **einmal beim Start** in Deklarationsreihenfolge und eignen sich für Klassen, Records und Hilfsmethoden.
 
 ---
 
@@ -770,7 +770,7 @@ label start:
 
 ### 3.22 `:: … @->{ … }<<` (Java-Anweisung)
 
-Siehe [Abschnitt 6](#6-eingebettetes-java-).
+Siehe [Abschnitt 6](#6-eingebettetes-java----).
 
 ---
 

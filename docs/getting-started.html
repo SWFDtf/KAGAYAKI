@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Erste Schritte mit vjava — KAGAYAKI Dokumentation</title>
+  <meta name="description" content="Voraussetzungen, Setup, CLI, Hello World und Quellcode-Struktur von vjava.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#hauptinhalt">Direkt zum Inhalt springen</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">
+        KAGAYAKI
+        <span class="brand-badge">Doku</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Hauptnavigation">
+        <ul>
+          <li><a href="index.html">Startseite</a></li>
+          <li><a href="erste-schritte.html">Erste Schritte</a></li>
+          <li><a href="konzepte.html">Konzepte</a></li>
+          <li><a href="anleitungen.html">Anleitungen &amp; FAQ</a></li>
+          <li><a href="getting-started.html" aria-current="page">vjava Setup</a></li>
+          <li><a href="sprachreferenz.html">Sprachreferenz</a></li>
+          <li><a href="mitmachen.html">Mitmachen</a></li>
+          <li><a href="md/getting-started.md">Markdown</a></li>
+        </ul>
+      </nav>
+
+      <details class="nav-toggle-details">
+        <summary aria-label="Menü öffnen">Menü</summary>
+        <nav aria-label="Mobile Hauptnavigation">
+          <ul>
+            <li><a href="index.html">Startseite</a></li>
+            <li><a href="erste-schritte.html">Erste Schritte</a></li>
+            <li><a href="konzepte.html">Konzepte</a></li>
+            <li><a href="anleitungen.html">Anleitungen &amp; FAQ</a></li>
+            <li><a href="getting-started.html" aria-current="page">vjava Setup</a></li>
+            <li><a href="sprachreferenz.html">Sprachreferenz</a></li>
+            <li><a href="mitmachen.html">Mitmachen</a></li>
+            <li><a href="md/getting-started.md">Markdown</a></li>
+          </ul>
+        </nav>
+      </details>
+    </div>
+  </header>
+
+  <main id="hauptinhalt" class="container prose">
+<h1 id="erste-schritte-mit-vjava">Erste Schritte mit vjava</h1>
+<p>Schritt-für-Schritt-Anleitung vom Klonen des Repositorys bis zum ersten laufenden <code>.vjava</code>-Programm.</p>
+<blockquote><p><strong>Wichtig zum Verständnis:</strong> vjava ist eine <strong>Skriptsprache für die Visual-Novel-Engine KAGAYAKI</strong>. Es gibt keinen eigenständigen Kommandozeilen-Interpreter wie <code>vjava datei.vjava</code>. Stattdessen startest du die <strong>Engine</strong> (Java 21 + LWJGL 3) und gibst ihr einen <strong>Projektordner</strong> mit <code>.vjava</code>-Dateien. Die Engine öffnet ein Fenster, parst die Skripte und führt sie aus. Die Sprachsyntax steht in der <a href="sprachreferenz.html">Sprachreferenz</a>.</p></blockquote>
+<h2 id="inhalt">Inhalt</h2>
+<ol><li><a href="#1-voraussetzungen">Voraussetzungen</a></li><li><a href="#2-installation--setup">Installation &amp; Setup</a></li><li><a href="#3-engine-auf-der-konsole-starten-cli">Engine auf der Konsole starten (CLI)</a></li><li><a href="#4-das-erste-programm-hello-world">Das erste Programm: „Hello World“</a></li><li><a href="#5-starterprojekt--demo">Starterprojekt &amp; Demo</a></li><li><a href="#6-skripte-prüfen--fehler-finden">Skripte prüfen &amp; Fehler finden</a></li><li><a href="#7-spiel-verpacken">Spiel verpacken</a></li><li><a href="#8-projektstruktur-des-quellcodes">Projektstruktur des Quellcodes</a></li><li><a href="#9-vjava-erweitern">vjava erweitern</a></li><li><a href="#10-fehlerbehebung">Fehlerbehebung</a></li></ol>
+<hr>
+<h2 id="1-voraussetzungen">1. Voraussetzungen</h2>
+<div class="table-wrap"><table><thead><tr><th>Komponente</th><th>Anforderung</th><th>Hinweis</th></tr></thead><tbody><tr><td><strong>JDK</strong></td><td><strong>Java 21 oder neuer</strong> (nicht 17!)</td><td><code>build.gradle</code> setzt <code>sourceCompatibility = JavaVersion.VERSION_21</code>. Ein <strong>JDK</strong> (kein reines JRE) ist nötig, weil <code>@-&gt;{ … }&lt;&lt;</code>-Blöcke zur Laufzeit mit <code>javax.tools.JavaCompiler</code> kompiliert werden.</td></tr><tr><td><strong>Build-Tool</strong></td><td><strong>Gradle</strong></td><td>Der Wrapper (<code>gradlew</code> / <code>gradlew.bat</code>) liegt im Repository – eine eigene Gradle-Installation ist <strong>nicht</strong> nötig. Maven wird nicht verwendet.</td></tr><tr><td><strong>Git</strong></td><td>beliebig aktuell</td><td>Zum Klonen.</td></tr><tr><td><strong>Grafik</strong></td><td>OpenGL-fähige GPU/Treiber</td><td>Die Engine rendert mit LWJGL/GLFW/OpenGL.</td></tr><tr><td><strong>Audio</strong></td><td>OpenAL (über LWJGL gebündelt)</td><td>Keine Zusatzinstallation.</td></tr><tr><td><strong>Editor</strong></td><td>beliebig (UTF-8)</td><td>z. B. IntelliJ IDEA oder VS Code.</td></tr></tbody></table></div>
+<p>Version prüfen:</p>
+<pre><code class="language-bash">java -version      # muss 21 oder höher anzeigen
+javac -version     # beweist, dass ein JDK installiert ist</code></pre>
+<p>Unterstützte Plattformen: Windows, macOS (Intel und Apple Silicon) und Linux (x64 und arm64). Die passenden LWJGL-Natives werden automatisch gewählt. Auf macOS setzt Gradle selbstständig das nötige JVM-Argument <code>-XstartOnFirstThread</code>.</p>
+<hr>
+<h2 id="2-installation--setup">2. Installation &amp; Setup</h2>
+<h3 id="21-repository-klonen">2.1 Repository klonen</h3>
+<pre><code class="language-bash">git clone https://github.com/SWFDtf/KAGAYAKI.git
+cd KAGAYAKI</code></pre>
+<h3 id="22-bauen">2.2 Bauen</h3>
+<pre><code class="language-bash">./gradlew build          # macOS / Linux
+gradlew.bat build        # Windows</code></pre>
+<p>Der erste Lauf lädt Gradle und alle Abhängigkeiten (LWJGL 3.3.6, JOML 1.10.8, Gson 2.11.0, JUnit, Mockito) und benötigt Internet. <code>build</code> führt auch die Tests aus; nur kompilieren: <code>./gradlew compileJava</code>.</p>
+<h3 id="23-tests-ausführen-optional">2.3 Tests ausführen (optional)</h3>
+<pre><code class="language-bash">./gradlew test</code></pre>
+<h3 id="24-gradle-aufgaben-im-überblick">2.4 Gradle-Aufgaben im Überblick</h3>
+<div class="table-wrap"><table><thead><tr><th>Aufgabe</th><th>Zweck</th></tr></thead><tbody><tr><td><code>./gradlew runStudio</code></td><td>Startet den <strong>Studio-Modus</strong> (zwei Fenster: Werkzeug + Live-Vorschau).</td></tr><tr><td><code>./gradlew runStandalone</code></td><td>Startet nur das <strong>Spielfenster</strong> ohne Studio-Werkzeuge.</td></tr><tr><td><code>./gradlew packageStandalone</code></td><td>Baut ein ausführbares JAR: <code>build/dist/kagayaki-standalone-&lt;version&gt;.jar</code>.</td></tr><tr><td><code>./gradlew test</code></td><td>Führt alle JUnit-Tests aus.</td></tr></tbody></table></div>
+<p>Mit <code>-PkagayakiProject=&lt;pfad&gt;</code> wählst du das Projekt aus (Pfad zum Ordner mit <code>project.vjava.json</code>).</p>
+<hr>
+<h2 id="3-engine-auf-der-konsole-starten-cli">3. Engine auf der Konsole starten (CLI)</h2>
+<h3 id="31-über-gradle">3.1 Über Gradle</h3>
+<pre><code class="language-bash"># Studio-Modus mit Projekt
+./gradlew runStudio -PkagayakiProject=/pfad/zu/meinem_projekt
+
+# Nur Spiel (Standalone)
+./gradlew runStandalone -PkagayakiProject=/pfad/zu/meinem_projekt</code></pre>
+<p>Ohne <code>-PkagayakiProject</code> sucht die Engine automatisch ein Projekt: zuerst <code>./project.vjava.json</code> im aktuellen Ordner, dann <code>./demo/project/project.vjava.json</code>.</p>
+<h3 id="32-direkt-über-die-java-klassen">3.2 Direkt über die Java-Klassen</h3>
+<div class="table-wrap"><table><thead><tr><th>Einstiegspunkt</th><th>Klasse</th><th>Standardmodus</th></tr></thead><tbody><tr><td>Studio/Allgemein</td><td><code>de.swfdtf.Main</code></td><td>Studio (zwei Fenster), sofern nicht <code>--standalone</code></td></tr><tr><td>Exportierte Spiele</td><td><code>de.swfdtf.StandaloneMain</code></td><td>Immer Standalone</td></tr></tbody></table></div>
+<h3 id="33-kommandozeilen-flags">3.3 Kommandozeilen-Flags</h3>
+<div class="table-wrap"><table><thead><tr><th>Flag</th><th>Argument</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>--studio</code></td><td>–</td><td>Studio-Modus (Dual-Window).</td></tr><tr><td><code>--standalone [&lt;dir&gt;]</code></td><td>optionaler Projektordner</td><td>Nur Spielfenster; der Ordner darf direkt folgen.</td></tr><tr><td><code>--project &lt;dir&gt;</code> / <code>--project=&lt;dir&gt;</code></td><td>Pfad</td><td>Projektordner.</td></tr><tr><td><code>--create-template &lt;dir&gt;</code> / <code>--create-template=&lt;dir&gt;</code></td><td>Pfad</td><td>Erzeugt ein vollständiges <strong>Starterprojekt</strong> im Ordner und startet damit.</td></tr><tr><td><code>--mode 2D\|3D</code> (Alias <code>--render-mode</code>), <code>--2d</code>, <code>--3d</code></td><td><code>2D</code> oder <code>3D</code></td><td>Render-Modus.</td></tr><tr><td><code>--width &lt;n&gt;</code>, <code>--height &lt;n&gt;</code></td><td>positive Ganzzahl</td><td>Logische Auflösung (Standard 1920×1080).</td></tr><tr><td><code>--fps &lt;n&gt;</code> (Alias <code>--target-fps</code>)</td><td>positive Ganzzahl</td><td>Ziel-Bildrate.</td></tr><tr><td><code>--vsync</code> / <code>--no-vsync</code> (auch <code>--vsync=true\|false</code>)</td><td>–</td><td>VSync an/aus.</td></tr><tr><td><code>--headless</code></td><td>–</td><td>Ohne sichtbares Fenster.</td></tr><tr><td><code>--smoke-test</code></td><td>–</td><td>Kurzer Startdurchlauf zur Prüfung.</td></tr></tbody></table></div>
+<p>Beispiel:</p>
+<pre><code class="language-bash">./gradlew runStandalone -PkagayakiProject=/pfad/zu/projekt</code></pre>
+<p>oder, wenn du die Klassen selbst startest (nach <code>./gradlew build</code>, mit dem Klassenpfad aus deiner IDE):</p>
+<pre><code class="language-bash">java -XstartOnFirstThread de.swfdtf.Main --standalone /pfad/zu/projekt   # -XstartOnFirstThread nur auf macOS</code></pre>
+<blockquote><p><strong>Tipp:</strong> In IntelliJ IDEA kannst du <code>de.swfdtf.Main</code> direkt mit den obigen Programmargumenten starten. Auf macOS muss dabei das VM-Argument <code>-XstartOnFirstThread</code> gesetzt sein.</p></blockquote>
+<hr>
+<h2 id="4-das-erste-programm-hello-world">4. Das erste Programm: „Hello World“</h2>
+<h3 id="41-projektordner-anlegen">4.1 Projektordner anlegen</h3>
+<pre><code class="language-bash">mkdir -p ~/vjava/hello
+cd ~/vjava/hello</code></pre>
+<h3 id="42-projectvjavajson-erstellen">4.2 <code>project.vjava.json</code> erstellen</h3>
+<p>Diese Datei beschreibt das Projekt. Fehlt sie, erzeugt die Engine Standardwerte – für die automatische Projekterkennung sollte sie aber vorhanden sein.</p>
+<pre><code class="language-json">{
+  &quot;title&quot;: &quot;Hello vjava&quot;,
+  &quot;entryLabel&quot;: &quot;start&quot;
+}</code></pre>
+<p>Alle Felder (alle optional):</p>
+<div class="table-wrap"><table><thead><tr><th>Feld</th><th>Typ</th><th>Standard</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>title</code></td><td>String</td><td><code>&quot;Untitled KAGAYAKI Project&quot;</code></td><td>Projekttitel</td></tr><tr><td><code>version</code></td><td>String</td><td><code>&quot;1.0.0&quot;</code></td><td>Projektversion</td></tr><tr><td><code>author</code></td><td>String</td><td><code>&quot;&quot;</code></td><td>Autor</td></tr><tr><td><code>renderMode</code></td><td>String</td><td><code>&quot;2D&quot;</code></td><td><code>&quot;2D&quot;</code> oder <code>&quot;3D&quot;</code></td></tr><tr><td><code>logicalWidth</code> / <code>logicalHeight</code></td><td>int</td><td><code>1920</code> / <code>1080</code></td><td>Logische Auflösung</td></tr><tr><td><code>entryLabel</code></td><td>String</td><td><code>&quot;start&quot;</code></td><td>Label, mit dem das Skript beginnt</td></tr><tr><td><code>defaultLanguage</code></td><td>String</td><td><code>&quot;deutsch&quot;</code></td><td>Standardsprache</td></tr><tr><td><code>dialogueMode</code></td><td>String</td><td><code>&quot;ADV&quot;</code></td><td><code>&quot;ADV&quot;</code>, <code>&quot;NVL&quot;</code> oder <code>&quot;BUBBLE&quot;</code></td></tr><tr><td><code>windowTitle</code></td><td>String</td><td>= <code>title</code></td><td>Fenstertitel</td></tr><tr><td><code>iconPath</code></td><td>String</td><td><code>&quot;&quot;</code></td><td>Pfad zum Fenster-Icon</td></tr></tbody></table></div>
+<h3 id="43-mainvjava-schreiben">4.3 <code>main.vjava</code> schreiben</h3>
+<p>Datei <code>~/vjava/hello/main.vjava</code> (UTF-8, <strong>4 Leerzeichen</strong> Einrückung):</p>
+<pre><code class="language-vjava">define a = Character(&quot;Aoi&quot;, color=&quot;#7aa2ff&quot;)
+
+label start:
+    &quot;Hallo, Welt! Das ist mein erstes vjava-Programm.&quot;
+    a &quot;Schön, dass du da bist.&quot;
+    return</code></pre>
+<p>So liest du es:</p>
+<div class="table-wrap"><table><thead><tr><th>Zeile</th><th>Bedeutung</th></tr></thead><tbody><tr><td><code>define a = Character(&quot;Aoi&quot;, color=&quot;#7aa2ff&quot;)</code></td><td>Legt den Sprecher <code>a</code> mit Anzeigename „Aoi“ und blauer Namensfarbe an.</td></tr><tr><td><code>label start:</code></td><td>Startpunkt (entspricht <code>entryLabel</code> aus der JSON-Datei).</td></tr><tr><td><code>&quot;Hallo, Welt! …&quot;</code></td><td>Text ohne Sprecher = Erzähler. Der Spieler klickt weiter.</td></tr><tr><td><code>a &quot;Schön, …&quot;</code></td><td>Dialogzeile des Sprechers <code>a</code>.</td></tr><tr><td><code>return</code></td><td>Beendet das Skript.</td></tr></tbody></table></div>
+<p>Bei der Statement-Verschachtelung zählt die Einrückung: alles Eingerückte unter <code>label start:</code> gehört zum Label.</p>
+<h3 id="44-ausführen">4.4 Ausführen</h3>
+<p>Aus dem Repository-Ordner <code>KAGAYAKI</code>:</p>
+<pre><code class="language-bash">./gradlew runStandalone -PkagayakiProject=$HOME/vjava/hello</code></pre>
+<p>Es öffnet sich das Spielfenster mit deinem Text; mit einem Mausklick (oder den im Controls-Screen belegten Tasten) schaltest du weiter. Zum Entwickeln mit Live-Vorschau verwendest du stattdessen <code>runStudio</code>:</p>
+<pre><code class="language-bash">./gradlew runStudio -PkagayakiProject=$HOME/vjava/hello</code></pre>
+<p>Im Studio-Modus lädt <strong><code>Shift+R</code></strong> das Skript neu und behält die aktuelle Position und Variablen bei.</p>
+<h3 id="45-nächste-ausbaustufe">4.5 Nächste Ausbaustufe</h3>
+<p>Erweitere <code>main.vjava</code> um Variablen, Menü, Hintergrund und Musik (Assets müssen existieren):</p>
+<pre><code class="language-vjava">define a = Character(&quot;Aoi&quot;, color=&quot;#7aa2ff&quot;)
+default mut = 0
+
+label start:
+    a &quot;Willst du ein Abenteuer erleben?&quot;
+    menu:
+        &quot;Ja&quot; -&gt; jump abenteuer
+        &quot;Nein&quot; -&gt; jump ende
+
+label abenteuer:
+    $ mut += 1
+    a &quot;Mut: [mut]. Los geht&#x27;s!&quot;
+    jump ende
+
+label ende:
+    &quot;Ende.&quot;
+    return</code></pre>
+<p>Alle Bausteine – Bilder, Audio, Transitions, Animationen, UI, Java-Blöcke – stehen in der <a href="sprachreferenz.html">Sprachreferenz</a>.</p>
+<hr>
+<h2 id="5-starterprojekt--demo">5. Starterprojekt &amp; Demo</h2>
+<h3 id="51-starterprojekt-generieren">5.1 Starterprojekt generieren</h3>
+<pre><code class="language-bash">./gradlew run --args=&quot;--create-template /pfad/zum/neuen_projekt&quot;</code></pre>
+<blockquote><p>Hinweis: Die Gradle-Aufgabe <code>run</code> startet <code>de.swfdtf.Main</code> (Studio-Modus) und wird vom <code>application</code>-Plugin bereitgestellt. Alternativ startest du <code>de.swfdtf.Main</code> mit <code>--create-template &lt;dir&gt;</code> in deiner IDE.</p></blockquote>
+<p>Der Generator (<code>ProjectTemplateGenerator</code>) erzeugt <code>project.vjava.json</code>, <code>main.vjava</code> (mit Java-Klassen, <code>layeredimage</code>, Verzweigung), <code>ui/screens.vjava</code>, <code>tl/english/translations.vjava</code> sowie prozedurale PNG- und WAV-Assets.</p>
+<h3 id="52-demo-schneewittchen">5.2 Demo „Schneewittchen“</h3>
+<p>Im Ordner <code>demo/project/</code> liegt ein vollständiges Beispielspiel (vier Kapitel, UI-Screens, Übersetzung, Audio). Es ist auch der <strong>Standard</strong>, wenn im Repository-Stamm kein Projekt angegeben wird:</p>
+<pre><code class="language-bash">./gradlew runStudio</code></pre>
+<p>Zum Lernen eignen sich besonders <code>demo/project/main.vjava</code> (Definitionen), <code>demo/project/kapitel/*.vjava</code> (Handlung) und <code>demo/project/ui/screens.vjava</code> (UI).</p>
+<hr>
+<h2 id="6-skripte-prüfen--fehler-finden">6. Skripte prüfen &amp; Fehler finden</h2>
+<ul><li><strong>Parser-Fehler</strong> (<code>VJavaParseException</code>) nennen Datei und Zeilennummer.</li><li><strong>Java-Kompilierfehler</strong> in <code>@-&gt;{ … }&lt;&lt;</code> (<code>VJavaCompileException</code>) werden auf die Zeile in der <code>.vjava</code>-Datei zurückgerechnet.</li><li><strong>Statischer Linter</strong> (<code>de.swfdtf.tools.VJavaLinter</code>) findet u. a. <code>MISSING_ENTRY_LABEL</code>, <code>MISSING_JUMP_TARGET</code>, <code>MISSING_CALL_TARGET</code>, <code>MISSING_MENU_TARGET</code>, <code>UNREACHABLE_LABEL</code>, <code>MISSING_ASSET</code>, <code>UNDEFINED_SPEAKER</code>, <code>DUPLICATE_DEFINITION</code>, <code>PARSE_ERROR</code>, <code>JAVA_COMPILE_ERROR</code>. Er läuft automatisch vor dem Standalone-Export und lässt sich auch aus Java aufrufen:</li></ul>
+<pre><code class="language-java">import de.swfdtf.tools.VJavaLinter;
+import java.nio.file.Path;
+
+public class LintDemo {
+    public static void main(String[] args) {
+        VJavaLinter.LintReport report = VJavaLinter.lint(Path.of(args[0]));
+        System.out.println(report);
+    }
+}</code></pre>
+<hr>
+<h2 id="7-spiel-verpacken">7. Spiel verpacken</h2>
+<pre><code class="language-bash">./gradlew packageStandalone</code></pre>
+<p>erzeugt <code>build/dist/kagayaki-standalone-&lt;version&gt;.jar</code> (ohne Studio-Werkzeuge, Hauptklasse <code>de.swfdtf.StandaloneMain</code>). Start:</p>
+<pre><code class="language-bash">java -jar build/dist/kagayaki-standalone-1.0.0.jar --standalone /pfad/zu/projekt
+# macOS: java -XstartOnFirstThread -jar …</code></pre>
+<p>Der Studio-<code>StandaloneBuilder</code> bündelt Skripte und Assets zusätzlich in ein prüfsummengesichertes <code>game.vpak</code> samt Startskripten (<code>run_game.sh</code>, <code>run_game.bat</code>) und verweigert den Export bei Lint-Fehlern.</p>
+<hr>
+<h2 id="8-projektstruktur-des-quellcodes">8. Projektstruktur des Quellcodes</h2>
+<pre><code class="language-text">KAGAYAKI/
+├── build.gradle                  # Gradle-Build, Tasks runStudio / runStandalone / packageStandalone
+├── settings.gradle
+├── gradlew, gradlew.bat          # Gradle-Wrapper
+├── src/
+│   ├── main/java/de/swfdtf/
+│   │   ├── Main.java             # Einstieg (Studio, --create-template)
+│   │   ├── StandaloneMain.java   # Einstieg für exportierte Spiele
+│   │   ├── parser/               # ★ Sprache: Lexer, Parser, AST, Laufzeit, Java-Compiler
+│   │   ├── core/                 # Engine-Kern: EngineApplication, EngineConfig, ProjectDescriptor, EngineAPI, Input, Events
+│   │   ├── state/                # StateStore, Rollback, Save/Load, Lokalisierung, Achievements
+│   │   ├── graphics/             # Renderer, SceneController, Sprites, ATL, Transitions, Textlayout, ObjectMotionController
+│   │   ├── audio/                # OpenAL-Mixer, Kanäle, Lip-Sync, TTS
+│   │   ├── ui/                   # Screens, Widgets, ScreenAstBuilder, Dialogmodi, GameRuntimeCoordinator
+│   │   ├── math/                 # Vec2f, Transform2D, Easing, ScreenShake
+│   │   ├── tools/                # Linter, Template-Generator, Studio, Packager (.vpak)
+│   │   └── git/                  # Git-Anbindung des Studios
+│   └── test/java/de/swfdtf/      # JUnit-Tests (parser/, state/, graphics/, ui/, …)
+├── demo/project/                 # Beispiel-Visual-Novel &quot;Schneewittchen&quot;
+└── docs/                         # Dokumentation</code></pre>
+<h3 id="81-verarbeitungspipeline">8.1 Verarbeitungspipeline</h3>
+<pre><code>flowchart LR
+    A[&quot;.vjava-Dateien&quot;] --&gt; B[&quot;ProjectScanner&quot;]
+    B --&gt; C[&quot;VJavaLexer&quot;]
+    C --&gt; D[&quot;VJavaParser&quot;]
+    D --&gt; E[&quot;VJavaAst / ProjectAst&quot;]
+    E --&gt; F[&quot;JavaBlockCompiler&quot;]
+    E --&gt; G[&quot;ScriptRuntime&quot;]
+    F --&gt; G
+    G --&gt; H[&quot;SceneController / AudioEngine / UI&quot;]
+    G --&gt; I[&quot;ScriptSession: State, Save, Rollback&quot;]</code></pre>
+<h3 id="82-wichtige-klassen-im-paket-deswfdtfparser">8.2 Wichtige Klassen im Paket <code>de.swfdtf.parser</code></h3>
+<div class="table-wrap"><table><thead><tr><th>Klasse</th><th>Aufgabe</th></tr></thead><tbody><tr><td><code>ProjectScanner</code></td><td>Findet rekursiv alle <code>*.vjava</code> und Assets, parst sie in deterministischer Reihenfolge und führt sie zu einem <code>ProjectAst</code> zusammen (inkl. Duplikat-Warnungen).</td></tr><tr><td><code>VJavaLexer</code></td><td>Zeilen- und einrückungsbewusster Lexer: erzeugt <code>LINE</code>, <code>INDENT</code>, <code>DEDENT</code> und <code>JAVA_BLOCK</code>-Tokens; kennt Kommentare, Strings und <code>@-&gt;{ … }&lt;&lt;</code>.</td></tr><tr><td><code>VJavaParser</code></td><td>Rekursiv-absteigender Parser. Top-Level-Schlüsselwörter (<code>define</code>, <code>default</code>, <code>image</code>, <code>layeredimage</code>, <code>transform</code>, <code>screen</code>, <code>translate</code>, <code>label</code>) in <code>parse…</code>-Methoden; Anweisungen im <code>switch</code> in <code>parseStatementBlock(…)</code>.</td></tr><tr><td><code>VJavaAst</code></td><td>Unveränderliches AST-Modell (Records): <code>Statement</code>-Hierarchie (<code>SayStatement</code>, <code>ShowStatement</code>, <code>MenuStatement</code>, <code>MoveStatement</code>, …), Definitionen, <code>ProjectAst</code>.</td></tr><tr><td><code>VJavaParseException</code></td><td>Syntaxfehler mit Datei und Zeile.</td></tr><tr><td><code>JavaBlockCompiler</code></td><td>Kompiliert <code>@-&gt;{ … }&lt;&lt;</code>-Blöcke im Speicher; baut <code>VJavaUserTypes</code> und <code>VJavaSnippet_&lt;i&gt;</code>.</td></tr><tr><td><code>VJavaExecutable</code></td><td>Schnittstelle der kompilierten Snippets: <code>execute(state, persistent, engine, scene)</code>.</td></tr><tr><td><code>VJavaCompileException</code></td><td>Kompilierfehler mit Zeilen-Mapping.</td></tr><tr><td><code>ConditionEvaluator</code></td><td>Wertet Ausdrücke/Bedingungen aus (<code>if</code>, <code>$</code>, <code>[…]</code>-Interpolation).</td></tr><tr><td><code>ScriptRuntime</code></td><td>Nicht blockierende State-Machine, die die Statements ausführt (<code>if (stmt instanceof …)</code>-Kette in <code>execute…</code>).</td></tr><tr><td><code>ScriptSession</code></td><td>Sitzungskoordinator: Rollback, Save/Load, Persistenz, Lokalisierung, Verlauf.</td></tr><tr><td><code>HotReloadWatcher</code></td><td>Beobachtet Dateiänderungen für Live-Reload.</td></tr><tr><td><code>MacroRegistry</code>, <code>ScriptProfiler</code>, <code>VariableWatchpointManager</code>, <code>TypeSafeStateView</code></td><td>Zusatzwerkzeuge (Makros, Profiling, Watchpoints, typsicherer State).</td></tr></tbody></table></div>
+<p>Weitere Anlaufstellen: <code>ui/ScreenAstBuilder</code> (baut <code>screen</code>-ASTs zu Widgets), <code>graphics/ATLTransform</code> und <code>AnimationEngine</code> (Animationen), <code>graphics/Transition</code> (Transition-Ausdrücke), <code>graphics/TextTagParser</code> (Inline-Tags), <code>graphics/ObjectMotionController</code> (<code>move</code>, <code>wasd_*</code>, <code>physics_*</code>, <code>on_collide</code>), <code>state/LocalizationManager</code> (<code>translate</code>), <code>tools/VJavaLinter</code>. Jedes Paket enthält eine <code>AGENT_CONTEXT.md</code> mit einer Typenübersicht.</p>
+<hr>
+<h2 id="9-vjava-erweitern">9. vjava erweitern</h2>
+<h3 id="91-neue-anweisung-hinzufügen-beispiel-shakesprite-tag">9.1 Neue Anweisung hinzufügen (Beispiel: <code>shake_sprite &lt;tag&gt;</code>)</h3>
+<p>Eine neue Skriptanweisung berührt immer <strong>drei Stellen</strong>:</p>
+<p><strong>1. AST-Record in <code>VJavaAst.java</code>:</strong></p>
+<pre><code class="language-java">public record ShakeSpriteStatement(String tag, String sourceFile, int lineNumber) implements Statement {
+}</code></pre>
+<p><code>Statement</code> ist ein <code>sealed interface</code> mit <code>permits</code>-Liste: Der neue Typ <strong>muss</strong> dort ergänzt werden (<code>public sealed interface Statement permits …, ShakeSpriteStatement</code>).</p>
+<p><strong>2. Parser in <code>VJavaParser.java</code>:</strong> Eintrag im <code>switch (keyword)</code> von <code>parseStatementBlock(…)</code> und eine Parse-Methode (Vorbild: <code>parseWasdStopStatement</code>).</p>
+<pre><code class="language-java">case &quot;shake_sprite&quot; -&gt; statements.add(parseShakeSpriteStatement(curr));</code></pre>
+<pre><code class="language-java">private ShakeSpriteStatement parseShakeSpriteStatement(Token token) {
+    String tag = stripKeyword(token.text(), &quot;shake_sprite&quot;, token);
+    if (tag.isEmpty() || tag.contains(&quot; &quot;)) {
+        throw error(token, &quot;Expected &#x27;shake_sprite &lt;tag&gt;&#x27;, got: &quot; + token.text());
+    }
+    return new ShakeSpriteStatement(tag, token.sourceFile(), token.lineNumber());
+}</code></pre>
+<p><strong>3. Laufzeit in <code>ScriptRuntime.java</code>:</strong> neuer Zweig vor dem abschließenden <code>throw new IllegalStateException(&quot;Unsupported AST statement type …&quot;)</code>:</p>
+<pre><code class="language-java">if (stmt instanceof VJavaAst.ShakeSpriteStatement shake) {
+    // Aufruf in SceneController / ObjectMotionController
+    statementIndex++;
+    return false;   // false = Skript läuft sofort weiter; true = auf Eingabe warten
+}</code></pre>
+<p>Danach: Test in <code>src/test/java/de/swfdtf/parser/</code> ergänzen (Vorbild: <code>VJavaMovementAndPhysicsTest</code>), gegebenenfalls <code>VJavaLinter</code> erweitern und die <a href="sprachreferenz.html">Sprachreferenz</a> aktualisieren.</p>
+<blockquote><p>Die genauen Signaturen (<code>Token</code>, <code>stripKeyword</code>, <code>error</code>, Rückgabewert der Ausführungsmethode) bitte im jeweiligen Quelltext gegenprüfen; der Codeausschnitt folgt dem Muster von <code>move</code>, <code>wasd_stop</code> und <code>on_collide</code>.</p></blockquote>
+<h3 id="92-neuen-transition-typ-text-tag-oder-ui-widget-hinzufügen">9.2 Neuen Transition-Typ, Text-Tag oder UI-Widget hinzufügen</h3>
+<div class="table-wrap"><table><thead><tr><th>Ziel</th><th>Stelle</th></tr></thead><tbody><tr><td>Transition (<code>with …</code>)</td><td><code>graphics/Transition</code> (<code>Transition.parse</code>) und <code>TransitionManager</code></td></tr><tr><td>Text-Tag (<code>{…}</code>)</td><td><code>graphics/TextTagParser</code>, <code>StyledTextLayout</code></td></tr><tr><td>UI-Widget / Screen-Schlüsselwort</td><td><code>VJavaParser</code> (Screen-Parsing), <code>ui/ScreenAstBuilder</code>, neue <code>UiNode</code>-Klasse</td></tr><tr><td>Screen-Aktion</td><td><code>ui/GameRuntimeCoordinator.handleAstScreenAction</code></td></tr><tr><td>Eigene Java-Objekte ohne Engine-Änderung</td><td><code>@-&gt;{ … }&lt;&lt;</code> mit <code>class … extends CustomDisplayable</code> und <code>custom &lt;Klasse&gt;</code> im Screen</td></tr></tbody></table></div>
+<h3 id="93-entwicklungs-workflow">9.3 Entwicklungs-Workflow</h3>
+<pre><code class="language-bash">./gradlew test --tests &quot;de.swfdtf.parser.*&quot;     # nur Parser-Tests
+./gradlew runStudio -PkagayakiProject=demo/project</code></pre>
+<hr>
+<h2 id="10-fehlerbehebung">10. Fehlerbehebung</h2>
+<div class="table-wrap"><table><thead><tr><th>Problem</th><th>Ursache</th><th>Lösung</th></tr></thead><tbody><tr><td><code>Unsupported class file major version</code> / Kompilierfehler</td><td>Java &lt; 21</td><td>JDK 21+ installieren, <code>JAVA_HOME</code> setzen.</td></tr><tr><td><code>ToolProvider.getSystemJavaCompiler()</code> liefert <code>null</code></td><td>Nur JRE installiert</td><td>Vollständiges JDK verwenden.</td></tr><tr><td>macOS: Absturz beim Fensterstart (<code>GLFW … main thread</code>)</td><td>Fehlendes <code>-XstartOnFirstThread</code></td><td>Über Gradle starten oder VM-Argument setzen.</td></tr><tr><td>Fenster öffnet nicht (Linux headless/SSH)</td><td>Kein Display</td><td>Mit Display starten oder <code>--headless</code> bzw. <code>--smoke-test</code> verwenden.</td></tr><tr><td>Engine startet ohne Projekt</td><td>Kein <code>project.vjava.json</code> gefunden</td><td><code>-PkagayakiProject=&lt;ordner&gt;</code> angeben.</td></tr><tr><td><code>VJavaParseException … indentation</code></td><td>Uneinheitliche Einrückung</td><td>4 Leerzeichen, keine Tab/Leerzeichen-Mischung.</td></tr><tr><td>Bild/Audio fehlt</td><td>Falscher Pfad</td><td>Pfade relativ zum Projektordner (<code>assets/…</code>); Linter <code>MISSING_ASSET</code> beachten.</td></tr><tr><td>Gradle lädt nichts</td><td>Kein Internet / Proxy</td><td>Erstlauf benötigt Netzwerk (Abhängigkeiten).</td></tr></tbody></table></div>
+<p><strong>Weiterführend:</strong> <a href="sprachreferenz.html">Sprachreferenz</a> · <a href="VJAVA_SPEZIFIKATION.md">VJAVA_SPEZIFIKATION.md</a> · <a href="ARCHITEKTUR.md">ARCHITEKTUR.md</a> · <a href="API_REFERENZ.md">API_REFERENZ.md</a></p>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>KAGAYAKI Dokumentation · <a href="md/getting-started.md">Diese Seite als Markdown</a></span>
+      <div class="footer-links">
+        <a href="impressum.html">Impressum</a>
+        <a href="datenschutz.html">Datenschutz</a>
+        <a href="lizenz.html">Lizenz</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

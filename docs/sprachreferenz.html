@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>vjava-Sprachreferenz — KAGAYAKI Dokumentation</title>
+  <meta name="description" content="Alle vjava-Befehle, Schlüsselwörter und Operatoren mit Argumenten und Beispielen.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#hauptinhalt">Direkt zum Inhalt springen</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">
+        KAGAYAKI
+        <span class="brand-badge">Doku</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Hauptnavigation">
+        <ul>
+          <li><a href="index.html">Startseite</a></li>
+          <li><a href="erste-schritte.html">Erste Schritte</a></li>
+          <li><a href="konzepte.html">Konzepte</a></li>
+          <li><a href="anleitungen.html">Anleitungen &amp; FAQ</a></li>
+          <li><a href="getting-started.html">vjava Setup</a></li>
+          <li><a href="sprachreferenz.html" aria-current="page">Sprachreferenz</a></li>
+          <li><a href="mitmachen.html">Mitmachen</a></li>
+          <li><a href="md/sprachreferenz.md">Markdown</a></li>
+        </ul>
+      </nav>
+
+      <details class="nav-toggle-details">
+        <summary aria-label="Menü öffnen">Menü</summary>
+        <nav aria-label="Mobile Hauptnavigation">
+          <ul>
+            <li><a href="index.html">Startseite</a></li>
+            <li><a href="erste-schritte.html">Erste Schritte</a></li>
+            <li><a href="konzepte.html">Konzepte</a></li>
+            <li><a href="anleitungen.html">Anleitungen &amp; FAQ</a></li>
+            <li><a href="getting-started.html">vjava Setup</a></li>
+            <li><a href="sprachreferenz.html" aria-current="page">Sprachreferenz</a></li>
+            <li><a href="mitmachen.html">Mitmachen</a></li>
+            <li><a href="md/sprachreferenz.md">Markdown</a></li>
+          </ul>
+        </nav>
+      </details>
+    </div>
+  </header>
+
+  <main id="hauptinhalt" class="container prose">
+<h1 id="vjava--sprachreferenz">vjava – Sprachreferenz</h1>
+<p>Vollständige Referenz aller Schlüsselwörter, Anweisungen, Operatoren und Inline-Tags der Skriptsprache <strong>vjava</strong> (Dateiendung <code>.vjava</code>).</p>
+<blockquote><p><strong>Was ist vjava?</strong> vjava ist die Skriptsprache der Visual-Novel-Engine <strong>KAGAYAKI</strong> (Java 21 + LWJGL 3). Sie kombiniert eine einrückungsbasierte, deklarative Story-Syntax (ähnlich Ren'Py) mit eingebettetem <strong>Java 21</strong>, das zur Laufzeit im Arbeitsspeicher kompiliert wird. Es gibt keinen separaten Compiler-Befehl: Die Engine lädt, parst und führt <code>.vjava</code>-Dateien direkt aus (siehe <a href="getting-started.html">getting-started.md</a>).</p></blockquote>
+<blockquote><p><strong>Verifikation:</strong> Alle Syntaxregeln wurden gegen <code>VJavaLexer</code>, <code>VJavaParser</code>, <code>ScriptRuntime</code> und <code>ObjectMotionController</code> abgeglichen. Die Beispiele wurden mit dem eingebauten Linter (<code>VJavaLinter</code>) geprüft (0 Fehler, 0 Warnungen). Ergänzende Detailtiefe: <a href="VJAVA_SPEZIFIKATION.md">VJAVA_SPEZIFIKATION.md</a>.</p></blockquote>
+<h2 id="inhaltsverzeichnis">Inhaltsverzeichnis</h2>
+<ol><li><a href="#1-allgemeine-syntaxregeln">Allgemeine Syntaxregeln</a></li><li><a href="#2-top-level-deklarationen">Top-Level-Deklarationen</a> <code>define</code> · <code>default</code> · <code>$</code> · <code>image</code> · <code>layeredimage</code> · <code>transform</code> · <code>screen</code> · <code>translate</code> · <code>label</code> · <code>@-&gt;{ }&lt;&lt;</code></li><li><a href="#3-label-anweisungen">Label-Anweisungen</a> Dialog · <code>nvl</code> · <code>window</code> · <code>scene</code> · <code>show</code> · <code>hide</code> · <code>with</code> · <code>pause</code> · <code>play</code> · <code>queue</code> · <code>stop</code> · <code>voice</code> · <code>menu</code> · <code>if</code> · <code>$</code> · <code>jump</code> · <code>call</code> · <code>return</code> · <code>input</code> · <code>block_rollback</code> · <code>pass</code></li><li><a href="#4-bewegung-steuerung--physik">Bewegung, Steuerung &amp; Physik</a> <code>move</code> · <code>move_by</code> · <code>wasd_init</code> · <code>wasd_stop</code> · <code>physics_init</code> · <code>physics_stop</code> · <code>on_collide</code></li><li><a href="#5-ausdrücke--operatoren">Ausdrücke &amp; Operatoren</a></li><li><a href="#6-eingebettetes-java----">Eingebettetes Java</a></li><li><a href="#7-transitions">Transitions</a></li><li><a href="#8-inline-text-tags">Inline-Text-Tags</a></li><li><a href="#9-screen-sprache-ui">Screen-Sprache (UI)</a></li><li><a href="#10-vollständiges-beispiel">Vollständiges Beispiel</a></li><li><a href="#11-typische-fehler">Typische Fehler</a></li></ol>
+<hr>
+<h2 id="1-allgemeine-syntaxregeln">1. Allgemeine Syntaxregeln</h2>
+<div class="table-wrap"><table><thead><tr><th>Regel</th><th>Beschreibung</th></tr></thead><tbody><tr><td>Kodierung</td><td>UTF-8 (BOM wird ignoriert); <code>\r\n</code> und <code>\r</code> werden zu <code>\n</code> normalisiert.</td></tr><tr><td>Einrückung</td><td>Blöcke beginnen nach einem <code>:</code> und werden durch Einrückung gebildet. Konvention: <strong>4 Leerzeichen</strong>; ein Tab zählt als 4 Spalten. Ein Rücksprung auf eine nicht existierende Ebene wirft <code>VJavaParseException</code>.</td></tr><tr><td>Kommentare</td><td><code># …</code> und <code>// …</code> (jeweils bis Zeilenende, außerhalb von Anführungszeichen).</td></tr><tr><td>Leerzeilen</td><td>Leerzeilen und reine Kommentarzeilen sind bedeutungslos.</td></tr><tr><td>Geschweifte Klammern</td><td>Auf Skriptebene gibt es <strong>keine</strong> <code>{}</code>-Blöcke. <code>{…}</code> in Dialogtexten sind Text-Tags (siehe <a href="#8-inline-text-tags">Abschnitt 8</a>).</td></tr><tr><td>Strings</td><td>In doppelten Anführungszeichen: <code>&quot;Text&quot;</code>.</td></tr><tr><td>Zugelassene Top-Level-Schlüsselwörter</td><td><code>define</code>, <code>default</code>, <code>$</code>, <code>image</code>, <code>layeredimage</code>, <code>transform</code>, <code>screen</code>, <code>translate</code>, <code>label</code> sowie <code>@-&gt;{ … }&lt;&lt;</code>. Alles andere auf Ebene 0 ist ein Parserfehler.</td></tr><tr><td>Dateien</td><td>Alle <code>*.vjava</code> unter dem Projektordner werden rekursiv gefunden und in lexikografischer Pfadreihenfolge zu <strong>einem</strong> Projekt zusammengeführt. Ausgeschlossen: <code>.git</code>, <code>build</code>, <code>.gradle</code>, <code>saves</code>, <code>out</code>, <code>dist</code>.</td></tr><tr><td>Doppelte Definitionen</td><td>Spätere Definitionen überschreiben frühere (<em>Last-Wins</em>) und erzeugen eine Warnung.</td></tr></tbody></table></div>
+<h3 id="argument-schreibweise-in-dieser-referenz">Argument-Schreibweise in dieser Referenz</h3>
+<div class="table-wrap"><table><thead><tr><th>Notation</th><th>Bedeutung</th></tr></thead><tbody><tr><td><code>&lt;name&gt;</code></td><td>Pflichtargument</td></tr><tr><td><code>[…]</code></td><td>optional</td></tr><tr><td><code>a \| b</code></td><td>Alternative</td></tr><tr><td><code>…</code></td><td>beliebig oft wiederholbar</td></tr></tbody></table></div>
+<hr>
+<h2 id="2-top-level-deklarationen">2. Top-Level-Deklarationen</h2>
+<h3 id="21-define--charaktere-und-konstanten">2.1 <code>define</code> – Charaktere und Konstanten</h3>
+<p><strong>Syntax</strong></p>
+<pre><code class="language-text">define &lt;id&gt; = Character(&lt;name&gt;, [color=…], [outline_color=…], [image=…], [voice_tag=…], [textbox=…], [voice_bleep=…])
+define &lt;id&gt; = &lt;ausdruck&gt;</code></pre>
+<p><strong>Beschreibung:</strong> Legt einen Sprecher (<code>Character</code>) oder eine globale Konstante an. Ein Sprecher wird später mit <code>&lt;id&gt; &quot;Text&quot;</code> verwendet.</p>
+<p><strong>Argumente von <code>Character(…)</code></strong></p>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Typ</th><th>Pflicht</th><th>Beschreibung</th></tr></thead><tbody><tr><td>1. Positionsargument / <code>name</code></td><td>String oder <code>None</code>/<code>null</code></td><td>ja</td><td>Anzeigename. <code>None</code> erzeugt einen leeren Namen (Erzähler).</td></tr><tr><td><code>color</code> (Alias <code>who_color</code>)</td><td>String <code>&quot;#RRGGBB&quot;</code></td><td>nein</td><td>Farbe des Sprechernamens.</td></tr><tr><td><code>outline_color</code> (Alias <code>who_outline_color</code>)</td><td>String <code>&quot;#RRGGBB&quot;</code></td><td>nein</td><td>Konturfarbe des Namens.</td></tr><tr><td><code>image</code></td><td>String</td><td>nein</td><td>Bild-Tag des zugehörigen Sprites (für Bubble-Dialoge u. a.).</td></tr><tr><td><code>voice_tag</code></td><td>String</td><td>nein</td><td>Kennung für Voice-Zuordnung.</td></tr><tr><td><code>textbox</code></td><td>String</td><td>nein</td><td>Textbox-Skin.</td></tr><tr><td><code>voice_bleep</code></td><td>String (Asset-Pfad)</td><td>nein</td><td>Tippgeräusch pro Zeichen.</td></tr><tr><td>beliebige weitere Namen</td><td>beliebig</td><td>nein</td><td>Landen in <code>CharacterDef.properties()</code>.</td></tr></tbody></table></div>
+<p><strong>Beispiel</strong></p>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;, color=&quot;#58a6ff&quot;, outline_color=&quot;#000000&quot;, image=&quot;lena&quot;, voice_tag=&quot;lena&quot;)
+define narrator = Character(None)
+define max_punkte = 100
+
+label start:
+    lena &quot;Hallo, ich bin Lena.&quot;
+    narrator &quot;Und ich spreche ohne Namensschild.&quot;
+    return</code></pre>
+<h3 id="22-default--standardvariablen">2.2 <code>default</code> – Standardvariablen</h3>
+<p><strong>Syntax:</strong> <code>default &lt;variable&gt; = &lt;ausdruck&gt;</code></p>
+<p><strong>Beschreibung:</strong> Setzt eine Spielvariable beim Spielstart <strong>nur</strong>, wenn sie noch nicht existiert (<code>state.has(name) == false</code>). Ideal für Anfangswerte, die durch Spielstände überschrieben werden.</p>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Typ</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&lt;variable&gt;</code></td><td>Bezeichner</td><td>Name der Variablen im <code>state</code>.</td></tr><tr><td><code>&lt;ausdruck&gt;</code></td><td><a href="#5-ausdrücke--operatoren">Ausdruck</a></td><td>Startwert (Zahl, String, Boolean, …).</td></tr></tbody></table></div>
+<pre><code class="language-vjava">default punkte = 0
+default spielername = &quot;Alex&quot;
+default hat_schluessel = false
+
+label start:
+    &quot;Du hast [punkte] Punkte und heißt [spielername].&quot;
+    return</code></pre>
+<h3 id="23--auf-top-level--globale-zuweisung">2.3 <code>$</code> auf Top-Level – globale Zuweisung</h3>
+<p><strong>Syntax:</strong> <code>$ &lt;variable&gt; &lt;op&gt; &lt;ausdruck&gt;</code> mit <code>&lt;op&gt;</code> ∈ <code>=</code>, <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code></p>
+<pre><code class="language-vjava">$ debug_modus = true
+
+label start:
+    if debug_modus:
+        &quot;Debug aktiv.&quot;
+    return</code></pre>
+<h3 id="24-image--bilddefinition">2.4 <code>image</code> – Bilddefinition</h3>
+<p><strong>Syntax:</strong> <code>image &lt;tag&gt; [attribut …] = &quot;&lt;pfad&gt;&quot;</code></p>
+<p><strong>Beschreibung:</strong> Registriert ein Bild. Das erste Wort ist der <strong>Tag</strong>, alle weiteren Wörter vor <code>=</code> sind <strong>Attribute</strong>. Der Schlüssel <code>tag attr1 attr2</code> wird bei <code>show</code>/<code>scene</code> aufgelöst.</p>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Typ</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&lt;tag&gt;</code></td><td>Bezeichner</td><td>Name zum Anzeigen (<code>show lena</code>).</td></tr><tr><td><code>attribut …</code></td><td>Bezeichner (0..n)</td><td>Varianten, z. B. <code>happy</code>, <code>winter</code>.</td></tr><tr><td><code>&lt;pfad&gt;</code></td><td>String</td><td>Pfad relativ zum Projektordner (z. B. <code>assets/images/bg/hof.png</code>). Formate: PNG/JPG/WebP.</td></tr></tbody></table></div>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;)
+
+image bg_hof = &quot;assets/images/bg/hof.png&quot;
+image lena happy = &quot;assets/images/char/lena_happy.png&quot;
+
+label start:
+    scene bg_hof
+    show lena happy
+    lena &quot;Ich bin glücklich!&quot;
+    return</code></pre>
+<h3 id="25-layeredimage--mehrstufige-sprites">2.5 <code>layeredimage</code> – mehrstufige Sprites</h3>
+<p><strong>Syntax</strong></p>
+<pre><code class="language-text">layeredimage &lt;tag&gt;:
+    always &quot;&lt;pfad&gt;&quot;                    # oder: always: + eingerückter Pfad
+    group &lt;gruppenname&gt;:
+        attribute &lt;name&gt; [default] [if &lt;bedingung&gt;] [&quot;&lt;pfad&gt;&quot;]    # Pfad alternativ als eingerückte Zeile
+    if &lt;bedingung&gt;:
+        &quot;&lt;pfad&gt;&quot;
+    elif &lt;bedingung&gt;:
+        &quot;&lt;pfad&gt;&quot;
+    else:
+        &quot;&lt;pfad&gt;&quot;</code></pre>
+<div class="table-wrap"><table><thead><tr><th>Element</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>always</code></td><td>Ebene, die immer gezeichnet wird.</td></tr><tr><td><code>group &lt;name&gt;:</code></td><td>Gruppe sich gegenseitig ausschließender Attribute.</td></tr><tr><td><code>attribute &lt;name&gt;</code></td><td>Auswählbare Variante. <code>default</code> = Standard der Gruppe; <code>if &lt;bed&gt;</code> = nur wählbar, wenn die Bedingung wahr ist.</td></tr><tr><td><code>if</code> / <code>elif</code> / <code>else</code></td><td>Zustandsabhängige Overlay-Ebene (Bedingung wird gegen <code>state</code> ausgewertet).</td></tr></tbody></table></div>
+<p>Laufzeitverhalten: <code>show &lt;tag&gt; &lt;attribut …&gt;</code> wählt Attribute; Attributwechsel innerhalb einer Gruppe überblenden <strong>0,20 s</strong>. Eine Gruppe namens <code>mouth</code> mit den Attributen <code>closed</code>, <code>half</code>/<code>half_open</code>, <code>open</code> wird automatisch vom Lip-Sync (Voice-Lautstärke) gesteuert.</p>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;)
+default stimmung = 0
+
+layeredimage lena:
+    always &quot;assets/images/char/lena_base.png&quot;
+    group gesicht:
+        attribute neutral default &quot;assets/images/char/lena_neutral.png&quot;
+        attribute happy if stimmung &gt; 0:
+            &quot;assets/images/char/lena_happy.png&quot;
+    if stimmung &gt; 50:
+        &quot;assets/images/char/lena_aura.png&quot;
+
+label start:
+    show lena happy
+    lena &quot;Sieh mal, mein Gesicht ändert sich.&quot;
+    return</code></pre>
+<h3 id="26-transform--atl-animationen">2.6 <code>transform</code> – ATL-Animationen</h3>
+<p><strong>Syntax</strong></p>
+<pre><code class="language-text">transform &lt;name&gt;:
+    &lt;eigenschaft&gt; &lt;wert&gt; [&lt;eigenschaft&gt; &lt;wert&gt; …]
+    &lt;warper&gt; &lt;sekunden&gt; &lt;eigenschaft&gt; &lt;wert&gt; …
+    pause &lt;sekunden&gt;
+    repeat [anzahl]
+    parallel: / block: / choice: / contains: / on &lt;event&gt;:</code></pre>
+<p><strong>Eigenschaften (Property-Set)</strong></p>
+<div class="table-wrap"><table><thead><tr><th>Eigenschaft</th><th>Typ</th><th>Bedeutung</th></tr></thead><tbody><tr><td><code>xpos</code>, <code>ypos</code>, <code>pos (x, y)</code></td><td>Zahl</td><td>Absolute Position (logisch 1920×1080).</td></tr><tr><td><code>xanchor</code>, <code>yanchor</code>, <code>anchor</code></td><td>Zahl</td><td>Ankerpunkt im Sprite.</td></tr><tr><td><code>xalign</code>, <code>yalign</code>, <code>align</code></td><td>0.0–1.0 oder <code>none</code></td><td>Relative Position (0.5 = Mitte).</td></tr><tr><td><code>zoom</code>, <code>xzoom</code>, <code>yzoom</code></td><td>Zahl</td><td>Skalierung.</td></tr><tr><td><code>rotate</code></td><td>Zahl (Grad)</td><td>Drehung.</td></tr><tr><td><code>alpha</code></td><td>0.0–1.0</td><td>Deckkraft.</td></tr><tr><td><code>blur</code></td><td>Zahl</td><td>Weichzeichner.</td></tr><tr><td><code>parallax_x</code>, <code>parallax_y</code></td><td>Zahl</td><td>Parallaxe.</td></tr><tr><td><code>crop</code></td><td><code>(x, y, w, h)</code> oder <code>none</code></td><td>Ausschnitt.</td></tr><tr><td><code>matrixcolor</code></td><td>Matrix-Ausdruck</td><td><code>identity()</code>, <code>brightness(b)</code>, <code>contrast(c)</code>, <code>saturation(s)</code>, <code>hue(deg)</code>, <code>opacity(a)</code>, <code>invert([t])</code>, <code>tint(r, g, b[, a])</code> / <code>tint(&quot;#hex&quot;)</code>, verkettbar mit <code>*</code>.</td></tr></tbody></table></div>
+<p><strong>Warper (Interpolation):</strong> <code>linear</code>, <code>ease</code>, <code>easein</code>/<code>ease_in</code>, <code>easeout</code>/<code>ease_out</code>, <code>easeinout</code>/<code>ease_in_out</code>, <code>smoothstep</code>, <code>ease_back</code>, <code>cubic_bezier(p1x, p1y, p2x, p2y)</code>, oder <code>warp &lt;warperExpr&gt; &lt;dauer&gt; [props]</code>. Jeweils gefolgt von der Dauer in Sekunden.</p>
+<p><strong>Steuerung:</strong> <code>pause &lt;sek&gt;</code> · <code>repeat [n | infinite | forever]</code> (<code>&lt;= 0</code> = endlos) · <code>pass</code> · <code>parallel:</code> (Zweige gleichzeitig) · <code>block:</code> · <code>choice:</code> (zufälliger Zweig) · <code>contains:</code> · <code>on &lt;event&gt;:</code>.</p>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;)
+image lena happy = &quot;assets/images/char/lena_happy.png&quot;
+
+transform schweben:
+    ypos 500
+    easeinout 1.0 ypos 480
+    easeinout 1.0 ypos 500
+    repeat
+
+transform einblenden:
+    xalign 0.5 yalign 1.0
+    zoom 1.0 alpha 0.0
+    easein 0.5 zoom 1.1 alpha 1.0
+    pause 0.2
+    parallel:
+        linear 1.0 rotate 5.0
+
+label start:
+    show lena happy:
+        xalign 0.5 yalign 1.0
+        alpha 0.0
+        linear 0.6 alpha 1.0
+    lena &quot;Ich blende sanft ein.&quot;
+    return</code></pre>
+<h3 id="27-screen--ui-screens">2.7 <code>screen</code> – UI-Screens</h3>
+<p>Siehe ausführlich <a href="#9-screen-sprache-ui">Abschnitt 9</a>.</p>
+<p><strong>Syntax:</strong> <code>screen &lt;name&gt;[(&lt;param&gt;, …)]:</code> + eingerückte Direktiven/Widgets.</p>
+<pre><code class="language-vjava">screen punkte_hud:
+    zorder 250
+    frame xpos 40 ypos 40:
+        text &quot;Punkte: [punkte]&quot; size 28</code></pre>
+<h3 id="28-translate--lokalisierung">2.8 <code>translate</code> – Lokalisierung</h3>
+<p><strong>Syntax</strong></p>
+<pre><code class="language-text">translate &lt;sprache&gt; &lt;id&gt;:
+    # &lt;sprecher&gt; &quot;&lt;original&gt;&quot;          (optional, Kommentar mit Originaltext)
+    &lt;sprecher&gt; &quot;&lt;übersetzung&gt;&quot;         oder  &quot;&lt;übersetzung&gt;&quot; für den Erzähler
+
+translate &lt;sprache&gt; strings:
+    old &quot;&lt;originaltext&gt;&quot;
+    new &quot;&lt;übersetzung&gt;&quot;</code></pre>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&lt;sprache&gt;</code></td><td>Sprachkennung (case-insensitiv), z. B. <code>english</code>. Ordner <code>tl/&lt;sprache&gt;/</code> enthält zusätzlich Asset-Overrides.</td></tr><tr><td><code>&lt;id&gt;</code></td><td><code>&lt;label&gt;_&lt;zeilennummer&gt;</code> oder kanonische Zeilen-ID; <code>strings</code> für String-Paare (Menüs, UI).</td></tr><tr><td><code>old</code> / <code>new</code></td><td>Originaltext und Übersetzung. Leere Übersetzungen werden übersprungen (Fallback auf Original).</td></tr></tbody></table></div>
+<p>Empfohlener Ablageort: <code>tl/&lt;sprache&gt;/translations.vjava</code>. Der aktive Sprachwechsel erfolgt zur Laufzeit ohne Neustart (<code>LocalizationManager.setLanguage</code>).</p>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;)
+
+label start:
+    lena &quot;Hallo, Welt!&quot;
+    menu:
+        &quot;Spielen&quot; -&gt; jump ende
+    return
+
+label ende:
+    return
+
+translate english start_4:
+    # lena &quot;Hallo, Welt!&quot;
+    lena &quot;Hello, world!&quot;
+
+translate english strings:
+    old &quot;Spielen&quot;
+    new &quot;Play&quot;</code></pre>
+<h3 id="29-label--skriptabschnitt">2.9 <code>label</code> – Skriptabschnitt</h3>
+<p><strong>Syntax:</strong> <code>label &lt;name&gt;[(&lt;param&gt;, …)]:</code> + eingerückter Statement-Block.</p>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&lt;name&gt;</code></td><td>Eindeutiger Bezeichner. Der <strong>Einstiegs-Label</strong> wird in <code>project.vjava.json</code> (<code>entryLabel</code>, Standard <code>start</code>) festgelegt.</td></tr><tr><td><code>(&lt;param&gt;, …)</code></td><td>Optionale Parameter für <code>call &lt;label&gt;(args)</code>.</td></tr></tbody></table></div>
+<pre><code class="language-vjava">label start:
+    &quot;Das ist der Anfang.&quot;
+    jump kapitel_2
+
+label kapitel_2:
+    &quot;Kapitel 2.&quot;
+    return</code></pre>
+<h3 id="210------java-block-top-level">2.10 <code>@-&gt;{ … }&lt;&lt;</code> – Java-Block (Top-Level)</h3>
+<p>Siehe <a href="#6-eingebettetes-java----">Abschnitt 6</a>. Top-Level-Blöcke laufen <strong>einmal beim Start</strong> in Deklarationsreihenfolge und eignen sich für Klassen, Records und Hilfsmethoden.</p>
+<hr>
+<h2 id="3-label-anweisungen">3. Label-Anweisungen</h2>
+<p>Innerhalb eines <code>label</code>-Blocks (und verschachtelt in <code>if</code>/<code>menu</code>) sind folgende Anweisungen gültig. Jede steht auf einer eigenen Zeile.</p>
+<h3 id="31-dialog">3.1 Dialog</h3>
+<p><strong>Syntax</strong></p>
+<pre><code class="language-text">&quot;&lt;text&gt;&quot; [with &lt;transition&gt;]
+&lt;sprecher&gt; &quot;&lt;text&gt;&quot; [with &lt;transition&gt;]</code></pre>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&lt;sprecher&gt;</code></td><td>ID eines mit <code>define … Character(…)</code> angelegten Sprechers. Unbekannte Sprecher meldet der Linter (<code>UNDEFINED_SPEAKER</code>).</td></tr><tr><td><code>&quot;&lt;text&gt;&quot;</code></td><td>Text; unterstützt <code>[variable]</code>-Interpolation und <a href="#8-inline-text-tags">Inline-Tags</a>.</td></tr></tbody></table></div>
+<p>Der Ablauf pausiert, bis der Spieler weiterklickt (<code>WAITING_DIALOGUE</code>). Jede Zeile erhält eine stabile Zeilen-ID (für Gelesen-Markierung, Skip, Übersetzung).</p>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;, color=&quot;#58a6ff&quot;)
+default punkte = 7
+
+label start:
+    &quot;Ein Erzähler spricht.&quot;
+    lena &quot;Du hast [punkte] Punkte – {b}super{/b}!&quot;
+    return</code></pre>
+<h3 id="32-nvl">3.2 <code>nvl</code></h3>
+<p><strong>Syntax:</strong> <code>nvl show</code> | <code>nvl hide</code> | <code>nvl clear</code></p>
+<p>Aktiviert/deaktiviert den kumulativen Vollbild-Textmodus bzw. leert den Textpuffer.</p>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;)
+
+label start:
+    nvl show
+    lena &quot;Erste Zeile bleibt stehen.&quot;
+    lena &quot;Zweite Zeile erscheint darunter.&quot;
+    nvl clear
+    nvl hide
+    return</code></pre>
+<h3 id="33-window">3.3 <code>window</code></h3>
+<p><strong>Syntax:</strong> <code>window show</code> | <code>window hide</code> | <code>window auto</code></p>
+<p>Steuert das Dialogfenster (<code>show</code> = immer sichtbar, <code>hide</code> = ausgeblendet, <code>auto</code> = nur bei Text).</p>
+<pre><code class="language-vjava">label start:
+    window hide
+    pause 1.0
+    window auto
+    &quot;Das Fenster ist wieder da.&quot;
+    return</code></pre>
+<h3 id="34-scene">3.4 <code>scene</code></h3>
+<p><strong>Syntax:</strong> <code>scene &lt;bgTag&gt; [with &lt;transition&gt;]</code></p>
+<p>Entfernt alle Sprites der Master-Ebene, setzt den Hintergrund (1920×1080) und löst optional eine Transition aus.</p>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&lt;bgTag&gt;</code></td><td>Bild-Tag (siehe <code>image</code>) oder direkter Pfad.</td></tr><tr><td><code>with &lt;transition&gt;</code></td><td>Optionaler <a href="#7-transitions">Übergang</a>.</td></tr></tbody></table></div>
+<pre><code class="language-vjava">image bg_hof = &quot;assets/images/bg/hof.png&quot;
+
+label start:
+    scene bg_hof with dissolve(0.8)
+    &quot;Der Hof.&quot;
+    return</code></pre>
+<h3 id="35-show">3.5 <code>show</code></h3>
+<p><strong>Syntax:</strong> <code>show &lt;tag&gt; [attribut …] [at &lt;position&gt;] [with &lt;transition&gt;] [:]</code></p>
+<p><code>at</code> und <code>with</code> dürfen in beliebiger Reihenfolge stehen. Endet die Zeile mit <code>:</code>, folgt ein eingerückter ATL-Block (siehe <a href="#26-transform--atl-animationen">2.6</a>), der direkt angewendet wird.</p>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&lt;tag&gt;</code></td><td>Bild-/Layeredimage-Tag.</td></tr><tr><td><code>attribut …</code></td><td>Attribute (z. B. <code>happy</code>).</td></tr><tr><td><code>at &lt;position&gt;</code></td><td>Eingebaute Position oder <code>transform</code>-Name: <code>left</code> (xalign 0.15), <code>center</code> (0.5, Standard bei neuem Sprite), <code>truecenter</code> (0.5/0.5), <code>right</code> (0.85), <code>offscreenleft</code>, <code>offscreenright</code>, <code>reset</code>.</td></tr><tr><td><code>with &lt;transition&gt;</code></td><td>Optionaler <a href="#7-transitions">Übergang</a>.</td></tr></tbody></table></div>
+<p>Ist der Tag schon sichtbar und wird kein <code>at</code> angegeben, bleibt die Position erhalten.</p>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;)
+image lena happy = &quot;assets/images/char/lena_happy.png&quot;
+
+transform schweben:
+    ypos 500
+    easeinout 1.0 ypos 480
+    easeinout 1.0 ypos 500
+    repeat
+
+label start:
+    show lena happy at left with dissolve(0.3)
+    lena &quot;Ich stehe links.&quot;
+    show lena happy at schweben
+    lena &quot;Jetzt schwebe ich.&quot;
+    return</code></pre>
+<h3 id="36-hide">3.6 <code>hide</code></h3>
+<p><strong>Syntax:</strong> <code>hide &lt;tag&gt; [with &lt;transition&gt;]</code></p>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;)
+image lena happy = &quot;assets/images/char/lena_happy.png&quot;
+
+label start:
+    show lena happy
+    lena &quot;Tschüss!&quot;
+    hide lena with dissolve(0.3)
+    return</code></pre>
+<h3 id="37-with">3.7 <code>with</code></h3>
+<p><strong>Syntax:</strong> <code>with &lt;transition&gt;</code></p>
+<p>Löst einen Übergang für die zuvor ausgeführten Bühnenänderungen aus. Zusätzlich gibt es die Screen-Shake-Presets <code>vpunch</code> und <code>hpunch</code>.</p>
+<pre><code class="language-vjava">label start:
+    &quot;Achtung!&quot;
+    with vpunch
+    &quot;Es hat gerumpelt.&quot;
+    return</code></pre>
+<h3 id="38-pause">3.8 <code>pause</code></h3>
+<p><strong>Syntax:</strong> <code>pause</code> | <code>pause hard</code> | <code>pause &lt;sekunden&gt;</code></p>
+<p>Ohne Argument/<code>hard</code>: wartet auf Klick. Mit Zahl: zeitgesteuerte Pause (per Klick überspringbar).</p>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Typ</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&lt;sekunden&gt;</code></td><td>Dezimalzahl</td><td>Dauer in Sekunden.</td></tr></tbody></table></div>
+<pre><code class="language-vjava">label start:
+    &quot;Warte kurz …&quot;
+    pause 1.5
+    &quot;Weiter geht&#x27;s.&quot;
+    return</code></pre>
+<h3 id="39-play">3.9 <code>play</code></h3>
+<p><strong>Syntax:</strong> <code>play &lt;kanal&gt; &quot;&lt;asset&gt;&quot; [loop | noloop] [fadein &lt;sek&gt;] [volume &lt;wert&gt;]</code></p>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Typ</th><th>Standard</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&lt;kanal&gt;</code></td><td>Bezeichner</td><td>–</td><td><code>music</code>, <code>sound</code>, <code>voice</code>, <code>ambient</code> oder eigener Name (wird bei Bedarf angelegt).</td></tr><tr><td><code>&quot;&lt;asset&gt;&quot;</code></td><td>String</td><td>–</td><td>Pfad (<code>.ogg</code>/<code>.wav</code>). <code>tl/&lt;sprache&gt;/…</code>-Overrides werden berücksichtigt.</td></tr><tr><td><code>loop</code> / <code>noloop</code></td><td>Flag</td><td><code>loop</code> für <code>music</code>/<code>ambient</code>, sonst <code>noloop</code></td><td>Wiederholung.</td></tr><tr><td><code>fadein &lt;sek&gt;</code></td><td>Zahl</td><td>0</td><td>Einblenddauer.</td></tr><tr><td><code>volume &lt;wert&gt;</code></td><td>Zahl</td><td>1.0</td><td>Kanal-Lautstärke (0.0–1.0).</td></tr></tbody></table></div>
+<p>Unbekannte Optionen erzeugen einen Parserfehler. Auf <code>music</code> wird der Titel automatisch im Musikraum freigeschaltet.</p>
+<pre><code class="language-vjava">label start:
+    play music &quot;assets/audio/theme.ogg&quot; fadein 1.0 volume 0.8
+    &quot;Musik läuft.&quot;
+    play sound &quot;assets/audio/klick.wav&quot; noloop
+    return</code></pre>
+<h3 id="310-queue">3.10 <code>queue</code></h3>
+<p><strong>Syntax</strong></p>
+<pre><code class="language-text">queue &lt;kanal&gt; &quot;&lt;a&gt;&quot;, &quot;&lt;b&gt;&quot; …
+queue &lt;kanal&gt; [&quot;&lt;a&gt;&quot;, &quot;&lt;b&gt;&quot;]
+queue &lt;kanal&gt;:
+    &quot;&lt;a&gt;&quot;
+    &quot;&lt;b&gt;&quot;</code></pre>
+<p>Reiht Titel in die Warteschlange des Kanals ein; der nächste startet automatisch nach dem aktuellen. Mindestens ein Pfad ist Pflicht.</p>
+<pre><code class="language-vjava">label start:
+    play music &quot;assets/audio/theme.ogg&quot;
+    queue music:
+        &quot;assets/audio/theme2.ogg&quot;
+        &quot;assets/audio/theme3.ogg&quot;
+    return</code></pre>
+<h3 id="311-stop">3.11 <code>stop</code></h3>
+<p><strong>Syntax:</strong> <code>stop &lt;kanal&gt; [fadeout &lt;sek&gt;]</code></p>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&lt;kanal&gt;</code></td><td>Kanalname oder <code>all</code> (alle Kanäle).</td></tr><tr><td><code>fadeout &lt;sek&gt;</code></td><td>Lineares Ausblenden (Standard 0 = sofort). Leert die Queue.</td></tr></tbody></table></div>
+<pre><code class="language-vjava">label start:
+    play music &quot;assets/audio/theme.ogg&quot;
+    &quot;Gleich ist Ruhe.&quot;
+    stop music fadeout 2.0
+    return</code></pre>
+<h3 id="312-voice">3.12 <code>voice</code></h3>
+<p><strong>Syntax:</strong> <code>voice &quot;&lt;asset&gt;&quot;</code></p>
+<p>Setzt die Sprachausgabe für die <strong>nachfolgende</strong> Dialogzeile; steuert zugleich den Lip-Sync.</p>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;)
+
+label start:
+    voice &quot;assets/audio/hallo.ogg&quot;
+    lena &quot;Hallo!&quot;
+    return</code></pre>
+<h3 id="313-menu">3.13 <code>menu</code></h3>
+<p><strong>Syntax</strong></p>
+<pre><code class="language-text">menu [&quot;&lt;frage&gt;&quot;]:
+    [timeout &lt;sek&gt; -&gt; [jump] &lt;label&gt;]
+    &quot;&lt;text&gt;&quot; [if &lt;bed&gt;] [disabled | disabled if &lt;bed&gt;] -&gt; [jump] &lt;label&gt;
+    &quot;&lt;text&gt;&quot; [qualifier]:
+        &lt;statements&gt;</code></pre>
+<div class="table-wrap"><table><thead><tr><th>Element</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&quot;&lt;frage&gt;&quot;</code></td><td>Titel – direkt nach <code>menu</code> oder als erste eigenständige String-Zeile.</td></tr><tr><td><code>timeout &lt;sek&gt; -&gt; &lt;label&gt;</code></td><td>Springt nach Ablauf zum Label (ohne Timeout-Ziel: erste verfügbare Option). Alternativ <code>timeout &lt;sek&gt;:</code> + eingerücktes <code>jump &lt;label&gt;</code>.</td></tr><tr><td><code>&quot;&lt;text&gt;&quot; -&gt; &lt;label&gt;</code></td><td>Option mit Direktsprung (<code>jump</code> optional).</td></tr><tr><td><code>&quot;&lt;text&gt;&quot;:</code> + Block</td><td>Option mit beliebigen Anweisungen.</td></tr><tr><td><code>if &lt;bed&gt;</code></td><td>Option wird bei <code>false</code> <strong>versteckt</strong>.</td></tr><tr><td><code>disabled</code></td><td>Dauerhaft ausgegraut.</td></tr><tr><td><code>disabled if &lt;bed&gt;</code></td><td>Sichtbar, aber bei <strong>wahrer</strong> Bedingung nicht wählbar. (Alternativ <code>if &lt;bed&gt; disabled</code>.)</td></tr></tbody></table></div>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;)
+default kennt_lena = true
+default hat_schluessel = false
+
+label start:
+    menu &quot;Was möchtest du tun?&quot;:
+        timeout 8.0 -&gt; jump zeit_abgelaufen
+
+        &quot;Den Flur untersuchen&quot; -&gt; jump flur
+        &quot;Mit Lena sprechen&quot; if kennt_lena -&gt; gespraech
+        &quot;Geheime Tür öffnen&quot; disabled if not hat_schluessel:
+            &quot;Die Tür öffnet sich knarrend.&quot;
+            jump flur
+
+label flur:
+    &quot;Ein langer Flur.&quot;
+    return
+
+label gespraech:
+    lena &quot;Hallo!&quot;
+    return
+
+label zeit_abgelaufen:
+    &quot;Du hast zu lange gezögert.&quot;
+    return</code></pre>
+<h3 id="314-if--elif--else">3.14 <code>if</code> / <code>elif</code> / <code>else</code></h3>
+<p><strong>Syntax</strong></p>
+<pre><code class="language-text">if &lt;bedingung&gt;:
+    &lt;statements&gt;
+elif &lt;bedingung&gt;:
+    &lt;statements&gt;
+else:
+    &lt;statements&gt;</code></pre>
+<p>Bedingungen siehe <a href="#5-ausdrücke--operatoren">Ausdrücke</a>. <code>elif</code>/<code>else</code> ohne vorangehendes <code>if</code> ist ein Fehler.</p>
+<pre><code class="language-vjava">default punkte = 12
+
+label start:
+    if punkte &gt;= 20:
+        &quot;Gold!&quot;
+    elif punkte &gt;= 10:
+        &quot;Silber!&quot;
+    else:
+        &quot;Bronze.&quot;
+    return</code></pre>
+<h3 id="315---variablenzuweisung">3.15 <code>$</code> – Variablenzuweisung</h3>
+<p><strong>Syntax:</strong> <code>$ &lt;variable&gt; &lt;op&gt; &lt;ausdruck&gt;</code> mit <code>&lt;op&gt;</code> ∈ <code>=</code>, <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code></p>
+<pre><code class="language-vjava">default punkte = 0
+
+label start:
+    $ punkte = 5
+    $ punkte += 10
+    $ punkte *= 2
+    &quot;Jetzt: [punkte]&quot;
+    return</code></pre>
+<h3 id="316-jump">3.16 <code>jump</code></h3>
+<p><strong>Syntax:</strong> <code>jump &lt;label&gt;</code> | <code>jump expression &lt;ausdruck&gt;</code></p>
+<p>Springt ohne Rückkehr (kein Call-Frame). Mit <code>expression</code> wird der Labelname berechnet.</p>
+<pre><code class="language-vjava">default ziel = &quot;kapitel_2&quot;
+
+label start:
+    jump expression ziel
+
+label kapitel_2:
+    &quot;Dynamisch gesprungen.&quot;
+    return</code></pre>
+<h3 id="317-call">3.17 <code>call</code></h3>
+<p><strong>Syntax:</strong> <code>call &lt;label&gt;</code> | <code>call &lt;label&gt;(&lt;arg1&gt;, &lt;arg2&gt;, …)</code> | <code>call expression &lt;ausdruck&gt;</code></p>
+<p>Ruft ein Label als Unterprogramm auf; <code>return</code> kehrt zurück. Argumente liegen unter <code>state.get(&quot;_call_args&quot;)</code>, der Rückgabewert unter <code>state.get(&quot;_return&quot;)</code>.</p>
+<pre><code class="language-vjava">label start:
+    call begruessung(&quot;Lena&quot;)
+    &quot;Zurück im Hauptablauf.&quot;
+    return
+
+label begruessung(name):
+    &quot;Hallo und willkommen!&quot;
+    return</code></pre>
+<h3 id="318-return">3.18 <code>return</code></h3>
+<p><strong>Syntax:</strong> <code>return</code> | <code>return &lt;ausdruck&gt;</code></p>
+<p>Kehrt zum Aufrufer zurück. Ist der Call-Stack leer, endet das Skript.</p>
+<pre><code class="language-vjava">label start:
+    call berechne
+    &quot;Ergebnis: [_return]&quot;
+    return
+
+label berechne:
+    return 6 * 7</code></pre>
+<h3 id="319-input">3.19 <code>input</code></h3>
+<p><strong>Syntax:</strong> <code>input &lt;variable&gt; &quot;&lt;prompt&gt;&quot; [default &quot;&lt;text&gt;&quot;] [allow &quot;&lt;zeichen&gt;&quot;] [length &lt;n&gt;]</code></p>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Typ</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&lt;variable&gt;</code></td><td>Bezeichner</td><td>Zielvariable im <code>state</code>.</td></tr><tr><td><code>&quot;&lt;prompt&gt;&quot;</code></td><td>String</td><td>Eingabeaufforderung.</td></tr><tr><td><code>default</code></td><td>String</td><td>Vorbelegung.</td></tr><tr><td><code>allow</code></td><td>String</td><td>Whitelist erlaubter Zeichen.</td></tr><tr><td><code>length</code></td><td>Ganzzahl</td><td>Maximale Zeichenzahl.</td></tr></tbody></table></div>
+<p>Unbekannte Optionen erzeugen einen Parserfehler.</p>
+<pre><code class="language-vjava">default spielername = &quot;Alex&quot;
+
+label start:
+    input spielername &quot;Wie heißt du?&quot; default &quot;Alex&quot; length 12
+    &quot;Willkommen, [spielername]!&quot;
+    return</code></pre>
+<h3 id="320-blockrollback">3.20 <code>block_rollback</code></h3>
+<p><strong>Syntax:</strong> <code>block_rollback</code> (ohne Argumente)</p>
+<p>Setzt eine Rollback-Barriere: Der Spieler kann nicht mehr hinter diesen Punkt zurückspulen (nützlich nach Entscheidungen oder Zufall).</p>
+<pre><code class="language-vjava">label start:
+    &quot;Du wirfst den Würfel …&quot;
+    block_rollback
+    &quot;Es ist eine Sechs.&quot;
+    return</code></pre>
+<h3 id="321-pass">3.21 <code>pass</code></h3>
+<p><strong>Syntax:</strong> <code>pass</code> – leere Anweisung, Platzhalter für sonst leere Blöcke.</p>
+<pre><code class="language-vjava">default offen = false
+
+label start:
+    if offen:
+        pass
+    else:
+        &quot;Geschlossen.&quot;
+    return</code></pre>
+<h3 id="322-------java-anweisung">3.22 <code>:: … @-&gt;{ … }&lt;&lt;</code> (Java-Anweisung)</h3>
+<p>Siehe <a href="#6-eingebettetes-java----">Abschnitt 6</a>.</p>
+<hr>
+<h2 id="4-bewegung-steuerung--physik">4. Bewegung, Steuerung &amp; Physik</h2>
+<p>Diese Anweisungen steuern <strong>Sprites</strong> auf der Bühne (Koordinaten im logischen Raster <strong>1920×1080</strong>, Ursprung links oben). Sie sind <strong>nicht blockierend</strong>: Die Anweisung startet die Bewegung, das Skript läuft sofort weiter. Der zugehörige Sprite muss vorher mit <code>show</code> angezeigt worden sein.</p>
+<h3 id="41-move">4.1 <code>move</code></h3>
+<p><strong>Syntax:</strong> <code>move &lt;tag&gt; [to] &lt;x&gt; &lt;y&gt; [duration &lt;sek&gt;] [ease &lt;kurve&gt;]</code></p>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Typ</th><th>Standard</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&lt;tag&gt;</code></td><td>Bezeichner</td><td>–</td><td>Sprite-Tag.</td></tr><tr><td><code>to</code></td><td>Schlüsselwort</td><td>–</td><td>Optional, nur lesbarkeitshalber.</td></tr><tr><td><code>&lt;x&gt;</code>, <code>&lt;y&gt;</code></td><td>Zahl</td><td>–</td><td>Zielkoordinaten.</td></tr><tr><td><code>duration &lt;sek&gt;</code></td><td>Zahl</td><td><code>0</code> (sofort)</td><td>Dauer des Tweens.</td></tr><tr><td><code>ease</code> / <code>easing &lt;kurve&gt;</code></td><td><code>linear</code>, <code>ease_in</code>, <code>ease_out</code>, <code>ease_in_out</code></td><td><code>linear</code></td><td>Beschleunigungskurve.</td></tr></tbody></table></div>
+<pre><code class="language-vjava">image player = &quot;assets/images/char/player.png&quot;
+
+label start:
+    show player
+    move player to 200 780
+    move player to 1480 780 duration 1.5 ease ease_in_out
+    &quot;Angekommen.&quot;
+    return</code></pre>
+<h3 id="42-moveby">4.2 <code>move_by</code></h3>
+<p><strong>Syntax:</strong> <code>move_by &lt;tag&gt; &lt;dx&gt; &lt;dy&gt; [duration &lt;sek&gt;] [ease &lt;kurve&gt;]</code></p>
+<p>Wie <code>move</code>, aber <strong>relativ</strong> zur aktuellen Position (kein <code>to</code>).</p>
+<pre><code class="language-vjava">image star = &quot;assets/images/char/star.png&quot;
+
+label start:
+    show star
+    move_by star 0 -20 duration 0.4 ease ease_out
+    &quot;Der Stern hüpft.&quot;
+    return</code></pre>
+<h3 id="43-wasdinit">4.3 <code>wasd_init</code></h3>
+<p><strong>Syntax:</strong> <code>wasd_init &lt;tag&gt; [speed &lt;px/s&gt;] [bounds &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt;] [diagonal_norm &lt;true|false&gt;]</code></p>
+<p>Bindet die Tastatursteuerung (<strong>W A S D</strong> bzw. Pfeiltasten) an einen Sprite. Springen (bei aktiver Physik) mit <strong>Leertaste/W</strong>. Die Steuerung ist deaktiviert, solange ein modaler Screen offen ist.</p>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Typ</th><th>Standard</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>&lt;tag&gt;</code></td><td>Bezeichner</td><td>–</td><td>Sprite-Tag.</td></tr><tr><td><code>speed</code></td><td>Zahl (px/s)</td><td><code>260</code></td><td>Geschwindigkeit.</td></tr><tr><td><code>bounds x1 y1 x2 y2</code></td><td>4 Zahlen</td><td>unbegrenzt</td><td>Erlaubter Bewegungsbereich (min x, min y, max x, max y).</td></tr><tr><td><code>diagonal_norm</code></td><td><code>true</code>/<code>false</code></td><td><code>true</code></td><td>Diagonale Bewegung auf konstante Geschwindigkeit normalisieren.</td></tr></tbody></table></div>
+<pre><code class="language-vjava">image player = &quot;assets/images/char/player.png&quot;
+
+label start:
+    show player
+    wasd_init player speed 280 bounds 80 120 1840 940 diagonal_norm true
+    &quot;Steuere den Spieler mit WASD.&quot;
+    return</code></pre>
+<h3 id="44-wasdstop">4.4 <code>wasd_stop</code></h3>
+<p><strong>Syntax:</strong> <code>wasd_stop [&lt;tag&gt;]</code> – ohne Tag werden <strong>alle</strong> Steuerungen beendet.</p>
+<pre><code class="language-vjava">image player = &quot;assets/images/char/player.png&quot;
+
+label start:
+    show player
+    wasd_init player
+    &quot;Bewege dich.&quot;
+    wasd_stop player
+    &quot;Steuerung beendet.&quot;
+    return</code></pre>
+<h3 id="45-physicsinit">4.5 <code>physics_init</code></h3>
+<p><strong>Syntax:</strong> <code>physics_init &lt;tag&gt; [gravity &lt;px/s²&gt;] [jump_force &lt;px/s&gt;] [ground_y &lt;y&gt;]</code></p>
+<p>Aktiviert vertikale Schwerkraft und Sprungphysik.</p>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Typ</th><th>Standard</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>gravity</code></td><td>Zahl</td><td><code>980</code></td><td>Fallbeschleunigung (px/s²).</td></tr><tr><td><code>jump_force</code></td><td>Zahl</td><td><code>460</code></td><td>Sprunggeschwindigkeit (px/s).</td></tr><tr><td><code>ground_y</code></td><td>Zahl</td><td><code>920</code></td><td>Y-Koordinate des Bodens.</td></tr></tbody></table></div>
+<pre><code class="language-vjava">image player = &quot;assets/images/char/player.png&quot;
+
+label start:
+    show player
+    wasd_init player
+    physics_init player gravity 900 jump_force 440 ground_y 780
+    &quot;Springe mit der Leertaste.&quot;
+    return</code></pre>
+<h3 id="46-physicsstop">4.6 <code>physics_stop</code></h3>
+<p><strong>Syntax:</strong> <code>physics_stop [&lt;tag&gt;]</code> – ohne Tag werden alle Physikkörper deaktiviert.</p>
+<pre><code class="language-vjava">image player = &quot;assets/images/char/player.png&quot;
+
+label start:
+    show player
+    physics_init player
+    &quot;Die Schwerkraft wirkt.&quot;
+    physics_stop player
+    &quot;Schwerelos.&quot;
+    return</code></pre>
+<h3 id="47-oncollide">4.7 <code>on_collide</code></h3>
+<p><strong>Syntax:</strong> <code>on_collide &lt;tagA&gt; &lt;tagB&gt; jump &lt;label&gt;</code></p>
+<p>Registriert einen AABB-Kollisionsauslöser: Beim ersten Überlappen von <code>tagA</code> und <code>tagB</code> springt das Skript zum Label. Genau vier Wörter sind erlaubt, sonst Parserfehler.</p>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;)
+image player = &quot;assets/images/char/player.png&quot;
+image star = &quot;assets/images/char/star.png&quot;
+
+label arena:
+    show player
+    show star
+    move player to 200 780
+    move star to 1480 780
+    wasd_init player speed 280
+    physics_init player ground_y 780
+    on_collide player star jump sieg
+    lena &quot;Erreiche den Stern!&quot;
+    return
+
+label sieg:
+    wasd_stop player
+    physics_stop player
+    lena &quot;Geschafft!&quot;
+    return</code></pre>
+<hr>
+<h2 id="5-ausdrücke--operatoren">5. Ausdrücke &amp; Operatoren</h2>
+<p>Ausdrücke werden von <code>ConditionEvaluator</code> ausgewertet (in <code>if</code>/<code>elif</code>, Menü-<code>if</code>, <code>$</code>, <code>jump expression</code>, <code>call</code>-Argumenten, <code>return</code> und <code>[…]</code>-Interpolationen).</p>
+<h3 id="51-literale">5.1 Literale</h3>
+<div class="table-wrap"><table><thead><tr><th>Typ</th><th>Beispiele</th></tr></thead><tbody><tr><td>Ganzzahl</td><td><code>42</code>, <code>0xFF</code>, <code>1_000</code></td></tr><tr><td>Gleitkomma</td><td><code>3.14</code>, <code>.5</code>, <code>1.25f</code>, <code>1e-3</code></td></tr><tr><td>String</td><td><code>&quot;Text&quot;</code>, <code>&#x27;Text&#x27;</code> (Escapes <code>\n \t \r \\ \&quot; \&#x27;</code>)</td></tr><tr><td>Boolean</td><td><code>true</code>, <code>false</code></td></tr><tr><td>Null</td><td><code>null</code> (in <code>Character(…)</code> auch <code>None</code>)</td></tr></tbody></table></div>
+<h3 id="52-operatoren-hohe--niedrige-präzedenz">5.2 Operatoren (hohe → niedrige Präzedenz)</h3>
+<div class="table-wrap"><table><thead><tr><th>Stufe</th><th>Operator(en)</th><th>Beschreibung</th></tr></thead><tbody><tr><td>1</td><td><code>.feld</code>, <code>.methode(args)</code>, <code>[index]</code></td><td>Zugriff auf Felder/Getter/Methoden, Index auf <code>Map</code>, <code>List</code>, String, Array</td></tr><tr><td>2</td><td><code>!</code>, <code>not</code>, <code>-</code>, <code>+</code> (unär)</td><td>Negation, Vorzeichen</td></tr><tr><td>3</td><td><code>*</code>, <code>/</code>, <code>%</code></td><td>Multiplikation, Division, Rest</td></tr><tr><td>4</td><td><code>+</code>, <code>-</code></td><td>Addition/Subtraktion; <code>+</code> verkettet Strings</td></tr><tr><td>5</td><td><code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code></td><td>Vergleich</td></tr><tr><td>6</td><td><code>==</code>, <code>!=</code></td><td>Gleichheit (mit numerischer Typ-Angleichung)</td></tr><tr><td>7</td><td><code>&amp;&amp;</code>, <code>and</code></td><td>Logisches UND (Short-Circuit)</td></tr><tr><td>8</td><td><code>\|\|</code>, <code>or</code></td><td>Logisches ODER (Short-Circuit)</td></tr><tr><td>9</td><td><code>a ? b : c</code></td><td>Ternärer Operator</td></tr></tbody></table></div>
+<p>Zuweisungsoperatoren (nur in <code>$</code>): <code>=</code>, <code>+=</code>, <code>-=</code>, <code>*=</code>, <code>/=</code>.</p>
+<h3 id="53-bezeichner--wahrheitswerte">5.3 Bezeichner &amp; Wahrheitswerte</h3>
+<ul><li>Variablennamen lesen zuerst aus <code>state</code>, dann aus <code>persistent</code>. Vordefiniert: <code>state</code>, <code>persistent</code>, <code>Math</code>.</li><li><strong>Wahrheitswerte:</strong> <code>null</code> → falsch · <code>Boolean</code> → direkt · <code>Number</code> → wahr, wenn ≠ 0 und nicht NaN · <code>String</code> → wahr, wenn nicht leer · jedes andere Objekt → wahr.</li></ul>
+<pre><code class="language-vjava">default hp = 40
+default items = 3
+default name = &quot;Lena&quot;
+
+label start:
+    $ bonus = hp &gt; 30 ? 10 : 0
+    $ text = name + &quot; hat &quot; + items + &quot; Items&quot;
+    if hp &gt; 0 and (items &gt;= 3 or bonus &gt; 0) and not (name == &quot;&quot;):
+        &quot;[text]; Bonus [bonus]; Wurzel von 16: [Math.sqrt(16)]&quot;
+    return</code></pre>
+<hr>
+<h2 id="6-eingebettetes-java----">6. Eingebettetes Java (<code>@-&gt;{ … }&lt;&lt;</code>)</h2>
+<p><strong>Syntax</strong></p>
+<pre><code class="language-text">@-&gt;{ &lt;java-code&gt; }&lt;&lt;                                  # einzeilig
+:: &lt;Beschreibung&gt; @-&gt;{ &lt;java-code&gt; }&lt;&lt;                # einzeilig mit Beschreibung
+:: Kode für VN: &lt;Beschreibung&gt; @-&gt;{                   # mehrzeilig
+    &lt;java-code&gt;
+}&lt;&lt;</code></pre>
+<p>Das Präfix <code>:: </code> (optional mit <code>Kode für VN:</code>/<code>Kode fuer VN:</code>) ist ein reiner Beschreibungstext. Blöcke dürfen auf Top-Level, in Labels, <code>if</code>- und <code>menu</code>-Blöcken stehen. Nach <code>}&lt;&lt;</code> sind auf der Zeile nur Leerraum oder Kommentare erlaubt. Klammern, Strings, Textblöcke (<code>&quot;&quot;&quot;</code>) und Kommentare im Java-Code beenden den Block nicht vorzeitig.</p>
+<p><strong>Bindings (Variablen im Java-Block)</strong></p>
+<div class="table-wrap"><table><thead><tr><th>Binding</th><th>Typ</th><th>Wichtige Methoden</th></tr></thead><tbody><tr><td><code>state</code></td><td><code>StateStore</code></td><td><code>set</code>, <code>get</code>, <code>getOrDefault</code>, <code>getString</code>, <code>getInt</code>, <code>getDouble</code>, <code>getBoolean</code>, <code>has</code>, <code>remove</code>, <code>keys</code>, <code>blockRollback</code>, <code>clear</code></td></tr><tr><td><code>persistent</code></td><td><code>PersistentAccess</code></td><td><code>set</code>, <code>get</code>, <code>has</code>, <code>markLineRead</code>, <code>isLineRead</code>, <code>unlockCg</code>, <code>unlockTrack</code>, <code>unlockEnding</code>, <code>unlockAchievement</code></td></tr><tr><td><code>engine</code></td><td><code>EngineAPI</code></td><td><code>logInfo</code>, <code>logWarn</code>, <code>logError</code>, <code>logDebug</code>, <code>getConfig</code>, <code>getProjectDescriptor</code>, <code>getClock</code>, <code>getInput</code>, <code>requestQuit</code>, <code>requestLiveReload</code></td></tr><tr><td><code>scene</code></td><td><code>SceneController</code></td><td><code>setScene</code>, <code>showSprite</code>, <code>hideSprite</code>, <code>registerImageDefinition</code>, <code>registerTransform</code>, <code>clearMasterSprites</code>, <code>getActiveSprite</code>, <code>getSceneGraph</code></td></tr></tbody></table></div>
+<p><strong>Kompilierung:</strong> In-Memory via <code>javax.tools</code> (benötigt ein <strong>JDK</strong>, kein reines JRE). Deklarierte Typen und <code>static</code>-Methoden werden in <code>de.swfdtf.vjava.gen.VJavaUserTypes</code> gesammelt und sind in <strong>allen</strong> späteren Blöcken und in Ausdrücken (<code>[item.name]</code>) nutzbar. Automatisch importiert: <code>de.swfdtf.state.*</code>, <code>de.swfdtf.core.*</code>, <code>de.swfdtf.graphics.*</code>, <code>de.swfdtf.math.*</code>, <code>java.util.*</code>. Kompilierfehler enthalten die <strong>.vjava-Zeilennummer</strong>.</p>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;)
+
+:: Kode für VN: Eigene Klasse und Hilfsmethode @-&gt;{
+    public static class InventarItem {
+        public final String name;
+        public final int wert;
+
+        public InventarItem(String name, int wert) {
+            this.name = name;
+            this.wert = wert;
+        }
+    }
+
+    public static int bonus(int basis) {
+        return basis + 25;
+    }
+}&lt;&lt;
+
+label start:
+    :: Item setzen @-&gt;{
+        state.set(&quot;aktives_item&quot;, new InventarItem(&quot;Sternenschlüssel&quot;, 42));
+        state.set(&quot;gesamt&quot;, bonus(42));
+        engine.logInfo(&quot;Item gesetzt&quot;);
+        persistent.unlockCg(&quot;cg_intro&quot;);
+    }&lt;&lt;
+    lena &quot;Du hast [aktives_item.name] (Wert [aktives_item.wert], gesamt [gesamt]).&quot;
+    if aktives_item.wert &gt;= 40:
+        lena &quot;Wertvoll!&quot;
+    return</code></pre>
+<hr>
+<h2 id="7-transitions">7. Transitions</h2>
+<p>Verwendbar in <code>with …</code> (an <code>scene</code>, <code>show</code>, <code>hide</code>, Dialog oder als eigene Zeile). Standarddauer ohne Angabe: <strong>0,5 s</strong>, Standardfarbe der Fades: <code>#000000</code>.</p>
+<div class="table-wrap"><table><thead><tr><th>Ausdruck</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>none</code></td><td>Kein Übergang.</td></tr><tr><td><code>dissolve(t)</code></td><td>Überblendung.</td></tr><tr><td><code>fade(t)</code> / <code>fade(t, #RRGGBB)</code> / <code>fade(aus, halten, ein, color=#RRGGBB)</code></td><td>Ausblenden zu Farbe und wieder ein.</td></tr><tr><td><code>pixellate(t)</code> (auch <code>pixelate</code>)</td><td>Verpixelung.</td></tr><tr><td><code>move(t)</code>, <code>ease(t)</code>, <code>easein(t)</code>, <code>easeout(t)</code>, <code>easeinout(t)</code></td><td>Bewegungs-/Easing-Übergänge.</td></tr><tr><td><code>wipeleft(t)</code>, <code>wiperight(t)</code>, <code>wipeup(t)</code>, <code>wipedown(t)</code></td><td>Wischblenden.</td></tr><tr><td><code>slideleft(t)</code>, <code>slideright(t)</code>, <code>pushleft(t)</code>, <code>pushright(t)</code></td><td>Schieben.</td></tr><tr><td><code>irisin(t)</code>, <code>irisout(t)</code></td><td>Irisblende.</td></tr><tr><td><code>blinds(t[, n])</code>, <code>squares(t[, n])</code></td><td>Jalousien/Quadrate (n Standard 16).</td></tr><tr><td><code>imagedissolve(&quot;maske.png&quot;, t[, ramplen=8][, reverse=true])</code></td><td>Überblendung über Graustufenmaske.</td></tr><tr><td><code>multiple(t1, t2, …)</code></td><td>Hintereinander ausgeführte Transitions.</td></tr><tr><td><code>vpunch</code>, <code>hpunch</code></td><td>Bildschirmwackeln vertikal/horizontal.</td></tr></tbody></table></div>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;)
+image bg_hof = &quot;assets/images/bg/hof.png&quot;
+image bg_nacht = &quot;assets/images/bg/nacht.png&quot;
+image lena happy = &quot;assets/images/char/lena_happy.png&quot;
+
+label start:
+    scene bg_hof with fade(1.0, #000000)
+    show lena happy at right with dissolve(0.4)
+    lena &quot;Weiter geht es …&quot; with vpunch
+    scene bg_nacht with wipeleft(0.7)
+    hide lena with pixellate(0.5)
+    return</code></pre>
+<hr>
+<h2 id="8-inline-text-tags">8. Inline-Text-Tags</h2>
+<p>Gelten in Dialogen, Menütexten, Prompts und Screen-Texten.</p>
+<h3 id="81-interpolation--escapes">8.1 Interpolation &amp; Escapes</h3>
+<div class="table-wrap"><table><thead><tr><th>Syntax</th><th>Wirkung</th></tr></thead><tbody><tr><td><code>[variable]</code></td><td>Wert aus <code>state</code>/<code>persistent</code>; auch Ausdrücke mit <code>.</code>, <code>[</code>, <code>(</code>. Unbekannte Namen bleiben wörtlich stehen.</td></tr><tr><td><code>[[</code></td><td>Wörtliches <code>[</code>.</td></tr><tr><td><code>{{</code></td><td>Wörtliches <code>{</code>.</td></tr></tbody></table></div>
+<h3 id="82-formatierung">8.2 Formatierung</h3>
+<div class="table-wrap"><table><thead><tr><th>Tag</th><th>Schließen</th><th>Wirkung</th></tr></thead><tbody><tr><td><code>{b}</code></td><td><code>{/b}</code></td><td>Fett</td></tr><tr><td><code>{i}</code></td><td><code>{/i}</code></td><td>Kursiv</td></tr><tr><td><code>{u}</code></td><td><code>{/u}</code></td><td>Unterstrichen</td></tr><tr><td><code>{s}</code></td><td><code>{/s}</code></td><td>Durchgestrichen</td></tr><tr><td><code>{sc}</code></td><td><code>{/sc}</code></td><td>Kapitälchen</td></tr><tr><td><code>{plain}</code></td><td>–</td><td>Alle Formatierungen zurücksetzen</td></tr><tr><td><code>{color=#RRGGBB}</code></td><td><code>{/color}</code></td><td>Farbe (<code>#RGB</code>, <code>#RGBA</code>, <code>#RRGGBB</code>, <code>#RRGGBBAA</code>)</td></tr><tr><td><code>{alpha=0.5}</code></td><td><code>{/alpha}</code></td><td>Deckkraft 0.0–1.0</td></tr><tr><td><code>{size=36}</code> / <code>{size=+8}</code> / <code>{size=-4}</code></td><td><code>{/size}</code></td><td>Absolute oder relative Schriftgröße</td></tr><tr><td><code>{font=pfad}</code></td><td><code>{/font}</code></td><td>Schriftart</td></tr><tr><td><code>{k=2.5}</code></td><td><code>{/k}</code></td><td>Zeichenabstand</td></tr></tbody></table></div>
+<h3 id="83-ablaufsteuerung">8.3 Ablaufsteuerung</h3>
+<div class="table-wrap"><table><thead><tr><th>Tag</th><th>Wirkung</th></tr></thead><tbody><tr><td><code>{w}</code> / <code>{w=1.5}</code></td><td>Warten auf Klick / Sekunden</td></tr><tr><td><code>{p}</code> / <code>{p=0.5}</code></td><td>Absatz + Warten</td></tr><tr><td><code>{nw}</code></td><td>Kein Warten am Zeilenende (automatisch weiter)</td></tr><tr><td><code>{fast}</code></td><td>Text bis hier sofort anzeigen</td></tr><tr><td><code>{cps=60}…{/cps}</code></td><td>Tippgeschwindigkeit in Zeichen/s (0 = sofort)</td></tr></tbody></table></div>
+<h3 id="84-spezial--effekte">8.4 Spezial &amp; Effekte</h3>
+<div class="table-wrap"><table><thead><tr><th>Tag</th><th>Wirkung</th></tr></thead><tbody><tr><td><code>{rb}漢字{/rb}{rt}かんじ{/rt}</code></td><td>Furigana (Lesehilfe über dem Text)</td></tr><tr><td><code>{image=pfad}</code></td><td>Inline-Bild</td></tr><tr><td><code>{a=ziel}…{/a}</code></td><td>Hyperlink</td></tr><tr><td><code>{wave}…{/wave}</code></td><td>Wellenanimation</td></tr><tr><td><code>{jitter}…{/jitter}</code> / <code>{shake}…{/shake}</code></td><td>Zittern</td></tr><tr><td><code>{gradient=#c1,#c2}…{/gradient}</code></td><td>Farbverlauf</td></tr></tbody></table></div>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;, color=&quot;#58a6ff&quot;)
+default name = &quot;Alex&quot;
+
+label start:
+    lena &quot;Hallo [name]! {b}Fett{/b}, {i}kursiv{/i}, {color=#ff5555}rot{/color}.{w=0.5} Weiter …&quot;
+    lena &quot;{cps=15}Langsam …{/cps}{p}Neuer Absatz mit {wave}Welle{/wave} und {{Klammer}}.&quot;
+    return</code></pre>
+<hr>
+<h2 id="9-screen-sprache-ui">9. Screen-Sprache (UI)</h2>
+<p><strong>Kopf:</strong> <code>screen &lt;name&gt;[(&lt;param&gt;, …)]:</code></p>
+<p><strong>Direktiven auf Screen-Ebene</strong></p>
+<div class="table-wrap"><table><thead><tr><th>Direktive</th><th>Beschreibung</th></tr></thead><tbody><tr><td><code>modal true\|false</code></td><td>Blockiert Eingaben an darunterliegende Elemente.</td></tr><tr><td><code>zorder &lt;int&gt;</code></td><td>Zeichenreihenfolge (Standard <code>200</code>).</td></tr><tr><td><code>key &lt;TASTE&gt; action &quot;&lt;aktion&gt;&quot;</code></td><td>Tastenbindung (<code>K_ESCAPE</code>, <code>ESCAPE</code>, <code>RETURN</code>, <code>SPACE</code>, <code>A</code>–<code>Z</code>).</td></tr><tr><td><code>timer &lt;sek&gt; [repeat true] action &quot;&lt;aktion&gt;&quot;</code></td><td>Zeitgeber.</td></tr></tbody></table></div>
+<p><strong>Container:</strong> <code>vbox</code>, <code>hbox</code>, <code>grid [&lt;spalten&gt; &lt;zeilen&gt;]</code>, <code>fixed</code>, <code>frame</code>, <code>window</code>, <code>viewport</code>, <code>vpgrid</code>, <code>imagemap</code>, <code>draggroup</code>, <code>side</code>.</p>
+<p><strong>Widgets:</strong> <code>text</code>, <code>label</code>, <code>textbutton</code>, <code>button</code>, <code>imagebutton</code>, <code>bar</code>, <code>vbar</code>, <code>slider</code>, <code>input</code>, <code>hotspot</code>, <code>hotbar</code>, <code>drag</code>, <code>mousearea</code>, <code>custom &lt;JavaKlasse&gt;</code>, <code>add</code>, <code>null</code>, <code>use</code>.</p>
+<p><strong>Kontrollfluss:</strong> <code>if</code> / <code>elif</code> / <code>else</code>, <code>for</code>, <code>on</code>.</p>
+<p><strong>Gemeinsame Eigenschaften:</strong> <code>id</code>, <code>xsize</code>/<code>width</code>, <code>ysize</code>/<code>height</code>, <code>padding</code>/<code>xpadding</code>/<code>ypadding</code>, <code>background</code> (<code>#…</code>), <code>border_color</code>, <code>border_thickness</code>, <code>corner_radius</code>, <code>alpha</code>, <code>sensitive</code>/<code>enabled</code>, <code>xpos</code>, <code>ypos</code>, <code>xalign</code>, <code>yalign</code>, <code>spacing</code>.</p>
+<p><strong>Wichtige Widget-Argumente</strong></p>
+<div class="table-wrap"><table><thead><tr><th>Widget</th><th>Argumente</th></tr></thead><tbody><tr><td><code>text &quot;&lt;s&gt;&quot;</code></td><td><code>size</code>, <code>color</code>, <code>drop_shadow</code>, <code>cps</code> (mit <code>[var]</code>-Interpolation)</td></tr><tr><td><code>textbutton &quot;&lt;s&gt;&quot;</code></td><td><code>action</code>, <code>selected</code>, <code>size</code></td></tr><tr><td><code>imagebutton</code></td><td><code>auto &quot;pfad_%s.png&quot;</code> (→ <code>idle</code>/<code>hover</code>/<code>insensitive</code>) oder <code>idle</code>, <code>hover</code>, <code>disabled</code>/<code>insensitive</code>, <code>action</code></td></tr><tr><td><code>bar</code>, <code>vbar</code></td><td><code>value VariableValue(&quot;var&quot;, max)</code></td></tr><tr><td><code>slider</code></td><td><code>value VariableValue(&quot;var&quot;, max)</code>, <code>min</code>, <code>range</code>, <code>step</code></td></tr><tr><td><code>input</code></td><td><code>value=VariableInputValue(&quot;var&quot;)</code>, <code>default</code>, <code>length</code>, <code>allow</code>, <code>placeholder</code>, <code>action</code></td></tr><tr><td><code>hotspot</code></td><td><code>(x, y, w, h)</code>, <code>hovered_color</code>, <code>action</code></td></tr><tr><td><code>drag</code></td><td><code>drag_name</code>, <code>payload</code>, <code>draggable</code>, <code>droppable</code>/<code>drop_target</code>, <code>snappable</code></td></tr><tr><td><code>viewport</code></td><td><code>scrollbars</code>, <code>yinitial</code></td></tr><tr><td><code>vpgrid</code></td><td><code>cols</code>, <code>cell_width</code>/<code>xsize</code>, <code>cell_height</code>/<code>ysize</code>, <code>spacing</code></td></tr></tbody></table></div>
+<p><strong>Aktionen (<code>action &quot;…&quot;</code>)</strong></p>
+<div class="table-wrap"><table><thead><tr><th>Aktion</th><th>Wirkung</th></tr></thead><tbody><tr><td><code>jump:&lt;label&gt;</code> oder <code>Jump(&quot;&lt;label&gt;&quot;)</code></td><td>Springt zu Label (schließt das Hauptmenü).</td></tr><tr><td><code>show_screen:&lt;name&gt;</code> / <code>ShowMenu(&quot;&lt;name&gt;&quot;)</code></td><td>Screen anzeigen (Aliase: <code>save_screen</code>, <code>load_screen</code>, <code>preferences_screen</code>).</td></tr><tr><td><code>hide_screen:&lt;name&gt;</code> / <code>Hide(&quot;&lt;name&gt;&quot;)</code></td><td>Screen ausblenden.</td></tr><tr><td><code>Start()</code> / <code>start</code></td><td>Spiel starten (Hauptmenü).</td></tr><tr><td><code>Return()</code></td><td>Oberstes modales Fenster schließen.</td></tr><tr><td><code>QuickSave()</code> / <code>QuickLoad()</code></td><td>Schnellspeichern/-laden.</td></tr><tr><td><code>Quit()</code> / <code>quit</code></td><td>Programm beenden.</td></tr></tbody></table></div>
+<pre><code class="language-vjava">default punkte = 25
+default name = &quot;Alex&quot;
+
+screen status_hud(titel):
+    modal false
+    zorder 250
+    frame xpos 40 ypos 40:
+        vbox spacing 8:
+            text &quot;[titel]&quot; size 28
+            text &quot;Punkte: [punkte]&quot; size 22
+            bar value VariableValue(&quot;punkte&quot;, 100)
+            slider value VariableValue(&quot;sfx_level&quot;, 1.0)
+            if punkte &gt; 20:
+                text &quot;Gut gemacht!&quot; color &quot;#3fb950&quot;
+            textbutton &quot;Schließen&quot; action &quot;hide_screen:status_hud&quot;
+            textbutton &quot;Zur Arena&quot; action &quot;Jump(\&quot;arena\&quot;)&quot;
+    key K_ESCAPE action &quot;Return()&quot;
+
+screen name_eingabe:
+    modal true
+    vbox spacing 12:
+        text &quot;Dein Name?&quot;
+        input value=VariableInputValue(&quot;name&quot;) length 12
+        textbutton &quot;OK&quot; action &quot;hide_screen:name_eingabe&quot;
+
+label start:
+    &quot;Screens definiert.&quot;
+    return
+
+label arena:
+    &quot;Arena.&quot;
+    return</code></pre>
+<blockquote><p><strong>Hinweis:</strong> Es gibt keine eigene Label-Anweisung zum Einblenden eines Screens. Screens werden über UI-Aktionen (<code>show_screen:&lt;name&gt;</code> / <code>ShowMenu(&quot;&lt;name&gt;&quot;)</code>) oder aus Java über <code>ScreenManager.showScreen(name)</code> angezeigt. Beachte außerdem, dass der Aktionsstring in <code>action &quot;…&quot;</code> Anführungszeichen mit <code>\&quot;</code> maskieren muss.</p></blockquote>
+<hr>
+<h2 id="10-vollständiges-beispiel">10. Vollständiges Beispiel</h2>
+<p>Das folgende Projekt (<code>main.vjava</code>) deckt nahezu alle Konstrukte ab und besteht den <code>VJavaLinter</code> ohne Befunde, sofern die referenzierten Assets existieren.</p>
+<pre><code class="language-vjava">define lena = Character(&quot;Lena&quot;, color=&quot;#58a6ff&quot;)
+define narrator = Character(None)
+define max_punkte = 100
+default punkte = 0
+default name = &quot;Spieler&quot;
+
+image bg_hof = &quot;assets/images/bg/hof.png&quot;
+image lena happy = &quot;assets/images/char/lena_happy.png&quot;
+image player = &quot;assets/images/char/player.png&quot;
+image star = &quot;assets/images/char/star.png&quot;
+
+transform schweben:
+    ypos 500
+    easeinout 1.0 ypos 480
+    easeinout 1.0 ypos 500
+    repeat
+
+:: Hilfsklasse @-&gt;{
+    public static int bonus(int basis) { return basis + 25; }
+}&lt;&lt;
+
+label start:
+    scene bg_hof with dissolve(0.8)
+    show lena happy at left with dissolve(0.3)
+    play music &quot;assets/audio/theme.ogg&quot; fadein 1.0 volume 0.8
+    voice &quot;assets/audio/hallo.ogg&quot;
+    lena &quot;Hallo, {b}Welt{/b}! Du hast [punkte] Punkte.&quot;
+    &quot;Erzähler ohne Sprecher.&quot;
+    input name &quot;Wie heißt du?&quot; default &quot;Alex&quot; length 12
+    $ punkte += 10
+    if punkte &gt;= 10 and name != &quot;&quot;:
+        lena &quot;Gut, [name].&quot;
+    elif punkte &gt; 0:
+        lena &quot;Naja.&quot;
+    else:
+        pass
+    menu &quot;Was tun?&quot;:
+        timeout 5.0 -&gt; jump ende
+        &quot;Spielen&quot; -&gt; jump arena
+        &quot;Reden&quot; if punkte &gt; 5 -&gt; reden
+        &quot;Gesperrt&quot; disabled if punkte &gt; 100:
+            lena &quot;Nie.&quot;
+    call unterprogramm(3)
+    pause 1.5
+    hide lena with dissolve(0.3)
+    stop music fadeout 2.0
+    jump ende
+
+label unterprogramm(n):
+    :: Rechnen @-&gt;{ state.set(&quot;ergebnis&quot;, bonus(3)); }&lt;&lt;
+    return
+
+label reden:
+    block_rollback
+    lena &quot;Reden.&quot;
+    return
+
+label arena:
+    show player
+    show star
+    move player to 200 780
+    move star to 1480 780 duration 0.4 ease ease_out
+    move_by star 0 -20 duration 0.4 ease ease_in_out
+    wasd_init player speed 280 bounds 80 120 1840 940 diagonal_norm true
+    physics_init player gravity 900 jump_force 440 ground_y 780
+    on_collide player star jump sieg
+    lena &quot;Los!&quot;
+    return
+
+label sieg:
+    wasd_stop player
+    physics_stop player
+    nvl show
+    &quot;Gewonnen.&quot;
+    nvl clear
+    nvl hide
+    window hide
+    window auto
+    jump ende
+
+label ende:
+    return</code></pre>
+<hr>
+<h2 id="11-typische-fehler">11. Typische Fehler</h2>
+<div class="table-wrap"><table><thead><tr><th>Meldung / Symptom</th><th>Ursache</th><th>Lösung</th></tr></thead><tbody><tr><td><code>Unknown statement: &#x27;…&#x27;</code></td><td>Unbekanntes Schlüsselwort oder Sprecher ohne <code>&quot;…&quot;</code>.</td><td>Schreibweise prüfen; Sprecher als <code>id &quot;Text&quot;</code>.</td></tr><tr><td><code>Orphaned &#x27;elif&#x27;/&#x27;else&#x27; without preceding &#x27;if&#x27;</code></td><td><code>elif</code>/<code>else</code> ohne <code>if</code>.</td><td>Einrückung und Reihenfolge prüfen.</td></tr><tr><td><code>Unknown option in &#x27;play&#x27; statement</code></td><td>Ungültige Option.</td><td>Erlaubt: <code>loop</code>, <code>noloop</code>, <code>fadein</code>, <code>volume</code>.</td></tr><tr><td><code>Expected &#x27;on_collide &lt;tagA&gt; &lt;tagB&gt; jump &lt;label&gt;&#x27;</code></td><td>Falsche Wortanzahl.</td><td>Genau vier Wörter.</td></tr><tr><td><code>VJavaParseException</code> (Einrückung)</td><td>Rücksprung passt zu keiner Ebene / Tabs-Mix.</td><td>Einheitlich 4 Leerzeichen.</td></tr><tr><td><code>MISSING_JUMP_TARGET</code>, <code>MISSING_ASSET</code>, <code>UNDEFINED_SPEAKER</code>, <code>UNREACHABLE_LABEL</code></td><td>Lint-Befunde.</td><td>Ziel/Asset/Sprecher anlegen bzw. Label verlinken.</td></tr><tr><td><code>VJavaCompileException</code></td><td>Fehler in <code>@-&gt;{ }&lt;&lt;</code>.</td><td>Fehlerzeile bezieht sich auf die <code>.vjava</code>-Datei; Java-21-Syntax prüfen, JDK (nicht JRE) verwenden.</td></tr></tbody></table></div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>KAGAYAKI Dokumentation · <a href="md/sprachreferenz.md">Diese Seite als Markdown</a></span>
+      <div class="footer-links">
+        <a href="impressum.html">Impressum</a>
+        <a href="datenschutz.html">Datenschutz</a>
+        <a href="lizenz.html">Lizenz</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
