@@ -996,3 +996,27 @@ public class MovieSprite extends SpriteNode implements AutoCloseable {
     @Override public void close()
 }
 ```
+
+
+### `ObjectMotionController`
+Interaktive Bewegungs-, WASD-, 2D-Physik- und AABB-Kollisionssteuerung auf `SceneController`-Sprites:
+```java
+public final class ObjectMotionController {
+    public static final Set<String> SUPPORTED_EASINGS;
+    public record MotionInput(boolean up, boolean down, boolean left, boolean right, boolean jumpPressed) { ... }
+
+    public ObjectMotionController(Map<String, SpriteNode> activeSprites)
+    public void startMove(String tag, float x, float y, boolean relative, double durationSeconds, String easing)
+    public void enableWasd(String tag, float speedPxPerSec, Float minX, Float minY, Float maxX, Float maxY, boolean normalizeDiagonal)
+    public void disableWasd(String tag)
+    public void enablePhysics(String tag, float gravityPxPerSec2, float jumpForcePxPerSec, float groundY)
+    public void disablePhysics(String tag)
+    public void registerCollisionTrigger(String tagA, String tagB, String targetLabel)
+    public void setCollisionJumpListener(Consumer<String> listener)
+    public List<String> update(double dt, MotionInput input)
+    public boolean hasActiveWasd()
+    public boolean hasActivePhysics()
+    public boolean isGrounded(String tag)
+}
+```
+- `SceneController` ergänzt `updateMotion(double dt, ObjectMotionController.MotionInput)` und `getMotionController()`.

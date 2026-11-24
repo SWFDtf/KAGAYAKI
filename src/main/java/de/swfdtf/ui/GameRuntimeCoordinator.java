@@ -10,6 +10,7 @@ import de.swfdtf.core.InputManager;
 import de.swfdtf.graphics.AnimationEngine;
 import de.swfdtf.graphics.FontManager;
 import de.swfdtf.graphics.IRenderPipeline;
+import de.swfdtf.graphics.ObjectMotionController;
 import de.swfdtf.graphics.RenderMode;
 import de.swfdtf.graphics.RenderPipeline2D;
 import de.swfdtf.graphics.SceneController;
@@ -275,12 +276,61 @@ public final class GameRuntimeCoordinator implements GameHost {
             screenManager.showScreen(trimmed.substring("show_screen:".length()).trim());
         } else if (trimmed.startsWith("hide_screen:")) {
             screenManager.hideScreen(trimmed.substring("hide_screen:".length()).trim());
-        } else if ("start".equalsIgnoreCase(trimmed)) {
+        } else if ("start".equalsIgnoreCase(trimmed) || "Start()".equalsIgnoreCase(trimmed)) {
             screenManager.hideScreen(MainMenuScreen.SCREEN_NAME);
             session.start();
-        } else if ("quit".equalsIgnoreCase(trimmed)) {
+        } else if ("quit".equalsIgnoreCase(trimmed) || "Quit()".equalsIgnoreCase(trimmed)) {
             api.requestQuit();
+        } else if ("QuickSave()".equalsIgnoreCase(trimmed)) {
+            try {
+                session.quickSave();
+                toastOverlay.pushToast("Quick Save", "Saved to Quick Slot");
+            } catch (IOException ex) {
+                api.logError("QuickSave failed: " + ex.getMessage());
+            }
+        } else if ("QuickLoad()".equalsIgnoreCase(trimmed)) {
+            try {
+                if (session.getSaveManager().slotExists("quick")) {
+                    session.quickLoad();
+                    toastOverlay.pushToast("Quick Load", "Loaded Quick Slot");
+                }
+            } catch (IOException ex) {
+                api.logError("QuickLoad failed: " + ex.getMessage());
+            }
+        } else {
+            String targetArg = extractQuotedScreenArg(trimmed);
+            if (trimmed.startsWith("Jump(") && targetArg != null) {
+                screenManager.hideScreen(MainMenuScreen.SCREEN_NAME);
+                session.getRuntime().jumpToLabel(targetArg);
+            } else if (trimmed.startsWith("ShowMenu(") && targetArg != null) {
+                String resolved = resolveBuiltinScreenAlias(targetArg);
+                screenManager.showScreen(resolved);
+            } else if (trimmed.startsWith("Hide(") && targetArg != null) {
+                screenManager.hideScreen(resolveBuiltinScreenAlias(targetArg));
+            } else if ("Return()".equalsIgnoreCase(trimmed)) {
+                Screen topModal = screenManager.getTopModalScreen();
+                if (topModal != null && !MainMenuScreen.SCREEN_NAME.equals(topModal.getName())) {
+                    screenManager.hideScreen(topModal.getName());
+                }
+            }
         }
+    }
+
+    private static String extractQuotedScreenArg(String expr) {
+        int first = expr.indexOf('"');
+        int last = expr.lastIndexOf('"');
+        if (first >= 0 && last > first) {
+            return expr.substring(first + 1, last).trim();
+        }
+        return null;
+    }
+
+    private static String resolveBuiltinScreenAlias(String screenName) {
+        return switch (screenName) {
+            case "save_screen", "load_screen" -> SaveLoadScreen.SCREEN_NAME;
+            case "preferences_screen" -> PreferencesScreen.SCREEN_NAME;
+            default -> screenName;
+        };
     }
 
     @Override
@@ -292,7 +342,10 @@ public final class GameRuntimeCoordinator implements GameHost {
         audioEngine.update(dt);
         animationEngine.update(dt);
         transitionManager.update(dt);
-        session.getSceneController().update(dt);
+        ObjectMotionController.MotionInput motionInput = (input != null && !screenManager.isModalActive())
+                ? extractMotionInput(input)
+                : ObjectMotionController.MotionInput.NONE;
+        session.getSceneController().updateMotion(dt, motionInput);
         lipSyncAnalyzer.updateFromRms(audioEngine.getActiveVoiceRms(), dt);
 
         if (input != null) {
@@ -301,6 +354,17 @@ public final class GameRuntimeCoordinator implements GameHost {
 
         syncDialogueAndOverlayScreens();
         screenManager.update(dt, input);
+    }
+
+    private ObjectMotionController.MotionInput extractMotionInput(InputManager input) {
+        boolean up = input.isKeyDown(GLFW.GLFW_KEY_W) || input.isKeyDown(GLFW.GLFW_KEY_UP);
+        boolean down = input.isKeyDown(GLFW.GLFW_KEY_S) || input.isKeyDown(GLFW.GLFW_KEY_DOWN);
+        boolean left = input.isKeyDown(GLFW.GLFW_KEY_A) || input.isKeyDown(GLFW.GLFW_KEY_LEFT);
+        boolean right = input.isKeyDown(GLFW.GLFW_KEY_D) || input.isKeyDown(GLFW.GLFW_KEY_RIGHT);
+        boolean jump = input.wasKeyJustPressed(GLFW.GLFW_KEY_SPACE)
+                || input.wasKeyJustPressed(GLFW.GLFW_KEY_W)
+                || input.wasKeyJustPressed(GLFW.GLFW_KEY_UP);
+        return new ObjectMotionController.MotionInput(up, down, left, right, jump);
     }
 
     private void handleGlobalShortcuts(InputManager input) {
@@ -319,7 +383,9 @@ public final class GameRuntimeCoordinator implements GameHost {
             return;
         }
 
-        if (justPressed(input, GLFW.GLFW_KEY_D) && !shift && !ctrl && api.getConfig().isStudioMode()
+        boolean wasdActive = session.getSceneController().getMotionController().hasActiveWasd();
+
+        if (!wasdActive && justPressed(input, GLFW.GLFW_KEY_D) && !shift && !ctrl && api.getConfig().isStudioMode()
                 && liveDirectorScreen != null && !screenManager.isModalActive()) {
             liveDirectorScreen.setVisible(!liveDirectorScreen.isVisible());
             if (liveDirectorScreen.isVisible()) {
@@ -359,7 +425,7 @@ public final class GameRuntimeCoordinator implements GameHost {
             session.rollback();
         } else if (justPressed(input, GLFW.GLFW_KEY_PAGE_DOWN)) {
             session.rollForward();
-        } else if (justPressed(input, GLFW.GLFW_KEY_S) && !ctrl && !shift) {
+        } else if (!wasdActive && justPressed(input, GLFW.GLFW_KEY_S) && !ctrl && !shift) {
             try {
                 session.quickSave();
                 toastOverlay.pushToast("Quick Save", "Saved to Quick Slot");
@@ -378,7 +444,7 @@ public final class GameRuntimeCoordinator implements GameHost {
         } else if (justPressed(input, GLFW.GLFW_KEY_H) && !ctrl && !shift) {
             historyLogScreen.refreshEntries();
             screenManager.showScreen(historyLogScreen);
-        } else if (justPressed(input, GLFW.GLFW_KEY_A) && !ctrl && !shift) {
+        } else if (!wasdActive && justPressed(input, GLFW.GLFW_KEY_A) && !ctrl && !shift) {
             advScreen.toggleAuto();
             toastOverlay.setAutoPillActive(advScreen.isAutoActive());
         } else if (justPressed(input, GLFW.GLFW_KEY_ESCAPE)) {

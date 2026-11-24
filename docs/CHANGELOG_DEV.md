@@ -4,6 +4,21 @@ Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architekt
 
 ---
 
+## [Ziele #0001–#0010 & `ZIELE.md` Roadmap — Abgeschlossen] Objektbewegung, WASD, Physik, Studio-Hauptmenü & Demo-Vorlage
+
+* **Roadmap [`ZIELE.md`](../ZIELE.md)**:
+  * **1.020 konkrete, priorisierte, testbare Ziele (`#0001`–`#1020`)** über 12 Fachkapitel (vJava-DSL, Studio-IDE, 2D-Rendering, 3D-Pipeline, UI, Audio, Save/State, Input, i18n, Build/Modding, Demo/Templates, QA/Docs).
+  * Ziele **`#0001`–`#0010`** direkt vollständig implementiert, getestet und abgehakt (`[x]`).
+* **`.vjava` Objektbewegung, WASD, 2D-Physik & Kollision (`VJavaMovementAndPhysicsTest`)**:
+  * `VJavaAst` & `VJavaParser`: 6 neue Statements (`move`, `move_by` mit `duration` & Easing `linear`/`ease_in`/`ease_out`/`ease_in_out`; `wasd_init`/`wasd_stop` inkl. Speed, Bounds & Diagonal-Normalisierung; `physics_init`/`physics_stop` mit Schwerkraft/Sprung/Bodenlandung; `on_collide <tagA> <tagB> jump <label>`).
+  * `de.swfdtf.graphics.ObjectMotionController` + Integration in `SceneController`, `ScriptRuntime`, `VJavaLinter` (`MISSING_COLLIDE_TARGET`), `ScriptFlowGraphExporter` und `GameRuntimeCoordinator` (inkl. WASD-Shortcut-Schutz & `.vjava` Screen-Aktionen `Start()`, `ShowMenu()`, `Jump()`, `QuickSave()`, `QuickLoad()`, `Quit()`).
+* **`EngineVersion`, Studio-Hauptmenü & Demo-Vorlage (`StudioMainMenuAndTemplateDemoTest`)**:
+  * `de.swfdtf.core.EngineVersion`: Zentrale Engine- (`KAGAYAKI v1.0.0`), DSL- (`vJava 1.1`) und Projekt-Versionsbanner.
+  * `StudioWindowController`: Startet im integrierten Project Hub (`StudioView.MAIN_MENU` / `studio_main_menu`) mit Versionsanzeige, „Neues Projekt“-Button, Vorlagenwahl (`FULL_DEMO` / `STARTER` / `MINIMAL`), Recent Projects (`StudioWorkspaceState`) und „Workspace öffnen“ / „Hauptmenü“-Umschaltung.
+  * `ProjectTemplateGenerator`: `TemplateType.FULL_DEMO` liefert komplettes Demo-Vorlage-Spiel inkl. `template_main_menu` (mit Version), `template_save_screen` / `template_load_screen` (6 Slots + QuickSave), `template_preferences_screen`, verzweigter Story + Lip-Sync + EN-Übersetzung sowie interaktiver `wasd_arena` (`player.png`, `goal_star.png`, `chime.wav`) mit `0 Errors, 0 Warnings`; `STARTER` bleibt als klassischer Default abwärtskompatibel.
+
+---
+
 ## [Welle 4 — Abgeschlossen (60 / 60 Features)] Schneewittchen-Demo-Integration (`demo/`)
 
 * **`de.swfdtf.demo.features` (`Wave4DemoProgressionTest`)**:

@@ -85,6 +85,7 @@ public final class SceneController {
     private final Map<String, String> imageDefinitions = new LinkedHashMap<>();
     private final Map<String, VJavaAst.LayeredImageDef> layeredImageDefinitions = new LinkedHashMap<>();
     private final Map<String, Transform2D> namedTransforms = new LinkedHashMap<>();
+    private final ObjectMotionController motionController = new ObjectMotionController(activeSprites);
 
     private Path projectRoot;
     private StateStore stateStore;
@@ -145,6 +146,7 @@ public final class SceneController {
      */
     public void setScene(String sceneName, String transitionExpr) {
         Objects.requireNonNull(sceneName, "sceneName must not be null");
+        motionController.clearAll();
         clearMasterSprites();
         sceneGraph.getLayer(SceneGraph.LAYER_BACKGROUND).clear();
 
@@ -333,12 +335,33 @@ public final class SceneController {
      * @param dt elapsed frame delta in seconds
      */
     public void update(double dt) {
+        updateMotion(dt, ObjectMotionController.MotionInput.NONE);
+    }
+
+    /**
+     * Advances active displayables plus sprite movement tweens, WASD controls, 2D physics,
+     * and collision triggers using the supplied {@link ObjectMotionController.MotionInput}.
+     *
+     * @param dt          elapsed frame delta in seconds
+     * @param motionInput frame movement and jump input (nullable)
+     */
+    public void updateMotion(double dt, ObjectMotionController.MotionInput motionInput) {
         if (backgroundNode != null) {
             backgroundNode.update(dt);
         }
         for (SpriteNode sprite : activeSprites.values()) {
             sprite.update(dt);
         }
+        motionController.update(dt, motionInput);
+    }
+
+    /**
+     * Returns the interactive motion, WASD, physics, and collision controller for stage sprites.
+     *
+     * @return stage {@link ObjectMotionController}
+     */
+    public ObjectMotionController getMotionController() {
+        return motionController;
     }
 
     /**

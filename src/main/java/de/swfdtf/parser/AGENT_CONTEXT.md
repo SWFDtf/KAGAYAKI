@@ -349,3 +349,14 @@ public final class ScriptSession {
     public EngineAPI getEngineApi()
 }
 ```
+
+
+### Neue Bewegungs-, WASD-, Physik- & Kollisions-Statements (`VJavaAst` & `VJavaParser`)
+- `VJavaAst.Statement` erweitert um:
+  - `MoveStatement(String tag, double targetX, double targetY, boolean relative, double durationSeconds, String easing, String sourceFile, int lineNumber)` (`move ... to ...`, `move_by ...`)
+  - `WasdInitStatement(String tag, double speedPxPerSec, Double minX, Double minY, Double maxX, Double maxY, boolean normalizeDiagonal, String sourceFile, int lineNumber)` (`wasd_init`)
+  - `WasdStopStatement(String tag, String sourceFile, int lineNumber)` (`wasd_stop`)
+  - `PhysicsInitStatement(String tag, double gravityPxPerSec2, double jumpForcePxPerSec, double groundY, String sourceFile, int lineNumber)` (`physics_init`)
+  - `PhysicsStopStatement(String tag, String sourceFile, int lineNumber)` (`physics_stop`)
+  - `OnCollideStatement(String tagA, String tagB, String targetLabel, String sourceFile, int lineNumber)` (`on_collide <tagA> <tagB> jump <label>`)
+- `ScriptRuntime` verdrahtet alle 6 Statements + `setCollisionJumpListener(targetLabel -> jumpToLabel(targetLabel))` auf `SceneController.getMotionController()`.

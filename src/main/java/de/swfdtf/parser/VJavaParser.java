@@ -21,8 +21,12 @@ import de.swfdtf.parser.VJavaAst.LayeredEntry;
 import de.swfdtf.parser.VJavaAst.LayeredImageDef;
 import de.swfdtf.parser.VJavaAst.MenuChoice;
 import de.swfdtf.parser.VJavaAst.MenuStatement;
+import de.swfdtf.parser.VJavaAst.MoveStatement;
 import de.swfdtf.parser.VJavaAst.NvlStatement;
+import de.swfdtf.parser.VJavaAst.OnCollideStatement;
 import de.swfdtf.parser.VJavaAst.PauseStatement;
+import de.swfdtf.parser.VJavaAst.PhysicsInitStatement;
+import de.swfdtf.parser.VJavaAst.PhysicsStopStatement;
 import de.swfdtf.parser.VJavaAst.PlayStatement;
 import de.swfdtf.parser.VJavaAst.QueueStatement;
 import de.swfdtf.parser.VJavaAst.ReturnStatement;
@@ -39,6 +43,8 @@ import de.swfdtf.parser.VJavaAst.TransformDef;
 import de.swfdtf.parser.VJavaAst.TranslateBlock;
 import de.swfdtf.parser.VJavaAst.TranslateEntry;
 import de.swfdtf.parser.VJavaAst.VoiceStatement;
+import de.swfdtf.parser.VJavaAst.WasdInitStatement;
+import de.swfdtf.parser.VJavaAst.WasdStopStatement;
 import de.swfdtf.parser.VJavaAst.WindowStatement;
 import de.swfdtf.parser.VJavaAst.WithStatement;
 import de.swfdtf.parser.VJavaLexer.Token;
@@ -985,6 +991,13 @@ public final class VJavaParser {
                 case "call" -> statements.add(parseCallStatement(curr));
                 case "return" -> statements.add(parseReturnStatement(curr));
                 case "input" -> statements.add(parseInputStatement(curr));
+                case "move" -> statements.add(parseMoveStatement(curr, false));
+                case "move_by" -> statements.add(parseMoveStatement(curr, true));
+                case "wasd_init" -> statements.add(parseWasdInitStatement(curr));
+                case "wasd_stop" -> statements.add(parseWasdStopStatement(curr));
+                case "physics_init" -> statements.add(parsePhysicsInitStatement(curr));
+                case "physics_stop" -> statements.add(parsePhysicsStopStatement(curr));
+                case "on_collide" -> statements.add(parseOnCollideStatement(curr));
                 case "if" -> statements.add(parseIfStatement(curr));
                 case "elif", "else" -> throw error(curr, "Orphaned '" + keyword + "' without preceding 'if'");
                 case "menu" -> statements.add(parseMenuStatement(curr));
@@ -1232,6 +1245,167 @@ public final class VJavaParser {
             throw error(token, "Expected 'window show', 'window hide', or 'window auto', got: " + token.text());
         }
         return new WindowStatement(action, token.sourceFile(), token.lineNumber());
+    }
+
+    private MoveStatement parseMoveStatement(Token token, boolean relative) {
+        String keyword = relative ? "move_by" : "move";
+        String rest = stripKeyword(token.text(), keyword, token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.isEmpty()) {
+            throw error(token, "Expected sprite tag after '" + keyword + "'");
+        }
+        String tag = parts.get(0);
+        int coordIdx = 1;
+        if (!relative && parts.size() > 1 && "to".equalsIgnoreCase(parts.get(1))) {
+            coordIdx = 2;
+        }
+        if (parts.size() < coordIdx + 2) {
+            throw error(token, "Expected coordinates '<x> <y>' in '" + keyword + "' statement");
+        }
+        double targetX = parseDoubleStrict(parts.get(coordIdx), token, keyword + " x");
+        double targetY = parseDoubleStrict(parts.get(coordIdx + 1), token, keyword + " y");
+        double durationSeconds = 0.0;
+        String easing = "linear";
+
+        int i = coordIdx + 2;
+        while (i < parts.size()) {
+            String opt = parts.get(i).toLowerCase(Locale.ROOT);
+            switch (opt) {
+                case "duration" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected duration value after 'duration'");
+                    }
+                    durationSeconds = parseDoubleStrict(parts.get(i + 1), token, "duration");
+                    i += 2;
+                }
+                case "ease", "easing" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected easing type after '" + parts.get(i) + "'");
+                    }
+                    easing = parts.get(i + 1).toLowerCase(Locale.ROOT);
+                    i += 2;
+                }
+                default -> throw error(token, "Unknown option in '" + keyword + "' statement: " + parts.get(i));
+            }
+        }
+        return new MoveStatement(tag, targetX, targetY, relative, durationSeconds, easing, token.sourceFile(), token.lineNumber());
+    }
+
+    private WasdInitStatement parseWasdInitStatement(Token token) {
+        String rest = stripKeyword(token.text(), "wasd_init", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.isEmpty()) {
+            throw error(token, "Expected sprite tag after 'wasd_init'");
+        }
+        String tag = parts.get(0);
+        double speed = 260.0;
+        Double minX = null;
+        Double minY = null;
+        Double maxX = null;
+        Double maxY = null;
+        boolean normalizeDiagonal = true;
+
+        int i = 1;
+        while (i < parts.size()) {
+            String opt = parts.get(i).toLowerCase(Locale.ROOT);
+            switch (opt) {
+                case "speed" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected speed value after 'speed'");
+                    }
+                    speed = parseDoubleStrict(parts.get(i + 1), token, "speed");
+                    i += 2;
+                }
+                case "bounds" -> {
+                    if (i + 4 >= parts.size()) {
+                        throw error(token, "Expected 'bounds <x1> <y1> <x2> <y2>'");
+                    }
+                    minX = parseDoubleStrict(parts.get(i + 1), token, "bounds x1");
+                    minY = parseDoubleStrict(parts.get(i + 2), token, "bounds y1");
+                    maxX = parseDoubleStrict(parts.get(i + 3), token, "bounds x2");
+                    maxY = parseDoubleStrict(parts.get(i + 4), token, "bounds y2");
+                    i += 5;
+                }
+                case "diagonal_norm" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected boolean after 'diagonal_norm'");
+                    }
+                    normalizeDiagonal = parseBooleanStrict(parts.get(i + 1), token, "diagonal_norm");
+                    i += 2;
+                }
+                default -> throw error(token, "Unknown option in 'wasd_init': " + parts.get(i));
+            }
+        }
+        return new WasdInitStatement(tag, speed, minX, minY, maxX, maxY, normalizeDiagonal, token.sourceFile(), token.lineNumber());
+    }
+
+    private WasdStopStatement parseWasdStopStatement(Token token) {
+        String raw = token.text().trim();
+        String rest = raw.length() > "wasd_stop".length() ? raw.substring("wasd_stop".length()).trim() : "";
+        if (rest.contains(" ")) {
+            throw error(token, "Expected optional single sprite tag after 'wasd_stop'");
+        }
+        return new WasdStopStatement(rest.isEmpty() ? null : rest, token.sourceFile(), token.lineNumber());
+    }
+
+    private PhysicsInitStatement parsePhysicsInitStatement(Token token) {
+        String rest = stripKeyword(token.text(), "physics_init", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.isEmpty()) {
+            throw error(token, "Expected sprite tag after 'physics_init'");
+        }
+        String tag = parts.get(0);
+        double gravity = 980.0;
+        double jumpForce = 460.0;
+        double groundY = 920.0;
+
+        int i = 1;
+        while (i < parts.size()) {
+            String opt = parts.get(i).toLowerCase(Locale.ROOT);
+            switch (opt) {
+                case "gravity" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected gravity value after 'gravity'");
+                    }
+                    gravity = parseDoubleStrict(parts.get(i + 1), token, "gravity");
+                    i += 2;
+                }
+                case "jump_force" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected jump force value after 'jump_force'");
+                    }
+                    jumpForce = parseDoubleStrict(parts.get(i + 1), token, "jump_force");
+                    i += 2;
+                }
+                case "ground_y" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected ground Y coordinate after 'ground_y'");
+                    }
+                    groundY = parseDoubleStrict(parts.get(i + 1), token, "ground_y");
+                    i += 2;
+                }
+                default -> throw error(token, "Unknown option in 'physics_init': " + parts.get(i));
+            }
+        }
+        return new PhysicsInitStatement(tag, gravity, jumpForce, groundY, token.sourceFile(), token.lineNumber());
+    }
+
+    private PhysicsStopStatement parsePhysicsStopStatement(Token token) {
+        String raw = token.text().trim();
+        String rest = raw.length() > "physics_stop".length() ? raw.substring("physics_stop".length()).trim() : "";
+        if (rest.contains(" ")) {
+            throw error(token, "Expected optional single sprite tag after 'physics_stop'");
+        }
+        return new PhysicsStopStatement(rest.isEmpty() ? null : rest, token.sourceFile(), token.lineNumber());
+    }
+
+    private OnCollideStatement parseOnCollideStatement(Token token) {
+        String rest = stripKeyword(token.text(), "on_collide", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.size() != 4 || !"jump".equalsIgnoreCase(parts.get(2))) {
+            throw error(token, "Expected 'on_collide <tagA> <tagB> jump <label>', got: " + token.text());
+        }
+        return new OnCollideStatement(parts.get(0), parts.get(1), parts.get(3), token.sourceFile(), token.lineNumber());
     }
 
     private PauseStatement parsePauseStatement(Token token) {

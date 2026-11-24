@@ -333,6 +333,7 @@ public final class ScriptRuntime {
             this.sceneController.setProjectRoot(project.projectRoot());
         }
         this.sceneController.setStateContext(this.stateStore, this.persistentAccess);
+        this.sceneController.getMotionController().setCollisionJumpListener(this::handleCollisionJump);
         registerServices();
     }
 
@@ -1038,8 +1039,74 @@ public final class ScriptRuntime {
             statementIndex++;
             return false;
         }
+        if (stmt instanceof VJavaAst.MoveStatement move) {
+            sceneController.getMotionController().startMove(
+                    move.tag(),
+                    (float) move.targetX(),
+                    (float) move.targetY(),
+                    move.relative(),
+                    move.durationSeconds(),
+                    move.easing()
+            );
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.WasdInitStatement wasdInit) {
+            sceneController.getMotionController().enableWasd(
+                    wasdInit.tag(),
+                    (float) wasdInit.speedPxPerSec(),
+                    wasdInit.minX() != null ? wasdInit.minX().floatValue() : null,
+                    wasdInit.minY() != null ? wasdInit.minY().floatValue() : null,
+                    wasdInit.maxX() != null ? wasdInit.maxX().floatValue() : null,
+                    wasdInit.maxY() != null ? wasdInit.maxY().floatValue() : null,
+                    wasdInit.normalizeDiagonal()
+            );
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.WasdStopStatement wasdStop) {
+            sceneController.getMotionController().disableWasd(wasdStop.tag());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.PhysicsInitStatement physInit) {
+            sceneController.getMotionController().enablePhysics(
+                    physInit.tag(),
+                    (float) physInit.gravityPxPerSec2(),
+                    (float) physInit.jumpForcePxPerSec(),
+                    (float) physInit.groundY()
+            );
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.PhysicsStopStatement physStop) {
+            sceneController.getMotionController().disablePhysics(physStop.tag());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.OnCollideStatement collide) {
+            sceneController.getMotionController().registerCollisionTrigger(
+                    collide.tagA(),
+                    collide.tagB(),
+                    collide.targetLabel()
+            );
+            statementIndex++;
+            return false;
+        }
 
         throw new IllegalStateException("Unsupported AST statement type: " + stmt.getClass().getName());
+    }
+
+    private void handleCollisionJump(String targetLabel) {
+        if (targetLabel == null || targetLabel.isBlank() || status == Status.ENDED) {
+            return;
+        }
+        String trimmed = targetLabel.trim();
+        if (projectAst.labels().containsKey(trimmed)) {
+            jumpToLabel(trimmed);
+        } else {
+            engineApi.logWarn("Collision jump target label not found: " + trimmed);
+        }
     }
 
     private void enterDialoguePrompt(VJavaAst.SayStatement say) {

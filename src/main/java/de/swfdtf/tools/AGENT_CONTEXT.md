@@ -217,3 +217,14 @@ public final class StudioWindowController implements StudioBridge {
     public ScreenManager getStudioScreenManager()
 }
 ```
+
+
+### Erweiterungen Studio Main Menu & Template-Vorlagen (`StudioWindowController`, `ProjectTemplateGenerator`, `VJavaLinter`)
+- `ProjectTemplateGenerator.TemplateType { FULL_DEMO, STARTER, MINIMAL }`:
+  - `FULL_DEMO`: Standard im Studio-Hub / „Neues Projekt“-Button; enthält `template_main_menu` (inkl. `EngineVersion`), `template_save_screen`, `template_load_screen`, `template_preferences_screen`, verzweigte Story, DE/EN-Übersetzung sowie spielbare `wasd_arena` (`player.png`, `goal_star.png`, `chime.wav`) mit `0 Errors, 0 Warnings`.
+  - `STARTER`: Kompakte klassische Starter-Vorlage (Default für abwärtskompatible `generate(Path)`-Signaturen).
+  - `MINIMAL`: Schlankes Grundgerüst.
+- `StudioWindowController`:
+  - `StudioView { MAIN_MENU, WORKSPACE }` (`MAIN_MENU_SCREEN_NAME = "studio_main_menu"`, `WORKSPACE_SCREEN_NAME = "studio_workspace"`).
+  - Neue Methoden: `createNewProject(Path, String, TemplateType)`, `showMainMenu()`, `showWorkspace()`, `getActiveView()`, `getSelectedTemplateType()`, `setSelectedTemplateType(TemplateType)`, `getEngineVersionBanner()`, `getActiveProjectVersion()`, `getActiveProjectRoot()`, `getRecentProjects()`, `getStudioInput()`.
+- `VJavaLinter`: Prüft zusätzlich `OnCollideStatement` (`MISSING_COLLIDE_TARGET`), `MoveStatement` (`INVALID_MOVE_DURATION`, `UNKNOWN_EASING`), `WasdInitStatement` (`INVALID_WASD_SPEED`, `INVALID_WASD_BOUNDS`) und `PhysicsInitStatement` (`INVALID_PHYSICS_CONFIG`).

@@ -1,6 +1,7 @@
 package de.swfdtf.tools;
 
 import de.swfdtf.core.ProjectDescriptor;
+import de.swfdtf.graphics.ObjectMotionController;
 import de.swfdtf.parser.JavaBlockCompiler;
 import de.swfdtf.parser.ProjectScanner;
 import de.swfdtf.parser.VJavaAst;
@@ -459,6 +460,69 @@ public final class VJavaLinter {
                 }
             } else if (stmt instanceof VJavaAst.VoiceStatement voice) {
                 verifyAssetExists(project, knownAssets, voice.assetPath(), voice.sourceFile(), voice.lineNumber(), issues);
+            } else if (stmt instanceof VJavaAst.OnCollideStatement collide) {
+                String target = collide.targetLabel() != null ? collide.targetLabel().trim() : "";
+                if (target.isEmpty() || !project.labels().containsKey(target)) {
+                    issues.add(new LintIssue(
+                            Severity.ERROR,
+                            "MISSING_COLLIDE_TARGET",
+                            "Collision target label '" + target + "' is not defined.",
+                            collide.sourceFile(),
+                            collide.lineNumber()
+                    ));
+                } else {
+                    outgoingEdges.add(target);
+                }
+            } else if (stmt instanceof VJavaAst.MoveStatement move) {
+                if (move.durationSeconds() < 0.0) {
+                    issues.add(new LintIssue(
+                            Severity.WARNING,
+                            "INVALID_MOVE_DURATION",
+                            "Negative move duration " + move.durationSeconds() + " for sprite '" + move.tag() + "'.",
+                            move.sourceFile(),
+                            move.lineNumber()
+                    ));
+                }
+                if (move.easing() != null && !ObjectMotionController.SUPPORTED_EASINGS.contains(
+                        move.easing().trim().toLowerCase(Locale.ROOT))) {
+                    issues.add(new LintIssue(
+                            Severity.WARNING,
+                            "UNKNOWN_EASING",
+                            "Unknown easing '" + move.easing() + "' for sprite '" + move.tag() + "'.",
+                            move.sourceFile(),
+                            move.lineNumber()
+                    ));
+                }
+            } else if (stmt instanceof VJavaAst.WasdInitStatement wasd) {
+                if (wasd.speedPxPerSec() <= 0.0) {
+                    issues.add(new LintIssue(
+                            Severity.WARNING,
+                            "INVALID_WASD_SPEED",
+                            "WASD speed must be positive for sprite '" + wasd.tag() + "'.",
+                            wasd.sourceFile(),
+                            wasd.lineNumber()
+                    ));
+                }
+                if (wasd.minX() != null && wasd.maxX() != null && wasd.minX() >= wasd.maxX()
+                        || wasd.minY() != null && wasd.maxY() != null && wasd.minY() >= wasd.maxY()) {
+                    issues.add(new LintIssue(
+                            Severity.WARNING,
+                            "INVALID_WASD_BOUNDS",
+                            "WASD bounds must have min < max for sprite '" + wasd.tag() + "'.",
+                            wasd.sourceFile(),
+                            wasd.lineNumber()
+                    ));
+                }
+            } else if (stmt instanceof VJavaAst.PhysicsInitStatement phys) {
+                if (phys.gravityPxPerSec2() < 0.0 || phys.jumpForcePxPerSec() < 0.0) {
+                    issues.add(new LintIssue(
+                            Severity.WARNING,
+                            "INVALID_PHYSICS_CONFIG",
+                            "Physics gravity and jump_force must be >= 0 for sprite '" + phys.tag() + "'.",
+                            phys.sourceFile(),
+                            phys.lineNumber()
+                    ));
+                }
             }
         }
     }

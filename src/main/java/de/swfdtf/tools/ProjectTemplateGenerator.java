@@ -1,6 +1,7 @@
 package de.swfdtf.tools;
 
 import de.swfdtf.audio.AudioDecoder;
+import de.swfdtf.core.EngineVersion;
 import de.swfdtf.core.ProjectDescriptor;
 import de.swfdtf.graphics.TextureManager;
 
@@ -24,15 +25,29 @@ public final class ProjectTemplateGenerator {
     private static final int BG_HEIGHT = 360;
     private static final int CHAR_WIDTH = 256;
     private static final int CHAR_HEIGHT = 384;
+    private static final int SPRITE_SIZE = 96;
     private static final int UI_FRAME_WIDTH = 256;
     private static final int UI_FRAME_HEIGHT = 96;
     private static final int AUDIO_SAMPLE_RATE = 22_050;
+
+    /**
+     * Available project scaffolding templates offered in Studio and CLI generators.
+     */
+    public enum TemplateType {
+        /** Full playable demo template with Main Menu, Save/Load screens, branching story, and WASD arena. */
+        FULL_DEMO,
+        /** Classic compact visual-novel starter template (3 labels, layeredimage, HUD, EN translation). */
+        STARTER,
+        /** Lightweight minimal project skeleton with entry label and HUD badge. */
+        MINIMAL
+    }
 
     private ProjectTemplateGenerator() {
     }
 
     /**
-     * Generates a starter KAGAYAKI project in {@code targetDir} using a default title and {@code "2D"} render mode.
+     * Generates a starter KAGAYAKI project in {@code targetDir} using a default title, {@code "2D"} render mode,
+     * and {@link TemplateType#STARTER}.
      *
      * @param targetDir destination project root directory
      * @return normalized path to the generated project root directory
@@ -44,11 +59,12 @@ public final class ProjectTemplateGenerator {
         String inferredTitle = (fileName != null && !fileName.toString().isBlank())
                 ? fileName.toString()
                 : DEFAULT_TITLE;
-        return generate(targetDir, inferredTitle, DEFAULT_RENDER_MODE);
+        return generate(targetDir, inferredTitle, DEFAULT_RENDER_MODE, TemplateType.STARTER);
     }
 
     /**
-     * Generates a starter KAGAYAKI project in {@code targetDir} with the specified title and render mode.
+     * Generates a starter KAGAYAKI project in {@code targetDir} with the specified title and render mode,
+     * defaulting to {@link TemplateType#STARTER}.
      *
      * @param targetDir  destination project root directory
      * @param title      project display title (falls back to default if null or blank)
@@ -57,7 +73,27 @@ public final class ProjectTemplateGenerator {
      * @throws IOException if writing project files or assets fails
      */
     public static Path generate(Path targetDir, String title, String renderMode) throws IOException {
+        return generate(targetDir, title, renderMode, TemplateType.STARTER);
+    }
+
+    /**
+     * Generates a KAGAYAKI project in {@code targetDir} using the requested {@link TemplateType}.
+     *
+     * @param targetDir    destination project root directory
+     * @param title        project display title (falls back to default if null or blank)
+     * @param renderMode   render backend mode ({@code "2D"} or {@code "3D"})
+     * @param templateType scaffolding preset ({@link TemplateType#FULL_DEMO}, {@link TemplateType#STARTER}, or {@link TemplateType#MINIMAL})
+     * @return normalized path to the generated project root directory
+     * @throws IOException if writing project files or assets fails
+     */
+    public static Path generate(
+            Path targetDir,
+            String title,
+            String renderMode,
+            TemplateType templateType
+    ) throws IOException {
         Objects.requireNonNull(targetDir, "targetDir must not be null");
+        TemplateType effectiveType = templateType != null ? templateType : TemplateType.STARTER;
         Path root = targetDir.toAbsolutePath().normalize();
         Files.createDirectories(root);
 
@@ -66,16 +102,33 @@ public final class ProjectTemplateGenerator {
         if (renderMode != null && !renderMode.isBlank()) {
             descriptor.setRenderMode(renderMode);
         }
-        descriptor.setAuthor("KAGAYAKI Studio");
+        descriptor.setAuthor("KAGAYAKI Studio (" + EngineVersion.VERSION + ")");
+        descriptor.setVersion(EngineVersion.VERSION);
         descriptor.normalizeDefaults();
         ProjectDescriptor.save(root, descriptor);
 
-        writeUtf8(root.resolve("main.vjava"), buildMainScript());
-        writeUtf8(root.resolve("ui/screens.vjava"), buildScreensScript());
-        writeUtf8(root.resolve("tl/english/translations.vjava"), buildEnglishTranslationScript());
-
-        generateProceduralImages(root);
-        generateProceduralAudio(root);
+        switch (effectiveType) {
+            case MINIMAL -> {
+                writeUtf8(root.resolve("main.vjava"), buildMinimalMainScript());
+                writeUtf8(root.resolve("ui/screens.vjava"), buildMinimalScreensScript(effectiveTitle));
+                generateMinimalImages(root);
+                generateMinimalAudio(root);
+            }
+            case STARTER -> {
+                writeUtf8(root.resolve("main.vjava"), buildMainScript(false));
+                writeUtf8(root.resolve("ui/screens.vjava"), buildStarterScreensScript());
+                writeUtf8(root.resolve("tl/english/translations.vjava"), buildEnglishTranslationScript(false));
+                generateProceduralImages(root, false);
+                generateProceduralAudio(root, false);
+            }
+            case FULL_DEMO -> {
+                writeUtf8(root.resolve("main.vjava"), buildMainScript(true));
+                writeUtf8(root.resolve("ui/screens.vjava"), buildScreensScript(effectiveTitle));
+                writeUtf8(root.resolve("tl/english/translations.vjava"), buildEnglishTranslationScript(true));
+                generateProceduralImages(root, true);
+                generateProceduralAudio(root, true);
+            }
+        }
 
         return root;
     }
@@ -88,7 +141,38 @@ public final class ProjectTemplateGenerator {
         Files.writeString(file, content, StandardCharsets.UTF_8);
     }
 
-    private static String buildMainScript() {
+    private static String buildMainScript(boolean includeDemoArena) {
+        String arenaImageDefs = includeDemoArena ? """
+                image player = "assets/images/sprites/player.png"
+                image goal_star = "assets/images/sprites/goal_star.png"
+                """ : "";
+        String arenaMenuChoice = includeDemoArena
+                ? "        \"Interaktive WASD- & Physik-Arena testen.\" -> jump wasd_arena\n"
+                : "";
+        String arenaLabels = includeDemoArena ? """
+
+                label wasd_arena:
+                    scene bg_akademie_nacht with fade(0.3)
+                    show player
+                    show goal_star
+                    move player to 200 780
+                    move goal_star to 1480 780 duration 0.4 ease ease_out
+                    move_by goal_star 0 -20 duration 0.4 ease ease_in_out
+                    wasd_init player speed 280 bounds 80 120 1840 940 diagonal_norm true
+                    physics_init player gravity 900 jump_force 440 ground_y 780
+                    on_collide player goal_star jump arena_victory
+                    lena "Bewege Kaito mit WASD / Pfeiltasten und springe mit Leertaste bis zum Stern!"
+                    return
+
+                label arena_victory:
+                    wasd_stop player
+                    physics_stop player
+                    play sound "assets/audio/chime.wav"
+                    show lena happy at center with dissolve(0.2)
+                    lena "Geschafft! Du hast das Ziel in der interaktiven WASD-Arena erreicht."
+                    stop music fadeout 1.0
+                    return
+                """ : "";
         return """
                 // Datei: main.vjava
                 define lena = Character("Lena", color="#58a6ff", image="lena", voice_tag="lena")
@@ -124,7 +208,7 @@ public final class ProjectTemplateGenerator {
                 image bg_akademie_nacht = "assets/images/bg/bg_akademie_nacht.png"
                 image bg_bibliothek = "assets/images/bg/bg_bibliothek.png"
                 image ui_dialog_frame = "assets/images/ui/dialog_frame.png"
-
+                %s
                 layeredimage lena:
                     always:
                         "assets/images/char/lena_base.png"
@@ -168,7 +252,7 @@ public final class ProjectTemplateGenerator {
                     menu:
                         "Ja, direkt weiter zu Dialog 2!" if mut_punkte >= 20 -> jump dialog_zwei
                         "Erst noch die Umgebung untersuchen." -> jump umgebung_pruefen
-
+                %s
                 label umgebung_pruefen:
                     show lena happy with dissolve(0.2)
                     lena "Gute Idee! Dein Sternenkompass leuchtet im Dunkeln." with vpunch
@@ -180,10 +264,101 @@ public final class ProjectTemplateGenerator {
                     lena "Das hier ist der zweite Beispieldialog der Vorlage. Du kannst jetzt speichern, laden oder zurückspulen!"
                     stop music fadeout 1.5
                     return
+                %s""".formatted(arenaImageDefs, arenaMenuChoice, arenaLabels);
+    }
+
+    private static String buildMinimalMainScript() {
+        return """
+                // Datei: main.vjava (Minimal-Vorlage)
+                define narrator = Character("KAGAYAKI", color="#58a6ff")
+
+                image bg_akademie_nacht = "assets/images/bg/bg_akademie_nacht.png"
+
+                label start:
+                    scene bg_akademie_nacht with fade(0.4)
+                    play music "assets/audio/nachtwind.wav" fadein 1.0
+                    narrator "Minimal-Projekt bereit. Ergänze weitere Labels, Sprites und UI-Screens."
+                    stop music fadeout 1.0
+                    return
                 """;
     }
 
-    private static String buildScreensScript() {
+    private static String buildScreensScript(String projectTitle) {
+        String escapedTitle = projectTitle.replace("\"", "'");
+        return """
+                // Datei: ui/screens.vjava
+                screen hud_badge():
+                    zorder 50
+                    frame:
+                        xalign 0.02
+                        yalign 0.02
+                        background "assets/images/ui/dialog_frame.png"
+                        vbox:
+                            spacing 6
+                            text "Mut: [mut_punkte]" size 20
+                            text "Spieler: [spieler_name]" size 16
+
+                screen template_main_menu():
+                    modal true
+                    zorder 410
+                    frame:
+                        xalign 0.5
+                        yalign 0.5
+                        background "assets/images/ui/dialog_frame.png"
+                        vbox:
+                            spacing 10
+                            text "%s" size 34
+                            text "%s" size 18
+                            textbutton "Neues Spiel" action "Start()"
+                            textbutton "Spiel laden (Save/Load)" action "ShowMenu(\\"load_screen\\")"
+                            textbutton "WASD- & Physik-Arena" action "Jump(\\"wasd_arena\\")"
+                            textbutton "Einstellungen" action "ShowMenu(\\"preferences_screen\\")"
+                            textbutton "Beenden" action "Quit()"
+
+                screen template_save_screen():
+                    modal true
+                    zorder 420
+                    frame:
+                        xalign 0.5
+                        yalign 0.5
+                        background "assets/images/ui/dialog_frame.png"
+                        vbox:
+                            spacing 8
+                            text "Spielstand speichern" size 28
+                            textbutton "Schnellspeichern (Quick Slot)" action "QuickSave()"
+                            text "Slots 1 - 6 stehen über das Save/Load-Menü bereit." size 16
+                            textbutton "Zurück" action "Return()"
+
+                screen template_load_screen():
+                    modal true
+                    zorder 420
+                    frame:
+                        xalign 0.5
+                        yalign 0.5
+                        background "assets/images/ui/dialog_frame.png"
+                        vbox:
+                            spacing 8
+                            text "Spielstand laden" size 28
+                            textbutton "Schnellladen (Quick Slot)" action "QuickLoad()"
+                            text "Slots 1 - 6 stehen über das Save/Load-Menü bereit." size 16
+                            textbutton "Zurück" action "Return()"
+
+                screen template_preferences_screen():
+                    modal true
+                    zorder 420
+                    frame:
+                        xalign 0.5
+                        yalign 0.5
+                        background "assets/images/ui/dialog_frame.png"
+                        vbox:
+                            spacing 8
+                            text "Einstellungen (Audio & Text)" size 28
+                            text "Textgeschwindigkeit, Musik, SFX und Sprache im Optionsmenü konfigurierbar." size 16
+                            textbutton "Zurück" action "Return()"
+                """.formatted(escapedTitle, EngineVersion.formatBanner());
+    }
+
+    private static String buildStarterScreensScript() {
         return """
                 // Datei: ui/screens.vjava
                 screen hud_badge():
@@ -199,7 +374,34 @@ public final class ProjectTemplateGenerator {
                 """;
     }
 
-    private static String buildEnglishTranslationScript() {
+    private static String buildMinimalScreensScript(String projectTitle) {
+        String escapedTitle = projectTitle.replace("\"", "'");
+        return """
+                // Datei: ui/screens.vjava (Minimal-Vorlage)
+                screen hud_badge():
+                    zorder 50
+                    frame:
+                        xalign 0.02
+                        yalign 0.02
+                        background "assets/images/ui/dialog_frame.png"
+                        vbox:
+                            spacing 6
+                            text "%s" size 20
+                            text "%s" size 14
+                """.formatted(escapedTitle, EngineVersion.formatBanner());
+    }
+
+    private static String buildEnglishTranslationScript(boolean includeDemoArena) {
+        String arenaTranslations = includeDemoArena ? """
+                    old "Interaktive WASD- & Physik-Arena testen."
+                    new "Test interactive WASD & physics arena."
+                """ : "";
+        String arenaDialogue = includeDemoArena ? """
+
+                translate english arena_01:
+                    # lena "Bewege Kaito mit WASD / Pfeiltasten und springe mit Leertaste bis zum Stern!"
+                    lena "Move Kaito with WASD / Arrow keys and jump with Space to reach the star!"
+                """ : "";
         return """
                 // Datei: tl/english/translations.vjava
                 translate english strings:
@@ -207,14 +409,42 @@ public final class ProjectTemplateGenerator {
                     new "Yes, continue straight to Dialogue 2!"
                     old "Erst noch die Umgebung untersuchen."
                     new "Inspect the surroundings first."
-
+                %s
                 translate english start_01:
                     # lena "Willkommen in der ersten Beispielszene, [spieler_name].{w=0.4} Bereit für den Übergang in Dialog 2?"
                     lena "Welcome to the first sample scene, [spieler_name].{w=0.4} Ready to proceed to Dialogue 2?"
-                """;
+                %s""".formatted(arenaTranslations, arenaDialogue);
     }
 
-    private static void generateProceduralImages(Path root) {
+    private static void generateMinimalImages(Path root) {
+        TextureManager.writePng(
+                root.resolve("assets/images/bg/bg_akademie_nacht.png"),
+                BG_WIDTH,
+                BG_HEIGHT,
+                renderNightAcademyBg(BG_WIDTH, BG_HEIGHT)
+        );
+        TextureManager.writePng(
+                root.resolve("assets/images/ui/dialog_frame.png"),
+                UI_FRAME_WIDTH,
+                UI_FRAME_HEIGHT,
+                renderDialogFrame(UI_FRAME_WIDTH, UI_FRAME_HEIGHT)
+        );
+    }
+
+    private static void generateMinimalAudio(Path root) throws IOException {
+        AudioDecoder.DecodedAudio drone = AudioDecoder.synthesizeTone(
+                220.0,
+                0.8,
+                AUDIO_SAMPLE_RATE,
+                0.22f
+        );
+        byte[] nachtwindWav = AudioDecoder.encodeWav(drone.pcm16(), drone.channels(), drone.sampleRate());
+        Path nachtwindPath = root.resolve("assets/audio/nachtwind.wav");
+        Files.createDirectories(nachtwindPath.getParent());
+        Files.write(nachtwindPath, nachtwindWav);
+    }
+
+    private static void generateProceduralImages(Path root, boolean includeDemoArena) {
         TextureManager.writePng(
                 root.resolve("assets/images/bg/bg_akademie_nacht.png"),
                 BG_WIDTH,
@@ -291,9 +521,23 @@ public final class ProjectTemplateGenerator {
                 UI_FRAME_HEIGHT,
                 renderDialogFrame(UI_FRAME_WIDTH, UI_FRAME_HEIGHT)
         );
+        if (includeDemoArena) {
+            TextureManager.writePng(
+                    root.resolve("assets/images/sprites/player.png"),
+                    SPRITE_SIZE,
+                    SPRITE_SIZE,
+                    renderPlayerBadgeSprite(SPRITE_SIZE, SPRITE_SIZE)
+            );
+            TextureManager.writePng(
+                    root.resolve("assets/images/sprites/goal_star.png"),
+                    SPRITE_SIZE,
+                    SPRITE_SIZE,
+                    renderGoalStarSprite(SPRITE_SIZE, SPRITE_SIZE)
+            );
+        }
     }
 
-    private static void generateProceduralAudio(Path root) throws IOException {
+    private static void generateProceduralAudio(Path root, boolean includeDemoArena) throws IOException {
         double[] chordFreqs = {220.0, 277.18, 329.63, 440.0};
         AudioDecoder.DecodedAudio first = AudioDecoder.synthesizeTone(
                 chordFreqs[0],
@@ -330,6 +574,19 @@ public final class ProjectTemplateGenerator {
         Path voicePath = root.resolve("assets/audio/voice/lena_01.wav");
         Files.createDirectories(voicePath.getParent());
         Files.write(voicePath, voiceWav);
+
+        if (includeDemoArena) {
+            AudioDecoder.DecodedAudio chimeTone = AudioDecoder.synthesizeTone(
+                    783.99,
+                    0.28,
+                    AUDIO_SAMPLE_RATE,
+                    0.32f
+            );
+            byte[] chimeWav = AudioDecoder.encodeWav(chimeTone.pcm16(), chimeTone.channels(), chimeTone.sampleRate());
+            Path chimePath = root.resolve("assets/audio/chime.wav");
+            Files.createDirectories(chimePath.getParent());
+            Files.write(chimePath, chimeWav);
+        }
     }
 
     private enum FaceMood {
@@ -525,6 +782,31 @@ public final class ProjectTemplateGenerator {
                     putPixel(rgba, w, x, y, 130, 192, 255, 110);
                 } else {
                     putPixel(rgba, w, x, y, 14, 20, 34, 220);
+                }
+            }
+        }
+        return rgba;
+    }
+
+    private static byte[] renderPlayerBadgeSprite(int w, int h) {
+        byte[] rgba = new byte[w * h * 4];
+        fillEllipse(rgba, w, h, w / 2, h / 2, w / 2 - 4, h / 2 - 4, 88, 166, 255, 255);
+        fillEllipse(rgba, w, h, w / 2, h / 2 - 8, 16, 16, 245, 224, 210, 255);
+        fillRect(rgba, w, h, w / 2 - 18, h / 2 + 10, w / 2 + 18, h - 12, 34, 62, 118, 255);
+        return rgba;
+    }
+
+    private static byte[] renderGoalStarSprite(int w, int h) {
+        byte[] rgba = new byte[w * h * 4];
+        int cx = w / 2;
+        int cy = h / 2;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                double dx = Math.abs(x - cx);
+                double dy = Math.abs(y - cy);
+                double manhattan = dx + dy;
+                if (manhattan < w * 0.42 || (dx < w * 0.14 && dy < h * 0.45) || (dy < h * 0.14 && dx < w * 0.45)) {
+                    putPixel(rgba, w, x, y, 255, 214, 72, 255);
                 }
             }
         }

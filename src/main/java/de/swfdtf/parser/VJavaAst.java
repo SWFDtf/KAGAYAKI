@@ -46,7 +46,13 @@ public final class VJavaAst {
             SetVarStatement,
             PauseStatement,
             WithStatement,
-            WindowStatement {
+            WindowStatement,
+            MoveStatement,
+            WasdInitStatement,
+            WasdStopStatement,
+            PhysicsInitStatement,
+            PhysicsStopStatement,
+            OnCollideStatement {
 
         String sourceFile();
 
@@ -400,6 +406,114 @@ public final class VJavaAst {
     }
 
     public record WindowStatement(String action, String sourceFile, int lineNumber) implements Statement {
+    }
+
+    /**
+     * Moves a sprite to an absolute or relative stage coordinate, optionally animated over time.
+     *
+     * @param tag             target sprite tag
+     * @param targetX         target X coordinate (or relative delta X)
+     * @param targetY         target Y coordinate (or relative delta Y)
+     * @param relative        {@code true} for {@code move_by}, {@code false} for {@code move ... to}
+     * @param durationSeconds tween duration in seconds ({@code 0} for instant placement)
+     * @param easing          easing curve name ({@code linear}, {@code ease_in}, {@code ease_out}, {@code ease_in_out})
+     * @param sourceFile      source script path
+     * @param lineNumber      1-based line number
+     */
+    public record MoveStatement(
+            String tag,
+            double targetX,
+            double targetY,
+            boolean relative,
+            double durationSeconds,
+            String easing,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Binds interactive WASD / arrow-key movement to a sprite tag with optional speed and stage bounds.
+     *
+     * @param tag               target sprite tag
+     * @param speedPxPerSec     speed in logical pixels per second
+     * @param minX              optional minimum X clamp (nullable)
+     * @param minY              optional minimum Y clamp (nullable)
+     * @param maxX              optional maximum X clamp (nullable)
+     * @param maxY              optional maximum Y clamp (nullable)
+     * @param normalizeDiagonal whether diagonal vectors are normalized to constant speed
+     * @param sourceFile        source script path
+     * @param lineNumber        1-based line number
+     */
+    public record WasdInitStatement(
+            String tag,
+            double speedPxPerSec,
+            Double minX,
+            Double minY,
+            Double maxX,
+            Double maxY,
+            boolean normalizeDiagonal,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Stops WASD control for a specific sprite tag or all sprites ({@code tag == null}).
+     *
+     * @param tag        optional sprite tag (nullable)
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record WasdStopStatement(String tag, String sourceFile, int lineNumber) implements Statement {
+    }
+
+    /**
+     * Enables 2D vertical gravity and jump physics for a sprite tag.
+     *
+     * @param tag               target sprite tag
+     * @param gravityPxPerSec2  downward gravity acceleration
+     * @param jumpForcePxPerSec upward jump velocity
+     * @param groundY           ground plane Y coordinate
+     * @param sourceFile        source script path
+     * @param lineNumber        1-based line number
+     */
+    public record PhysicsInitStatement(
+            String tag,
+            double gravityPxPerSec2,
+            double jumpForcePxPerSec,
+            double groundY,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Disables 2D physics for a specific sprite tag or all sprites ({@code tag == null}).
+     *
+     * @param tag        optional sprite tag (nullable)
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record PhysicsStopStatement(String tag, String sourceFile, int lineNumber) implements Statement {
+    }
+
+    /**
+     * Registers an AABB collision trigger between two sprites that jumps to {@code targetLabel}.
+     *
+     * @param tagA        first sprite tag
+     * @param tagB        second sprite tag
+     * @param targetLabel label to jump to on overlap
+     * @param sourceFile  source script path
+     * @param lineNumber  1-based line number
+     */
+    public record OnCollideStatement(
+            String tagA,
+            String tagB,
+            String targetLabel,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
     }
 
     /**

@@ -327,6 +327,16 @@ public final class ScriptFlowGraphExporter {
                 if (!target.isEmpty() && IDENTIFIER_PATTERN.matcher(target).matches()) {
                     edges.add(new FlowEdge(fromLabel, target, EdgeKind.CALL, activeCondition));
                 }
+            } else if (stmt instanceof VJavaAst.OnCollideStatement collide) {
+                String target = collide.targetLabel() != null ? collide.targetLabel().trim() : "";
+                if (!target.isEmpty()) {
+                    edges.add(new FlowEdge(
+                            fromLabel,
+                            target,
+                            EdgeKind.JUMP,
+                            combineCondition(activeCondition, "collide(" + collide.tagA() + "," + collide.tagB() + ")")
+                    ));
+                }
             } else if (stmt instanceof VJavaAst.MenuStatement menu) {
                 if (menu.timeoutJumpLabel() != null && !menu.timeoutJumpLabel().isBlank()) {
                     String timeoutTarget = menu.timeoutJumpLabel().trim();
