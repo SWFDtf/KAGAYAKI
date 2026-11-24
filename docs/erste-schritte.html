@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Erste Schritte — KAGAYAKI Dokumentation</title>
+  <meta name="description" content="Schnellstart-Anleitung ohne Hürden: KAGAYAKI einrichten, starten und die erste Szene schreiben.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#hauptinhalt">Direkt zum Inhalt springen</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">
+        KAGAYAKI
+        <span class="brand-badge">Doku</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Hauptnavigation">
+        <ul>
+          <li><a href="index.html">Startseite</a></li>
+          <li><a href="erste-schritte.html" aria-current="page">Erste Schritte</a></li>
+          <li><a href="konzepte.html">Konzepte</a></li>
+          <li><a href="anleitungen.html">Anleitungen &amp; FAQ</a></li>
+          <li><a href="mitmachen.html">Mitmachen</a></li>
+          <li><a href="md/erste-schritte.md">Markdown</a></li>
+        </ul>
+      </nav>
+
+      <details class="nav-toggle-details">
+        <summary aria-label="Menü öffnen">Menü</summary>
+        <nav aria-label="Mobile Hauptnavigation">
+          <ul>
+            <li><a href="index.html">Startseite</a></li>
+            <li><a href="erste-schritte.html" aria-current="page">Erste Schritte</a></li>
+            <li><a href="konzepte.html">Konzepte</a></li>
+            <li><a href="anleitungen.html">Anleitungen &amp; FAQ</a></li>
+            <li><a href="mitmachen.html">Mitmachen</a></li>
+            <li><a href="md/erste-schritte.md">Markdown</a></li>
+          </ul>
+        </nav>
+      </details>
+    </div>
+  </header>
+
+  <main id="hauptinhalt" class="container prose">
+    <h1>Erste Schritte</h1>
+    <p>
+      In wenigen Minuten läuft KAGAYAKI auf deinem Rechner. Du brauchst keine tiefen
+      Programmierkenntnisse, um zu beginnen.
+    </p>
+
+    <section aria-labelledby="voraussetzungen-titel">
+      <h2 id="voraussetzungen-titel">1. Was du brauchst</h2>
+      <ul>
+        <li><strong>Java 21:</strong> Die Laufzeitumgebung, auf der KAGAYAKI aufbaut.</li>
+        <li><strong>Ein Texteditor:</strong> Zum Beispiel VS Code, IntelliJ IDEA oder jeder andere Editor, der UTF-8-Textdateien speichert.</li>
+        <li><strong>Das Projekt-Repository:</strong> Lade KAGAYAKI herunter oder klone es mit Git.</li>
+      </ul>
+      <p>
+        Gradle — das Werkzeug zum Bauen und Starten des Projekts — ist über den mitgelieferten
+        <code>gradlew</code>-Wrapper bereits enthalten. Du musst es nicht extra installieren.
+      </p>
+    </section>
+
+    <section aria-labelledby="starten-titel">
+      <h2 id="starten-titel">2. KAGAYAKI starten</h2>
+      <p>Öffne ein Terminal im Hauptordner des Projekts und führe diesen Befehl aus:</p>
+      <pre><code>./gradlew runStudio</code></pre>
+      <p>Unter Windows nutzt du stattdessen:</p>
+      <pre><code>gradlew.bat runStudio</code></pre>
+      <p>
+        Damit startet der <strong>Studio-Modus</strong>: Du siehst ein Werkzeugfenster für dein
+        Projekt und ein zweites Fenster, in dem dein Spiel live läuft.
+      </p>
+      <div class="callout">
+        <span class="callout-title">Nur spielen statt entwickeln?</span>
+        <p>
+          Mit <code>./gradlew runStandalone</code> startest du nur das Spielfenster ohne
+          Entwicklungswerkzeuge.
+        </p>
+      </div>
+    </section>
+
+    <section aria-labelledby="erste-szene-titel">
+      <h2 id="erste-szene-titel">3. Deine erste Szene schreiben</h2>
+      <p>
+        Geschichten in KAGAYAKI stehen in Dateien mit der Endung <code>.vjava</code>.
+        Hier ist ein vollständiges, kleines Beispiel für eine Datei <code>main.vjava</code>:
+      </p>
+      <pre><code>define a = Character("Aoi", color="#7aa2ff")
+
+label start:
+    "Willkommen in deiner ersten Geschichte mit KAGAYAKI."
+    a "Schön, dass du hier bist! Alles funktioniert."
+    return</code></pre>
+      <p>
+        Jede eingerückte Zeile unter <code>label start:</code> gehört zu dieser Szene.
+        Die Anführungszeichen ohne Namen davor sind Erzählertext. Mit <code>a "..."</code>
+        spricht die Figur <em>Aoi</em>.
+      </p>
+    </section>
+
+    <section aria-labelledby="tests-titel">
+      <h2 id="tests-titel">4. Prüfen, ob alles gesund ist</h2>
+      <p>
+        Wenn du sicherstellen möchtest, dass alle Funktionen der Engine sauber arbeiten,
+        kannst du jederzeit die eingebauten Tests ausführen:
+      </p>
+      <pre><code>./gradlew test</code></pre>
+    </section>
+
+    <section aria-labelledby="weiter-titel">
+      <h2 id="weiter-titel">Wie geht es weiter?</h2>
+      <p>
+        Lies als Nächstes die <a href="konzepte.html">Konzepte</a>, um zu verstehen, wie
+        Ordner, Szenen und Grafik zusammenspielen. Oder springe direkt zu den
+        <a href="anleitungen.html">Anleitungen &amp; FAQ</a>.
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>KAGAYAKI Dokumentation · <a href="md/erste-schritte.md">Diese Seite als Markdown</a></span>
+      <div class="footer-links">
+        <a href="impressum.html">Impressum</a>
+        <a href="datenschutz.html">Datenschutz</a>
+        <a href="lizenz.html">Lizenz</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

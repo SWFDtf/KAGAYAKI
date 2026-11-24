@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Anleitungen &amp; FAQ — KAGAYAKI Dokumentation</title>
+  <meta name="description" content="Schritt-für-Schritt-Hilfen für Dialoge, Entscheidungen, Bilder, Audio und Antworten auf häufige Fragen.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#hauptinhalt">Direkt zum Inhalt springen</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">
+        KAGAYAKI
+        <span class="brand-badge">Doku</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Hauptnavigation">
+        <ul>
+          <li><a href="index.html">Startseite</a></li>
+          <li><a href="erste-schritte.html">Erste Schritte</a></li>
+          <li><a href="konzepte.html">Konzepte</a></li>
+          <li><a href="anleitungen.html" aria-current="page">Anleitungen &amp; FAQ</a></li>
+          <li><a href="mitmachen.html">Mitmachen</a></li>
+          <li><a href="md/anleitungen.md">Markdown</a></li>
+        </ul>
+      </nav>
+
+      <details class="nav-toggle-details">
+        <summary aria-label="Menü öffnen">Menü</summary>
+        <nav aria-label="Mobile Hauptnavigation">
+          <ul>
+            <li><a href="index.html">Startseite</a></li>
+            <li><a href="erste-schritte.html">Erste Schritte</a></li>
+            <li><a href="konzepte.html">Konzepte</a></li>
+            <li><a href="anleitungen.html" aria-current="page">Anleitungen &amp; FAQ</a></li>
+            <li><a href="mitmachen.html">Mitmachen</a></li>
+            <li><a href="md/anleitungen.md">Markdown</a></li>
+          </ul>
+        </nav>
+      </details>
+    </div>
+  </header>
+
+  <main id="hauptinhalt" class="container prose">
+    <h1>Anleitungen &amp; Häufige Fragen</h1>
+    <p>
+      Hier findest du kompakte Rezepte für den Alltag mit KAGAYAKI sowie Antworten auf typische Fragen.
+    </p>
+
+    <section aria-labelledby="entscheidungen-titel">
+      <h2 id="entscheidungen-titel">1. Entscheidungen und Verzweigungen bauen</h2>
+      <p>
+        Mit <code>menu:</code> bietest du den Spielerinnen und Spielern Auswahlmöglichkeiten an.
+        Jede Option leitet zu einem eigenen Block oder einem anderen <code>label</code> weiter:
+      </p>
+      <pre><code>label kreuzung:
+    "Welchen Weg möchtest du nehmen?"
+    menu:
+        "Durch den ruhigen Park gehen":
+            jump park_szene
+        "Die belebte Straße nehmen":
+            jump strasse_szene</code></pre>
+    </section>
+
+    <section aria-labelledby="bilder-audio-titel">
+      <h2 id="bilder-audio-titel">2. Bilder und Musik einbinden</h2>
+      <p>
+        Lege Grafiken in <code>assets/images/</code> und Musik oder Geräusche in <code>assets/audio/</code> ab.
+        Danach nutzt du sie mit kurzen Befehlen direkt in deiner Szene:
+      </p>
+      <pre><code>scene bg park with dissolve
+show aoi laechelnd at center
+play music "assets/audio/morgenstimmung.ogg" fadein 1.5
+
+a "Hörst du die Vögel? Ein guter Tag beginnt."</code></pre>
+    </section>
+
+    <section aria-labelledby="java-block-titel">
+      <h2 id="java-block-titel">3. Eigene Logik mit Java einfügen</h2>
+      <p>
+        Wenn du Punkte zählen oder eine eigene Berechnung ausführen möchtest, öffnest du einen
+        Java-Block mit <code>@->{</code> und schließt ihn mit <code>}<<</code>:
+      </p>
+      <pre><code>:: Punkte erhöhen @->{
+    int aktuell = state.getInt("mut", 0);
+    state.set("mut", aktuell + 1);
+}<<</code></pre>
+      <p>
+        Über <code>state</code> speicherst du Werte, die automatisch beim Zurückblättern und in
+        Spielständen erhalten bleiben.
+      </p>
+    </section>
+
+    <section aria-labelledby="export-titel">
+      <h2 id="export-titel">4. Fertiges Spiel exportieren</h2>
+      <p>
+        Um eine eigenständige Datei für Spielerinnen und Spieler zu erzeugen, führst du diesen
+        Befehl aus:
+      </p>
+      <pre><code>./gradlew packageStandalone</code></pre>
+      <p>
+        Das fertige Programm liegt anschließend im Ordner <code>build/dist/</code>.
+      </p>
+    </section>
+
+    <section aria-labelledby="faq-titel">
+      <h2 id="faq-titel">5. Häufige Fragen (FAQ)</h2>
+
+      <details class="faq-item">
+        <summary>Muss ich Java können, um mit KAGAYAKI zu arbeiten?</summary>
+        <p>
+          Nein. Für Dialoge, Szenenwechsel, Bilder, Musik und Entscheidungen reicht die einfache
+          <code>.vjava</code>-Skriptsprache völlig aus. Java-Blöcke sind rein optional.
+        </p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Was passiert, wenn ein Bild oder eine Datei fehlt?</summary>
+        <p>
+          KAGAYAKI stürzt nicht ab. Stattdessen zeigt die Engine ein deutlich erkennbares
+          Platzhalter-Muster an und schreibt einen klaren Hinweis in das Protokoll.
+        </p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Kann ich meine Geschichte in mehrere Sprachen übersetzen?</summary>
+        <p>
+          Ja. Im Ordner <code>tl/</code> legst du Übersetzungsdateien und bei Bedarf eigene
+          Sprachaufnahmen oder Grafiken pro Sprache ab.
+        </p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Auf welchen Betriebssystemen läuft KAGAYAKI?</summary>
+        <p>
+          Die Engine unterstützt Windows, macOS (inklusive Apple Silicon) und Linux.
+          Die passenden Grafik- und Audio-Bibliotheken werden automatisch über Gradle geladen.
+        </p>
+      </details>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>KAGAYAKI Dokumentation · <a href="md/anleitungen.md">Diese Seite als Markdown</a></span>
+      <div class="footer-links">
+        <a href="impressum.html">Impressum</a>
+        <a href="datenschutz.html">Datenschutz</a>
+        <a href="lizenz.html">Lizenz</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
