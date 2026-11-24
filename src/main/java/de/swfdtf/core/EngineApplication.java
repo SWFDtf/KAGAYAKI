@@ -24,6 +24,7 @@ import java.util.Objects;
 public final class EngineApplication implements AutoCloseable {
 
     private static final String STUDIO_CONTROLLER_CLASS = "de.swfdtf.tools.StudioWindowController";
+    private static final String GAME_COORDINATOR_CLASS = "de.swfdtf.ui.GameRuntimeCoordinator";
     private static final int SMOKE_TEST_FRAMES = 5;
 
     private final EngineConfig config;
@@ -34,7 +35,9 @@ public final class EngineApplication implements AutoCloseable {
     private final List<Updatable> updatables = new ArrayList<>();
     private IRenderPipeline activePipeline;
     private StudioBridge studioBridge;
+    private GameHost gameHost;
     private boolean studioBridgeInitialized = false;
+    private boolean gameHostInitialized = false;
     private boolean initialized = false;
     private boolean disposed = false;
 
@@ -67,6 +70,17 @@ public final class EngineApplication implements AutoCloseable {
      * @param studioBridge optional studio bridge (if {@code null} in studio mode, loaded dynamically if present)
      */
     public EngineApplication(EngineConfig config, StudioBridge studioBridge) {
+        this(config, studioBridge, null);
+    }
+
+    /**
+     * Creates an {@link EngineApplication} with optional explicit {@link StudioBridge} and {@link GameHost}.
+     *
+     * @param config       immutable engine configuration
+     * @param studioBridge optional studio bridge
+     * @param gameHost     optional game host
+     */
+    public EngineApplication(EngineConfig config, StudioBridge studioBridge, GameHost gameHost) {
         this.config = Objects.requireNonNull(config, "config must not be null");
         ProjectDescriptor descriptor = loadProjectDescriptorQuietly(config.projectDir());
         EngineLogger logger = new EngineLogger();
@@ -77,6 +91,7 @@ public final class EngineApplication implements AutoCloseable {
         this.sceneGraph = new SceneGraph();
         this.windowManager = new WindowManager(logger);
         this.studioBridge = studioBridge;
+        this.gameHost = gameHost;
 
         this.api.registerService(SceneGraph.class, sceneGraph);
         this.api.registerService(EngineApplication.class, this);
@@ -117,6 +132,8 @@ public final class EngineApplication implements AutoCloseable {
         }
 
         switchRenderPipeline(requestedMode);
+
+        initializeGameHostIfApplicable();
 
         if (config.isStudioMode()) {
             initializeStudioBridgeIfAvailable();
@@ -170,8 +187,13 @@ public final class EngineApplication implements AutoCloseable {
             input.pollGamepads();
         }
 
-        if (api.consumeLiveReloadRequested() && studioBridge != null) {
-            studioBridge.onReload();
+        if (api.consumeLiveReloadRequested()) {
+            if (gameHostInitialized && gameHost != null) {
+                gameHost.onReload();
+            }
+            if (studioBridge != null) {
+                studioBridge.onReload();
+            }
         }
 
         GameClock clock = api.getClock();
@@ -179,6 +201,9 @@ public final class EngineApplication implements AutoCloseable {
         double fixedDt = clock.getFixedTimestep();
         for (int i = 0; i < steps; i++) {
             sceneGraph.update((float) fixedDt);
+            if (gameHostInitialized && gameHost != null) {
+                gameHost.update(fixedDt, input);
+            }
             for (Updatable updatable : List.copyOf(updatables)) {
                 updatable.update(fixedDt);
             }
@@ -209,6 +234,9 @@ public final class EngineApplication implements AutoCloseable {
                 updateNormalizedMouseAndViewport(gameWindow, fbW, fbH);
                 activePipeline.beginFrame(fbW, fbH);
                 activePipeline.renderSceneGraph(sceneGraph);
+                if (gameHostInitialized && gameHost != null) {
+                    gameHost.renderUi(api.getClock().getTotalTimeSeconds());
+                }
                 activePipeline.endFrame();
                 if (activePipeline instanceof RenderPipeline2D p2d) {
                     Rect2f vp = p2d.getLastLetterboxViewport();
@@ -341,12 +369,26 @@ public final class EngineApplication implements AutoCloseable {
         return initialized;
     }
 
+    /** @return active {@link GameHost}, or {@code null} if no project host was loaded */
+    public GameHost getGameHost() {
+        return gameHost;
+    }
+
     @Override
     public void close() {
         if (disposed) {
             return;
         }
         disposed = true;
+
+        if (gameHostInitialized && gameHost != null) {
+            try {
+                gameHost.dispose();
+            } catch (RuntimeException ex) {
+                api.getLogger().error("Engine", "Error disposing GameHost", ex);
+            }
+            gameHostInitialized = false;
+        }
 
         if (studioBridgeInitialized && studioBridge != null) {
             try {
@@ -393,6 +435,30 @@ public final class EngineApplication implements AutoCloseable {
         return config.isStudioMode()
                 ? projectTitle + " — Live Preview"
                 : projectTitle;
+    }
+
+    private void initializeGameHostIfApplicable() {
+        Path projectDir = config.projectDir();
+        boolean hasProject = gameHost != null
+                || (projectDir != null && Files.isRegularFile(projectDir.resolve(ProjectDescriptor.FILE_NAME)));
+        if (!hasProject) {
+            return;
+        }
+        if (gameHost == null) {
+            try {
+                Class<?> clazz = Class.forName(GAME_COORDINATOR_CLASS);
+                Object instance = clazz.getDeclaredConstructor().newInstance();
+                if (instance instanceof GameHost host) {
+                    gameHost = host;
+                }
+            } catch (ReflectiveOperationException ex) {
+                api.getLogger().warn("Engine", "Failed to instantiate GameRuntimeCoordinator: " + ex.getMessage());
+                return;
+            }
+        }
+        gameHost.init(this, !config.headless());
+        gameHostInitialized = true;
+        api.registerService(GameHost.class, gameHost);
     }
 
     private void initializeStudioBridgeIfAvailable() {
