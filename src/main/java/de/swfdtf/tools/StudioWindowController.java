@@ -3,12 +3,14 @@ package de.swfdtf.tools;
 import de.swfdtf.core.EngineAPI;
 import de.swfdtf.core.EngineApplication;
 import de.swfdtf.core.EngineLogger;
+import de.swfdtf.core.InputManager;
 import de.swfdtf.core.StudioBridge;
 import de.swfdtf.graphics.FontManager;
 import de.swfdtf.graphics.RenderMode;
 import de.swfdtf.graphics.RenderPipeline2D;
 import de.swfdtf.graphics.SceneLayer;
 import de.swfdtf.graphics.TextureManager;
+import de.swfdtf.math.Rect2f;
 import de.swfdtf.parser.ProjectScanner;
 import de.swfdtf.parser.ScriptSession;
 import de.swfdtf.parser.VJavaAst;
@@ -21,8 +23,11 @@ import de.swfdtf.ui.ThemePalette;
 import de.swfdtf.ui.VBox;
 import de.swfdtf.ui.Viewport;
 import de.swfdtf.ui.WindowBox;
+import org.lwjgl.glfw.GLFW;
+import org.lwjgl.system.MemoryStack;
 
 import java.io.IOException;
+import java.nio.IntBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -46,6 +51,7 @@ public final class StudioWindowController implements StudioBridge {
     private boolean glReady = false;
 
     private RenderPipeline2D studioPipeline;
+    private InputManager studioInput;
     private FontManager fontManager;
     private TextureManager textureManager;
     private ScreenManager studioScreenManager;
@@ -81,10 +87,13 @@ public final class StudioWindowController implements StudioBridge {
         this.textureManager = new TextureManager(api.getLogger(), projectRoot);
         this.studioScreenManager = new ScreenManager();
         this.studioScreenManager.setLogicalSize(1920.0f, 1080.0f);
+        this.studioInput = new InputManager();
+        this.studioInput.setLogicalSize(1920, 1080);
 
         if (glReady) {
             this.studioPipeline = new RenderPipeline2D();
             this.studioPipeline.init(1920, 1080);
+            this.studioInput.attachToWindow(studioWindowHandle);
         }
 
         buildStudioUi();
@@ -196,7 +205,13 @@ public final class StudioWindowController implements StudioBridge {
             refreshTimer = 0.0;
             refreshInspectors();
         }
-        studioScreenManager.update(dt, null);
+        if (studioInput != null) {
+            studioInput.beginFrame();
+            studioScreenManager.update(dt, studioInput);
+            studioInput.endFrame();
+        } else {
+            studioScreenManager.update(dt, null);
+        }
     }
 
     @Override
@@ -207,6 +222,32 @@ public final class StudioWindowController implements StudioBridge {
         studioPipeline.beginFrame(windowWidth, windowHeight);
         studioScreenManager.render(studioPipeline, fontManager, textureManager, elapsedSeconds);
         studioPipeline.endFrame();
+        updateStudioInputViewport(windowWidth, windowHeight);
+    }
+
+    private void updateStudioInputViewport(int fbWidth, int fbHeight) {
+        if (studioInput == null || studioPipeline == null || studioWindowHandle == 0L) {
+            return;
+        }
+        Rect2f vp = studioPipeline.getLastLetterboxViewport();
+        if (vp.width() <= 0.0f || vp.height() <= 0.0f || fbWidth <= 0 || fbHeight <= 0) {
+            return;
+        }
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            IntBuffer winW = stack.mallocInt(1);
+            IntBuffer winH = stack.mallocInt(1);
+            GLFW.glfwGetWindowSize(studioWindowHandle, winW, winH);
+            int screenW = winW.get(0);
+            int screenH = winH.get(0);
+            float scaleX = screenW > 0 ? screenW / (float) fbWidth : 1.0f;
+            float scaleY = screenH > 0 ? screenH / (float) fbHeight : 1.0f;
+            studioInput.setViewport(
+                    vp.x() * scaleX,
+                    vp.y() * scaleY,
+                    vp.width() * scaleX,
+                    vp.height() * scaleY
+            );
+        }
     }
 
     @Override
@@ -375,6 +416,10 @@ public final class StudioWindowController implements StudioBridge {
             return;
         }
         disposed = true;
+        if (studioInput != null) {
+            studioInput.dispose();
+            studioInput = null;
+        }
         if (studioPipeline != null) {
             studioPipeline.dispose();
             studioPipeline = null;
@@ -417,5 +462,14 @@ public final class StudioWindowController implements StudioBridge {
 
     public ScreenManager getStudioScreenManager() {
         return studioScreenManager;
+    }
+
+    /**
+     * Returns the Studio Window A input manager used to route mouse and keyboard events.
+     *
+     * @return the Studio {@link InputManager}, or {@code null} before {@link #init} or after {@link #dispose}
+     */
+    public InputManager getStudioInput() {
+        return studioInput;
     }
 }

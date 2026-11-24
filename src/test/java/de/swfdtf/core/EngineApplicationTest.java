@@ -10,6 +10,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class EngineApplicationTest {
 
@@ -88,5 +94,30 @@ class EngineApplicationTest {
             assertEquals(RenderMode.MODE_2D, app.getActivePipeline().getMode());
         }
         assertEquals(1, studioDisposeCount.get());
+    }
+
+    @Test
+    void lifecycleCoordinatesGameHostAndStudioBridgeWithMockito() {
+        EngineConfig config = EngineConfig.builder()
+                .engineMode(EngineMode.STUDIO_DUAL_WINDOW)
+                .renderModeName("2D")
+                .headless(true)
+                .build();
+
+        StudioBridge studioBridge = mock(StudioBridge.class);
+        GameHost gameHost = mock(GameHost.class);
+
+        try (EngineApplication app = new EngineApplication(config, studioBridge, gameHost)) {
+            app.initialize();
+            app.stepOnce(1.0 / 60.0);
+        }
+
+        var order = inOrder(gameHost, studioBridge);
+        order.verify(gameHost).init(any(EngineApplication.class), eq(false));
+        order.verify(studioBridge).init(any(EngineAPI.class), eq(0L), eq(0L));
+        order.verify(gameHost).update(anyDouble(), any(InputManager.class));
+        order.verify(studioBridge).update(anyDouble());
+        verify(gameHost).dispose();
+        verify(studioBridge).dispose();
     }
 }

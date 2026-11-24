@@ -303,6 +303,12 @@ public final class EngineApplication implements AutoCloseable {
      */
     public void switchRenderPipeline(RenderMode mode) {
         Objects.requireNonNull(mode, "mode must not be null");
+        if (!config.headless()) {
+            GlfwWindow gameWindow = windowManager.getGameWindow();
+            if (gameWindow != null && !gameWindow.isDestroyed()) {
+                gameWindow.makeCurrent();
+            }
+        }
         if (activePipeline != null) {
             if (activePipeline.getMode() == mode) {
                 return;
@@ -382,6 +388,12 @@ public final class EngineApplication implements AutoCloseable {
         disposed = true;
 
         if (gameHostInitialized && gameHost != null) {
+            if (!config.headless()) {
+                GlfwWindow gameWindow = windowManager.getGameWindow();
+                if (gameWindow != null && !gameWindow.isDestroyed()) {
+                    gameWindow.makeCurrent();
+                }
+            }
             try {
                 gameHost.dispose();
             } catch (RuntimeException ex) {
@@ -391,15 +403,31 @@ public final class EngineApplication implements AutoCloseable {
         }
 
         if (studioBridgeInitialized && studioBridge != null) {
+            if (!config.headless() && windowManager.hasStudioWindow()) {
+                windowManager.getStudioWindow().makeCurrent();
+            }
             try {
                 studioBridge.dispose();
             } catch (RuntimeException ex) {
                 api.getLogger().error("Studio", "Error disposing StudioBridge", ex);
+            } finally {
+                if (!config.headless()) {
+                    GlfwWindow gameWindow = windowManager.getGameWindow();
+                    if (gameWindow != null && !gameWindow.isDestroyed()) {
+                        gameWindow.makeCurrent();
+                    }
+                }
             }
             studioBridgeInitialized = false;
         }
 
         if (activePipeline != null) {
+            if (!config.headless()) {
+                GlfwWindow gameWindow = windowManager.getGameWindow();
+                if (gameWindow != null && !gameWindow.isDestroyed()) {
+                    gameWindow.makeCurrent();
+                }
+            }
             try {
                 if (!config.headless() || activePipeline instanceof RenderPipeline3DStub) {
                     activePipeline.dispose();
@@ -484,8 +512,22 @@ public final class EngineApplication implements AutoCloseable {
         long gameHandle = windowManager.getGameWindow() != null
                 ? windowManager.getGameWindow().getHandle()
                 : 0L;
-        studioBridge.init(api, studioHandle, gameHandle);
-        studioBridgeInitialized = true;
+        boolean switchedToStudioContext = false;
+        if (!config.headless() && windowManager.hasStudioWindow()) {
+            windowManager.getStudioWindow().makeCurrent();
+            switchedToStudioContext = true;
+        }
+        try {
+            studioBridge.init(api, studioHandle, gameHandle);
+            studioBridgeInitialized = true;
+        } finally {
+            if (switchedToStudioContext) {
+                GlfwWindow gameWindow = windowManager.getGameWindow();
+                if (gameWindow != null && !gameWindow.isDestroyed()) {
+                    gameWindow.makeCurrent();
+                }
+            }
+        }
     }
 
     private boolean shouldTerminate(long frameCount) {

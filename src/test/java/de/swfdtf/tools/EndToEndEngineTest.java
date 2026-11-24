@@ -114,7 +114,9 @@ class EndToEndEngineTest {
                 assertTrue(archive.contains("assets/audio/nachtwind.wav"));
             }
 
-            // 7. Trigger Live Reload & verify Studio refresh
+            // 7. Trigger Live Reload & verify Studio refresh + Studio input initialization
+            assertNotNull(studio.getStudioInput(), "StudioWindowController should expose its own InputManager");
+            studio.getStudioInput().onCursorPos(820.0, 44.0);
             app.getApi().requestLiveReload();
             app.stepOnce(1.0 / 60.0);
             studio.refreshInspectors();
