@@ -1,6 +1,29 @@
 # KAGAYAKI — Entwicklungs-Changelog
 
-Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architektur-Änderungen und Meilensteine von **KAGAYAKI** (`de.swfdtf`).
+Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architektur-Änderungen und Meilensteine von **KAGAYAKI** (`de.swfdtf`, Repository: `https://github.com/SWFDtf/KAGAYAKI`).
+
+---
+
+## [Welle 4 — Abgeschlossen (60 / 60 Features)] Schneewittchen-Demo-Integration (`demo/`)
+
+* **`de.swfdtf.demo.features` (`Wave4DemoProgressionTest`)**:
+  1. `SnowWhiteChapterCatalog` (7 Schneewittchen-Kapitel in `ChapterRegistry` + Label-Unlock).
+  2. `SnowWhiteCodexCatalog` (8 Märchen-Codex-Einträge über `CodexGlossaryManager`).
+  3. `SnowWhiteAffinityDirector` (Meilenstein-gesteuerte Zuneigung für `jaeger`, `zwerge`, `prinz`, `koenigin`).
+  4. `SnowWhiteQuoteBook` (deduplizierte, durchsuchbare Zitat-Lesezeichen mit atomarer JSON-Persistenz).
+  5. `SnowWhiteReadingStats` (Lese-Fortschritt kombiniert mit `ScriptWordCountAnalyzer`).
+* **`de.swfdtf.demo.director` (`Wave4DemoDirectorTest`)**:
+  6. `SnowWhiteWeatherDirector` (Kapitel-Wetter-Choreographie über `WeatherOverlayController`).
+  7. `SnowWhiteCameraChoreographer` (Kapitel-Kamera- & Letterbox-Presets).
+  8. `SnowWhiteAudioShowcase` (Audio-Cues, Ducking, Ambient-Crossfade, Captions & Voice-Bookmarks).
+  9. `SnowWhiteAccessibilityProfile` (Presets `STANDARD`, `HIGH_CONTRAST`, `AUTO_CINEMA` inkl. JSON-Save/Load).
+  10. `SnowWhiteScreenshotShowcase` (prozedurale Kapitel-Vorschau-PNGs über `ScreenshotCaptureService` ohne `java.awt`).
+* **`de.swfdtf.demo.qa` & `demo.Main` (`Wave4DemoQaTest`)**:
+  11. `SnowWhitePlaythroughSuite` (Automatisierte Playthroughs über alle 3 `ChoiceStrategy`-Modi).
+  12. `SnowWhiteFlowAndTranslationReport` (Mermaid/DOT, Übersetzungsabdeckung & Asset-Audit als Markdown).
+  13. `SnowWhiteIntegrityAuditor` (SHA-256-Manifest, Asset-Metadaten, Pre-Flight & `.vpak`-CRC32-Prüfung).
+  14. `SnowWhiteDiagnosticExporter` (Profiling, Watchpoints, State-Diff & JSON-Diagnosebundle).
+  15. `SnowWhiteShowcaseCli` & CLI-Flags `--showcase`, `--preflight`, `--flow-graph` + Gradle-Task `runDemoShowcase`.
 
 ---
 

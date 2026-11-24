@@ -1,9 +1,12 @@
 package de.swfdtf.demo;
 
 import de.swfdtf.core.EngineMode;
+import de.swfdtf.demo.qa.SnowWhiteFlowAndTranslationReport;
+import de.swfdtf.demo.qa.SnowWhiteShowcaseCli;
 import de.swfdtf.demo.service.SnowWhiteConsoleNarrator;
 import de.swfdtf.demo.service.SnowWhiteEngineService;
 import de.swfdtf.demo.story.SnowWhiteStoryRunner;
+import de.swfdtf.tools.ExportPreFlightChecker;
 import de.swfdtf.tools.StandaloneBuilder;
 import de.swfdtf.tools.VJavaLinter;
 
@@ -23,6 +26,9 @@ import java.nio.file.Path;
  *   <li>{@code --lint}: Prüft das {@code .vjava}-Projekt statisch mit {@link VJavaLinter}.</li>
  *   <li>{@code --generate-assets}: Erzeugt alle prozeduralen PNG- und WAV-Assets.</li>
  *   <li>{@code --export <zielordner>}: Exportiert das Projekt als {@code .vpak}-Bundle.</li>
+ *   <li>{@code --showcase <zielordner>}: Erzeugt Flow-Graph, Audit, Diagnostik und Asset-Manifest.</li>
+ *   <li>{@code --preflight}: Führt die Release-Vorabprüfung ({@link ExportPreFlightChecker}) aus.</li>
+ *   <li>{@code --flow-graph}: Gibt den Mermaid-Flowchart des Schneewittchen-Skripts aus.</li>
  *   <li>{@code --project <ordner>}: Alternativer Pfad zum {@code .vjava}-Projekt (Standard: {@code project}).</li>
  * </ul>
  */
@@ -41,6 +47,7 @@ public final class Main {
         Path projectDir = resolveDefaultProjectDir();
         String mode = "--auto";
         Path exportDir = null;
+        Path showcaseDir = null;
 
         if (args != null) {
             for (int i = 0; i < args.length; i++) {
@@ -59,7 +66,15 @@ public final class Main {
                         mode = "--export";
                         exportDir = Path.of(args[++i]);
                     }
-                    case "--auto", "--interactive", "--studio", "--standalone", "--lint", "--generate-assets" ->
+                    case "--showcase" -> {
+                        if (i + 1 >= args.length) {
+                            throw new IllegalArgumentException("Zielverzeichnis nach --showcase fehlt.");
+                        }
+                        mode = "--showcase";
+                        showcaseDir = Path.of(args[++i]);
+                    }
+                    case "--auto", "--interactive", "--studio", "--standalone",
+                            "--lint", "--generate-assets", "--preflight", "--flow-graph" ->
                             mode = arg;
                     default -> throw new IllegalArgumentException("Unbekanntes Argument: " + arg);
                 }
@@ -82,6 +97,27 @@ public final class Main {
                 if (report.hasErrors()) {
                     System.exit(1);
                 }
+            }
+            case "--preflight" -> {
+                service.ensureAssets();
+                ExportPreFlightChecker.PreFlightReport preFlight =
+                        new ExportPreFlightChecker().check(service.getProjectDir());
+                System.out.println(preFlight.summaryMarkdown());
+                if (!preFlight.readyForRelease()) {
+                    System.exit(1);
+                }
+            }
+            case "--flow-graph" -> {
+                service.ensureAssets();
+                SnowWhiteFlowAndTranslationReport.AuditBundle audit =
+                        new SnowWhiteFlowAndTranslationReport().analyze(service.getProjectDir());
+                System.out.println(audit.mermaidDiagram());
+            }
+            case "--showcase" -> {
+                service.ensureAssets();
+                SnowWhiteShowcaseCli.ShowcaseOutput output =
+                        new SnowWhiteShowcaseCli().generateShowcase(service.getProjectDir(), showcaseDir);
+                System.out.println("[Showcase] Artefakte erzeugt in: " + output.outputDir());
             }
             case "--studio" -> service.launchGui(EngineMode.STUDIO_DUAL_WINDOW);
             case "--standalone" -> service.launchGui(EngineMode.STANDALONE_GAME);

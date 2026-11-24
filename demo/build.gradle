@@ -53,6 +53,8 @@ dependencies {
 
     testImplementation platform('org.junit:junit-bom:6.0.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.mockito:mockito-core:5.14.2'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -120,4 +122,12 @@ tasks.register('runDemoStandalone', JavaExec) {
     if (isMac) {
         jvmArgs '-XstartOnFirstThread'
     }
+}
+
+tasks.register('runDemoShowcase', JavaExec) {
+    group = 'demo'
+    description = 'Erzeugt den vollständigen Schneewittchen-Showcase-Bericht (Flow-Graph, Audit, Diagnostik & Manifest).'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.swfdtf.demo.Main'
+    args '--showcase', layout.buildDirectory.dir('showcase').get().asFile.absolutePath, '--project', file('project').absolutePath
 }

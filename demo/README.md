@@ -26,6 +26,10 @@ Dieses Verzeichnis enthält ein vollständiges, lauffähiges Demo-Projekt für *
 - **Deklaratives UI & Lokalisierung**: `ui/screens.vjava` (`screen maerchen_hud` via `ScreenAstBuilder`) und `tl/english/translations.vjava` (`LocalizationManager` mit Live-Sprachwechsel Deutsch/Englisch).
 - **4-Tier-Persistenz & Meta-Systeme**: `RevertableStateStore` (Rollback & Roll-Forward + Barriere), `SaveManager` (atomares GZIP-JSON Quick-Save/Load mit `__vjavaClass`-Rekonstruktion), `HistoryLog`, `AchievementManager`, `GalleryManager` und `EndingsManager`.
 - **Prozedurale Assets (`SnowWhiteAssetGenerator`)**: Alle PNG-Hintergründe/-Sprites und WAV-Musik-/SFX-/Voice-Dateien werden ohne `java.awt` direkt über `TextureManager.writePng` und `AudioDecoder.encodeWav` erzeugt — `VJavaLinter` meldet **0 Fehler und 0 Warnungen**.
+- **Welle-4-Showcase & Qualitätssicherung (`de.swfdtf.demo.features`, `director`, `qa`)**:
+  - *Progression & Story*: `SnowWhiteChapterCatalog`, `SnowWhiteCodexCatalog`, `SnowWhiteAffinityDirector`, `SnowWhiteQuoteBook`, `SnowWhiteReadingStats`.
+  - *Regie, Audio & Accessibility*: `SnowWhiteWeatherDirector`, `SnowWhiteCameraChoreographer`, `SnowWhiteAudioShowcase`, `SnowWhiteAccessibilityProfile`, `SnowWhiteScreenshotShowcase`.
+  - *QA, Integrität & CLI*: `SnowWhitePlaythroughSuite`, `SnowWhiteFlowAndTranslationReport`, `SnowWhiteIntegrityAuditor`, `SnowWhiteDiagnosticExporter`, `SnowWhiteShowcaseCli`.
 
 ---
 
@@ -45,12 +49,18 @@ demo/
 │   └── assets/                      # Prozedural erzeugte PNG-Bilder & WAV-Audiodateien
 └── src/
     ├── main/java/de/swfdtf/demo/
-    │   ├── Main.java                # CLI-Einstiegspunkt (--auto, --interactive, --studio, --standalone, --lint, --export)
+    │   ├── Main.java                # CLI-Einstiegspunkt (--auto, --interactive, --studio, --standalone, --lint, --export, --showcase, --preflight, --flow-graph)
     │   ├── model/                   # CharacterStatus, MurderAttempt, StoryCheckpointSummary
     │   ├── service/                 # SnowWhiteAssetGenerator, SnowWhiteConsoleNarrator, SnowWhiteEngineService
-    │   └── story/                   # SnowWhiteStoryRunner
+    │   ├── story/                   # SnowWhiteStoryRunner
+    │   ├── features/                # ChapterCatalog, CodexCatalog, AffinityDirector, QuoteBook, ReadingStats
+    │   ├── director/                # WeatherDirector, CameraChoreographer, AudioShowcase, AccessibilityProfile, ScreenshotShowcase
+    │   └── qa/                      # PlaythroughSuite, FlowAndTranslationReport, IntegrityAuditor, DiagnosticExporter, ShowcaseCli
     └── test/java/de/swfdtf/demo/
-        └── SnowWhiteDemoTest.java   # JUnit-6-Tests für Linter, Handlung, Rollback, Lokalisierung & .vpak-Export
+        ├── SnowWhiteDemoTest.java   # JUnit-6-Tests für Linter, Handlung, Rollback, Lokalisierung & .vpak-Export
+        ├── Wave4DemoProgressionTest.java
+        ├── Wave4DemoDirectorTest.java
+        └── Wave4DemoQaTest.java
 ```
 
 ---
@@ -72,7 +82,10 @@ Alle Befehle werden vom Wurzelverzeichnis des Repositories aus mit dem Gradle-Wr
 # 4. JUnit-6-Tests für das Demo-Projekt ausführen
 ./gradlew -p demo test
 
-# 5. Grafische Ausführung im KAGAYAKI Dual-Window-Studio oder Standalone-Fenster
+# 5. Vollständigen Showcase-Bericht generieren (Flow-Graph, Audit, Diagnostik, Manifest & Pre-Flight)
+./gradlew -p demo runDemoShowcase
+
+# 6. Grafische Ausführung im KAGAYAKI Dual-Window-Studio oder Standalone-Fenster
 ./gradlew -p demo runDemoStudio
 ./gradlew -p demo runDemoStandalone
 ```
