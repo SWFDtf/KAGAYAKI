@@ -4,6 +4,29 @@ Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architekt
 
 ---
 
+## [M6 — Abgeschlossen] `LayeredImage`, Dark-Slate-UI-System, `ScreenAstBuilder`, 3 Dialog-Modi & Eingebaute System-/Meta-Screens
+
+### Erweiterung `de.swfdtf.graphics` & `de.swfdtf.parser`
+* `LayeredImage` (+ `LayerRenderInfo`, `Builder`, `implements CustomDisplayable`): Mehrstufiges Composite-Sprite aus `VJavaAst.LayeredImageDef` oder `Builder` mit `always`-, `group`- (inkl. `0.20s`-Crossfade bei Attributwechsel und `LipSyncAnalyzer`-Anbindung auf Gruppe `"mouth"`) und bedingten `if`-Ebenen.
+* `SceneController`: Um `registerLayeredImage`, `getLayeredImageDefinition`, `setStateContext(StateStore, PersistentAccess)` und `update(double dt)` erweitert; `showSprite(...)` erzeugt oder aktualisiert bei registrierter `LayeredImageDef` direkt einen `LayeredImage`-basierten `SpriteNode`.
+* `ScriptRuntime`: Verdrahtet `StateStore`/`PersistentAccess` (`setStateContext`) und `projectAst.layeredImages()` (`registerLayeredImage`) automatisch mit `SceneController`.
+* JUnit-6-Test in `src/test/java/de/swfdtf/graphics/LayeredImageTest.java` (4 Tests).
+
+### Paket `de.swfdtf.ui`
+* **Kern & Theme**: `ThemePalette` (Dark-Slate-Hexkonstanten `#0d0e15`–`#f85149` + RGBA-/Premultiplied-Helfer), `UiNode`, `Screen` (+ `KeyBinding`, `ScreenTimer`), `ScreenManager` (Z-sortierter Screen-Stack, Modal-Blockierung, `Tab`/`Shift+Tab`-Focus-Traversal, `InputManager`-Routing) sowie paketinterne Helfer `UiRenderSupport` (`ScissorState` via `GL11.glScissor`, Scrollbar, Headless-`FontManager`-Fallback) und `UiMediaSupport` (`PreviewImageNode` mit STB-PNG-Dekodierung).
+* **Layout-Container**: `VBox`, `HBox`, `Grid`, `Fixed` (+ `AlignmentSpec`), `Frame` (Dark-Slate oder `NineSliceDrawable`), `WindowBox`, `Viewport` (Scissor-Clipping + Scrollbar-Dragging) und `VpGrid` (Row-Virtualisierung `[firstVisibleRow..lastVisibleRow]`).
+* **Widgets & AST-Builder**: `TextWidget` (`TextTagParser` + `StyledTextLayout` + `TypewriterController`), `TextButton`, `ImageButton`, `Hotspot`, `Hotbar`, `Imagemap`, `Bar`, `VBar`, `Slider`, `TextInput` (`allowChars`/`maxLength`/Caret), `DragItem`, `DragGroup`, `CustomDisplayableWidget` sowie `ScreenAstBuilder` (`screen`-AST-Instanziierung mit `if`/`elif`/`else`, `key`/`timer`, `VariableValue`/`VariableInputValue`, `custom`-Displayables und Action-Dispatcher).
+* **3 Dialog-Modi & In-Game-Overlays**: `AdvDialogueScreen` (`(140, 790, 1640, 250)`, `PreferencesState`-CPS, `0.055s`-Voice-Bleep-Drosselung, Auto/Skip/TTS, QuickMenu-Leiste), `NvlDialogueScreen` (Vollbild-`Viewport` aus `ScriptRuntime.getNvlLines()`), `BubbleDialogueScreen` (+ `BubbleLayoutConfig`, `BubbleEntry`, dynamischer Sprite-Anker-Tail, Retain-Modus, `Shift+B`-Layout-Editor mit `saves/bubble_layouts.json`), `QuickMenuScreen` (`Z = 210`), `ChoiceMenuScreen` (inkl. Timeout-`Bar`) und `InputOverlayScreen`.
+* **Eingebaute System-, Meta- & Toast-Screens**: `MainMenuScreen` (inkl. automatischem `Continue` über neuesten Save-Slot), `SaveLoadScreen` (5×6 manuelle Slots + `QUICK`/`AUTO`-Tabs, Custom-Namen, STB-PNG-Thumbnails, Löschen), `PreferencesScreen` (Audio/Text/Modus/Sprache/RenderMode/TTS/Dyslexie/UI-Scale), `ControlsScreen` (`ALL`/`KEYBOARD`/`MOUSE`/`GAMEPAD`), `AboutScreen`, `HistoryLogScreen` (`Replay Voice` + `Jump Back`), `GalleryScreen` (`VpGrid` + Variationen + Vollbild-Zoom), `MusicRoomScreen` (16-Band-`VBar`-Spektrum), `EndingsTreeScreen` (Eltern-Kind-Routenbaum + Completion-`Bar`), `AchievementsScreen` (Maskierung versteckter gesperrter Achievements als `"???"`) und `NotificationToastOverlay` (`AchievementManager.pollToast()` + `SKIPPING >>`/`AUTO >`-Status-Pill).
+* JUnit-6-Tests in `src/test/java/de/swfdtf/ui/` (`UiLayoutAndWidgetsTest`, `DialogueModesTest`, `BuiltInScreensTest`) — insgesamt **157** grüne Tests in **43** Suites laut `build/test-results/test/` über alle Pakete (`audio`, `core`, `git`, `graphics`, `math`, `parser`, `state`, `ui`).
+
+### Dokumentation
+* `src/main/java/de/swfdtf/ui/AGENT_CONTEXT.md` neu erstellt.
+* `src/main/java/de/swfdtf/graphics/AGENT_CONTEXT.md` (`LayeredImage`, `SceneController`) und `src/main/java/de/swfdtf/parser/AGENT_CONTEXT.md` (`ScriptRuntime`) aktualisiert.
+* `docs/ARCHITEKTUR.md`, `docs/API_REFERENZ.md`, `docs/VJAVA_SPEZIFIKATION.md` und `docs/CHANGELOG_DEV.md` auf den abgeschlossenen Stand von Meilenstein M6 aktualisiert.
+
+---
+
 ## [M5 — Abgeschlossen] OpenAL-Audio-Mixer, DSP, Lip-Sync, TTS, ATL-Animationen, Dual-FBO-Transitions, Partikel & Video-Playback
 
 ### Paket `de.swfdtf.audio`

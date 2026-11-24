@@ -1,11 +1,12 @@
-# `.vjava` Sprach- und Projekt-Spezifikation (M5-Stand)
+# `.vjava` Sprach- und Projekt-Spezifikation (M6-Stand)
 
-> **Implementierungsstand (Meilenstein M5 abgeschlossen)**: Alle in diesem Dokument beschriebenen `.vjava`-Sprachkonstrukte, Projektscan-Regeln, Ausdrucks- und Bedingungsgrammatiken, die In-Memory-Java-21-Kompilierung, das 4-Tier-State-/Rollback-/Save-/Lokalisierungssystem sowie die Audio-, ATL-Animations-, Transitions-, Partikel-, Video- und TTS-Subsysteme sind implementiert und verifiziert:
+> **Implementierungsstand (Meilenstein M6 abgeschlossen)**: Alle in diesem Dokument beschriebenen `.vjava`-Sprachkonstrukte, Projektscan-Regeln, Ausdrucks- und Bedingungsgrammatiken, die In-Memory-Java-21-Kompilierung, das 4-Tier-State-/Rollback-/Save-/Lokalisierungssystem, die Audio-, ATL-Animations-, Transitions-, Partikel-, Video- und TTS-Subsysteme sowie `LayeredImage` und das deklarative Dark-Slate-UI-Subsystem (`de.swfdtf.ui`) sind implementiert und verifiziert:
 > * **M1**: Projekt-Metadaten (`ProjectDescriptor` für `project.vjava.json`), Laufzeit-Konfiguration (`EngineConfig`) und Java-Skript-Fassade (`EngineAPI`, Binding `engine`).
 > * **M2**: Komplette Inline-Rich-Text-Syntax inklusive Variableninterpolation, Flow-Control-Cues, Furigana, Inline-Bildern, Hyperlinks und Text-Animationstags (`TextTagParser`, `StyledTextLayout`, `TypewriterController`, `FontAtlas`, `FontManager`) sowie `CustomDisplayable`.
 > * **M3**: Vollständiger Lexer (`VJavaLexer`), rekursiv-absteigender AST-Parser (`VJavaParser` / `VJavaAst`), rekursiver Projektscanner (`ProjectScanner`), In-Memory-Java-21-Compiler (`JavaBlockCompiler` / `VJavaExecutable`), Ausdrucks-Evaluator (`ConditionEvaluator`), nicht-blockierende Skript-Laufzeit (`ScriptRuntime`), Bühnensteuerung (`SceneController`, Binding `scene`) sowie State-Verträge (`StateStore` als `state`, `PersistentAccess` als `persistent`).
 > * **M4**: Sitzungskoordinator (`ScriptSession`), deterministischer Rollback-/Roll-Forward-Speicher (`RevertableStateStore`, `RevertableMap`, `RevertableList`), 4-Tier-Persistenz (`SessionState`, `PersistentState`, `PreferencesState`), `HistoryLog`, atomares GZIP-JSON-Save/Load mit PNG-Thumbnails und `__vjavaClass`-Codec (`SaveManager`, `SaveSlotData`, `SaveValueCodec`), Meta-Progression (`AchievementManager`, `GalleryManager`, `EndingsManager`) sowie Live-Lokalisierung (`LocalizationManager`).
 > * **M5**: OpenAL-/Virtual-Mixer-Audio-Engine (`AudioEngine`, `AudioChannel`, `AudioDecoder`, `AudioDsp`, `LipSyncAnalyzer`, `TextToSpeechService`), zeitgesteuerte ATL-Animationsausführung (`ATLTransform`, `AnimationEngine`), Dual-FBO-Transitions-Compositor (`Transition`, `TransitionManager`), 2D-Partikelsystem (`ParticleSystem`) sowie Video-Playback (`VideoPlayer`, `MovieSprite`).
+> * **M6**: Mehrstufige Composite-Sprites (`LayeredImage` + `SceneController`-Anbindung), Dark-Slate-UI-Framework (`ThemePalette`, `Screen`, `ScreenManager`, Container, Widgets, `ScreenAstBuilder` für `screen`-ASTs), 3 Dialog-Modi (`AdvDialogueScreen`, `NvlDialogueScreen`, `BubbleDialogueScreen` inkl. `Shift+B`-Editor) sowie alle eingebauten System-, Meta- und Toast-Screens.
 
 ---
 
@@ -113,7 +114,7 @@ image lena happy winter = "assets/images/char/lena_happy_winter.png"
 ```
 * Das erste Wort nach `image` ist `tag`, alle weiteren Wörter vor `=` sind `attributes`. Der zusammengesetzte Schlüssel (`ImageDef.fullKey()`) wird automatisch bei `SceneController.registerImageDefinition(...)` registriert.
 
-### 3.3 `layeredimage`
+### 3.3 `layeredimage` (`LayeredImage` & `SceneController`, M6)
 ```vjava
 layeredimage lena:
     always "assets/images/char/lena_base.png"
@@ -128,8 +129,12 @@ layeredimage lena:
     else:
         "assets/images/char/lena_normal.png"
 ```
-* `always` akzeptiert sowohl einen direkten Pfad/Ausdruck als auch einen eingerückten Block (`always:`) mit optionalen `if`-Einträgen.
-* `group <name>:` enthält `attribute <name> [default] [if <cond>] ["<asset>" | : "<asset>"]`-Einträge.
+* **Syntax**: `always` akzeptiert einen direkten Pfad/Ausdruck oder einen eingerückten Block (`always:`). `group <name>:` enthält `attribute <name> [default] [if <cond>] ["<asset>" | : "<asset>"]`-Einträge; `if`/`elif`/`else` steuern bedingte Overlay-Ebenen.
+* **Laufzeitsemantik (`LayeredImage`, `SceneController`, `ScriptRuntime`)**:
+  * `ScriptRuntime` registriert beim Start alle `LayeredImageDef`s über `SceneController.registerLayeredImage(...)` und verknüpft `StateStore`/`PersistentAccess` via `SceneController.setStateContext(...)`.
+  * Bei `show <tag> [attrs...]` erzeugt oder aktualisiert `SceneController` einen `SpriteNode` mit `LayeredImage` (`CustomDisplayable`).
+  * Attributwechsel innerhalb einer `group` lösen einen glatten `0.20s`-Crossfade (`LayeredImage.DEFAULT_CROSSFADE_DURATION_SECONDS`) zwischen vorheriger und neuer Ebene aus (`SceneController.update(dt)` / `LayeredImage.update(dt)`).
+  * Über `LayeredImage.bindLipSync(LipSyncAnalyzer)` bzw. `applyMouthShape(MouthShape)` steuert der Voice-RMS-Analysator automatisch die Gruppe `mouth` (`closed`, `half`/`half_open`, `open`).
 
 ### 3.4 `transform` (ATL-Transformationsblöcke, `ATLTransform` & `AnimationEngine`)
 ```vjava
@@ -149,7 +154,7 @@ transform center_zoom:
   * **Steuerung & Container**: `pause <seconds>`, `repeat [count|infinite|forever]` (`<= 0` = endlos), `pass`, `parallel:` (alle Zweige gleichzeitig), `block:`, `choice:` (zufällige Auswahl eines Zweigs), `contains:`, `on <event>:`.
 * **Ausführung zur Laufzeit**: `ATLTransform.fromAst(transformDef)` überführt beliebige `VJavaAst.TransformDef`-/`AtlStep`-Bäume in zeitgesteuerte Timelines auf `Transform2D`, die über `AnimationEngine.play(id, sceneNode, atl)` pro Frame (`update(dt)`) aktualisiert werden können. `ScriptRuntime` wendet numerische ATL-Schritte beim `show`/`transform`-Aufruf zusätzlich unmittelbar auf die registrierten/initialen `Transform2D`-Werte an.
 
-### 3.5 `screen` (Deklarative UI-Screens)
+### 3.5 `screen` (Deklarative UI-Screens & `ScreenAstBuilder`, M6)
 ```vjava
 screen status_hud(titel):
     modal false
@@ -157,14 +162,19 @@ screen status_hud(titel):
     frame xpos 40 ypos 40:
         vbox spacing 8:
             text "[titel]" size 28
+            bar value VariableValue("hp", 100)
+            slider value VariableValue("sfx_level", 1.0)
             textbutton "Schließen" action "hide_screen"
-    :: Kode für VN: Screen-Hook @->{
-        engine.logDebug("Screen-Item ausgeführt");
-    }<<
+    key K_ESCAPE action "Return()"
+    timer 2.0 repeat true action "Refresh()"
 ```
 * Kopfzeile: `screen <name>:` oder `screen <name>(param1, param2):`.
-* Direktiven auf oberster Screen-Ebene: `modal true|false`, `zorder <int>`.
-* Erkannte Widget-Schlüsselwörter (`VJavaParser`): `vbox`, `hbox`, `grid` (inkl. `grid <cols> <rows>`), `fixed`, `frame`, `window`, `viewport`, `vpgrid`, `textbutton`, `imagebutton`, `text`, `label`, `bar`, `vbar`, `slider`, `input`, `hotspot`, `hotbar`, `imagemap`, `draggroup`, `drag`, `key`, `timer`, `custom`, `add`, `null`, `button`, `side`, `mousearea`, `use`, `on`, `if`, `elif`, `else`, `for` sowie eingebettete `@->{ ... }<<`-Blöcke (`keyword="java_block"`).
+* Direktiven auf oberster Screen-Ebene: `modal true|false`, `zorder <int>` (Standard `SceneLayer.Z_SCREENS = 200`).
+* **Parser-Schlüsselwörter (`VJavaParser`)**: `vbox`, `hbox`, `grid` (inkl. `grid <cols> <rows>`), `fixed`, `frame`, `window`, `viewport`, `vpgrid`, `textbutton`, `imagebutton`, `text`, `label`, `bar`, `vbar`, `slider`, `input`, `hotspot`, `hotbar`, `imagemap`, `draggroup`, `drag`, `key`, `timer`, `custom`, `add`, `null`, `button`, `side`, `mousearea`, `use`, `on`, `if`, `elif`, `else`, `for` sowie `@->{ ... }<<` (`keyword="java_block"`).
+* **AST-Instanziierung über `ScreenAstBuilder.build(ScreenDef, ScriptRuntime, Consumer<String>)`**:
+  * **Container-Mapping**: `vbox` → `VBox` (`spacing`, `fill_width`, `xalign=0.5`), `hbox` → `HBox` (`spacing`, `yalign=0.5`), `grid` → `Grid` (`cols`/`rows` oder `primaryArg`, `spacing`/`xspacing`/`yspacing`), `fixed` → `Fixed` (unterstützt `xpos`/`ypos` und `xalign`/`yalign`), `frame` → `Frame`, `window` → `WindowBox`, `viewport` → `Viewport` (`scrollbars`, `yinitial`), `vpgrid` → `VpGrid` (`cols`, `cell_width`/`xsize`, `cell_height`/`ysize`, `spacing`/`xspacing`/`yspacing`), `imagemap` → `Imagemap` (`ground`, `hover`), `draggroup` → `DragGroup`.
+  * **Widget-Mapping**: `text`/`label` → `TextWidget` (mit `[var]`-Interpolation, `size`, `color`, `drop_shadow`, `cps`), `textbutton`/`button` → `TextButton` (`action`, `selected`, `size`), `imagebutton` → `ImageButton` (`auto` mit `%s` → `idle`/`hover`/`insensitive`, oder explizit `idle`/`hover`/`disabled`/`insensitive`, `action`), `bar` → `Bar`, `vbar` → `VBar`, `slider` → `Slider` (`min`, `range`, `step`), `input` → `TextInput` (`value=VariableInputValue("var")`, `default`, `length`, `allow`, `placeholder`, `action`), `hotspot` → `Hotspot` (`(x, y, w, h)`, `hovered_color`, `action`), `hotbar` → `Hotbar`, `drag` → `DragItem` (`drag_name`, `payload`, `draggable`, `droppable`/`drop_target`, `snappable`), `custom <Klassenname>` → `CustomDisplayableWidget` (Auflösung aus `CompiledProjectBlocks.findUserType` oder `Class.forName`).
+  * **Kontrollfluss, Bindings & Properties**: `if`/`elif`/`else` werden über `ConditionEvaluator` ausgewertet; `key <KEY>` (z. B. `K_ESCAPE`, `ESCAPE`, `RETURN`, `SPACE`, `A`–`Z`) registriert `Screen.KeyBinding`; `timer <sec>` (`repeat`, `action`) registriert `Screen.ScreenTimer`; `VariableValue("var", max)` und `VariableInputValue("var")` lesen/schreiben direkt nach `StateStore`. Gemeinsame Properties auf allen Knoten: `id`, `xsize`/`width`, `ysize`/`height`, `padding`/`xpadding`/`ypadding`, `background` (`#...`), `border_color`, `border_thickness`, `corner_radius`, `alpha`, `sensitive`/`enabled`.
 
 ### 3.6 `translate` (Lokalisierungsblöcke & M4-Laufzeitauflösung)
 ```vjava
@@ -207,6 +217,7 @@ Innerhalb eines `label:`-Blocks (sowie verschachtelt in `if`/`elif`/`else` und `
 
 * Vor jeder Dialogzeile interpoliert `ScriptRuntime` `[var]`-Platzhalter über `TextTagParser.interpolateVariables` (Lookup in `state`, `persistent` und für `.`/`[`/`(`-Ausdrücke via `ConditionEvaluator`).
 * Jede Zeile erhält eine deterministische `lineId` (`<sourceFile>:<lineNumber>:<hash>`). `DialoguePrompt.alreadyRead()` gibt an, ob die Zeile vor Anzeige bereits in `persistent.isLineRead(lineId)` markiert war; danach wird `persistent.markLineRead(lineId)` aufgerufen.
+* **Präsentationsmodi (`de.swfdtf.ui`, M6)**: `AdvDialogueScreen` (klassische Bottom-Box `(140, 790, 1640, 250)` mit Bleeps, Auto/Skip, TTS und QuickMenu), `NvlDialogueScreen` (Vollbild-`Viewport` über `ScriptRuntime.getNvlLines()`) sowie `BubbleDialogueScreen` (dynamische Sprechblasen über dem Sprecher-Sprite inklusive `Shift+B`-Layout-Editor und `saves/bubble_layouts.json`).
 
 ### 4.2 Bühne, Sprites, Transitions & Pausen (`SceneController`, `Transition`, `TransitionManager`)
 | Syntax | Verhalten |

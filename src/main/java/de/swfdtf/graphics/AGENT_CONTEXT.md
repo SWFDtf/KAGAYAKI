@@ -1,12 +1,14 @@
 # Package `de.swfdtf.graphics` — AGENT_CONTEXT
 
 ## Zweck des Pakets
-LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- und Textsubsystem von KAGAYAKI (Meilensteine M1–M3 & M5, vollständig ohne `java.awt`): Dual-Window- und Standalone-GLFW-Verwaltung mit gemeinsamen OpenGL-Objekt-Namespaces (`WindowManager`, `GlfwWindow`), Z-sortierter Szenengraph (`SceneGraph`, `SceneLayer`, `SceneNode`, `SpriteNode`, `CustomDisplayable`) mit 8 Standard-Ebenen (`-100` bis `1000`), High-Level-Bühnensteuerung (`SceneController` inklusive `StageEntry`/`StageSnapshot` für Skript-Laufzeit und Rollback), Offscreen-Framebuffer (`Framebuffer`), GLSL-Shader-Compiler (`ShaderProgram`), das einheitliche Pipeline-Interface `IRenderPipeline` mit `RenderPipeline2D` (Premultiplied Alpha, `ColorMatrix4f`, SDF-Rounded-Rectangles, Pivot-Rotation, Letterbox-Blit) und `RenderPipeline3DStub`, reine STB-Bild-/Texturverwaltung (`Texture`, `TextureManager`, `NineSliceDrawable`), Rich-Text-, Typografie-, Furigana- und Typewriter-Engine (`TextTagParser`, `FontAtlas`, `FontManager`, `StyledTextLayout`), deklarative ATL-Animationen (`ATLTransform`, `AnimationEngine`), GPU-Dual-FBO-Szenenübergänge (`Transition`, `TransitionManager`), prozedurales 2D-Partikelsystem (`ParticleSystem`) sowie Video-Playback (`VideoPlayer`, `MovieSprite`).
+LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- und Textsubsystem von KAGAYAKI (Meilensteine M1–M3, M5 & M6, vollständig ohne `java.awt`): Dual-Window- und Standalone-GLFW-Verwaltung mit gemeinsamen OpenGL-Objekt-Namespaces (`WindowManager`, `GlfwWindow`), Z-sortierter Szenengraph (`SceneGraph`, `SceneLayer`, `SceneNode`, `SpriteNode`, `LayeredImage`, `CustomDisplayable`) mit 8 Standard-Ebenen (`-100` bis `1000`), High-Level-Bühnensteuerung (`SceneController` inklusive `StageEntry`/`StageSnapshot` für Skript-Laufzeit und Rollback sowie `LayeredImage`-Anbindung), Offscreen-Framebuffer (`Framebuffer`), GLSL-Shader-Compiler (`ShaderProgram`), das einheitliche Pipeline-Interface `IRenderPipeline` mit `RenderPipeline2D` (Premultiplied Alpha, `ColorMatrix4f`, SDF-Rounded-Rectangles, Pivot-Rotation, Letterbox-Blit) und `RenderPipeline3DStub`, reine STB-Bild-/Texturverwaltung (`Texture`, `TextureManager`, `NineSliceDrawable`), Rich-Text-, Typografie-, Furigana- und Typewriter-Engine (`TextTagParser`, `FontAtlas`, `FontManager`, `StyledTextLayout`), deklarative ATL-Animationen (`ATLTransform`, `AnimationEngine`), GPU-Dual-FBO-Szenenübergänge (`Transition`, `TransitionManager`), prozedurales 2D-Partikelsystem (`ParticleSystem`) sowie Video-Playback (`VideoPlayer`, `MovieSprite`).
 
 ## Abhängigkeiten zu anderen `de.swfdtf.*`-Paketen
 - `de.swfdtf.math` (`ColorMatrix4f`, `Easing`, `Rect2f`, `ScreenShake`, `Transform2D`, `Vec2f`)
 - `de.swfdtf.core` (`EngineLogger` in `WindowManager`, `RenderPipeline3DStub`, `TextureManager`, `SceneController`, `VideoPlayer`)
-- `de.swfdtf.parser` (`VJavaAst` in `ATLTransform`)
+- `de.swfdtf.parser` (`VJavaAst` in `ATLTransform`, `LayeredImage`, `SceneController`; `ConditionEvaluator` in `LayeredImage`)
+- `de.swfdtf.state` (`StateStore`, `PersistentAccess` in `LayeredImage`, `SceneController`)
+- `de.swfdtf.audio` (`LipSyncAnalyzer` in `LayeredImage`)
 - Externe Bibliotheken: `org.lwjgl.glfw.*`, `org.lwjgl.opengl.*`, `org.lwjgl.stb.*` (`STBImage`, `STBImageWrite`, `STBTruetype`, `STBTTFontinfo`), `org.lwjgl.system.*`, `org.joml.Matrix4f`.
 
 ## Enthaltene Typen
@@ -21,7 +23,9 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- 
 | `SceneLayer` | `final class` | Benannte, Z-sortierte Ebene im `SceneGraph` mit Sichtbarkeit, Parallax-Faktor, Tag-/ID-Suche und stabiler Z-Sortierung der Knoten. |
 | `SceneNode` | `class` | Hierarchischer Szenengraph-Knoten für texturierte Sprites, SDF-Rechtecke (mit Eckenradius und Rahmen), Container-Vererbung sowie `shouldDrawStandardQuad`/`onCustomRender`-Hooks. |
 | `SpriteNode` | `class` | VN-Sprite-Knoten (`extends SceneNode`) mit `imageTag`/`attributes`/`assetPath`-Metadaten sowie nativer Unterstützung für `Texture`, `NineSliceDrawable` und `CustomDisplayable`. |
-| `SceneController` | `final class` | High-Level-Bühnensteuerung (`scene` in `@->{ ... }<<`) für tag-basiertes `setScene`, `showSprite` (mit Positions-/Transform-Erhalt) und `hideSprite` auf `SceneGraph`-Ebenen inklusive Bild-/Transform-Registry. |
+| `LayeredImage` | `class` | Mehrstufiges Composite-Sprite (`implements CustomDisplayable`) aus `VJavaAst.LayeredImageDef` oder `Builder` mit `always`-, `group`- (inkl. `0.20s`-Crossfade und `LipSyncAnalyzer`-Mundformen) und `if`-Ebenen. |
+| `LayeredImage.LayerRenderInfo` & `Builder` | `record` / `final class` | Render-Snapshot einer einzelnen aktiven Ebene (`assetPath`, `alpha`) sowie Fluent-Builder zur programmatischen `LayeredImage`-Erstellung. |
+| `SceneController` | `final class` | High-Level-Bühnensteuerung (`scene` in `@->{ ... }<<`) für tag-basiertes `setScene`, `showSprite` (mit Positions-/Transform-Erhalt und `LayeredImage`-Erstellung/-Aktualisierung), `hideSprite`, `update(dt)` sowie Bild-/Transform-/`LayeredImage`-Registry. |
 | `SceneController.StageEntry` & `StageSnapshot` | `record` | Unveränderliche Schnappschüsse einzelner Bühnen-Sprites und des gesamten Bühnenzustands (Hintergrund + aktive Sprites) für deterministisches M4-Rollback und Save/Load. |
 | `CustomDisplayable` | `interface` | Erweiterbarer Vertrag (`update`, `render`, `getPreferredWidth`, `getPreferredHeight`) für prozedurale Grafik, Partikel oder Live-Gauges in Java oder `.vjava`-`@->{ ... }<<`-Blöcken. |
 | `Texture` | `final class` | OpenGL-2D-Textur-Handle im Premultiplied-`RGBA8`-Format (`GL_LINEAR`, `GL_CLAMP_TO_EDGE`) inklusive CPU-Premultiplication (`premultiplyRgba`) und Fallback-Markierung. |
@@ -283,6 +287,10 @@ public final class SceneController {
     public boolean hideSprite(String tag, String transitionExpr)
     public void registerImageDefinition(String key, String assetPath)
     public void registerTransform(String name, Transform2D transform)
+    public void registerLayeredImage(VJavaAst.LayeredImageDef def)
+    public VJavaAst.LayeredImageDef getLayeredImageDefinition(String name)
+    public void setStateContext(StateStore stateStore, PersistentAccess persistentAccess)
+    public void update(double dt)
     public StageSnapshot snapshotState()
     public void restoreState(StageSnapshot snapshot)
     public void clearMasterSprites()
@@ -295,6 +303,61 @@ public final class SceneController {
     public SceneGraph getSceneGraph()
     public void setTransitionListener(BiConsumer<String, String> listener)
     public void setProjectRoot(Path projectRoot)
+}
+```
+
+### `LayeredImage`
+```java
+public class LayeredImage implements CustomDisplayable {
+    public static final float DEFAULT_CROSSFADE_DURATION_SECONDS = 0.20f;
+    public static final String DEFAULT_MOUTH_GROUP_NAME = "mouth";
+
+    public record LayerRenderInfo(String assetPath, float alpha) {}
+
+    public static final class Builder {
+        public Builder always(String assetPath)
+        public Builder group(String groupName)
+        public Builder attribute(String groupName, String attrName, boolean isDefault, String assetPath)
+        public Builder attribute(String groupName, String attrName, boolean isDefault, String assetPath, String conditionExpr)
+        public Builder conditional(String conditionExpr, String assetPath)
+        public Builder textureManager(TextureManager textureManager)
+        public Builder crossfadeDuration(float seconds)
+        public Builder mouthGroupName(String mouthGroupName)
+        public LayeredImage build()
+    }
+
+    public LayeredImage(VJavaAst.LayeredImageDef def)
+    public LayeredImage(VJavaAst.LayeredImageDef def, TextureManager textureManager)
+    public static Builder builder(String name)
+
+    public void setAttributes(Collection<String> attributes)
+    public void setAttributes(Collection<String> attributes, StateStore state, PersistentAccess persistent)
+    public void resolve(StateStore state, PersistentAccess persistent)
+    public void bindLipSync(LipSyncAnalyzer analyzer)
+    public boolean applyMouthShape(LipSyncAnalyzer.MouthShape shape)
+    @Override public void update(double dt)
+    @Override public void render(RenderPipeline2D pipeline, Rect2f bounds, float alpha, ColorMatrix4f colorMatrix)
+    @Override public float getPreferredWidth()
+    @Override public float getPreferredHeight()
+    public List<LayerRenderInfo> getActiveRenderLayers()
+    public void registerLayerTexture(String assetPath, Texture texture)
+
+    public String getName()
+    public List<String> getResolvedLayerAssets()
+    public List<String> getSelectedAttributes()
+    public String getActiveAttribute(String groupName)
+    public Map<String, String> getActiveGroupAttributes()
+    public float getGroupPreviousAlpha(String groupName)
+    public float getGroupCurrentAlpha(String groupName)
+    public float getGroupFadeProgress(String groupName)
+    public boolean isCrossfading()
+    public float getCrossfadeDurationSeconds()
+    public void setCrossfadeDurationSeconds(float crossfadeDurationSeconds)
+    public String getMouthGroupName()
+    public void setMouthGroupName(String mouthGroupName)
+    public LipSyncAnalyzer getBoundLipSync()
+    public TextureManager getTextureManager()
+    public void setTextureManager(TextureManager textureManager)
 }
 ```
 

@@ -9,7 +9,7 @@
 * **Build-System**: Gradle (Groovy DSL) mit automatischer Plattform-/Architektur-Erkennung für LWJGL-Natives (`windows`, `windows-arm64`, `macos`, `macos-arm64`, `linux`, `linux-arm64`) und `-XstartOnFirstThread` auf macOS
 * **Grafik, Fenster & Audio**: LWJGL `3.3.6` (`lwjgl`, `lwjgl-glfw`, `lwjgl-opengl`, `lwjgl-openal`, `lwjgl-stb`)
 * **Mathematik & Serialisierung**: `org.joml:joml:1.10.8`, `com.google.code.gson:gson:2.11.0`
-* **Testing**: JUnit Jupiter `6.0.0` (`useJUnitPlatform()`) — **140** Tests (laut `build/test-results/test/`) in `audio`, `core`, `git`, `graphics`, `math`, `parser` und `state`
+* **Testing**: JUnit Jupiter `6.0.0` (`useJUnitPlatform()`) — **157** Tests in **43** Suites (laut `build/test-results/test/`) in `audio`, `core`, `git`, `graphics`, `math`, `parser`, `state` und `ui`
 
 ---
 
@@ -29,19 +29,19 @@ Die Engine trennt Entwicklungsbetrieb und Auslieferung über `EngineMode`:
 
 ---
 
-## 3. Paketstruktur & Status (Meilenstein M5 abgeschlossen)
+## 3. Paketstruktur & Status (Meilenstein M6 abgeschlossen)
 
 | Paket | Status | Verantwortung |
 | :--- | :--- | :--- |
 | `de.swfdtf` (`Main` / `StandaloneMain`) | **Implementiert (M1)** | `Main` (Standard `STUDIO_DUAL_WINDOW`, optional `--standalone`) und `StandaloneMain` (erzwingt `STANDALONE_GAME`) als CLI-Einstiegspunkte für `EngineApplication`. |
 | `de.swfdtf.math` | **Implementiert (M1)** | `Vec2f`, `Rect2f`, `ColorMatrix4f` (Premultiplied Alpha), `Easing` (`EaseType` + `cubicBezier`), `Transform2D`, `ScreenShake` (`vpunch`/`hpunch`/`custom`). |
 | `de.swfdtf.core` | **Implementiert (M1)** | `EngineMode`, `EngineConfig` (+ `Builder`, CLI-Parser), `ProjectDescriptor` (`project.vjava.json`), `EngineLogger` (Ringpuffer + Listener), `GameClock` (60 Hz Fixed-Timestep), `InputManager` (GLFW + Letterbox-Mapping + Gamepad), `EngineAPI` (Fassade + Service-Locator), `StudioBridge`, `EngineApplication` (+ `Updatable`). |
-| `de.swfdtf.graphics` | **Implementiert (M1 + M2 + M3 + M5)** | `RenderMode`, `IRenderPipeline`, `RenderPipeline2D` (OpenGL 3.3 Core, Offscreen-`Framebuffer`, `ShaderProgram`, SDF-Rounded-Rects, Pivot-Rotation, Letterbox-Blit), `RenderPipeline3DStub`, `SceneGraph`, `SceneLayer`, `SceneNode`, `SpriteNode`, `SceneController` (+ `StageEntry`, `StageSnapshot`), `CustomDisplayable`, `GlfwWindow`, `WindowManager`, `Texture`, `TextureManager` (`STBImage`/`STBImageWrite`, Fallback-Schraffur), `NineSliceDrawable`, `TextTagParser`, `FontAtlas` (`STBTruetype` + CPU-Fallback), `FontManager`, `StyledTextLayout` (+ `TypewriterController`), `ATLTransform`, `AnimationEngine`, `Transition`, `TransitionManager`, `ParticleSystem`, `VideoPlayer` und `MovieSprite`. |
+| `de.swfdtf.graphics` | **Implementiert (M1 + M2 + M3 + M5 + M6)** | `RenderMode`, `IRenderPipeline`, `RenderPipeline2D` (OpenGL 3.3 Core, Offscreen-`Framebuffer`, `ShaderProgram`, SDF-Rounded-Rects, Pivot-Rotation, Letterbox-Blit), `RenderPipeline3DStub`, `SceneGraph`, `SceneLayer`, `SceneNode`, `SpriteNode`, `LayeredImage`, `SceneController` (+ `StageEntry`, `StageSnapshot`), `CustomDisplayable`, `GlfwWindow`, `WindowManager`, `Texture`, `TextureManager` (`STBImage`/`STBImageWrite`, Fallback-Schraffur), `NineSliceDrawable`, `TextTagParser`, `FontAtlas` (`STBTruetype` + CPU-Fallback), `FontManager`, `StyledTextLayout` (+ `TypewriterController`), `ATLTransform`, `AnimationEngine`, `Transition`, `TransitionManager`, `ParticleSystem`, `VideoPlayer` und `MovieSprite`. |
 | `de.swfdtf.git` | **Implementiert (M1)** | `GitController` (nicht-interaktive Git-CLI-Steuerung mit Commit-Policy-Validierung). |
-| `de.swfdtf.parser` | **Implementiert (M3 + M4)** | `VJavaLexer`, `VJavaParser`, `VJavaAst`, `VJavaParseException`, `ProjectScanner`, `JavaBlockCompiler` (`VJavaUserTypes` + `VJavaSnippet_<i>` via `javax.tools.JavaCompiler`), `VJavaExecutable`, `VJavaCompileException`, `ConditionEvaluator`, `ScriptRuntime` und `ScriptSession`. |
+| `de.swfdtf.parser` | **Implementiert (M3 + M4 + M6)** | `VJavaLexer`, `VJavaParser`, `VJavaAst`, `VJavaParseException`, `ProjectScanner`, `JavaBlockCompiler` (`VJavaUserTypes` + `VJavaSnippet_<i>` via `javax.tools.JavaCompiler`), `VJavaExecutable`, `VJavaCompileException`, `ConditionEvaluator`, `ScriptRuntime` und `ScriptSession`. |
 | `de.swfdtf.state` | **Implementiert (M3 + M4)** | Verträge `StateStore` / `PersistentAccess` / `Revertable`, In-Memory-Implementierungen (`SimpleStateStore`, `SimplePersistentAccess`), deterministischer Rollback-Speicher (`RevertableMap`, `RevertableList`, `RevertableStateStore`), 4-Tier-Persistenz (`SessionState`, `PersistentState`, `PreferencesState`), `HistoryLog`, `SaveValueCodec`, `SaveSlotData`, `SaveManager`, Meta-Manager (`AchievementManager`, `GalleryManager`, `EndingsManager`) und `LocalizationManager`. |
 | `de.swfdtf.audio` | **Implementiert (M5)** | `AudioDsp` (`BiquadFilter`, RMS, DFT-Spektrumbänder, Goertzel), `AudioDecoder` (`STBVorbis`-OGG, WAV-Codec, Ton-/Akkord-/Bleep-Synthese), `AudioChannel` (Crossfade, Queue, Filter, `ChannelSnapshot`), `AudioEngine` (OpenAL + Headless-Virtual-Mixer, `ScriptRuntime.AudioBridge`, `tl/<lang>/`-Auflösung), `LipSyncAnalyzer` (`MouthShape`) und `TextToSpeechService` (Virtual-Thread-Self-Voicing). |
-| `de.swfdtf.ui` *(geplant)* | Geplant (M6) | Deklarative Screens, Layout-Container, Widgets, ADV/NVL/Sprechblasen-Modi. |
+| `de.swfdtf.ui` | **Implementiert (M6)** | `ThemePalette`, `UiNode`, `Screen`, `ScreenManager`, 8 Layout-Container (`VBox`, `HBox`, `Grid`, `Fixed`, `Frame`, `WindowBox`, `Viewport`, `VpGrid`), 13 Widgets (`TextWidget`, `TextButton`, `ImageButton`, `Hotspot`, `Hotbar`, `Imagemap`, `Bar`, `VBar`, `Slider`, `TextInput`, `DragItem`, `DragGroup`, `CustomDisplayableWidget`), `ScreenAstBuilder`, 3 Dialogmodi (`AdvDialogueScreen`, `NvlDialogueScreen`, `BubbleDialogueScreen`), `QuickMenuScreen`, `ChoiceMenuScreen`, `InputOverlayScreen` sowie alle 10 System-/Meta-Screens und `NotificationToastOverlay`. |
 | `de.swfdtf.tools` *(geplant)* | Geplant (M7) | `StudioWindowController`, Vorlagen-Generator, Live-Regisseur, Lint und `.vpak`-Packager. |
 
 ---
@@ -159,7 +159,31 @@ Um zyklische Paketabhängigkeiten zu vermeiden, stellt `EngineAPI` einen Thread-
 
 ---
 
-## 11. Laufzeit-Koordination (`EngineApplication` & `GlfwWindow`)
+## 11. Deklaratives UI-System, Dark-Slate-Palette, `LayeredImage` & 3 Dialog-Modi (M6)
+
+### 11.1 `LayeredImage` & Composite-Bühnenanbindung (`de.swfdtf.graphics`)
+* **`LayeredImage` (`implements CustomDisplayable`)**: Wertet `VJavaAst.LayeredImageDef` (oder `LayeredImage.builder(...)`) deterministisch gegen `selectedAttributes`, `StateStore` und `PersistentAccess` aus (`always`-Basisebenen, sich gegenseitig ausschließende `group`-Attribute mit `default`-Fallback sowie eigenständige `if`-Overlay-Ebenen).
+* **Gruppen-Crossfade & Lip-Sync**: Bei Attributwechsel innerhalb einer `group` blendet `LayeredImage` über `DEFAULT_CROSSFADE_DURATION_SECONDS = 0.20f` zwischen ausgehender und eingehender Ebene über (`getActiveRenderLayers()`). Über `bindLipSync(LipSyncAnalyzer)` bzw. `applyMouthShape(MouthShape)` steuert der Voice-RMS-Analysator direkt die `"mouth"`-Gruppe (`closed`, `half`/`half_open`, `open`).
+* **`SceneController`-Integration**: `ScriptRuntime` registriert alle `LayeredImageDef`s via `SceneController.registerLayeredImage(...)` und übergibt den Laufzeitkontext per `SceneController.setStateContext(stateStore, persistentAccess)`. `SceneController.showSprite(...)` erzeugt oder aktualisiert dann automatisch einen `LayeredImage`-basierten `SpriteNode` unter Beibehaltung der laufenden Crossfade-Zustände; `SceneController.update(double dt)` treibt aktive `CustomDisplayable`s an.
+
+### 11.2 Dark-Slate-Theme, Screen-Stack, Container & Widgets (`de.swfdtf.ui`)
+* **`ThemePalette`**: Einheitliches Dark-Slate-Farbschema (`CANVAS_BG = "#0d0e15"`, `PANEL_SURFACE = "#161822"`, `PANEL_GLASS = "#161822d9"`, `ELEVATED = "#1f2232"`, `BORDER = "#2e334a"`, `ACCENT_IDLE = "#388bfd"`, `ACCENT_HOVER = "#58a6ff"`, `ACTIVE_SELECTED = "#f0883e"`, `DISABLED = "#8b949e7f"`, `TEXT_PRIMARY = "#f0f6fc"`, `TEXT_MUTED = "#8b949e"`, `SUCCESS = "#3fb950"`, `WARNING = "#d29922"`, `ERROR = "#f85149"`).
+* **`UiNode`, `Screen` & `ScreenManager`**: `ScreenManager` sortiert sichtbare `Screen`s aufsteigend nach `zOrder`, sperrt Input unterhalb des obersten modalen Screens (`getInputEligibleScreensTopDown()`), löst screen-lokale `KeyBinding`s und `ScreenTimer` aus, verwaltet `Tab`/`Shift+Tab`-Focus-Cycling (`cycleFocus`) und leitet Maus-, Scroll-, Zeichen- und Tastaturereignisse vom `InputManager` in logischen Canvas-Koordinaten weiter.
+* **Layout-Container & Widgets**:
+  * Container: `VBox`, `HBox`, `Grid`, `Fixed` (`addChildAt` + `AlignmentSpec`), `Frame` (Dark-Slate oder `NineSliceDrawable`), `WindowBox` (Titelkopfzeile), `Viewport` (Scissor-Clipping via `UiRenderSupport.pushScissor`/`popScissor` + interaktive Scrollbar) und `VpGrid` (Row-Virtualisierung `[firstVisibleRow..lastVisibleRow]`).
+  * Widgets: `TextWidget` (`TextTagParser` + `StyledTextLayout` + `TypewriterController`), `TextButton`, `ImageButton`, `Hotspot`, `Hotbar`, `Imagemap`, `Bar`, `VBar`, `Slider`, `TextInput` (`allowChars`/`maxLength`/Caret), `DragItem`/`DragGroup` (Drop-Target-Snapping) und `CustomDisplayableWidget` (bettet `LayeredImage`/`ParticleSystem` in UI-Bäume ein).
+* **`ScreenAstBuilder`**: Übersetzt geparste `VJavaAst.ScreenDef`-Bäume direkt in lauffähige `Screen`-Instanzen inklusive `if`/`elif`/`else`-Auswertung über `ConditionEvaluator`, `[var]`-Interpolation, `key`/`timer`-Bindungen, `VariableValue`/`VariableInputValue`-State-Bindings, `custom`-Displayable-Instanziierung (`VJavaUserTypes` / Klassenname) und Action-Dispatching.
+
+### 11.3 Die 3 Dialog-Modi & eingebaute System-/Meta-Screens
+* **3 Dialog-Modi (`Z = 200`)**:
+  1. **`AdvDialogueScreen`**: Klassische Dialogbox `(140, 790, 1640, 250)` mit Sprecher-Badge, `PreferencesState.getTextSpeedCps()`-Typewriter, gedrosselten Voice-Bleeps (`0.055s` via `AudioEngine.playVoiceBleep`), Auto-Forward, Skip (`skipUnread`/`skipAfterChoices`), Self-Voicing-TTS und QuickMenu-Leiste.
+  2. **`NvlDialogueScreen`**: Vollbild-`PANEL_GLASS`-Overlay mit scrollbarer `Viewport`-Absatzliste aus `ScriptRuntime.getNvlLines()`.
+  3. **`BubbleDialogueScreen`**: Dynamische Sprechblasen über dem Sprecher-Sprite (`SceneController.getActiveSprite`), Multi-Bubble-Retain-Modus (`setRetainPreviousBubbles`) und integriertem `Shift+B`-Drag-Editor (Persistenz in `saves/bubble_layouts.json`).
+* **Overlays & eingebaute System-/Meta-Screens**: `QuickMenuScreen` (`Z = 210`), `ChoiceMenuScreen` (`Z = 300`, Timeout-`Bar`), `InputOverlayScreen` (`Z = 300`, modal), `MainMenuScreen` (`Z = 400`, automatisches `Continue` über neuesten Save-Slot), `SaveLoadScreen` (`Z = 400`, 5×6 manuelle Slots + `QUICK`/`AUTO`-Tabs, Custom-Name, STB-PNG-Thumbnails, Löschen), `PreferencesScreen` (`Z = 400`, Live-Audio-/Text-/Modus-/Sprach-/TTS-/Dyslexie-/Scale-Einstellungen), `ControlsScreen` (`Z = 400`, Keyboard/Mouse/Gamepad-Tabelle), `AboutScreen` (`Z = 400`), `HistoryLogScreen` (`Z = 400`, `Replay Voice` + `Jump Back`), `GalleryScreen` (`Z = 400`, `VpGrid` + Variationen + Zoom), `MusicRoomScreen` (`Z = 400`, 16-Band-`VBar`-Spektrum), `EndingsTreeScreen` (`Z = 400`, Routenbaum + Completion-`Bar`), `AchievementsScreen` (`Z = 400`, versteckte Einträge als `"???"`) und `NotificationToastOverlay` (`Z = 500`, Achievement-Toast-Animation + `SKIPPING >>`/`AUTO >`-Status-Pill).
+
+---
+
+## 12. Laufzeit-Koordination (`EngineApplication` & `GlfwWindow`)
 
 * **`EngineApplication`**: Implementiert `AutoCloseable`, verwaltet `EngineAPI`, `SceneGraph`, `WindowManager`, registrierte `EngineApplication.Updatable`-Hooks, die aktive `IRenderPipeline` sowie die optionale `StudioBridge`.
 * **Deterministische Schleife (`run()` / `stepOnce(double)`)**: Pollt Eingabe- und Fensterereignisse, verarbeitet `api.consumeLiveReloadRequested()`, führt `GameClock.advanceFrame(realDelta)` in deterministischen `1/60 s`-Schritten für `SceneGraph.update`, `Updatable.update` und `StudioBridge.update` aus und rendert anschließend Game-Fenster B und (im Studio-Modus) Studio-Fenster A.

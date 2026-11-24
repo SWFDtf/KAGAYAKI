@@ -1,6 +1,6 @@
-# KAGAYAKI — Öffentliche API-Referenz (M1–M5)
+# KAGAYAKI — Öffentliche API-Referenz (M1–M6)
 
-Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen der abgeschlossenen M1-, M2-, M3-, M4- und M5-Pakete (`de.swfdtf`, `de.swfdtf.core`, `de.swfdtf.graphics`, `de.swfdtf.math`, `de.swfdtf.git`, `de.swfdtf.parser`, `de.swfdtf.state`, `de.swfdtf.audio`) sowie die Gradle-Tasks aus `build.gradle`.
+Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen der abgeschlossenen M1- bis M6-Pakete (`de.swfdtf`, `de.swfdtf.core`, `de.swfdtf.graphics`, `de.swfdtf.math`, `de.swfdtf.git`, `de.swfdtf.parser`, `de.swfdtf.state`, `de.swfdtf.audio`, `de.swfdtf.ui`) sowie die Gradle-Tasks aus `build.gradle`.
 
 ---
 
@@ -9,7 +9,7 @@ Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen 
 | Task | Gruppe | Beschreibung |
 | :--- | :--- | :--- |
 | `./gradlew build` | `build` | Kompiliert Java 21 Quellen, führt JUnit-6-Tests aus und paketiert das Standard-JAR. |
-| `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`, 140 Tests laut `build/test-results/test/`) mit ausführlichem Event-Logging aus. |
+| `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`, **157** Tests in **43** Suites laut `build/test-results/test/`) mit ausführlichem Event-Logging aus. |
 | `./gradlew run` | `application` | Startet `de.swfdtf.Main` (unter macOS automatisch mit `-XstartOnFirstThread`). |
 | `./gradlew runStudio` | `kagayaki` | Startet `de.swfdtf.Main` mit `--studio` (optional `-PprojectDir=<pfad>` ergänzt `--project <pfad>`). |
 | `./gradlew runStandalone` | `kagayaki` | Startet `de.swfdtf.StandaloneMain` (optional `-PprojectDir=<pfad>` ergänzt `--standalone <pfad>`). |
@@ -257,8 +257,8 @@ Hierarchischer, Z-sortierter Szenengraph mit 8 vorregistrierten Standard-Ebenen 
   * `void render(RenderPipeline2D pipeline, Rect2f bounds, float alpha, ColorMatrix4f colorMatrix)`
   * `default float getPreferredWidth()` / `default float getPreferredHeight()`
 
-### `SceneController` (M3, Binding `scene`)
-High-Level-Bühnensteuerung für `scene`/`show`/`hide` auf `SceneGraph` (`LAYER_BACKGROUND`, `LAYER_MASTER`) inklusive Positionserhalt beim Tag-Wechsel und deterministischer Stage-Snapshots.
+### `SceneController` (M3 + M6, Binding `scene`)
+High-Level-Bühnensteuerung für `scene`/`show`/`hide` auf `SceneGraph` (`LAYER_BACKGROUND`, `LAYER_MASTER`) inklusive Positionserhalt beim Tag-Wechsel, `LayeredImage`-Auswertung und deterministischer Stage-Snapshots.
 * **Records**:
   * `public record StageEntry(String tag, List<String> attributes, String positionName, String assetPath, Transform2D transform)`
   * `public record StageSnapshot(String backgroundTag, String backgroundAssetPath, Transform2D backgroundTransform, Map<String, StageEntry> activeSprites)`
@@ -271,12 +271,23 @@ High-Level-Bühnensteuerung für `scene`/`show`/`hide` auf `SceneGraph` (`LAYER_
   * `public boolean hideSprite(String tag, String transitionExpr)`
   * `public void registerImageDefinition(String key, String assetPath)`
   * `public void registerTransform(String name, Transform2D transform)`
+  * `public void registerLayeredImage(VJavaAst.LayeredImageDef def)`
+  * `public VJavaAst.LayeredImageDef getLayeredImageDefinition(String name)`
+  * `public void setStateContext(StateStore stateStore, PersistentAccess persistentAccess)`
+  * `public void update(double dt)`
   * `public void clearMasterSprites()`
 * **Snapshots & Abfragen**:
   * `public StageSnapshot snapshotState()` / `public void restoreState(StageSnapshot snapshot)`
   * `public SpriteNode getActiveSprite(String tag)` / `public Map<String, SpriteNode> getActiveSprites()`
   * `public String getBackgroundTag()` / `public SpriteNode getBackgroundNode()` / `public String getLastTransitionExpr()` / `public SceneGraph getSceneGraph()`
   * `public void setTransitionListener(BiConsumer<String, String> listener)` / `public void setProjectRoot(Path projectRoot)`
+
+### `LayeredImage` (M6, `implements CustomDisplayable`)
+Mehrstufiges Composite-Sprite aus `VJavaAst.LayeredImageDef` oder `LayeredImage.builder(name)` mit `always`-, `group`- (inkl. `0.20s`-Crossfade und `LipSyncAnalyzer`-Anbindung) und `if`-Ebenen:
+* **Konstanten**: `DEFAULT_CROSSFADE_DURATION_SECONDS = 0.20f`, `DEFAULT_MOUTH_GROUP_NAME = "mouth"`.
+* **Record & Builder**: `LayerRenderInfo(String assetPath, float alpha)`; `LayeredImage.Builder` (`always`, `group`, `attribute`, `conditional`, `textureManager`, `crossfadeDuration`, `mouthGroupName`, `build`).
+* **Konstruktoren & Fabrik**: `LayeredImage(VJavaAst.LayeredImageDef)`, `LayeredImage(VJavaAst.LayeredImageDef, TextureManager)`, `LayeredImage.builder(String name)`.
+* **Methoden**: `setAttributes(Collection<String>)`, `setAttributes(Collection<String>, StateStore, PersistentAccess)`, `resolve(StateStore, PersistentAccess)`, `bindLipSync(LipSyncAnalyzer)`, `applyMouthShape(LipSyncAnalyzer.MouthShape)`, `update(double)`, `render(RenderPipeline2D, Rect2f, float, ColorMatrix4f)`, `getPreferredWidth()`, `getPreferredHeight()`, `getActiveRenderLayers()`, `registerLayerTexture(String, Texture)`, `getName()`, `getResolvedLayerAssets()`, `getSelectedAttributes()`, `getActiveAttribute(String)`, `getActiveGroupAttributes()`, `getGroupPreviousAlpha(String)`, `getGroupCurrentAlpha(String)`, `getGroupFadeProgress(String)`, `isCrossfading()`, `getCrossfadeDurationSeconds()` / `setCrossfadeDurationSeconds(float)`, `getMouthGroupName()` / `setMouthGroupName(String)`, `getBoundLipSync()`, `getTextureManager()` / `setTextureManager(TextureManager)`.
 
 ### `Texture`, `TextureManager` & `NineSliceDrawable`
 Reine STB-Texturpipeline (`STBImage` / `STBImageWrite`, Premultiplied `RGBA8`) ohne `java.awt`:
@@ -608,3 +619,57 @@ Nicht-blockierender Self-Voicing-TTS-Dienst auf einem Java-21-Virtual-Thread mit
 * **Konstruktoren**: `TextToSpeechService()`, `TextToSpeechService(EngineLogger logger, boolean osCommandExecutionEnabled)`.
 * **Statische Helfer**: `stripRichTextTags(String rawText)`, `buildSpeechCommand(String osName, String utterance)`.
 * **Methoden**: `setEnabled(boolean)` / `isEnabled()`, `setOsCommandExecutionEnabled(boolean)` / `isOsCommandExecutionEnabled()`, `speak(String text)`, `stop()`, `getSpokenHistory()`, `clearSpokenHistory()`, `setOnSpeakListener(Consumer<String>)`, `getPendingCount()`, `awaitIdle(long timeoutMillis)`, `isDisposed()`, `dispose()`, `close()`.
+
+---
+
+## 10. Paket `de.swfdtf.ui` (M6)
+
+### Kern, Dark-Slate-Theme & Screen-Stack
+* **`ThemePalette`**: Kanonische Dark-Slate-Hexkonstanten (`CANVAS_BG = "#0d0e15"`, `PANEL_SURFACE = "#161822"`, `PANEL_GLASS = "#161822d9"`, `ELEVATED = "#1f2232"`, `BORDER = "#2e334a"`, `ACCENT_IDLE = "#388bfd"`, `ACCENT_HOVER = "#58a6ff"`, `ACTIVE_SELECTED = "#f0883e"`, `DISABLED = "#8b949e7f"`, `TEXT_PRIMARY = "#f0f6fc"`, `TEXT_MUTED = "#8b949e"`, `SUCCESS = "#3fb950"`, `WARNING = "#d29922"`, `ERROR = "#f85149"`) sowie `straightRgba(String)` und `premultipliedRgba(String, float)`.
+* **`UiNode`** (`abstract class`): `measure(float, float)`, `layout(Rect2f)`, `update(double)`, `render(RenderPipeline2D, FontManager, TextureManager, double)`, Input-Dispatch (`dispatchMouseMove`, `dispatchMouseDown`, `dispatchMouseUp`, `dispatchMouseScroll`, `dispatchKeyPressed`, `dispatchCharTyped`, `setHoveredDeep`), Baum-Management (`addChild`, `removeChild`, `clearChildren`, `getChildren`, `getParent`), Padding-/Bounds-/Stil-Properties (`id`, `bounds`, `preferredSize`, `visible`, `enabled`, `focusable`, `hovered`, `focused`, `pressed`, `alpha`, `backgroundColorHex`, `borderColorHex`, `borderThickness`, `cornerRadius`).
+* **`Screen`**: Sub-Typen `KeyBinding(int glfwKey, int requiredModsMask, Runnable action)` und `ScreenTimer(double intervalSeconds, boolean repeat, Runnable action)`; Konstruktoren `Screen(String)`, `Screen(String, int zOrder, boolean modal)`; Methoden `onShow()`, `onHide()`, `layout(float, float)`, `update(double)`, `render(...)`, `addKeyBinding(...)`, `addTimer(...)`, `triggerKeyBindings(int, int)`, `getKeyBindings()`, `getName()`, `getZOrder()`/`setZOrder`, `isModal()`/`setModal`, `isVisible()`/`setVisible`, `getRoot()`/`setRoot`.
+* **`ScreenManager`**: `setLogicalSize(float, float)`, `registerScreen(Screen)`, `showScreen(Screen|String)`, `hideScreen(String)`, `toggleScreen(String)`, `getScreen(String)`, `getVisibleScreensSorted()`, `getTopModalScreen()`, `isModalActive()`, `getInputEligibleScreensTopDown()`, `update(double, InputManager)`, `routeInput(InputManager)`, `dispatchMouseDown`/`Up`/`Scroll`, `dispatchKeyPressed`, `dispatchCharTyped`, `cycleFocus(Screen, boolean)`, `render(...)`, `getFocusedNode()`, `getLogicalWidth()`, `getLogicalHeight()`.
+
+### Layout-Container (`extends UiNode`)
+* **`VBox`**: `setSpacing(float)`/`getSpacing()`, `setFillWidth(boolean)`/`isFillWidth()`, `setAlignCenterX(boolean)`/`isAlignCenterX()`.
+* **`HBox`**: `setSpacing(float)`/`getSpacing()`, `setAlignCenterY(boolean)`/`isAlignCenterY()`, `setFillHeight(boolean)`/`isFillHeight()`.
+* **`Grid`**: `Grid(int columns, int rows)`, `setSpacing(float h, float v)`, `getColumns()`, `getRows()`, `getHorizontalSpacing()`, `getVerticalSpacing()`.
+* **`Fixed`**: `AlignmentSpec(xPos, yPos, xAlign, yAlign, hasXPos, hasYPos, hasXAlign, hasYAlign)`, `addChildAt(UiNode, float x, float y, float width, float height)`, `setChildAlignment(UiNode, AlignmentSpec)`.
+* **`Frame`**: `DEFAULT_CORNER_RADIUS = 8.0f`, `DEFAULT_BORDER_THICKNESS = 1.0f`; `setNineSlice(NineSliceDrawable)` / `getNineSlice()`.
+* **`WindowBox`**: `DEFAULT_HEADER_HEIGHT = 40.0f`, `DEFAULT_TITLE_FONT_SIZE = 20.0f`; `WindowBox()`, `WindowBox(String title)`, `setTitle`/`getTitle`, `setHeaderHeight`/`getHeaderHeight`, `setTitleFontSize`/`getTitleFontSize`, `getWindowContentBounds()`.
+* **`Viewport`**: `DEFAULT_SCROLL_STEP = 48.0f`, `SCROLLBAR_WIDTH = 8.0f`; `setScrollY`/`getScrollY`, `getMaxScrollY()`, `getContentHeight()`, `setScrollbarVisible`/`isScrollbarVisible`, `setScrollStep`/`getScrollStep`, `isDraggingScrollbar()`.
+* **`VpGrid`**: `DEFAULT_SCROLL_STEP = 64.0f`; `VpGrid(int columns, float cellWidth, float cellHeight)`, `setSpacing(float, float)`, `setScrollY`/`getScrollY`, `getMaxScrollY()`, `getTotalContentHeight()`, `getTotalRows()`, `getFirstVisibleRow()`, `getLastVisibleRow()`, `setScrollbarVisible`/`isScrollbarVisible`, `setScrollStep`/`getScrollStep`.
+
+### Widgets & `ScreenAstBuilder`
+* **`TextWidget`**: `DEFAULT_FONT_SIZE = 24.0f`, `DEFAULT_LINE_SPACING = 1.15f`; `TextWidget(String)`, `setText`/`getText`, `setFontSize`/`getFontSize`, `setLineSpacing`/`getLineSpacing`, `setColorHex`/`getColorHex`, `setDropShadow`/`isDropShadow`, `setTypewriterCps`/`getTypewriterCps`, `setFontManager`, `getTypewriter()`, `getLayout()`.
+* **`TextButton`**: `DEFAULT_FONT_SIZE = 22.0f`, `DEFAULT_CORNER_RADIUS = 6.0f`; `TextButton(String label, Runnable onClick)`, `setText`/`getText`, `setOnClick`/`getOnClick`, `setSelected`/`isSelected`, `setFontSize`/`getFontSize`, `getCurrentSurfaceColorHex()`, `getCurrentBorderColorHex()`, `getCurrentTextColorHex()`, `click()`.
+* **`ImageButton`**: `ImageButton(String idlePath, String hoverPath, Runnable onClick)`, `setDisabledPath`/`getDisabledPath`, `setIdlePath`/`getIdlePath`, `setHoverPath`/`getHoverPath`, `setSelectedPath`/`getSelectedPath`, `setSelected`/`isSelected`, `setOnClick`/`getOnClick`, `getCurrentImagePath()`, `click()`.
+* **`Hotspot`**: `Hotspot(Rect2f area, Runnable onClick)`, `getArea()`/`setArea`, `setOnClick`/`getOnClick`, `setHoveredColorHex`/`getHoveredColorHex`, `isInside(float, float)`.
+* **`Hotbar`**: `Hotbar(Rect2f area, Supplier<Float> valueSupplier, float maxValue)`, `getArea()`/`setArea`, `getMaxValue()`/`setMaxValue`, `getCurrentValue()`, `getNormalizedRatio()`, `setFillColorHex`/`getFillColorHex`, `setTrackColorHex`/`getTrackColorHex()`.
+* **`Imagemap`**: `Imagemap(String groundPath, String hoverPath)`, `getGroundPath()`/`setGroundPath`, `getHoverPath()`/`setHoverPath`, `addHotspot(Rect2f, Runnable)`, `addHotbar(Rect2f, Supplier<Float>, float)`, `getHotspots()`, `getHotbars()`.
+* **`Bar` & `VBar`**: `Bar(float value, float max)` (`DEFAULT_WIDTH = 300.0f`, `DEFAULT_HEIGHT = 24.0f`), `VBar(float value, float max)` (`DEFAULT_WIDTH = 24.0f`, `DEFAULT_HEIGHT = 200.0f`); `setValue`/`getValue`, `setRange`/`getMax`, `getNormalizedValue()`, `setFillColorHex`/`getFillColorHex`, `setTrackColorHex`/`getTrackColorHex`.
+* **`Slider`**: `DEFAULT_WIDTH = 300.0f`, `DEFAULT_HEIGHT = 28.0f`; `Slider(float value, float min, float max, Consumer<Float> onChanged)`, `setValue`/`getValue`, `getMin()`, `getMax()`, `setStep`/`getStep`, `isDragging()`, `setOnChanged`, `getNormalizedValue()`.
+* **`TextInput`**: `DEFAULT_WIDTH = 340.0f`, `DEFAULT_HEIGHT = 44.0f`, `DEFAULT_FONT_SIZE = 20.0f`; `TextInput(String initialText, Consumer<String> onSubmit)`, `setText`/`getText`, `setPlaceholder`/`getPlaceholder`, `setAllowChars`/`getAllowChars`, `setMaxLength`/`getMaxLength`, `setOnSubmit`, `setOnChanged`, `setFontSize`/`getFontSize`.
+* **`DragItem` & `DragGroup`**: `DragItem(String id, Object payload)` (`DEFAULT_SIZE = 96.0f`, `setDropTarget`/`isDropTarget`, `setDraggable`/`isDraggable`, `setSnappable`/`isSnappable`, `setOnDrop`/`getOnDrop`, `getSnappedTo()`, `isDragging()`); `DragGroup` (`addDragItem`, `getItems()`, `getActiveDraggedItem()`, `findDropTargetAt`, `findIntersectingDropTarget`).
+* **`CustomDisplayableWidget`**: `CustomDisplayableWidget(CustomDisplayable)`, `getDisplayable()`, `setDisplayable(CustomDisplayable)`.
+* **`ScreenAstBuilder`**: `public static Screen build(VJavaAst.ScreenDef def, ScriptRuntime runtimeOrNull, Consumer<String> actionDispatcher)`.
+
+### Dialog-Modi, Overlays & eingebaute System-/Meta-Screens
+* **`AdvDialogueScreen`** (`SCREEN_NAME = "adv_dialogue"`, `PANEL_X = 140.0f`, `PANEL_Y = 790.0f`, `PANEL_W = 1640.0f`, `PANEL_H = 250.0f`, `BLEEP_THROTTLE_SECONDS = 0.055`, `SKIP_STEP_SECONDS = 0.05`): `AdvDialogueScreen(ScriptSession, ScreenManager[, AudioEngine, TextToSpeechService])`, `handlePrimaryAdvance()`, `toggleSkip()`, `setSkipActive(boolean)`, `isSkipActive()`, `toggleAuto()`, `setAutoActive(boolean)`, `isAutoActive()`, `getBleepCount()`, `getVisibleCharCount()`, `isTypewriterFinished()`, `getDialogueBoxBounds()`, `getSpeakerNameWidget()`, `getDialogueTextWidget()`, `getQuickMenuRow()`, `setAudioEngine`, `setTtsService`, `syncFromRuntime(boolean)`.
+* **`NvlDialogueScreen`** (`SCREEN_NAME = "nvl_dialogue"`): `NvlDialogueScreen(ScriptSession)`, `handlePrimaryAdvance()`, `syncFromRuntime(boolean)`, `getEntries()`, `getEntryCount()`, `isLatestTypewriterFinished()`, `getViewport()`, `getParagraphContainer()`, `getParagraphWidgets()`.
+* **`BubbleDialogueScreen`** (`SCREEN_NAME = "bubble_dialogue"`, `PRESETS_FILE_NAME = "bubble_layouts.json"`, `DEFAULT_BOX_W = 540.0f`, `DEFAULT_BOX_H = 160.0f`): Records `BubbleLayoutConfig` (`containsBox`, `isNearTailTip`) und `BubbleEntry`; `BubbleDialogueScreen(ScriptSession)`, `toggleEditorMode()`, `setEditorMode(boolean)`, `isEditorActive()`, `setRetainPreviousBubbles(boolean)`, `isRetainPreviousBubbles()`, `clearRetainedBubbles()`, `setLayoutPreset`/`getLayoutPreset`/`getLayoutPresets()`, `getActiveBubble()`, `getRetainedBubbles()`, `getVisibleBubbleCount()`, `handlePrimaryAdvance()`, `syncFromRuntime(boolean)`, `resolveLayoutForPrompt`, `resolveSpeakerAnchor`, `savePresetsToDisk()`.
+* **`QuickMenuScreen`** (`SCREEN_NAME = "quick_menu"`, `Z_ORDER = 210`): `QuickMenuScreen(ScriptSession, ScreenManager)`, Button-Getter `getBarBox()`, `getBackButton()`, `getHistoryButton()`, `getSkipButton()`, `getAutoButton()`, `getSaveButton()`, `getQuickSaveButton()`, `getQuickLoadButton()`, `getPrefsButton()`.
+* **`ChoiceMenuScreen`** (`SCREEN_NAME = "choice_menu"`): `ChoiceMenuScreen(ScriptSession)`, `syncFromRuntime(boolean)`, `getOptionButtons()`, `getTimeoutBar()`, `getCaptionLabel()`.
+* **`InputOverlayScreen`** (`SCREEN_NAME = "input_overlay"`): `InputOverlayScreen(ScriptSession)`, `syncFromRuntime(boolean)`, `submitCurrentText(String)`, `getPromptLabel()`, `getTextInput()`, `getConfirmButton()`.
+* **`MainMenuScreen`** (`SCREEN_NAME = "main_menu"`): `MainMenuScreen(ScriptSession, ScreenManager)`, `refreshContinueState()`, `getNewestSaveSlotId()`, `getTitleBanner()` sowie Button-Getter (`getStartButton()`, `getContinueButton()`, `getLoadButton()`, `getGalleryButton()`, `getMusicRoomButton()`, `getEndingsButton()`, `getAchievementsButton()`, `getPreferencesButton()`, `getControlsButton()`, `getAboutButton()`, `getQuitButton()`).
+* **`SaveLoadScreen`** (`SCREEN_NAME = "save_load"`, `SLOTS_PER_PAGE = 6`, `TOTAL_PAGES = 5`): Enums `Mode { SAVE, LOAD }`, `FilterTab { MANUAL, QUICK, AUTO }`, `SlotCardView`; `SaveLoadScreen(ScriptSession, ScreenManager)`, `setMode`/`getMode`, `setFilterTab`/`getFilterTab`, `setPage`/`getCurrentPage`, `refreshSlots()`, `handleSlotAction(String)`, `handleSlotDelete(String)`, `getVisibleCards()`, `getCustomNameInput()`, `getPageButtons()`.
+* **`PreferencesScreen`** (`SCREEN_NAME = "preferences"`): `PreferencesScreen(ScriptSession, ScreenManager)`, `refreshFromPreferences()`, `cycleDialogueMode()`, `cycleLanguage()`, `selectLanguage(String)`, `toggleRenderMode()`, `savePreferences()`, `setFontManager(FontManager)` sowie Slider-/Toggle-Getter.
+* **`ControlsScreen`** (`SCREEN_NAME = "controls"`): Enum `Category { ALL, KEYBOARD, MOUSE, GAMEPAD }`, Record `BindingEntry(Category, String input, String action)`; `ControlsScreen(ScreenManager)`, `setCategory`/`getActiveCategory`, `getVisibleBindings()`.
+* **`AboutScreen`** (`SCREEN_NAME = "about"`): `AboutScreen(ScriptSession, ScreenManager)`, `refreshInfo()` sowie Info-Widget-Getter.
+* **`HistoryLogScreen`** (`SCREEN_NAME = "history_log"`): `HistoryRowView`; `HistoryLogScreen(ScriptSession, ScreenManager[, AudioEngine])`, `refreshEntries()`, `replayVoice(String)`, `jumpBackTo(HistoryLog.HistoryEntry)`, `setAudioEngine`, `getRowViews()`, `getViewport()`.
+* **`GalleryScreen`** (`SCREEN_NAME = "gallery"`): `GalleryCardView`; `GalleryScreen(ScriptSession, ScreenManager)`, `refreshGallery()`, `selectEntry(GalleryManager.GalleryEntry)`, `stepVariation(int)`, `toggleZoom()`, `setZoomed(boolean)`/`isZoomed()`, `getCardViews()`, `getSelectedEntry()`, `getVariationIndex()`, `getActiveVariationPath()`.
+* **`MusicRoomScreen`** (`SCREEN_NAME = "music_room"`, `SPECTRUM_BAND_COUNT = 16`): `MusicRoomScreen(ScriptSession, ScreenManager[, AudioEngine])`, `registerTrackTitle(String, String)`, `refreshTracks()`, `playTrack(String)`, `stopPlayback()`, `setAudioEngine`, `getSpectrumBands()`, `getCurrentTrackId()`, `getNowPlayingLabel()`, `getStopButton()`, `getTrackButtons()`, `getSpectrumBars()`.
+* **`EndingsTreeScreen`** (`SCREEN_NAME = "endings_tree"`): Record `TreeNodeView(EndingsManager.EndingDef, int depth, boolean unlocked, TextWidget titleLabel, TextWidget statusLabel)`; `EndingsTreeScreen(ScriptSession, ScreenManager)`, `refreshTree()`, `getNodeViews()`, `getCompletionBar()`, `getCompletionLabel()`.
+* **`AchievementsScreen`** (`SCREEN_NAME = "achievements"`): Record `AchievementRowView(AchievementManager.AchievementDef, boolean unlocked, TextWidget titleLabel, TextWidget descriptionLabel, TextWidget statusLabel)`; `AchievementsScreen(ScriptSession, ScreenManager)`, `refreshAchievements()`, `getRows()`, `getSummaryLabel()`, `getProgressBar()`.
+* **`NotificationToastOverlay`** (`SCREEN_NAME = "notification_toast"`, `DEFAULT_TOAST_DURATION = 4.0`): Record `ToastPayload(String title, String subtitle)`; `NotificationToastOverlay(ScriptSession, ScreenManager)`, `pushToast(String, String)`, `setSkipPillActive(boolean)`, `setAutoPillActive(boolean)`, `isToastVisible()`, `getActiveToast()`, `getPendingToastCount()`, `getToastCard()`, `getStatusPill()`, `getStatusPillText()`.
+* *(Paketintern)*: `UiRenderSupport` (GL-Scissor-Stack, Scrollbar-Rendering, Headless-`FontManager`-Fallback) und `UiMediaSupport` (Dark-Slate-Karten-/Button-Helfer, Zeitformatierung, `PreviewImageNode` mit STB-PNG-Dekodierung).
