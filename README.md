@@ -55,6 +55,12 @@ Optionally pass a project directory:
 - `docs/` — Architecture and design documentation
 - `build.gradle` — Gradle build configuration and custom `kagayaki` tasks
 
+## Documentation
+
+- [Erste Schritte mit vjava](docs/getting-started.md) — Setup, CLI, Hello World, Quellcode-Struktur
+- [vjava-Sprachreferenz](docs/sprachreferenz.md) — alle Befehle, Argumente und Beispiele
+- [vjava-Spezifikation](docs/VJAVA_SPEZIFIKATION.md) — technische Detailspezifikation
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
