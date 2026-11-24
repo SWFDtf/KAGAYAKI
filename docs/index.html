@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KAGAYAKI Dokumentation — Geschichten für Menschen</title>
+  <meta name="description" content="Menschenzentrierte Dokumentation für KAGAYAKI, die Java-21-Visual-Novel-Engine für klare Geschichten und barrierefreie Spiele.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#hauptinhalt">Direkt zum Inhalt springen</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">
+        KAGAYAKI
+        <span class="brand-badge">Doku</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Hauptnavigation">
+        <ul>
+          <li><a href="index.html" aria-current="page">Startseite</a></li>
+          <li><a href="erste-schritte.html">Erste Schritte</a></li>
+          <li><a href="konzepte.html">Konzepte</a></li>
+          <li><a href="anleitungen.html">Anleitungen &amp; FAQ</a></li>
+          <li><a href="mitmachen.html">Mitmachen</a></li>
+          <li><a href="md/index.md">Markdown</a></li>
+        </ul>
+      </nav>
+
+      <details class="nav-toggle-details">
+        <summary aria-label="Menü öffnen">Menü</summary>
+        <nav aria-label="Mobile Hauptnavigation">
+          <ul>
+            <li><a href="index.html" aria-current="page">Startseite</a></li>
+            <li><a href="erste-schritte.html">Erste Schritte</a></li>
+            <li><a href="konzepte.html">Konzepte</a></li>
+            <li><a href="anleitungen.html">Anleitungen &amp; FAQ</a></li>
+            <li><a href="mitmachen.html">Mitmachen</a></li>
+            <li><a href="md/index.md">Markdown</a></li>
+          </ul>
+        </nav>
+      </details>
+    </div>
+  </header>
+
+  <main id="hauptinhalt" class="container">
+    <section class="hero" aria-labelledby="hero-titel">
+      <h1 id="hero-titel">Geschichten erzählen — klar, direkt und für Menschen gebaut.</h1>
+      <p class="hero-lead">
+        <strong>KAGAYAKI</strong> ist eine Visual-Novel-Engine auf Basis von Java 21.
+        Du schreibst Dialoge, Entscheidungen und Szenen in leicht lesbaren <code>.vjava</code>-Dateien.
+        Wenn du tiefere Programmlogik brauchst, bindest du Java direkt ein — ohne Umwege.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="erste-schritte.html">In 5 Minuten starten</a>
+        <a class="btn btn-secondary" href="konzepte.html">Wie KAGAYAKI funktioniert</a>
+      </div>
+    </section>
+
+    <section aria-labelledby="warum-titel" class="prose">
+      <h2 id="warum-titel">Warum dieses Projekt für Menschen existiert</h2>
+      <p>
+        Viele Werkzeuge für Spieleentwicklung zwingen Autorinnen und Autoren in komplexe Oberflächen
+        oder unverständliche Skriptsprachen. KAGAYAKI geht einen ruhigeren Weg:
+      </p>
+      <ul>
+        <li><strong>Lesbare Texte statt Klammer-Salat:</strong> Deine Geschichte steht im Mittelpunkt. Eine einfache Einrückung zeigt, was zusammengehört.</li>
+        <li><strong>Zwei Fenster für entspanntes Arbeiten:</strong> Im Studio-Modus siehst du links deine Werkzeuge und rechts sofort das laufende Spiel.</li>
+        <li><strong>Barrierefreiheit von Anfang an:</strong> Vorlesefunktion (Text-to-Speech), Tastatur- und Gamepad-Steuerung sowie klare Kontraste sind fest eingebaut.</li>
+        <li><strong>Volle Kontrolle bei Bedarf:</strong> Entwicklerinnen und Entwickler können jederzeit sauberen Java-21-Code in ihre Szenen einbetten.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="bereiche-titel">
+      <h2 id="bereiche-titel">Alle Bereiche der Dokumentation</h2>
+      <div class="card-grid">
+        <article class="card">
+          <div>
+            <h3>Erste Schritte</h3>
+            <p>Installiere die Voraussetzungen, starte das Studio und schreibe deine erste kleine Szene.</p>
+          </div>
+          <a class="card-link" href="erste-schritte.html">Zur Schnellstart-Anleitung →</a>
+        </article>
+
+        <article class="card">
+          <div>
+            <h3>Konzepte</h3>
+            <p>Verstehe die Philosophie hinter KAGAYAKI, das Zwei-Fenster-Prinzip und den Aufbau von Projekten.</p>
+          </div>
+          <a class="card-link" href="konzepte.html">Grundlagen entdecken →</a>
+        </article>
+
+        <article class="card">
+          <div>
+            <h3>Anleitungen &amp; FAQ</h3>
+            <p>Schritt-für-Schritt-Hilfen für Dialoge, Bilder, Musik, Speicherstände und häufige Fragen.</p>
+          </div>
+          <a class="card-link" href="anleitungen.html">Hilfen &amp; Antworten lesen →</a>
+        </article>
+
+        <article class="card">
+          <div>
+            <h3>Mitmachen</h3>
+            <p>Du möchtest Texte verbessern, Fehler melden oder Code beisteuern? Hier erfährst du, wie es geht.</p>
+          </div>
+          <a class="card-link" href="mitmachen.html">Teil des Projekts werden →</a>
+        </article>
+      </div>
+    </section>
+
+    <aside class="callout callout-tip" aria-label="Hinweis zu Markdown-Dateien">
+      <span class="callout-title">Für Rohdaten-Leser &amp; Offline-Nutzung</span>
+      <p>
+        Alle Seiten dieser Dokumentation liegen zusätzlich als reine Textdateien im Markdown-Format vor.
+        Du findest sie im Ordner <a href="md/index.md">/docs/md/</a>.
+      </p>
+    </aside>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>KAGAYAKI Dokumentation · Gebaut mit reinem HTML5 &amp; CSS</span>
+      <div class="footer-links">
+        <a href="md/index.md">Markdown-Version</a>
+        <a href="impressum.html">Impressum</a>
+        <a href="datenschutz.html">Datenschutz</a>
+        <a href="lizenz.html">Lizenz</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

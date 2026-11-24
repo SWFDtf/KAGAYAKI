@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lizenz — KAGAYAKI Dokumentation</title>
+  <meta name="description" content="MIT-Lizenz für KAGAYAKI sowie Übersicht der verwendeten Open-Source-Bibliotheken.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#hauptinhalt">Direkt zum Inhalt springen</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">
+        KAGAYAKI
+        <span class="brand-badge">Doku</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Hauptnavigation">
+        <ul>
+          <li><a href="index.html">Startseite</a></li>
+          <li><a href="erste-schritte.html">Erste Schritte</a></li>
+          <li><a href="konzepte.html">Konzepte</a></li>
+          <li><a href="anleitungen.html">Anleitungen &amp; FAQ</a></li>
+          <li><a href="mitmachen.html">Mitmachen</a></li>
+          <li><a href="md/lizenz.md">Markdown</a></li>
+        </ul>
+      </nav>
+
+      <details class="nav-toggle-details">
+        <summary aria-label="Menü öffnen">Menü</summary>
+        <nav aria-label="Mobile Hauptnavigation">
+          <ul>
+            <li><a href="index.html">Startseite</a></li>
+            <li><a href="erste-schritte.html">Erste Schritte</a></li>
+            <li><a href="konzepte.html">Konzepte</a></li>
+            <li><a href="anleitungen.html">Anleitungen &amp; FAQ</a></li>
+            <li><a href="mitmachen.html">Mitmachen</a></li>
+            <li><a href="md/lizenz.md">Markdown</a></li>
+          </ul>
+        </nav>
+      </details>
+    </div>
+  </header>
+
+  <main id="hauptinhalt" class="container prose">
+    <h1>Lizenz &amp; Open-Source-Hinweise</h1>
+    <p>
+      KAGAYAKI baut auf offenen Standards und freier Software auf. Hier findest du die Lizenz des
+      Projekts sowie eine Übersicht der eingesetzten Bibliotheken.
+    </p>
+
+    <section aria-labelledby="mit-titel">
+      <h2 id="mit-titel">1. Projekt-Lizenz (MIT)</h2>
+      <p>
+        Die MIT-Lizenz erlaubt es dir, KAGAYAKI frei zu nutzen, zu kopieren, zu verändern und zu
+        veröffentlichen — auch für eigene kommerzielle Spiele. Wichtig ist nur, dass der
+        Lizenzhinweis erhalten bleibt.
+      </p>
+      <pre><code>MIT License
+
+Copyright (c) [2026] [KAGAYAKI / Name des Autors]
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.</code></pre>
+    </section>
+
+    <section aria-labelledby="drittanbieter-titel">
+      <h2 id="drittanbieter-titel">2. Verwendete Bibliotheken</h2>
+      <p>
+        KAGAYAKI nutzt folgende bewährte Open-Source-Bibliotheken (stand <code>build.gradle</code>):
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Bibliothek</th>
+              <th>Version</th>
+              <th>Einsatzbereich</th>
+              <th>Lizenz</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>LWJGL (GLFW, OpenGL, OpenAL, STB)</td>
+              <td>3.3.6</td>
+              <td>Fenster, Grafik, Audio &amp; Bild-/Schrift-Dekodierung</td>
+              <td>BSD-3-Clause</td>
+            </tr>
+            <tr>
+              <td>JOML</td>
+              <td>1.10.8</td>
+              <td>Mathematik für Vektoren &amp; Matrizen</td>
+              <td>MIT</td>
+            </tr>
+            <tr>
+              <td>Gson</td>
+              <td>2.11.0</td>
+              <td>Lesen und Schreiben von JSON-Daten</td>
+              <td>Apache-2.0</td>
+            </tr>
+            <tr>
+              <td>JUnit Jupiter</td>
+              <td>6.0.0</td>
+              <td>Automatisierte Tests (Entwicklung)</td>
+              <td>EPL-2.0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>KAGAYAKI Dokumentation · <a href="md/lizenz.md">Diese Seite als Markdown</a></span>
+      <div class="footer-links">
+        <a href="impressum.html">Impressum</a>
+        <a href="datenschutz.html">Datenschutz</a>
+        <a href="lizenz.html" aria-current="page">Lizenz</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
