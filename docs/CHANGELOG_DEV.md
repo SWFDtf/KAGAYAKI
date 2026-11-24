@@ -4,6 +4,29 @@ Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architekt
 
 ---
 
+## [Welle 2 — Abgeschlossen] 15 Studio-Tooling-, Analyse- & Authoring-Features (`de.swfdtf.tools`)
+
+* **Analyse & Suche (`Wave2AnalysisToolsTest`)**:
+  1. `ScriptFlowGraphExporter` (Mermaid `flowchart TD` & Graphviz DOT aus `ProjectAst` inkl. unerreichbarer Labels).
+  2. `ScriptWordCountAnalyzer` (Wort-/Zeichen-/Dialogstatistik pro Sprecher & geschätzte Lesezeit).
+  3. `UnusedAssetDetector` (Cross-Referenzierung von `assets/**` gegen Skript-, `LayeredImage`- & `Screen`-Referenzen).
+  4. `TranslationCoverageAuditor` (Übersetzungsabdeckung je Sprache inkl. fehlender Texte).
+  5. `ProjectSearchService` (Volltext- und Regex-Suche über `**/*.vjava`).
+* **Authoring, Formatierung, Diffing & Lesezeichen (`Wave2AuthoringToolsTest`)**:
+  6. `VJavaScriptFormatter` (4-Space-Normalisierung unter Erhalt von `@->{ ... }<<`-Blöcken).
+  7. `StateSnapshotDiffService` (strukturierter Vergleich zweier State-Maps oder `SaveSlotData`).
+  8. `AssetMetadataInspector` (PNG-`IHDR`- & WAV-`RIFF`-Inspektion ohne `java.awt`).
+  9. `LabelBookmarkManager` (kategorisierte Label-Lesezeichen mit atomarer JSON-Persistenz).
+  10. `VJavaLinterAutoFixer` (idempotente Auto-Fixes für fehlende Sprecher & `jump`/`call`-Stubs).
+* **Automatisierung, Palette & Release-Prüfung (`Wave2ReleaseToolsTest`)**:
+  11. `AutomatedPlaythroughRunner` (Headless-Playthrough-Bot mit `ChoiceStrategy` & Label-Coverage).
+  12. `StudioCommandPalette` (durchsuchbare Befehlspalette mit Verlauf).
+  13. `ExportPreFlightChecker` (Release-Checkliste aus `ProjectDescriptor`, `VJavaLinter`, Assets & Übersetzungen).
+  14. `VpakManifestInspector` (vollständige `.vpak`-CRC32-Verifikation & Extension-Größenbericht).
+  15. `StudioWorkspaceState` (atomare JSON-Persistenz für Studio-Workspace-Präferenzen).
+
+---
+
 ## [Welle 1 & GUI-/Demo-Reparatur — Abgeschlossen] Dual-Window-Reparatur & 15 Fundament-Features
 
 ### GUI-, Kontext- & Einstiegspunkt-Reparaturen (`main` & `demo`)

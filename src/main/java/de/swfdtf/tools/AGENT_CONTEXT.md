@@ -35,6 +35,21 @@ Entwickler-Werkzeuge, Dual-Window-Studio-UI und Standalone-Build-Pipeline von KA
 | `StudioWindowController` | `final class` | Dual-Window-Studio-Controller (`implements StudioBridge`) für Fenster A mit dediziertem `InputManager`, Projekt-Explorer, Template-Generator, Live-Linter, State-Variablen-Inspektor, Konsole, 2D/3D-RenderMode-Umschalter, Live-Reload und Standalone-Exporter. |
 | `AssetChecksumVerifier` | `final class` | SHA-256-Manifest-Erzeugung (`AssetManifest`) und Integritätsprüfung (`VerificationReport`) für `assets/**`. |
 | `DiagnosticBundleExporter` | `final class` | Atomarer JSON-Diagnosebundle-Export (`DiagnosticReport`: Engine-Version, Konfiguration, `EngineLogger`-Einträge, optionaler `LintReport`, Metriken). |
+| `ScriptFlowGraphExporter` | `final class` | Generiert gerichtete Label-/Transition-Graphen (`FlowGraph`) aus `ProjectAst` und exportiert Mermaid (`flowchart TD`) sowie Graphviz DOT. |
+| `ScriptWordCountAnalyzer` | `final class` | Berechnet Wort-, Zeichen-, Dialogzeilen-Statistiken pro Sprecher und geschätzte Lesezeit unter Stripping von Rich-Text-Tags (`ScriptStatsReport`). |
+| `UnusedAssetDetector` | `final class` | Vergleicht `ProjectAst.discoveredAssets()` gegen Skript-, Charakter-, `LayeredImage`- und `Screen`-Referenzen (`AssetUsageReport`). |
+| `TranslationCoverageAuditor` | `final class` | Prüft Dialogzeilen gegen `TranslateBlock`-Übersetzungen pro Sprache (`CoverageReport`, `LanguageCoverage`). |
+| `ProjectSearchService` | `final class` | Deterministische Volltext- und Regex-Suche über `**/*.vjava` (`SearchMatch`). |
+| `VJavaScriptFormatter` | `final class` | Formatiert `.vjava`-Skripte (4-Space-Einrückung, Leerzeilen, Trailing-Whitespace) unter Erhalt von `@->{ ... }<<`-Java-Blöcken. |
+| `StateSnapshotDiffService` | `final class` | Berechnet strukturierte Deltas (`StateDiff`: `added`, `removed`, `modified`) zwischen State-Maps oder `SaveSlotData`. |
+| `AssetMetadataInspector` | `final class` | Liest PNG-`IHDR`-Dimensionen und WAV-`RIFF`-Metadaten (Samplerate, Kanäle, Dauer) ohne `java.awt`. |
+| `LabelBookmarkManager` | `final class` | Verwaltet kategorisierte Label-Lesezeichen mit atomarer Gson-JSON-Persistenz (`LabelBookmark`). |
+| `VJavaLinterAutoFixer` | `final class` | Idempotente, sichere Auto-Fixes für `UNDEFINED_SPEAKER` und fehlende `jump`/`call`-Ziel-Labels (`AutoFixResult`). |
+| `AutomatedPlaythroughRunner` | `final class` | Headless-Playthrough-Bot für `ScriptRuntime` mit `ChoiceStrategy` (`FIRST_CHOICE`, `LAST_CHOICE`, `ROUND_ROBIN`) und Label-Coverage (`PlaythroughReport`). |
+| `StudioCommandPalette` | `final class` | Durchsuchbare Studio-Befehlspalette (`PaletteCommand`) mit Shortcut-Metadaten und begrenzter Historie. |
+| `ExportPreFlightChecker` | `final class` | Release-Vorabprüfung (`PreFlightReport`) über `ProjectDescriptor`, `VJavaLinter`, `assets/` und `tl/` als Markdown-Checkliste. |
+| `VpakManifestInspector` | `final class` | Prüft alle Einträge eines `.vpak`-Archivs inklusive CRC32-Verifikation, Kompressionsrate und Extension-Statistik (`VpakInspectionReport`). |
+| `StudioWorkspaceState` | `final class` | Persistiert Studio-Workspace-Einstellungen (letztes Projekt, Recent-Projects, Panel-Auswahl) atomar als JSON. |
 
 ## Öffentliche API-Signaturen
 
