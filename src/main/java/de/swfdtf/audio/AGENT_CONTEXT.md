@@ -29,6 +29,11 @@ LWJGL-3-/OpenAL-Audio-, DSP-, Lip-Sync- und Accessibility-TTS-Subsystem von KAGA
 | `LipSyncAnalyzer` | `final class` | Attack/Release-Hüllkurven-Analysator, der Echtzeit-Voice-RMS-Amplituden in geglättete Mundöffnung (`[0, 1]`) und `MouthShape` überführt. |
 | `LipSyncAnalyzer.MouthShape` | `enum` | Diskrete Mundanimationszustände (`CLOSED`, `HALF_OPEN`, `OPEN`). |
 | `TextToSpeechService` | `final class` | Nicht-blockierender Self-Voicing-TTS-Dienst (`implements AutoCloseable`) auf einem Virtual-Thread-Worker mit `TextTagParser`-Bereinigung und OS-Sprachausgabe. |
+| `AudioDuckingController` | `final class` | Attack-/Release-Hüllkurve zur sanften Musik-/Ambient-Absenkung während aktiver Sprachausgabe (`applyToGain`). |
+| `AmbientCrossfadeMixer` | `final class` | Mehrspur-Ambient-Soundscape-Mixer mit benannten Ebenen, Presets und sanfter Überblendung (`getActiveWeights`). |
+| `ClosedCaptionQueue` | `final class` | Barrierefreie Untertitel-/Closed-Caption-Warteschlange (`DIALOGUE`, `SFX`, `MUSIC`) mit Ablauf-Timer und Kategorie-Filter. |
+| `AudioCueRegistry` | `final class` | Logische `AudioCue`-Registry mit Kanal-Filterung, `Optional`-Lookup und Gson-JSON-Serialisierung. |
+| `VoicePlaybackBookmark` | `final class` | Begrenzter Verlauf zuletzt abgespielter Voice-Clips (`VoiceClipRecord`) mit Lookup nach `lineId` und Sprecher. |
 
 ## Öffentliche API-Signaturen
 

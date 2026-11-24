@@ -45,6 +45,11 @@ Vollständige 4-Schichten-State-, Rollback-, Save/Load-, Verlaufs-, Meta-Progres
 | `SaveSlotQueryService` | `final class` | Tagging, Volltextsuche, Filterung nach Tag/Label und Sortierung (Zeitstempel/Spielzeit) über `SaveSlotData` mit `Optional`- und unveränderlichen Listen-Ergebnissen. |
 | `SaveMigrationStep` | `interface` | Versionsschritt (`fromVersion()`, `toVersion()`, `migrate(SaveSlotData)`) für abwärtskompatible Spielstand-Migrationen. |
 | `SaveMigrationService` | `final class` | Validierte Migrations-Pipeline für `SaveSlotData` inklusive Versions-Tracking (`__saveVersion`) und Migrationsprotokoll (`__migrationTrail`). |
+| `AutoReadController` | `class` | Dynamische CPS-basierte Auto-Read-Steuerung (`startLine`, `update(dt, typewriterFinished, voicePlaying)`) mit optionalem Warten auf Sprachausgabe. |
+| `SkipModeController` | `class` | Steuert Schnell-Überspringen (`OFF`, `READ_ONLY`, `ALL`) inklusive Schutz vor Ungelesenem und automatischem Stopp bei Auswahlmenüs. |
+| `ChapterRegistry` | `class` | Kapitelauswahl- und Freischalt-Manager (`ChapterDef`) über `PersistentAccess` inklusive Fortschritts-Prozentwert. |
+| `CodexGlossaryManager` | `class` | In-Game-Codex/Glossar (`CodexEntry`) über `PersistentAccess` mit Kategorie-Filter, Suche und Freischalt-Fortschritt. |
+| `RelationshipAffinityTracker` | `class` | Charakter-Vertrauens-/Zuneigungs-Tracker (`RelationshipTier`: `HOSTILE`..`DEVOTED`) mit optionaler `StateStore`-Synchronisation und Listener-Events. |
 
 ## Öffentliche API-Signaturen
 

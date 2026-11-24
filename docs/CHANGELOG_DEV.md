@@ -4,6 +4,29 @@ Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architekt
 
 ---
 
+## [Welle 3 — Abgeschlossen] 15 Gameplay-, Grafik-, Audio- & Accessibility-Features
+
+* **`de.swfdtf.graphics` (`Wave3GraphicsFeaturesTest`)**:
+  1. `WeatherOverlayController` (dynamische Wetter-Presets `CLEAR`/`RAIN`/`SNOW`/`FOG`/`EMBERS`, Wind, Nebel-Tint & `ParticleSystem`-Sync).
+  2. `ColorBlindnessFilter` (`ColorMatrix4f`-Barrierefreiheitsfilter für Protanopie, Deuteranopie, Tritanopie, High-Contrast & Grayscale).
+  3. `CameraDirectorPresets` (kinematische Kamera-Presets mit `Transform2D`-Interpolation).
+  4. `ScreenshotCaptureService` (pure STB-PNG-Aufnahme über `TextureManager.writePng` ohne `java.awt`).
+  5. `CinematicLetterboxController` (animierte Kinobalken im `1920x1080`-Raum).
+* **`de.swfdtf.audio` (`Wave3AudioFeaturesTest`)**:
+  6. `AudioDuckingController` (Attack/Release-BGM-Absenkung bei aktiver Sprachausgabe).
+  7. `AmbientCrossfadeMixer` (mehrschichtiger Ambient-Soundscape-Mixer mit Presets).
+  8. `ClosedCaptionQueue` (Untertitel-Warteschlange für `DIALOGUE`/`SFX`/`MUSIC`).
+  9. `AudioCueRegistry` (logische Audio-Cues mit Gson-JSON-Export/-Import).
+  10. `VoicePlaybackBookmark` (begrenzter Voice-Line-Wiedergabeverlauf nach Zeile und Sprecher).
+* **`de.swfdtf.state` (`Wave3GameplayFeaturesTest`)**:
+  11. `AutoReadController` (dynamisches CPS-Auto-Read mit `waitForVoice`).
+  12. `SkipModeController` (`OFF`/`READ_ONLY`/`ALL` mit `stopOnChoice`).
+  13. `ChapterRegistry` (Kapitelauswahl & Freischaltung über `PersistentAccess`).
+  14. `CodexGlossaryManager` (Codex/Glossar mit Suche, Kategorien & `PersistentAccess`).
+  15. `RelationshipAffinityTracker` (Charakter-Zuneigungsstufen `HOSTILE`..`DEVOTED`, Events & optionale `StateStore`-Bindung).
+
+---
+
 ## [Welle 2 — Abgeschlossen] 15 Studio-Tooling-, Analyse- & Authoring-Features (`de.swfdtf.tools`)
 
 * **Analyse & Suche (`Wave2AnalysisToolsTest`)**:

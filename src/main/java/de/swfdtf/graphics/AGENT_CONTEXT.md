@@ -46,6 +46,11 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- 
 | `ParticleSystem` | `final class` | GPU-batchbares und headless simulierbares 2D-Partikel- und Wettersystem (`implements CustomDisplayable`) mit `Particle`, `ParticleEmitter` und 5 Presets (`SNOW_BLOSSOM`, `RAIN`, `CHERRY_BLOSSOM`, `SPARKS`, `DUST`). |
 | `VideoPlayer` | `final class` | Video-Playback-Controller (`implements AutoCloseable`) mit austauschbaren `FrameSource`-Streams (`ProceduralTestFrameSource`, Virtual-Thread-`FfmpegProcessFrameSource`) und optionalem OpenGL-Textur-Upload. |
 | `MovieSprite` | `class` | Animierter `SpriteNode` (`extends SpriteNode implements AutoCloseable`), der einen `VideoPlayer` für Cutscenes und Video-Hintergründe in den Szenengraph einbindet. |
+| `WeatherOverlayController` | `final class` | Dynamische Wetter-Presets (`CLEAR`, `RAIN`, `SNOW`, `FOG`, `EMBERS`) mit Windvektor, sanftem Intensitätsübergang, Nebel-Tint (`ColorMatrix4f`) und optionaler `ParticleSystem`-Synchronisation. |
+| `ColorBlindnessFilter` | `final class` | Barrierefreiheits-Farbmatrix-Generator (`NONE`, `PROTANOPIA`, `DEUTERANOPIA`, `TRITANOPIA`, `HIGH_CONTRAST`, `GRAYSCALE`) mit Intensitätsmischung `0..1`. |
+| `CameraDirectorPresets` | `final class` | Kinematische Kamera-Presets (`ESTABLISHING`, `CLOSE_UP`, `DRAMATIC_TILT`, `PAN_LEFT_TO_RIGHT`, `ZOOM_PULSE`) mit flüssiger Interpolation zu `CameraState` und `Transform2D`. |
+| `ScreenshotCaptureService` | `final class` | Schreibt RGBA8-Framebuffer-Snapshots ohne `java.awt` über `TextureManager.writePng` als PNGs inklusive Dateinamen-Bereinigung und Listing. |
+| `CinematicLetterboxController` | `final class` | Animiert Kinobalken (`Rect2f` oben/unten) im logischen `1920x1080`-Koordinatenraum. |
 
 ## Öffentliche API-Signaturen
 
