@@ -1817,4 +1817,42 @@ public final class ObjectMotionController {
         PhysicsBody body = physicsBodies.get(tag);
         return body != null && body.grounded;
     }
+
+    /**
+     * Returns the first active WASD-controlled sprite tag, or {@code null} if none is bound.
+     *
+     * @return active WASD sprite tag or {@code null}
+     */
+    public String getPrimaryWasdTag() {
+        return wasdBindings.isEmpty() ? null : wasdBindings.keySet().iterator().next();
+    }
+
+    /**
+     * Returns all distinct partner sprite tags linked to {@code spriteTag} via {@code on_collide}
+     * or {@code on_overlap} triggers.
+     *
+     * @param spriteTag query sprite tag (nullable)
+     * @return immutable list of interactive partner tags
+     */
+    public List<String> getInteractivePartnersFor(String spriteTag) {
+        if (spriteTag == null || spriteTag.isBlank()) {
+            return List.of();
+        }
+        Set<String> partners = new LinkedHashSet<>();
+        for (CollisionTrigger t : collisionTriggers) {
+            if (spriteTag.equals(t.tagA)) {
+                partners.add(t.tagB);
+            } else if (spriteTag.equals(t.tagB)) {
+                partners.add(t.tagA);
+            }
+        }
+        for (OverlapTrigger t : overlapTriggers) {
+            if (spriteTag.equals(t.tagA)) {
+                partners.add(t.tagB);
+            } else if (spriteTag.equals(t.tagB)) {
+                partners.add(t.tagA);
+            }
+        }
+        return List.copyOf(partners);
+    }
 }

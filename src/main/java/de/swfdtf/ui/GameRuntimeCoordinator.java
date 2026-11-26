@@ -11,8 +11,11 @@ import de.swfdtf.audio.VoicePlaybackBookmark;
 import de.swfdtf.core.EngineAPI;
 import de.swfdtf.core.EngineApplication;
 import de.swfdtf.core.GameHost;
+import de.swfdtf.core.GamepadNavigationRouter;
 import de.swfdtf.core.InputManager;
+import de.swfdtf.core.KeybindingRemapper;
 import de.swfdtf.graphics.AnimationEngine;
+import de.swfdtf.graphics.ColorBlindnessFilter;
 import de.swfdtf.graphics.FontManager;
 import de.swfdtf.graphics.IRenderPipeline;
 import de.swfdtf.graphics.ObjectMotionController;
@@ -55,6 +58,7 @@ public final class GameRuntimeCoordinator implements GameHost {
     private static final String LIVE_DIRECTOR_CLASS = "de.swfdtf.tools.LiveDirectorOverlay";
     private static final String DEVELOPER_INSPECTORS_CLASS = "de.swfdtf.tools.DeveloperInspectors";
     private static final String COLLISION_DEBUG_TAG = "collision_debug_overlay";
+    private static final float ACTION_PROMPT_MAX_DISTANCE = 160.0f;
 
     private EngineApplication app;
     private EngineAPI api;
@@ -89,6 +93,10 @@ public final class GameRuntimeCoordinator implements GameHost {
     private EndingsTreeScreen endingsTreeScreen;
     private AchievementsScreen achievementsScreen;
     private NotificationToastOverlay toastOverlay;
+    private ClosedCaptionOverlayScreen closedCaptionOverlay;
+    private ActionPromptOverlayScreen actionPromptOverlay;
+    private KeybindingRemapper keybindingRemapper;
+    private ColorBlindnessFilter colorBlindnessFilter;
 
     private Screen liveDirectorScreen;
     private Screen developerInspectorsScreen;
@@ -128,6 +136,8 @@ public final class GameRuntimeCoordinator implements GameHost {
         this.lipSyncAnalyzer = new LipSyncAnalyzer();
         this.ttsService = new TextToSpeechService();
         this.ttsService.setOsCommandExecutionEnabled(!api.getConfig().headless());
+        this.colorBlindnessFilter = new ColorBlindnessFilter();
+        this.keybindingRemapper = createDefaultKeybindingRemapper();
 
         this.screenManager = new ScreenManager();
         this.screenManager.setLogicalSize(api.getConfig().logicalWidth(), api.getConfig().logicalHeight());
@@ -241,6 +251,9 @@ public final class GameRuntimeCoordinator implements GameHost {
         api.registerService(TransitionManager.class, transitionManager);
         api.registerService(ScreenManager.class, screenManager);
         api.registerService(AutoSaveScheduler.class, autoSaveScheduler);
+        api.registerService(KeybindingRemapper.class, keybindingRemapper);
+        api.registerService(GamepadNavigationRouter.class, screenManager.getGamepadRouter());
+        api.registerService(ColorBlindnessFilter.class, colorBlindnessFilter);
     }
 
     private void buildAndRegisterScreens() {
@@ -254,7 +267,7 @@ public final class GameRuntimeCoordinator implements GameHost {
         this.saveLoadScreen = new SaveLoadScreen(session, screenManager);
         this.preferencesScreen = new PreferencesScreen(session, screenManager);
         this.preferencesScreen.setFontManager(fontManager);
-        this.controlsScreen = new ControlsScreen(screenManager);
+        this.controlsScreen = new ControlsScreen(screenManager, keybindingRemapper);
         this.aboutScreen = new AboutScreen(session, screenManager);
         this.historyLogScreen = new HistoryLogScreen(session, screenManager, audioEngine);
         this.galleryScreen = new GalleryScreen(session, screenManager);
@@ -262,6 +275,8 @@ public final class GameRuntimeCoordinator implements GameHost {
         this.endingsTreeScreen = new EndingsTreeScreen(session, screenManager);
         this.achievementsScreen = new AchievementsScreen(session, screenManager);
         this.toastOverlay = new NotificationToastOverlay(session, screenManager);
+        this.closedCaptionOverlay = new ClosedCaptionOverlayScreen(audioEngine.getClosedCaptionQueue());
+        this.actionPromptOverlay = new ActionPromptOverlayScreen();
 
         registerHidden(advScreen);
         registerHidden(nvlScreen);
@@ -279,6 +294,8 @@ public final class GameRuntimeCoordinator implements GameHost {
         registerHidden(musicRoomScreen);
         registerHidden(endingsTreeScreen);
         registerHidden(achievementsScreen);
+        registerHidden(closedCaptionOverlay);
+        registerHidden(actionPromptOverlay);
         screenManager.showScreen(toastOverlay);
 
         // Register custom .vjava screen definitions
@@ -435,17 +452,35 @@ public final class GameRuntimeCoordinator implements GameHost {
             syncCollisionDebugOverlay();
         }
         syncDialogueAndOverlayScreens();
+        if (closedCaptionOverlay != null) {
+            closedCaptionOverlay.syncFromQueue();
+        }
+        syncActionPromptOverlay();
         screenManager.update(dt, input);
     }
 
     private ObjectMotionController.MotionInput extractMotionInput(InputManager input) {
-        boolean up = input.isKeyDown(GLFW.GLFW_KEY_W) || input.isKeyDown(GLFW.GLFW_KEY_UP);
-        boolean down = input.isKeyDown(GLFW.GLFW_KEY_S) || input.isKeyDown(GLFW.GLFW_KEY_DOWN);
-        boolean left = input.isKeyDown(GLFW.GLFW_KEY_A) || input.isKeyDown(GLFW.GLFW_KEY_LEFT);
-        boolean right = input.isKeyDown(GLFW.GLFW_KEY_D) || input.isKeyDown(GLFW.GLFW_KEY_RIGHT);
-        boolean jump = input.wasKeyJustPressed(GLFW.GLFW_KEY_SPACE)
-                || input.wasKeyJustPressed(GLFW.GLFW_KEY_W)
-                || input.wasKeyJustPressed(GLFW.GLFW_KEY_UP);
+        float axisX = input.getGamepadAxis(GLFW.GLFW_GAMEPAD_AXIS_LEFT_X);
+        float axisY = input.getGamepadAxis(GLFW.GLFW_GAMEPAD_AXIS_LEFT_Y);
+        int quickSaveKey = keybindingRemapper.getKeyCode("QuickSave").orElse(GLFW.GLFW_KEY_S);
+        int autoKey = keybindingRemapper.getKeyCode("Auto").orElse(GLFW.GLFW_KEY_A);
+        int rightKey = keybindingRemapper.getKeyCode("Right").orElse(GLFW.GLFW_KEY_D);
+
+        boolean up = keybindingRemapper.isActionDown("Up", input) || axisY < 0.0f;
+        boolean down = keybindingRemapper.isActionDown("Down", input)
+                || (quickSaveKey == GLFW.GLFW_KEY_S && input.isKeyDown(GLFW.GLFW_KEY_S))
+                || axisY > 0.0f;
+        boolean left = keybindingRemapper.isActionDown("Left", input)
+                || (autoKey == GLFW.GLFW_KEY_A && input.isKeyDown(GLFW.GLFW_KEY_A))
+                || axisX < 0.0f;
+        boolean right = keybindingRemapper.isActionDown("Right", input)
+                || (rightKey == GLFW.GLFW_KEY_D && input.isKeyDown(GLFW.GLFW_KEY_RIGHT))
+                || axisX > 0.0f;
+        int jumpKey = keybindingRemapper.getKeyCode("Jump").orElse(GLFW.GLFW_KEY_UP);
+        int upKey = keybindingRemapper.getKeyCode("Up").orElse(GLFW.GLFW_KEY_W);
+        boolean jump = input.wasKeyJustPressed(jumpKey)
+                || input.wasKeyJustPressed(upKey)
+                || input.wasKeyJustPressed(GLFW.GLFW_KEY_SPACE);
         return new ObjectMotionController.MotionInput(up, down, left, right, jump);
     }
 
@@ -453,7 +488,8 @@ public final class GameRuntimeCoordinator implements GameHost {
         boolean shift = input.isShiftDown();
         boolean ctrl = input.isCtrlDown();
 
-        if (justPressed(input, GLFW.GLFW_KEY_V) && !ctrl && !shift && !screenManager.isModalActive()) {
+        int selfVoicingKey = keybindingRemapper.getKeyCode("SelfVoicing").orElse(GLFW.GLFW_KEY_V);
+        if (justPressed(input, selfVoicingKey) && !ctrl && !shift && !screenManager.isModalActive()) {
             PreferencesState prefs = session.getPreferencesState();
             prefs.setSelfVoicing(!prefs.isSelfVoicing());
             ttsService.setEnabled(prefs.isSelfVoicing());
@@ -501,6 +537,9 @@ public final class GameRuntimeCoordinator implements GameHost {
         if (screenManager.isModalActive()) {
             if (justPressed(input, GLFW.GLFW_KEY_ESCAPE)) {
                 Screen topModal = screenManager.getTopModalScreen();
+                if (topModal instanceof ControlsScreen cs && cs.isCapturingKey()) {
+                    return;
+                }
                 if (topModal != null && !MainMenuScreen.SCREEN_NAME.equals(topModal.getName())) {
                     screenManager.hideScreen(topModal.getName());
                 }
@@ -508,21 +547,33 @@ public final class GameRuntimeCoordinator implements GameHost {
             return;
         }
 
+        int rollbackKey = keybindingRemapper.getKeyCode("Rollback").orElse(GLFW.GLFW_KEY_PAGE_UP);
+        int rollForwardKey = keybindingRemapper.getKeyCode("RollForward").orElse(GLFW.GLFW_KEY_PAGE_DOWN);
+        int quickSaveKey = keybindingRemapper.getKeyCode("QuickSave").orElse(GLFW.GLFW_KEY_S);
+        int quickLoadKey = keybindingRemapper.getKeyCode("QuickLoad").orElse(GLFW.GLFW_KEY_L);
+        int historyKey = keybindingRemapper.getKeyCode("History").orElse(GLFW.GLFW_KEY_H);
+        int autoKey = keybindingRemapper.getKeyCode("Auto").orElse(GLFW.GLFW_KEY_A);
+        int advanceKey = keybindingRemapper.getKeyCode("Advance").orElse(GLFW.GLFW_KEY_SPACE);
+        int rightKey = keybindingRemapper.getKeyCode("Right").orElse(GLFW.GLFW_KEY_D);
+        int skipKey = keybindingRemapper.getKeyCode("Skip").orElse(GLFW.GLFW_KEY_LEFT_CONTROL);
+
         // In-game shortcuts when no modal screen blocks input
-        if (justPressed(input, GLFW.GLFW_KEY_PAGE_UP)) {
+        if (justPressed(input, rollbackKey)) {
             if (!session.rollback() && session.getStateStore().isRollbackBlocked() && toastOverlay != null) {
                 toastOverlay.pushToast("Rollback Blocked", "Cannot roll back past a decision barrier.");
             }
-        } else if (justPressed(input, GLFW.GLFW_KEY_PAGE_DOWN)) {
+        } else if (justPressed(input, rollForwardKey)) {
             session.rollForward();
-        } else if (!wasdActive && justPressed(input, GLFW.GLFW_KEY_S) && !ctrl && !shift) {
+        } else if (justPressed(input, quickSaveKey) && (!wasdActive || quickSaveKey != GLFW.GLFW_KEY_S)
+                && !ctrl && !shift) {
             try {
                 session.quickSave();
                 toastOverlay.pushToast("Quick Save", "Saved to Quick Slot");
             } catch (IOException ex) {
                 api.logError("QuickSave failed: " + ex.getMessage());
             }
-        } else if (justPressed(input, GLFW.GLFW_KEY_L) && !ctrl && !shift) {
+        } else if (justPressed(input, quickLoadKey) && (!wasdActive || quickLoadKey != rightKey)
+                && !ctrl && !shift) {
             try {
                 if (session.getSaveManager().slotExists("quick")) {
                     session.quickLoad();
@@ -531,24 +582,25 @@ public final class GameRuntimeCoordinator implements GameHost {
             } catch (IOException ex) {
                 api.logError("QuickLoad failed: " + ex.getMessage());
             }
-        } else if (justPressed(input, GLFW.GLFW_KEY_H) && !ctrl && !shift) {
+        } else if (justPressed(input, historyKey) && !ctrl && !shift) {
             historyLogScreen.refreshEntries();
             screenManager.showScreen(historyLogScreen);
-        } else if (!wasdActive && justPressed(input, GLFW.GLFW_KEY_A) && !ctrl && !shift) {
+        } else if (justPressed(input, autoKey) && (!wasdActive || autoKey != GLFW.GLFW_KEY_A)
+                && !ctrl && !shift) {
             advScreen.toggleAuto();
             toastOverlay.setAutoPillActive(advScreen.isAutoActive());
         } else if (justPressed(input, GLFW.GLFW_KEY_ESCAPE)) {
             screenManager.showScreen(mainMenuScreen);
-        } else if ((justPressed(input, GLFW.GLFW_KEY_SPACE) || justPressed(input, GLFW.GLFW_KEY_ENTER))
+        } else if ((justPressed(input, advanceKey)
+                || (advanceKey == GLFW.GLFW_KEY_SPACE && justPressed(input, GLFW.GLFW_KEY_ENTER)))
                 && !ctrl && !shift) {
             advanceCurrentDialogueMode();
         }
 
-        if (ctrl && advScreen != null) {
+        boolean skipHeld = input.isKeyDown(skipKey) || (skipKey == GLFW.GLFW_KEY_LEFT_CONTROL && ctrl);
+        if (skipHeld && advScreen != null) {
             advScreen.setSkipActive(true);
             toastOverlay.setSkipPillActive(true);
-        } else if (advScreen != null && !input.isCtrlDown() && advScreen.isSkipActive()) {
-            // Leave skip toggleable from QuickMenu too; hold Ctrl activates fast skip
         }
     }
 
@@ -677,10 +729,85 @@ public final class GameRuntimeCoordinator implements GameHost {
         return mode.trim().toUpperCase(Locale.ROOT);
     }
 
+    private void syncActionPromptOverlay() {
+        if (actionPromptOverlay == null || session == null) {
+            return;
+        }
+        if (screenManager.isModalActive()) {
+            actionPromptOverlay.updatePrompt(false, 0.0f, 0.0f, "", "");
+            return;
+        }
+        SceneController sc = session.getSceneController();
+        ObjectMotionController motion = sc.getMotionController();
+        String playerTag = motion.getPrimaryWasdTag();
+        if (playerTag == null) {
+            actionPromptOverlay.updatePrompt(false, 0.0f, 0.0f, "", "");
+            return;
+        }
+        SpriteNode playerSprite = sc.getActiveSprite(playerTag);
+        if (playerSprite == null) {
+            actionPromptOverlay.updatePrompt(false, 0.0f, 0.0f, "", "");
+            return;
+        }
+        float px = playerSprite.getTransform().getXpos();
+        float py = playerSprite.getTransform().getYpos();
+        SpriteNode nearestPartner = null;
+        double nearestDist = Double.MAX_VALUE;
+        for (String partnerTag : motion.getInteractivePartnersFor(playerTag)) {
+            SpriteNode partner = sc.getActiveSprite(partnerTag);
+            if (partner == null) {
+                continue;
+            }
+            double dist = Math.hypot(partner.getTransform().getXpos() - px, partner.getTransform().getYpos() - py);
+            if (dist <= ACTION_PROMPT_MAX_DISTANCE && dist < nearestDist) {
+                nearestDist = dist;
+                nearestPartner = partner;
+            }
+        }
+        if (nearestPartner == null) {
+            actionPromptOverlay.updatePrompt(false, 0.0f, 0.0f, "", "");
+            return;
+        }
+        int interactKey = keybindingRemapper.getKeyCode("Interact").orElse(GLFW.GLFW_KEY_E);
+        String keyBadge = ControlsScreen.formatKeyName(interactKey);
+        actionPromptOverlay.updatePrompt(
+                true,
+                nearestPartner.getTransform().getXpos(),
+                nearestPartner.getTransform().getYpos(),
+                keyBadge,
+                "Untersuchen"
+        );
+    }
+
+    private static KeybindingRemapper createDefaultKeybindingRemapper() {
+        KeybindingRemapper remapper = new KeybindingRemapper();
+        remapper.registerDefault("Advance", GLFW.GLFW_KEY_SPACE);
+        remapper.registerDefault("QuickSave", GLFW.GLFW_KEY_S);
+        remapper.registerDefault("QuickLoad", GLFW.GLFW_KEY_L);
+        remapper.registerDefault("Auto", GLFW.GLFW_KEY_A);
+        remapper.registerDefault("Skip", GLFW.GLFW_KEY_LEFT_CONTROL);
+        remapper.registerDefault("History", GLFW.GLFW_KEY_H);
+        remapper.registerDefault("Rollback", GLFW.GLFW_KEY_PAGE_UP);
+        remapper.registerDefault("RollForward", GLFW.GLFW_KEY_PAGE_DOWN);
+        remapper.registerDefault("SelfVoicing", GLFW.GLFW_KEY_V);
+        remapper.registerDefault("Up", GLFW.GLFW_KEY_W);
+        remapper.registerDefault("Down", GLFW.GLFW_KEY_DOWN);
+        remapper.registerDefault("Left", GLFW.GLFW_KEY_LEFT);
+        remapper.registerDefault("Right", GLFW.GLFW_KEY_D);
+        remapper.registerDefault("Jump", GLFW.GLFW_KEY_UP);
+        remapper.registerDefault("Interact", GLFW.GLFW_KEY_E);
+        return remapper;
+    }
+
     private void applyPreferencesToSubsystems(PreferencesState prefs) {
         fontManager.setDyslexiaFriendlyMode(prefs.isHighContrastDyslexiaFont());
         fontManager.setGlobalTextScale(prefs.getUiTextScale());
         ttsService.setEnabled(prefs.isSelfVoicing());
+        api.getInput().setGamepadDeadzone(prefs.getGamepadDeadzone());
+        screenManager.getGamepadRouter().setDeadzone(prefs.getGamepadDeadzone());
+        colorBlindnessFilter.setMode(prefs.isHighContrastDyslexiaFont()
+                ? ColorBlindnessFilter.AccessibilityMode.HIGH_CONTRAST
+                : ColorBlindnessFilter.AccessibilityMode.NONE);
         if ("3D".equalsIgnoreCase(prefs.getRenderMode())) {
             app.switchRenderPipeline(RenderMode.MODE_3D);
         }

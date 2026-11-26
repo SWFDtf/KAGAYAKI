@@ -48,6 +48,7 @@ public final class PreferencesState {
     private boolean selfVoicing = false;
     private boolean highContrastDyslexiaFont = false;
     private float uiTextScale = 1.0f;
+    private float gamepadDeadzone = 0.15f;
 
     /**
      * Creates a {@code PreferencesState} initialized with engine defaults.
@@ -140,6 +141,11 @@ public final class PreferencesState {
         }
         if (!Float.isFinite(uiTextScale) || uiTextScale <= 0.0f) {
             uiTextScale = 1.0f;
+        }
+        if (!Float.isFinite(gamepadDeadzone) || gamepadDeadzone < 0.0f) {
+            gamepadDeadzone = 0.15f;
+        } else if (gamepadDeadzone > 0.95f) {
+            gamepadDeadzone = 0.95f;
         }
     }
 
@@ -456,6 +462,28 @@ public final class PreferencesState {
         this.uiTextScale = (!Float.isFinite(uiTextScale) || uiTextScale <= 0.0f) ? 1.0f : uiTextScale;
     }
 
+    /**
+     * Returns the configured analog gamepad deadzone threshold.
+     *
+     * @return deadzone threshold in {@code [0.0, 0.95]}
+     */
+    public synchronized float getGamepadDeadzone() {
+        return gamepadDeadzone;
+    }
+
+    /**
+     * Sets the analog gamepad deadzone threshold.
+     *
+     * @param gamepadDeadzone deadzone threshold in {@code [0.0, 0.95]}
+     */
+    public synchronized void setGamepadDeadzone(float gamepadDeadzone) {
+        if (!Float.isFinite(gamepadDeadzone) || gamepadDeadzone < 0.0f) {
+            this.gamepadDeadzone = 0.15f;
+        } else {
+            this.gamepadDeadzone = Math.min(0.95f, gamepadDeadzone);
+        }
+    }
+
     @Override
     public synchronized boolean equals(Object obj) {
         if (this == obj) {
@@ -477,6 +505,7 @@ public final class PreferencesState {
                 && selfVoicing == other.selfVoicing
                 && highContrastDyslexiaFont == other.highContrastDyslexiaFont
                 && Float.compare(uiTextScale, other.uiTextScale) == 0
+                && Float.compare(gamepadDeadzone, other.gamepadDeadzone) == 0
                 && Objects.equals(renderMode, other.renderMode)
                 && Objects.equals(language, other.language)
                 && Objects.equals(dialogueMode, other.dialogueMode);
@@ -488,7 +517,7 @@ public final class PreferencesState {
                 masterVolume, musicVolume, soundVolume, voiceVolume, ambientVolume,
                 textSpeedCps, autoForwardDelaySeconds, skipUnread, skipAfterChoices,
                 fullscreen, renderMode, language, dialogueMode,
-                selfVoicing, highContrastDyslexiaFont, uiTextScale
+                selfVoicing, highContrastDyslexiaFont, uiTextScale, gamepadDeadzone
         );
     }
 }

@@ -332,7 +332,8 @@ public final class F06InputAccessibilityBoundaryE2eTest {
             prefs.setHighContrastDyslexiaFont(true);
             prefs.setUiTextScale(-5.0f);
             assertEquals(1.0f, prefs.getUiTextScale(), 0.001f);
-            fontManager.setGlobalTextScale(-1.0f);
+            assertThrows(IllegalArgumentException.class, () -> fontManager.setGlobalTextScale(-1.0f));
+            fontManager.setGlobalTextScale(0.1f);
             assertTrue(fontManager.getGlobalTextScale() > 0.0f);
             assertTrue(computeContrastRatio(ThemePalette.TEXT_PRIMARY, ThemePalette.CANVAS_BG) >= 7.0);
         }

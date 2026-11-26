@@ -190,10 +190,10 @@ public final class F06InputAccessibilityE2eTest {
             assertEquals("Zweite Dialogzeile nach dem Advance.",
                     session.getRuntime().getActiveDialogue().interpolatedText());
 
-            // Remapped QuickSave key F5 must write saves/quick.vjsave.
+            // Remapped QuickSave key F5 must write saves/quick.ksav.
             tapKey(app, GLFW.GLFW_KEY_F5);
-            assertTrue(Files.isRegularFile(projectDir.resolve("saves/quick.vjsave")),
-                    "Remapped QuickSave key F5 must create saves/quick.vjsave");
+            assertTrue(Files.isRegularFile(projectDir.resolve("saves/quick.ksav")),
+                    "Remapped QuickSave key F5 must create saves/quick.ksav");
 
             // Jump to wasd_scene and verify remapped Right key L moves player sprite.
             session.getRuntime().jumpToLabel("wasd_scene");
@@ -475,8 +475,11 @@ public final class F06InputAccessibilityE2eTest {
 
             PreferencesScreen prefsScreen = (PreferencesScreen) screens.getScreen(PreferencesScreen.SCREEN_NAME);
             assertNotNull(prefsScreen);
+            screens.showScreen(prefsScreen);
+            app.stepOnce(FIXED_DT);
             clickNode(screens, prefsScreen.getDyslexiaFontToggle());
             app.stepOnce(FIXED_DT);
+            screens.hideScreen(PreferencesScreen.SCREEN_NAME);
 
             assertTrue(session.getPreferencesState().isHighContrastDyslexiaFont());
             assertTrue(fontManager.isDyslexiaFriendlyMode());

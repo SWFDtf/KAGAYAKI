@@ -13,7 +13,7 @@ label start:
     move player to 200 500
     move chest to 250 500
     wasd_init player speed 260 bounds 40 40 1880 1040 diagonal_norm true
-    on_collide player chest call inspect_chest
+    on_collide player chest jump inspect_chest
     lena "Trete an die Truhe heran."
     return
 

@@ -1,5 +1,6 @@
 package de.swfdtf.ui;
 
+import de.swfdtf.core.GamepadNavigationRouter;
 import de.swfdtf.core.InputManager;
 import de.swfdtf.graphics.FontManager;
 import de.swfdtf.graphics.RenderPipeline2D;
@@ -20,6 +21,7 @@ import java.util.Objects;
 public final class ScreenManager {
 
     private final Map<String, Screen> screens = new LinkedHashMap<>();
+    private final GamepadNavigationRouter gamepadRouter = new GamepadNavigationRouter();
     private float logicalWidth = RenderPipeline2D.DEFAULT_LOGICAL_WIDTH;
     private float logicalHeight = RenderPipeline2D.DEFAULT_LOGICAL_HEIGHT;
     private final boolean[] previousButtons = new boolean[InputManager.MOUSE_BUTTON_COUNT];
@@ -64,6 +66,14 @@ public final class ScreenManager {
         screen.setVisible(true);
         screen.onShow();
         screen.layout(logicalWidth, logicalHeight);
+        if (focusedNode != null && !screen.isVisible()) {
+            focusedNode.setFocused(false);
+            focusedNode = null;
+        }
+        if (screen.isModal() && focusedNode != null) {
+            focusedNode.setFocused(false);
+            focusedNode = null;
+        }
     }
 
     /**
@@ -95,6 +105,10 @@ public final class ScreenManager {
         if (s.isVisible()) {
             s.setVisible(false);
             s.onHide();
+            if (focusedNode != null) {
+                focusedNode.setFocused(false);
+                focusedNode = null;
+            }
         }
         return true;
     }
@@ -200,6 +214,45 @@ public final class ScreenManager {
         }
         if (input != null) {
             routeInput(input);
+            routeGamepadNavigation(dt, input);
+        }
+    }
+
+    private void routeGamepadNavigation(double dt, InputManager input) {
+        List<GamepadNavigationRouter.NavigationDirection> navEvents = gamepadRouter.poll(input, Math.max(0.0, dt));
+        if (navEvents.isEmpty()) {
+            return;
+        }
+        List<Screen> eligible = getInputEligibleScreensTopDown();
+        Screen focusTarget = findTopFocusableScreen(eligible);
+        for (GamepadNavigationRouter.NavigationDirection dir : navEvents) {
+            switch (dir) {
+                case DOWN, RIGHT -> {
+                    if (focusTarget != null) {
+                        cycleFocus(focusTarget, false);
+                    }
+                }
+                case UP, LEFT -> {
+                    if (focusTarget != null) {
+                        cycleFocus(focusTarget, true);
+                    }
+                }
+                case CONFIRM -> {
+                    if (focusedNode != null && focusedNode.isVisible() && focusedNode.isEnabled()) {
+                        focusedNode.dispatchKeyPressed(GLFW.GLFW_KEY_ENTER, 0);
+                        eligible = getInputEligibleScreensTopDown();
+                        focusTarget = findTopFocusableScreen(eligible);
+                    }
+                }
+                case CANCEL -> {
+                    Screen topModal = getTopModalScreen();
+                    if (topModal != null && !MainMenuScreen.SCREEN_NAME.equals(topModal.getName())) {
+                        hideScreen(topModal.getName());
+                        eligible = getInputEligibleScreensTopDown();
+                        focusTarget = findTopFocusableScreen(eligible);
+                    }
+                }
+            }
         }
     }
 
@@ -350,7 +403,10 @@ public final class ScreenManager {
             }
         }
         if (key == GLFW.GLFW_KEY_TAB && !eligible.isEmpty()) {
-            cycleFocus(eligible.get(0), (mods & GLFW.GLFW_MOD_SHIFT) != 0);
+            Screen target = findTopFocusableScreen(eligible);
+            if (target != null) {
+                cycleFocus(target, (mods & GLFW.GLFW_MOD_SHIFT) != 0);
+            }
             return true;
         }
         return isModalActive();
@@ -409,6 +465,18 @@ public final class ScreenManager {
         }
     }
 
+    private Screen findTopFocusableScreen(List<Screen> eligible) {
+        List<UiNode> probe = new ArrayList<>();
+        for (Screen s : eligible) {
+            probe.clear();
+            collectFocusables(s.getRoot(), probe);
+            if (!probe.isEmpty()) {
+                return s;
+            }
+        }
+        return null;
+    }
+
     /**
      * Executes {@code render}.
      *
@@ -449,6 +517,15 @@ public final class ScreenManager {
      */
     public UiNode getFocusedNode() {
         return focusedNode;
+    }
+
+    /**
+     * Returns the integrated {@link GamepadNavigationRouter} used for UI focus navigation.
+     *
+     * @return gamepad navigation router
+     */
+    public GamepadNavigationRouter getGamepadRouter() {
+        return gamepadRouter;
     }
 
     /**

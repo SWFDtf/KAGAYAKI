@@ -2,6 +2,7 @@ package de.swfdtf.ui;
 
 import de.swfdtf.audio.AudioEngine;
 import de.swfdtf.audio.TextToSpeechService;
+import de.swfdtf.core.KeybindingRemapper;
 import de.swfdtf.graphics.SceneLayer;
 import de.swfdtf.graphics.StyledTextLayout;
 import de.swfdtf.graphics.TextTagParser;
@@ -199,7 +200,41 @@ public class AdvDialogueScreen extends Screen {
     @Override
     public void onShow() {
         syncFromRuntime(true);
+        applyHighContrastStyling();
         updateStatusIndicators();
+    }
+
+    @Override
+    public boolean triggerKeyBindings(int key, int mods) {
+        KeybindingRemapper remapper = session.getEngineApi().getService(KeybindingRemapper.class);
+        if (remapper == null) {
+            return super.triggerKeyBindings(key, mods);
+        }
+        if ((mods & (GLFW.GLFW_MOD_CONTROL | GLFW.GLFW_MOD_ALT | GLFW.GLFW_MOD_SUPER)) != 0) {
+            return false;
+        }
+        String action = remapper.findActionForKey(key).orElse(null);
+        if ("Advance".equals(action)) {
+            handlePrimaryAdvance();
+            return true;
+        }
+        if ("QuickSave".equals(action)) {
+            performQuickSave();
+            return true;
+        }
+        if ("QuickLoad".equals(action)) {
+            performQuickLoad();
+            return true;
+        }
+        if ("Rollback".equals(action)) {
+            session.rollback();
+            return true;
+        }
+        if ("RollForward".equals(action)) {
+            session.rollForward();
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -215,6 +250,7 @@ public class AdvDialogueScreen extends Screen {
         }
 
         syncFromRuntime(false);
+        applyHighContrastStyling();
 
         if (bleepCooldown > 0.0) {
             bleepCooldown = Math.max(0.0, bleepCooldown - dt);
@@ -464,6 +500,7 @@ public class AdvDialogueScreen extends Screen {
             if (Math.abs(dialogueText.getTypewriterCps() - targetCps) > 0.01f) {
                 dialogueText.setTypewriterCps(targetCps);
             }
+            applyHighContrastStyling();
             return;
         }
 
@@ -503,6 +540,28 @@ public class AdvDialogueScreen extends Screen {
                 tts.setEnabled(true);
                 tts.speak(lineText);
             }
+        }
+        applyHighContrastStyling();
+    }
+
+    private void applyHighContrastStyling() {
+        boolean highContrast = session.getPreferencesState().isHighContrastDyslexiaFont();
+        speakerText.setDropShadow(!highContrast);
+        dialogueText.setDropShadow(!highContrast);
+        statusBadge.setDropShadow(!highContrast);
+        if (highContrast) {
+            speakerText.setColorHex("#ffffff");
+            dialogueText.setColorHex(ThemePalette.TEXT_PRIMARY);
+            statusBadge.setColorHex("#ffffff");
+        } else {
+            if (lastPrompt != null && lastPrompt.speakerColorHex() != null
+                    && !lastPrompt.speakerColorHex().isBlank()) {
+                speakerText.setColorHex(lastPrompt.speakerColorHex());
+            } else {
+                speakerText.setColorHex(ThemePalette.ACCENT_HOVER);
+            }
+            dialogueText.setColorHex(ThemePalette.TEXT_PRIMARY);
+            statusBadge.setColorHex(ThemePalette.ACTIVE_SELECTED);
         }
     }
 

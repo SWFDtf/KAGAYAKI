@@ -1,11 +1,15 @@
 package de.swfdtf.ui;
 
+import de.swfdtf.core.InputManager;
+import de.swfdtf.core.KeybindingRemapper;
 import de.swfdtf.graphics.SceneLayer;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Built-in Dark-Slate Controls reference screen ({@code Z = 400}, modal) presenting a tabular
@@ -67,6 +71,7 @@ public class ControlsScreen extends Screen {
     );
 
     private final ScreenManager screenManager;
+    private final KeybindingRemapper keybindingRemapper;
     private final VBox rowsContainer;
     private final Viewport viewport;
     private final TextButton allTab;
@@ -76,6 +81,8 @@ public class ControlsScreen extends Screen {
 
     private Category activeCategory = Category.ALL;
     private final List<BindingEntry> visibleBindings = new ArrayList<>();
+    private final Map<String, TextButton> keyButtonsByAction = new LinkedHashMap<>();
+    private String capturingAction = null;
 
     /**
      * Creates a {@code ControlsScreen} optionally wired to {@code screenManager}.
@@ -83,8 +90,19 @@ public class ControlsScreen extends Screen {
      * @param screenManager UI screen manager (nullable)
      */
     public ControlsScreen(ScreenManager screenManager) {
+        this(screenManager, null);
+    }
+
+    /**
+     * Creates a {@code ControlsScreen} optionally wired to interactive keybinding remapping.
+     *
+     * @param screenManager      UI screen manager (nullable)
+     * @param keybindingRemapper optional live keybinding remapper (nullable)
+     */
+    public ControlsScreen(ScreenManager screenManager, KeybindingRemapper keybindingRemapper) {
         super(SCREEN_NAME, SceneLayer.Z_MODAL, true);
         this.screenManager = screenManager;
+        this.keybindingRemapper = keybindingRemapper;
 
         Frame backdrop = new Frame();
         UiMediaSupport.styleBackdrop(backdrop);
@@ -135,7 +153,99 @@ public class ControlsScreen extends Screen {
 
     @Override
     public void onShow() {
+        capturingAction = null;
         rebuildTable();
+    }
+
+    @Override
+    public boolean triggerKeyBindings(int key, int mods) {
+        if (capturingAction != null && keybindingRemapper != null) {
+            if (key == GLFW.GLFW_KEY_ESCAPE) {
+                capturingAction = null;
+                refreshRebindButtonLabels();
+                return true;
+            }
+            if (key >= 0 && key < InputManager.KEY_COUNT && !isModifierKey(key)) {
+                keybindingRemapper.rebindAllowingSwap(capturingAction, key);
+                capturingAction = null;
+                refreshRebindButtonLabels();
+                return true;
+            }
+            return false;
+        }
+        return super.triggerKeyBindings(key, mods);
+    }
+
+    /**
+     * Returns whether this screen is currently waiting for a key press to rebind an action.
+     *
+     * @return {@code true} while capturing a keybinding
+     */
+    public boolean isCapturingKey() {
+        return capturingAction != null;
+    }
+
+    /**
+     * Formats a GLFW key code into a concise human-readable key badge label.
+     *
+     * @param keyCode GLFW key code
+     * @return concise uppercase key label (e.g., {@code "E"}, {@code "F"}, {@code "SPACE"})
+     */
+    public static String formatKeyName(int keyCode) {
+        if (keyCode >= GLFW.GLFW_KEY_A && keyCode <= GLFW.GLFW_KEY_Z) {
+            return String.valueOf((char) ('A' + (keyCode - GLFW.GLFW_KEY_A)));
+        }
+        if (keyCode >= GLFW.GLFW_KEY_0 && keyCode <= GLFW.GLFW_KEY_9) {
+            return String.valueOf((char) ('0' + (keyCode - GLFW.GLFW_KEY_0)));
+        }
+        if (keyCode >= GLFW.GLFW_KEY_F1 && keyCode <= GLFW.GLFW_KEY_F12) {
+            return "F" + (1 + (keyCode - GLFW.GLFW_KEY_F1));
+        }
+        return switch (keyCode) {
+            case GLFW.GLFW_KEY_SPACE -> "SPACE";
+            case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> "ENTER";
+            case GLFW.GLFW_KEY_ESCAPE -> "ESC";
+            case GLFW.GLFW_KEY_LEFT_CONTROL, GLFW.GLFW_KEY_RIGHT_CONTROL -> "CTRL";
+            case GLFW.GLFW_KEY_LEFT_SHIFT, GLFW.GLFW_KEY_RIGHT_SHIFT -> "SHIFT";
+            case GLFW.GLFW_KEY_PAGE_UP -> "PAGE_UP";
+            case GLFW.GLFW_KEY_PAGE_DOWN -> "PAGE_DOWN";
+            case GLFW.GLFW_KEY_UP -> "UP";
+            case GLFW.GLFW_KEY_DOWN -> "DOWN";
+            case GLFW.GLFW_KEY_LEFT -> "LEFT";
+            case GLFW.GLFW_KEY_RIGHT -> "RIGHT";
+            default -> "KEY_" + keyCode;
+        };
+    }
+
+    private static boolean isModifierKey(int key) {
+        return key == GLFW.GLFW_KEY_LEFT_SHIFT
+                || key == GLFW.GLFW_KEY_RIGHT_SHIFT
+                || key == GLFW.GLFW_KEY_LEFT_CONTROL
+                || key == GLFW.GLFW_KEY_RIGHT_CONTROL
+                || key == GLFW.GLFW_KEY_LEFT_ALT
+                || key == GLFW.GLFW_KEY_RIGHT_ALT
+                || key == GLFW.GLFW_KEY_LEFT_SUPER
+                || key == GLFW.GLFW_KEY_RIGHT_SUPER;
+    }
+
+    private void beginCapture(String action) {
+        this.capturingAction = action;
+        refreshRebindButtonLabels();
+    }
+
+    private void refreshRebindButtonLabels() {
+        if (keybindingRemapper == null) {
+            return;
+        }
+        Map<String, Integer> bindings = keybindingRemapper.snapshotBindings();
+        for (Map.Entry<String, TextButton> entry : keyButtonsByAction.entrySet()) {
+            String action = entry.getKey();
+            TextButton btn = entry.getValue();
+            boolean activeCapture = action.equals(capturingAction);
+            int keyCode = bindings.getOrDefault(action, GLFW.GLFW_KEY_UNKNOWN);
+            btn.setText(activeCapture ? "Taste drücken..." : formatKeyName(keyCode));
+            btn.setSelected(activeCapture);
+        }
     }
 
     /**
@@ -165,9 +275,46 @@ public class ControlsScreen extends Screen {
 
         rowsContainer.clearChildren();
         visibleBindings.clear();
+        keyButtonsByAction.clear();
+
+        if (keybindingRemapper != null && (activeCategory == Category.ALL || activeCategory == Category.KEYBOARD)) {
+            for (Map.Entry<String, Integer> entry : keybindingRemapper.snapshotBindings().entrySet()) {
+                String action = entry.getKey();
+                String keyText = action.equals(capturingAction)
+                        ? "Taste drücken..."
+                        : formatKeyName(entry.getValue());
+                visibleBindings.add(new BindingEntry(Category.KEYBOARD, keyText, action));
+
+                Frame rowFrame = new Frame();
+                UiMediaSupport.styleElevatedCard(rowFrame);
+                rowFrame.setPadding(12.0f, 8.0f);
+
+                HBox row = new HBox();
+                row.setSpacing(20.0f);
+                row.setAlignCenterY(true);
+
+                TextWidget catLbl = UiMediaSupport.createMutedText(Category.KEYBOARD.name(), 18.0f);
+                catLbl.setPreferredSize(160.0f, 34.0f);
+                TextWidget actionLbl = UiMediaSupport.createTitleText(action, 20.0f);
+                actionLbl.setPreferredSize(540.0f, 34.0f);
+                TextButton rebindBtn = UiMediaSupport.createActionButton(
+                        keyText, 240.0f, 34.0f, () -> beginCapture(action));
+                rebindBtn.setSelected(action.equals(capturingAction));
+                keyButtonsByAction.put(action, rebindBtn);
+
+                row.addChild(catLbl);
+                row.addChild(rebindBtn);
+                row.addChild(actionLbl);
+                rowFrame.addChild(row);
+                rowsContainer.addChild(rowFrame);
+            }
+        }
 
         for (BindingEntry entry : DEFAULT_BINDINGS) {
             if (activeCategory != Category.ALL && entry.category() != activeCategory) {
+                continue;
+            }
+            if (keybindingRemapper != null && entry.category() == Category.KEYBOARD) {
                 continue;
             }
             visibleBindings.add(entry);

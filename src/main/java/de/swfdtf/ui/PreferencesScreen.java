@@ -2,6 +2,7 @@ package de.swfdtf.ui;
 
 import de.swfdtf.audio.AudioEngine;
 import de.swfdtf.audio.TextToSpeechService;
+import de.swfdtf.graphics.ColorBlindnessFilter;
 import de.swfdtf.graphics.FontManager;
 import de.swfdtf.graphics.SceneLayer;
 import de.swfdtf.parser.ScriptSession;
@@ -40,6 +41,7 @@ public class PreferencesScreen extends Screen {
     private final Slider textSpeedSlider;
     private final Slider autoDelaySlider;
     private final Slider uiScaleSlider;
+    private final Slider gamepadDeadzoneSlider;
 
     private final TextButton fullscreenToggle;
     private final TextButton skipUnreadToggle;
@@ -151,6 +153,12 @@ public class PreferencesScreen extends Screen {
                     if (fontManager != null) {
                         fontManager.setDyslexiaFriendlyMode(next);
                     }
+                    ColorBlindnessFilter filter = session.getEngineApi().getService(ColorBlindnessFilter.class);
+                    if (filter != null) {
+                        filter.setMode(next
+                                ? ColorBlindnessFilter.AccessibilityMode.HIGH_CONTRAST
+                                : ColorBlindnessFilter.AccessibilityMode.NONE);
+                    }
                     refreshLabels();
                 });
         this.uiScaleSlider = addSliderRow(rightCol, "UI Text Scale", prefs.getUiTextScale(), 0.75f, 1.75f, val -> {
@@ -159,6 +167,14 @@ public class PreferencesScreen extends Screen {
                 fontManager.setGlobalTextScale(val);
             }
         });
+        this.gamepadDeadzoneSlider = addSliderRow(
+                rightCol, "Gamepad Deadzone", prefs.getGamepadDeadzone(), 0.05f, 0.80f, val -> {
+                    prefs.setGamepadDeadzone(val);
+                    session.getEngineApi().getInput().setGamepadDeadzone(prefs.getGamepadDeadzone());
+                    if (screenManager != null) {
+                        screenManager.getGamepadRouter().setDeadzone(prefs.getGamepadDeadzone());
+                    }
+                });
 
         columns.addChild(leftCol);
         columns.addChild(rightCol);
@@ -239,6 +255,7 @@ public class PreferencesScreen extends Screen {
         textSpeedSlider.setValue(prefs.getTextSpeedCps());
         autoDelaySlider.setValue(prefs.getAutoForwardDelaySeconds());
         uiScaleSlider.setValue(prefs.getUiTextScale());
+        gamepadDeadzoneSlider.setValue(prefs.getGamepadDeadzone());
         refreshLabels();
     }
 
@@ -426,6 +443,15 @@ public class PreferencesScreen extends Screen {
      */
     public Slider getUiScaleSlider() {
         return uiScaleSlider;
+    }
+
+    /**
+     * Returns the gamepadDeadzoneSlider value.
+     *
+     * @return the resulting value
+     */
+    public Slider getGamepadDeadzoneSlider() {
+        return gamepadDeadzoneSlider;
     }
 
     /**
