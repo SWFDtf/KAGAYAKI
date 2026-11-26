@@ -54,6 +54,13 @@ Entwickler-Werkzeuge, Dual-Window-Studio-UI und Standalone-Build-Pipeline von KA
 | `StudioWorkspaceState` | `final class` | Persistiert Studio-Workspace-Einstellungen (letztes Projekt, Recent-Projects, Panel-Auswahl) atomar als JSON. |
 | `PerformanceBenchmarkRunner` | `final class` | Reproduzierbare Micro-Benchmark-Suite für Lexer, Parser, Motion-Controller, SceneGraph-Traversal und Rich-Text-Layout inkl. `docs/BENCHMARKS.md`-Export (`BenchmarkMetric`, `BenchmarkSuiteReport`). |
 | `VJavaSyntaxHighlighter` | `final class` | Schneller Single-Pass-Lexikal-Tokenizer (`TokenType`, `TokenRun`) für `.vjava`-Code mit `< 2 ms` pro 1.000 Zeilen und Java-Block-Schutz (`"}<<"`). |
+| `VJavaAutocompleteEngine` | `final class` | Kontextabhängige Code-Vervollständigung (`Suggestion`) für DSL-Keywords, Charaktere, Labels, Transforms und Projekt-Assets. |
+| `ProjectRefactorService` | `final class` | Projekt-Refactoring (`renameLabel`, `renameAssetTag`, `duplicateProject`, `archiveProjectZip`, `createNewScript`, `bumpProjectVersion`, `importExternalAsset`, `formatAllScripts`). |
+| `StudioAuthoringToolkit` | `final class` | Studio-Authoring-Helfer (`ScreenAspectPreset`, `TimelineCue`, `ProjectDescriptorFormModel`, `VoiceMatchProposal`, `LipSyncCalibration`, `ScreenshotDiffResult`, `AudioPeakDiagnostic`, `LayeredImage`/WCAG-Checks). |
+| `StudioReportAndQaService` | `final class` | Übersetzungs-Matrix (`TranslationMatrixRow`), `ScriptProfiler`-Hotspots, `SaveSlotInspectionEntry` + Fixture-Export, 1:1 Java-Block-Diagnosen, HTML-Dashboard, Ending-Coverage & Release-Readiness. |
+| `StudioWorkspaceAutoRecovery` | `final class` | Crash-sichere 30s-Auto-Recovery für ungesicherte Editor-Puffer unter `.studio_autosave`. |
+| `UserTemplateRepository` | `final class` | Verwaltet benutzerdefinierte Projektvorlagen und `TemplatePreviewCard`-Vorschaukarten für den Projekt-Hub. |
+| `StudioCliRunner` | `final class` | Headless CI/CD CLI-Runner für `lint`, `preflight`, `flow-graph`, `standalone-build`, `release-check` und `html-report` mit Exit-Codes. |
 
 ## Öffentliche API-Signaturen
 

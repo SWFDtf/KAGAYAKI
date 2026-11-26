@@ -10,12 +10,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * Exports a validated KAGAYAKI project into a self-contained standalone distribution directory
@@ -32,6 +38,73 @@ public final class StandaloneBuilder {
     private static final String LAUNCHER_BAT_NAME = "run_game.bat";
     private static final String PACKAGING_DESCRIPTOR_NAME = "standalone-packaging.json";
     private static final String STANDALONE_MAIN_CLASS = "de.swfdtf.StandaloneMain";
+    private static final String CHECKSUMS_FILE_NAME = "checksums.sha256";
+
+    /** Default per-asset uncompressed size budget in bytes ({@code 5 MiB}) for {@code #0151}. */
+    public static final long DEFAULT_ASSET_SIZE_BUDGET_BYTES = 5L * 1024L * 1024L;
+
+    /**
+     * Target export profile for Standalone packaging ({@code #0126}).
+     */
+    public enum ExportProfile {
+        /** Windows desktop distribution profile. */
+        WINDOWS("windows", List.of(), "run_game.bat"),
+        /** macOS desktop distribution profile requiring {@code -XstartOnFirstThread}. */
+        MACOS("macos", List.of("-XstartOnFirstThread"), "run_game.sh"),
+        /** Linux desktop distribution profile. */
+        LINUX("linux", List.of(), "run_game.sh"),
+        /** Diagnostic debug profile enabling assertions and verbose logging. */
+        DEBUG("debug", List.of("-ea"), "run_game.sh"),
+        /** Optimized release profile. */
+        RELEASE("release", List.of(), "run_game.sh");
+
+        private final String id;
+        private final List<String> jvmOptions;
+        private final String primaryLauncher;
+
+        ExportProfile(String id, List<String> jvmOptions, String primaryLauncher) {
+            this.id = id;
+            this.jvmOptions = jvmOptions;
+            this.primaryLauncher = primaryLauncher;
+        }
+
+        /**
+         * Returns the export profile identifier.
+         *
+         * @return profile identifier
+         */
+        public String id() {
+            return id;
+        }
+
+        /**
+         * Returns the configured JVM flags for this profile.
+         *
+         * @return immutable JVM flags configured for this profile
+         */
+        public List<String> jvmOptions() {
+            return jvmOptions;
+        }
+
+        /**
+         * Returns the primary launcher filename for this profile.
+         *
+         * @return primary launcher filename
+         */
+        public String primaryLauncher() {
+            return primaryLauncher;
+        }
+    }
+
+    /**
+     * Warning entry emitted when an uncompressed asset exceeds the configured export budget ({@code #0151}).
+     *
+     * @param assetPath   project-relative asset path
+     * @param sizeBytes   actual file size on disk
+     * @param budgetBytes configured threshold in bytes
+     */
+    public record AssetBudgetWarning(String assetPath, long sizeBytes, long budgetBytes) {
+    }
 
     private static final Gson GSON = new GsonBuilder()
             .setPrettyPrinting()
@@ -75,8 +148,33 @@ public final class StandaloneBuilder {
             Path outputDir,
             Path optionalStandaloneJar
     ) throws IOException {
+        return build(projectDir, outputDir, optionalStandaloneJar, ExportProfile.RELEASE,
+                DEFAULT_ASSET_SIZE_BUDGET_BYTES);
+    }
+
+    /**
+     * Lints, packs, checks asset size budgets, writes SHA-256 checksums, and generates standalone
+     * distribution artifacts for {@code projectDir} using an explicit {@link ExportProfile}.
+     *
+     * @param projectDir            source KAGAYAKI project root directory
+     * @param outputDir             target standalone distribution directory
+     * @param optionalStandaloneJar optional prebuilt {@code kagayaki-standalone.jar} to bundle (nullable)
+     * @param profile               target platform/build profile (defaults to {@link ExportProfile#RELEASE})
+     * @param assetSizeBudgetBytes  uncompressed per-asset warning threshold in bytes ({@code <= 0} disables check)
+     * @return immutable {@link BuildResult} describing generated artifacts
+     * @throws IllegalStateException if {@link VJavaLinter#lint(Path)} reports any errors
+     * @throws IOException           if reading project metadata or writing distribution files fails
+     */
+    public static BuildResult build(
+            Path projectDir,
+            Path outputDir,
+            Path optionalStandaloneJar,
+            ExportProfile profile,
+            long assetSizeBudgetBytes
+    ) throws IOException {
         Objects.requireNonNull(projectDir, "projectDir must not be null");
         Objects.requireNonNull(outputDir, "outputDir must not be null");
+        ExportProfile effectiveProfile = profile != null ? profile : ExportProfile.RELEASE;
 
         Path normalizedProject = projectDir.toAbsolutePath().normalize();
         Path normalizedOutput = outputDir.toAbsolutePath().normalize();
@@ -95,14 +193,18 @@ public final class StandaloneBuilder {
                 VpakArchiver.pack(normalizedProject, vpakFile, encryptionKey);
 
         Path bundledJar = bundleOrWriteRuntimeReference(normalizedOutput, optionalStandaloneJar);
-        Path shLauncher = writeUnixLauncher(normalizedOutput);
-        writeWindowsLauncher(normalizedOutput);
+        Path shLauncher = writeUnixLauncher(normalizedOutput, effectiveProfile);
+        writeWindowsLauncher(normalizedOutput, effectiveProfile);
+        List<AssetBudgetWarning> budgetWarnings = inspectAssetSizeBudget(normalizedProject, assetSizeBudgetBytes);
         Path packagingDescriptor = writePackagingDescriptor(
                 normalizedOutput,
                 descriptor,
                 packedEntries.size(),
-                bundledJar != null
+                bundledJar != null,
+                effectiveProfile,
+                budgetWarnings
         );
+        writeSha256Checksums(normalizedOutput);
 
         return new BuildResult(
                 normalizedOutput,
@@ -112,6 +214,38 @@ public final class StandaloneBuilder {
                 packagingDescriptor,
                 packedEntries.size()
         );
+    }
+
+    /**
+     * Inspects {@code projectDir/assets} and returns warnings for files exceeding {@code maxFileBytes}.
+     *
+     * @param projectDir   project root directory
+     * @param maxFileBytes maximum recommended asset size in bytes ({@code <= 0} returns empty list)
+     * @return immutable list of {@link AssetBudgetWarning} records sorted by path
+     * @throws IOException if directory traversal fails
+     */
+    public static List<AssetBudgetWarning> inspectAssetSizeBudget(Path projectDir, long maxFileBytes)
+            throws IOException {
+        Objects.requireNonNull(projectDir, "projectDir must not be null");
+        if (maxFileBytes <= 0L) {
+            return List.of();
+        }
+        Path assetsDir = projectDir.toAbsolutePath().normalize().resolve("assets");
+        if (!Files.isDirectory(assetsDir)) {
+            return List.of();
+        }
+        List<AssetBudgetWarning> warnings = new ArrayList<>();
+        try (Stream<Path> walk = Files.walk(assetsDir)) {
+            List<Path> files = walk.filter(Files::isRegularFile).sorted().toList();
+            for (Path f : files) {
+                long size = Files.size(f);
+                if (size > maxFileBytes) {
+                    String rel = projectDir.toAbsolutePath().normalize().relativize(f).toString().replace('\\', '/');
+                    warnings.add(new AssetBudgetWarning(rel, size, maxFileBytes));
+                }
+            }
+        }
+        return List.copyOf(warnings);
     }
 
     private static ProjectDescriptor loadDescriptorOrDefault(Path projectDir) throws IOException {
@@ -158,7 +292,8 @@ public final class StandaloneBuilder {
         return null;
     }
 
-    private static Path writeUnixLauncher(Path outputDir) throws IOException {
+    private static Path writeUnixLauncher(Path outputDir, ExportProfile profile) throws IOException {
+        String profileOpts = String.join(" ", profile.jvmOptions());
         String script = """
                 #!/usr/bin/env sh
                 set -eu
@@ -166,9 +301,10 @@ public final class StandaloneBuilder {
                 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
                 cd "$SCRIPT_DIR"
 
-                JVM_OPTS=""
+                JVM_OPTS=\"""" + profileOpts + """
+                "
                 case "$(uname -s)" in
-                  Darwin*) JVM_OPTS="-XstartOnFirstThread" ;;
+                  Darwin*) JVM_OPTS="$JVM_OPTS -XstartOnFirstThread" ;;
                 esac
 
                 JAR_FILE="${KAGAYAKI_STANDALONE_JAR:-""" + STANDALONE_JAR_NAME + """
@@ -202,7 +338,8 @@ public final class StandaloneBuilder {
         return shPath;
     }
 
-    private static void writeWindowsLauncher(Path outputDir) throws IOException {
+    private static void writeWindowsLauncher(Path outputDir, ExportProfile profile) throws IOException {
+        String profileOpts = String.join(" ", profile.jvmOptions());
         String script = "@echo off\r\n"
                 + "setlocal\r\n"
                 + "cd /d \"%~dp0\"\r\n"
@@ -213,7 +350,8 @@ public final class StandaloneBuilder {
                 + "  echo Build it via gradlew.bat packageStandalone and place it in \"%~dp0\". 1>&2\r\n"
                 + "  exit /b 1\r\n"
                 + ")\r\n"
-                + "java -cp \"%JAR_FILE%\" " + STANDALONE_MAIN_CLASS + " --standalone . %*\r\n";
+                + "java " + profileOpts + " -cp \"%JAR_FILE%\" " + STANDALONE_MAIN_CLASS
+                + " --standalone . %*\r\n";
 
         Files.writeString(outputDir.resolve(LAUNCHER_BAT_NAME), script, StandardCharsets.UTF_8);
     }
@@ -222,7 +360,9 @@ public final class StandaloneBuilder {
             Path outputDir,
             ProjectDescriptor descriptor,
             int packagedEntries,
-            boolean jarBundled
+            boolean jarBundled,
+            ExportProfile profile,
+            List<AssetBudgetWarning> budgetWarnings
     ) throws IOException {
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("title", descriptor.getTitle());
@@ -230,6 +370,10 @@ public final class StandaloneBuilder {
         root.put("author", descriptor.getAuthor());
         root.put("renderMode", descriptor.getRenderMode());
         root.put("entryLabel", descriptor.getEntryLabel());
+        root.put("exportProfile", profile.id());
+        root.put("profileJvmOptions", profile.jvmOptions());
+        root.put("assetBudgetWarnings", budgetWarnings);
+        root.put("checksumsFile", CHECKSUMS_FILE_NAME);
         root.put("mainClass", STANDALONE_MAIN_CLASS);
         root.put("mainArgs", List.of("--standalone", "."));
         root.put("vpakFile", VPAK_FILE_NAME);
@@ -250,6 +394,7 @@ public final class StandaloneBuilder {
         Map<String, Object> jvmOptions = new LinkedHashMap<>();
         jvmOptions.put("macOS", List.of("-XstartOnFirstThread"));
         jvmOptions.put("default", List.of());
+        jvmOptions.put("activeProfile", profile.jvmOptions());
         root.put("jvmOptions", jvmOptions);
 
         Map<String, Object> jlink = new LinkedHashMap<>();
@@ -273,6 +418,32 @@ public final class StandaloneBuilder {
         Path descriptorPath = outputDir.resolve(PACKAGING_DESCRIPTOR_NAME);
         Files.writeString(descriptorPath, GSON.toJson(root), StandardCharsets.UTF_8);
         return descriptorPath;
+    }
+
+    private static void writeSha256Checksums(Path outputDir) throws IOException {
+        Path checksumsFile = outputDir.resolve(CHECKSUMS_FILE_NAME);
+        List<Path> artifacts = new ArrayList<>();
+        try (Stream<Path> list = Files.list(outputDir)) {
+            list.filter(Files::isRegularFile)
+                    .filter(p -> !CHECKSUMS_FILE_NAME.equals(p.getFileName().toString()))
+                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
+                    .forEach(artifacts::add);
+        }
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 unavailable", ex);
+        }
+        HexFormat hex = HexFormat.of();
+        StringBuilder sb = new StringBuilder();
+        for (Path artifact : artifacts) {
+            digest.reset();
+            byte[] bytes = Files.readAllBytes(artifact);
+            String hash = hex.formatHex(digest.digest(bytes));
+            sb.append(hash).append("  ").append(artifact.getFileName()).append('\n');
+        }
+        Files.writeString(checksumsFile, sb.toString(), StandardCharsets.UTF_8);
     }
 
     private static String sanitizeAppName(String title) {

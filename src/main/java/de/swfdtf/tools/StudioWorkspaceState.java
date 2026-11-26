@@ -13,16 +13,19 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
 /**
  * Persistent Studio workspace preferences model storing the last opened project,
- * bounded recent-project history, auto-lint behavior, active Studio panel, and
- * Studio window dimensions.
+ * bounded recent-project history, auto-lint behavior, active Studio panel, layout preset,
+ * theme variant, UI scaling, onboarding state, user templates, and window dimensions.
  *
  * <p>Persists atomically to JSON via Gson and provides fluent configuration builders,
  * unmodifiable history views, and defensive normalization on load.</p>
@@ -41,6 +44,21 @@ public final class StudioWorkspaceState {
     /** Default selected Studio panel identifier. */
     public static final String DEFAULT_SELECTED_PANEL = "explorer";
 
+    /** Default Studio workspace layout preset. */
+    public static final String DEFAULT_LAYOUT_PRESET = "DOCKING";
+
+    /** Default Studio color theme identifier. */
+    public static final String DEFAULT_THEME_VARIANT = "DARK_SLATE";
+
+    /** Minimum allowed Studio UI scale factor ({@code 80%}). */
+    public static final float MIN_UI_SCALE = 0.80f;
+
+    /** Maximum allowed Studio UI scale factor ({@code 150%}). */
+    public static final float MAX_UI_SCALE = 1.50f;
+
+    /** Default Studio UI scale factor ({@code 100%}). */
+    public static final float DEFAULT_UI_SCALE = 1.0f;
+
     private static final Gson GSON = new GsonBuilder()
             .setPrettyPrinting()
             .create();
@@ -49,6 +67,12 @@ public final class StudioWorkspaceState {
     private List<String> recentProjectPaths = new ArrayList<>();
     private boolean autoLintOnReload = true;
     private String selectedPanel = DEFAULT_SELECTED_PANEL;
+    private String layoutPreset = DEFAULT_LAYOUT_PRESET;
+    private Map<String, Boolean> panelVisibility = defaultPanelVisibility();
+    private String themeVariant = DEFAULT_THEME_VARIANT;
+    private float uiScale = DEFAULT_UI_SCALE;
+    private boolean onboardingTourCompleted = false;
+    private List<String> userTemplatePaths = new ArrayList<>();
     private int windowWidth = DEFAULT_WINDOW_WIDTH;
     private int windowHeight = DEFAULT_WINDOW_HEIGHT;
 
@@ -63,6 +87,14 @@ public final class StudioWorkspaceState {
         this.recentProjectPaths = new ArrayList<>(builder.recentProjectPaths);
         this.autoLintOnReload = builder.autoLintOnReload;
         this.selectedPanel = builder.selectedPanel;
+        setLayoutPreset(builder.layoutPreset);
+        if (builder.panelVisibilityExplicit) {
+            this.panelVisibility = new LinkedHashMap<>(builder.panelVisibility);
+        }
+        this.themeVariant = builder.themeVariant;
+        this.uiScale = builder.uiScale;
+        this.onboardingTourCompleted = builder.onboardingTourCompleted;
+        this.userTemplatePaths = new ArrayList<>(builder.userTemplatePaths);
         this.windowWidth = builder.windowWidth;
         this.windowHeight = builder.windowHeight;
         normalizeDefaults();
@@ -97,6 +129,12 @@ public final class StudioWorkspaceState {
                 .recentProjectPaths(getRecentProjectPaths())
                 .autoLintOnReload(autoLintOnReload)
                 .selectedPanel(selectedPanel)
+                .layoutPreset(layoutPreset)
+                .panelVisibility(getPanelVisibility())
+                .themeVariant(themeVariant)
+                .uiScale(uiScale)
+                .onboardingTourCompleted(onboardingTourCompleted)
+                .userTemplatePaths(getUserTemplatePaths())
                 .windowWidth(windowWidth)
                 .windowHeight(windowHeight);
     }
@@ -323,6 +361,183 @@ public final class StudioWorkspaceState {
         return this;
     }
 
+    /**
+     * Returns the active Studio layout preset name ({@code DOCKING}, {@code COMPACT}, or {@code DEBUG}).
+     *
+     * @return non-blank layout preset name
+     */
+    public String getLayoutPreset() {
+        return layoutPreset;
+    }
+
+    /**
+     * Sets the active Studio layout preset and updates default panel visibility weights.
+     *
+     * @param layoutPreset preset identifier (falls back to {@link #DEFAULT_LAYOUT_PRESET} if null/blank)
+     * @return {@code this} for fluent chaining
+     */
+    public StudioWorkspaceState setLayoutPreset(String layoutPreset) {
+        this.layoutPreset = normalizeLayoutPreset(layoutPreset);
+        if ("COMPACT".equals(this.layoutPreset)) {
+            this.panelVisibility.put("flowGraph", Boolean.FALSE);
+            this.panelVisibility.put("variables", Boolean.FALSE);
+            this.panelVisibility.put("explorer", Boolean.TRUE);
+            this.panelVisibility.put("linter", Boolean.TRUE);
+        } else if ("DEBUG".equals(this.layoutPreset)) {
+            this.panelVisibility.put("explorer", Boolean.TRUE);
+            this.panelVisibility.put("linter", Boolean.TRUE);
+            this.panelVisibility.put("variables", Boolean.TRUE);
+            this.panelVisibility.put("flowGraph", Boolean.TRUE);
+        } else {
+            this.panelVisibility = defaultPanelVisibility();
+        }
+        return this;
+    }
+
+    /**
+     * Returns an unmodifiable snapshot of panel visibility flags keyed by panel identifier.
+     *
+     * @return unmodifiable panel visibility map
+     */
+    public Map<String, Boolean> getPanelVisibility() {
+        if (panelVisibility == null || panelVisibility.isEmpty()) {
+            return Collections.unmodifiableMap(defaultPanelVisibility());
+        }
+        return Collections.unmodifiableMap(new LinkedHashMap<>(panelVisibility));
+    }
+
+    /**
+     * Updates visibility of an individual Studio panel.
+     *
+     * @param panelId panel key ({@code explorer}, {@code linter}, {@code variables}, {@code flowGraph})
+     * @param visible visibility flag
+     * @return {@code this} for fluent chaining
+     */
+    public StudioWorkspaceState setPanelVisible(String panelId, boolean visible) {
+        if (panelId != null && !panelId.isBlank()) {
+            if (panelVisibility == null) {
+                panelVisibility = defaultPanelVisibility();
+            }
+            panelVisibility.put(panelId.trim(), visible);
+        }
+        return this;
+    }
+
+    /**
+     * Returns the configured Studio theme variant name.
+     *
+     * @return theme variant identifier
+     */
+    public String getThemeVariant() {
+        return themeVariant;
+    }
+
+    /**
+     * Sets the Studio theme variant name.
+     *
+     * @param themeVariant variant name (e.g., {@code DARK_SLATE}, {@code MIDNIGHT_HIGH_CONTRAST}, {@code DAYLIGHT})
+     * @return {@code this} for fluent chaining
+     */
+    public StudioWorkspaceState setThemeVariant(String themeVariant) {
+        this.themeVariant = (themeVariant == null || themeVariant.isBlank())
+                ? DEFAULT_THEME_VARIANT
+                : themeVariant.trim();
+        return this;
+    }
+
+    /**
+     * Returns the Studio High-DPI UI scaling factor in {@code [0.80, 1.50]}.
+     *
+     * @return clamped UI scale factor
+     */
+    public float getUiScale() {
+        return uiScale;
+    }
+
+    /**
+     * Sets the Studio UI scaling factor, clamped to {@code [0.80, 1.50]}.
+     *
+     * @param uiScale scale multiplier
+     * @return {@code this} for fluent chaining
+     */
+    public StudioWorkspaceState setUiScale(float uiScale) {
+        this.uiScale = clampUiScale(uiScale);
+        return this;
+    }
+
+    /**
+     * Returns whether the Studio onboarding tour has been completed or skipped.
+     *
+     * @return {@code true} if completed or dismissed
+     */
+    public boolean isOnboardingTourCompleted() {
+        return onboardingTourCompleted;
+    }
+
+    /**
+     * Marks whether the Studio onboarding tour has been completed or dismissed.
+     *
+     * @param onboardingTourCompleted completion state
+     * @return {@code this} for fluent chaining
+     */
+    public StudioWorkspaceState setOnboardingTourCompleted(boolean onboardingTourCompleted) {
+        this.onboardingTourCompleted = onboardingTourCompleted;
+        return this;
+    }
+
+    /**
+     * Returns an unmodifiable list of user-saved custom project template directories.
+     *
+     * @return unmodifiable list of custom template directories
+     */
+    public List<String> getUserTemplatePaths() {
+        if (userTemplatePaths == null || userTemplatePaths.isEmpty()) {
+            return List.of();
+        }
+        return List.copyOf(userTemplatePaths);
+    }
+
+    /**
+     * Registers a custom user template directory path without duplicates.
+     *
+     * @param templateDir custom template directory path
+     * @return {@code this} for fluent chaining
+     */
+    public StudioWorkspaceState recordUserTemplate(Path templateDir) {
+        Objects.requireNonNull(templateDir, "templateDir must not be null");
+        String norm = templateDir.toAbsolutePath().normalize().toString();
+        if (userTemplatePaths == null) {
+            userTemplatePaths = new ArrayList<>();
+        }
+        if (!userTemplatePaths.contains(norm)) {
+            userTemplatePaths.add(norm);
+        }
+        return this;
+    }
+
+    private static Map<String, Boolean> defaultPanelVisibility() {
+        Map<String, Boolean> map = new LinkedHashMap<>();
+        map.put("explorer", Boolean.TRUE);
+        map.put("linter", Boolean.TRUE);
+        map.put("variables", Boolean.TRUE);
+        map.put("flowGraph", Boolean.FALSE);
+        return map;
+    }
+
+    private static String normalizeLayoutPreset(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return DEFAULT_LAYOUT_PRESET;
+        }
+        return raw.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
+    private static float clampUiScale(float scale) {
+        if (!Float.isFinite(scale)) {
+            return DEFAULT_UI_SCALE;
+        }
+        return Math.max(MIN_UI_SCALE, Math.min(MAX_UI_SCALE, scale));
+    }
+
     private void normalizeDefaults() {
         if (lastProjectPath != null && lastProjectPath.isBlank()) {
             lastProjectPath = null;
@@ -335,6 +550,17 @@ public final class StudioWorkspaceState {
         } else {
             selectedPanel = selectedPanel.trim();
         }
+        layoutPreset = normalizeLayoutPreset(layoutPreset);
+        if (panelVisibility == null || panelVisibility.isEmpty()) {
+            panelVisibility = defaultPanelVisibility();
+        }
+        if (themeVariant == null || themeVariant.isBlank()) {
+            themeVariant = DEFAULT_THEME_VARIANT;
+        } else {
+            themeVariant = themeVariant.trim();
+        }
+        uiScale = clampUiScale(uiScale);
+        userTemplatePaths = sanitizeRecentPaths(userTemplatePaths);
         if (windowWidth <= 0) {
             windowWidth = DEFAULT_WINDOW_WIDTH;
         }
@@ -376,11 +602,17 @@ public final class StudioWorkspaceState {
             return false;
         }
         return autoLintOnReload == other.autoLintOnReload
+                && Float.compare(uiScale, other.uiScale) == 0
+                && onboardingTourCompleted == other.onboardingTourCompleted
                 && windowWidth == other.windowWidth
                 && windowHeight == other.windowHeight
                 && Objects.equals(lastProjectPath, other.lastProjectPath)
                 && Objects.equals(recentProjectPaths, other.recentProjectPaths)
-                && Objects.equals(selectedPanel, other.selectedPanel);
+                && Objects.equals(selectedPanel, other.selectedPanel)
+                && Objects.equals(layoutPreset, other.layoutPreset)
+                && Objects.equals(panelVisibility, other.panelVisibility)
+                && Objects.equals(themeVariant, other.themeVariant)
+                && Objects.equals(userTemplatePaths, other.userTemplatePaths);
     }
 
     @Override
@@ -390,6 +622,12 @@ public final class StudioWorkspaceState {
                 recentProjectPaths,
                 autoLintOnReload,
                 selectedPanel,
+                layoutPreset,
+                panelVisibility,
+                themeVariant,
+                uiScale,
+                onboardingTourCompleted,
+                userTemplatePaths,
                 windowWidth,
                 windowHeight
         );
@@ -402,6 +640,10 @@ public final class StudioWorkspaceState {
                 + ", recentProjectPaths=" + recentProjectPaths
                 + ", autoLintOnReload=" + autoLintOnReload
                 + ", selectedPanel='" + selectedPanel + '\''
+                + ", layoutPreset='" + layoutPreset + '\''
+                + ", themeVariant='" + themeVariant + '\''
+                + ", uiScale=" + uiScale
+                + ", onboardingTourCompleted=" + onboardingTourCompleted
                 + ", windowWidth=" + windowWidth
                 + ", windowHeight=" + windowHeight
                 + '}';
@@ -416,6 +658,13 @@ public final class StudioWorkspaceState {
         private List<String> recentProjectPaths = List.of();
         private boolean autoLintOnReload = true;
         private String selectedPanel = DEFAULT_SELECTED_PANEL;
+        private String layoutPreset = DEFAULT_LAYOUT_PRESET;
+        private Map<String, Boolean> panelVisibility = defaultPanelVisibility();
+        private boolean panelVisibilityExplicit = false;
+        private String themeVariant = DEFAULT_THEME_VARIANT;
+        private float uiScale = DEFAULT_UI_SCALE;
+        private boolean onboardingTourCompleted = false;
+        private List<String> userTemplatePaths = List.of();
         private int windowWidth = DEFAULT_WINDOW_WIDTH;
         private int windowHeight = DEFAULT_WINDOW_HEIGHT;
 
@@ -464,6 +713,75 @@ public final class StudioWorkspaceState {
          */
         public Builder selectedPanel(String selectedPanel) {
             this.selectedPanel = selectedPanel;
+            return this;
+        }
+
+        /**
+         * Sets the Studio layout preset name.
+         *
+         * @param layoutPreset preset identifier
+         * @return {@code this}
+         */
+        public Builder layoutPreset(String layoutPreset) {
+            this.layoutPreset = layoutPreset;
+            return this;
+        }
+
+        /**
+         * Sets the panel visibility map.
+         *
+         * @param panelVisibility visibility map
+         * @return {@code this}
+         */
+        public Builder panelVisibility(Map<String, Boolean> panelVisibility) {
+            this.panelVisibility = panelVisibility != null
+                    ? new LinkedHashMap<>(panelVisibility)
+                    : defaultPanelVisibility();
+            this.panelVisibilityExplicit = panelVisibility != null;
+            return this;
+        }
+
+        /**
+         * Sets the Studio theme variant name.
+         *
+         * @param themeVariant theme variant identifier
+         * @return {@code this}
+         */
+        public Builder themeVariant(String themeVariant) {
+            this.themeVariant = themeVariant;
+            return this;
+        }
+
+        /**
+         * Sets the Studio UI scale factor.
+         *
+         * @param uiScale scale multiplier clamped to {@code [0.80, 1.50]}
+         * @return {@code this}
+         */
+        public Builder uiScale(float uiScale) {
+            this.uiScale = uiScale;
+            return this;
+        }
+
+        /**
+         * Sets whether the Studio onboarding tour has been completed.
+         *
+         * @param onboardingTourCompleted tour completion flag
+         * @return {@code this}
+         */
+        public Builder onboardingTourCompleted(boolean onboardingTourCompleted) {
+            this.onboardingTourCompleted = onboardingTourCompleted;
+            return this;
+        }
+
+        /**
+         * Sets custom user template directory paths.
+         *
+         * @param userTemplatePaths user template paths
+         * @return {@code this}
+         */
+        public Builder userTemplatePaths(List<String> userTemplatePaths) {
+            this.userTemplatePaths = userTemplatePaths != null ? List.copyOf(userTemplatePaths) : List.of();
             return this;
         }
 

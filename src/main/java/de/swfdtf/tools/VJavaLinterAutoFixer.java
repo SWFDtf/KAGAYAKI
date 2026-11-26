@@ -1,6 +1,7 @@
 package de.swfdtf.tools;
 
 import de.swfdtf.core.ProjectDescriptor;
+import de.swfdtf.graphics.TextureManager;
 import de.swfdtf.parser.ProjectScanner;
 import de.swfdtf.parser.VJavaAst;
 
@@ -163,6 +164,50 @@ public final class VJavaLinterAutoFixer {
 
         writeAtomically(targetFile, updated);
         return new AutoFixResult(descriptions.size(), descriptions);
+    }
+
+    /**
+     * Generates a readable 64x64 checkerboard RGBA placeholder PNG inside {@code projectRoot} for
+     * a missing {@code assets/...} image reference ({@code #0125}), eliminating {@code MISSING_ASSET}.
+     *
+     * @param projectRoot       project root directory
+     * @param assetRelativePath relative target asset path (must resolve inside {@code projectRoot})
+     * @return normalized path of the written placeholder PNG file
+     * @throws IOException              if writing fails
+     * @throws IllegalArgumentException if {@code assetRelativePath} escapes {@code projectRoot} or is blank
+     */
+    public Path createPlaceholderPngForMissingAsset(Path projectRoot, String assetRelativePath) throws IOException {
+        Objects.requireNonNull(projectRoot, "projectRoot must not be null");
+        Objects.requireNonNull(assetRelativePath, "assetRelativePath must not be null");
+        String trimmed = assetRelativePath.trim().replace('\\', '/');
+        while (trimmed.startsWith("/")) {
+            trimmed = trimmed.substring(1);
+        }
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("assetRelativePath must not be blank");
+        }
+        Path root = projectRoot.toAbsolutePath().normalize();
+        Path target = root.resolve(trimmed).normalize();
+        if (!target.startsWith(root)) {
+            throw new IllegalArgumentException("Asset path escapes project root: " + assetRelativePath);
+        }
+        if (target.getParent() != null) {
+            Files.createDirectories(target.getParent());
+        }
+        final int size = 64;
+        byte[] rgba = new byte[size * size * 4];
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                boolean magenta = ((x / 8) + (y / 8)) % 2 == 0;
+                int idx = (y * size + x) * 4;
+                rgba[idx] = (byte) (magenta ? 0xD9 : 0x2E);
+                rgba[idx + 1] = (byte) (magenta ? 0x46 : 0x33);
+                rgba[idx + 2] = (byte) (magenta ? 0xEF : 0x4A);
+                rgba[idx + 3] = (byte) 0xFF;
+            }
+        }
+        TextureManager.writePng(target, size, size, rgba);
+        return target;
     }
 
     private static Path resolveTargetScriptFile(Path normalizedRoot, VJavaAst.ProjectAst project) {

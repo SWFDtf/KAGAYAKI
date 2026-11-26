@@ -5,6 +5,8 @@ import com.google.gson.GsonBuilder;
 import de.swfdtf.core.EngineAPI;
 import de.swfdtf.core.EngineConfig;
 import de.swfdtf.core.EngineLogger;
+import de.swfdtf.parser.AstJsonSerializer;
+import de.swfdtf.parser.VJavaAst;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -19,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * Builds and atomically exports structured JSON diagnostic bundles containing engine version,
@@ -245,6 +249,75 @@ public final class DiagnosticBundleExporter {
                 Files.deleteIfExists(tempFile);
             }
         }
+    }
+
+    /**
+     * Atomically writes a multi-file bug-report ZIP bundle containing {@code diagnostic-report.json},
+     * {@code logs.txt}, {@code lint-report.json}, {@code ast-summary.json}, and {@code system-info.txt}.
+     *
+     * @param outputZip          destination ZIP archive path
+     * @param api                engine API facade
+     * @param optionalLintReport optional lint report (nullable)
+     * @param optionalAst        optional parsed project AST (nullable)
+     * @param extraMetrics       optional extra diagnostic metrics (nullable)
+     * @return normalized absolute path to written ZIP file
+     * @throws IOException if ZIP assembly or atomic write fails
+     */
+    public Path exportZipBundle(
+            Path outputZip,
+            EngineAPI api,
+            VJavaLinter.LintReport optionalLintReport,
+            VJavaAst.ProjectAst optionalAst,
+            Map<String, Object> extraMetrics
+    ) throws IOException {
+        Objects.requireNonNull(outputZip, "outputZip must not be null");
+        Objects.requireNonNull(api, "api must not be null");
+
+        Path normalizedTarget = outputZip.toAbsolutePath().normalize();
+        Path parent = normalizedTarget.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+
+        DiagnosticReport report = buildReport(api, optionalLintReport, extraMetrics);
+        String json = toJson(report);
+        String logsText = String.join("\n", report.recentLogLines());
+        String lintJson = report.lintReport() != null ? GSON.toJson(report.lintReport()) : "{}";
+        String astJson = optionalAst != null ? AstJsonSerializer.toJson(optionalAst) : "{}";
+        String sysInfo = "os.name=" + System.getProperty("os.name", "unknown") + "\n"
+                + "os.arch=" + System.getProperty("os.arch", "unknown") + "\n"
+                + "java.version=" + System.getProperty("java.version", "unknown") + "\n"
+                + "engine.version=" + report.engineVersion() + "\n"
+                + "render.backend=" + report.renderBackend() + "\n"
+                + "exported.at=" + report.exportedAt() + "\n";
+
+        Path tempFile = parent != null
+                ? Files.createTempFile(parent, "diag-bundle-", ".tmp")
+                : Files.createTempFile("diag-bundle-", ".tmp");
+        boolean moved = false;
+        try {
+            try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(tempFile), StandardCharsets.UTF_8)) {
+                writeZipEntry(zos, "diagnostic-report.json", json);
+                writeZipEntry(zos, "logs.txt", logsText);
+                writeZipEntry(zos, "lint-report.json", lintJson);
+                writeZipEntry(zos, "ast-summary.json", astJson);
+                writeZipEntry(zos, "system-info.txt", sysInfo);
+            }
+            moveAtomically(tempFile, normalizedTarget);
+            moved = true;
+            return normalizedTarget;
+        } finally {
+            if (!moved) {
+                Files.deleteIfExists(tempFile);
+            }
+        }
+    }
+
+    private static void writeZipEntry(ZipOutputStream zos, String name, String content) throws IOException {
+        zos.putNextEntry(new ZipEntry(name));
+        byte[] bytes = (content != null ? content : "").getBytes(StandardCharsets.UTF_8);
+        zos.write(bytes);
+        zos.closeEntry();
     }
 
     /**

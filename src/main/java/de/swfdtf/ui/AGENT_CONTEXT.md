@@ -17,7 +17,7 @@ Vollständiges Dark-Slate-UI-, Screen-Management-, Widget-, `screen`-AST-Builder
 ### Kern, Theme & Screen-Management
 | Typ | Art | Beschreibung |
 | :--- | :--- | :--- |
-| `ThemePalette` | `final class` | Kanonische Dark-Slate-Farbkonstanten (`CANVAS_BG`, `PANEL_SURFACE`, `PANEL_GLASS`, `ELEVATED`, `BORDER`, `ACCENT_IDLE/HOVER`, `ACTIVE_SELECTED`, `DISABLED`, `TEXT_PRIMARY/MUTED`, `SUCCESS`, `WARNING`, `ERROR`) mit Straight-/Premultiplied-RGBA-Konvertern. |
+| `ThemePalette` | `final class` | Kanonische Dark-Slate-Farbkonstanten (`CANVAS_BG`..`ERROR`), kuratierte `ThemeVariant`-Varianten (`DARK_SLATE`, `MIDNIGHT_HIGH_CONTRAST`, `DAYLIGHT`), Straight-/Premultiplied-RGBA-Konverter sowie WCAG-2.1-Kontrastberechnung (`contrastRatio`, `meetsWcagAA`). |
 | `UiNode` | `abstract class` | Abstrakte Basisklasse aller UI-Container und -Widgets mit `measure`/`layout`/`update`/`render`, Padding, Box-Styling, Z-order-Input-Dispatching und Fokus-Flags. |
 | `Screen` | `class` | Deklarativer Screen-Container mit Wurzel-`UiNode`, `zOrder`, `modal`-Flag, `onShow`/`onHide`-Lebenszyklus, `KeyBinding`-Shortcuts und `ScreenTimer`-Timern. |
 | `Screen.KeyBinding` & `ScreenTimer` | `record` / `final class` | Screen-lokale GLFW-Tastenkürzel-Bindung (`glfwKey`, `requiredModsMask`, `action`) sowie einmaliger/wiederholender Screen-Timer. |

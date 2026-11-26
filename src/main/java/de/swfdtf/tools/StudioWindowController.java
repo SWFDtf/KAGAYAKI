@@ -1,13 +1,20 @@
 package de.swfdtf.tools;
 
+import de.swfdtf.audio.AudioChannel;
 import de.swfdtf.audio.AudioEngine;
 import de.swfdtf.core.EngineAPI;
 import de.swfdtf.core.EngineApplication;
+import de.swfdtf.core.EngineEvent;
+import de.swfdtf.core.EngineEventBus;
 import de.swfdtf.core.EngineLogger;
+import de.swfdtf.core.EnginePlugin;
 import de.swfdtf.core.EngineVersion;
+import de.swfdtf.core.EventSubscription;
 import de.swfdtf.core.InputManager;
+import de.swfdtf.core.PluginRegistry;
 import de.swfdtf.core.ProjectDescriptor;
 import de.swfdtf.core.StudioBridge;
+import de.swfdtf.graphics.ColorBlindnessFilter;
 import de.swfdtf.graphics.FontManager;
 import de.swfdtf.graphics.RenderMode;
 import de.swfdtf.graphics.RenderPipeline2D;
@@ -15,13 +22,18 @@ import de.swfdtf.graphics.SceneLayer;
 import de.swfdtf.graphics.TextureManager;
 import de.swfdtf.math.Rect2f;
 import de.swfdtf.parser.ConditionEvaluator;
+import de.swfdtf.parser.HotReloadWatcher;
 import de.swfdtf.parser.ProjectScanner;
 import de.swfdtf.parser.ScriptDebugger;
+import de.swfdtf.parser.ScriptProfiler;
 import de.swfdtf.parser.ScriptRuntime;
 import de.swfdtf.parser.ScriptSession;
 import de.swfdtf.parser.VJavaAst;
 import de.swfdtf.parser.VariableWatchpointManager;
 import de.swfdtf.parser.WatchpointEvent;
+import de.swfdtf.state.HistoryLog;
+import de.swfdtf.state.LocalizationManager;
+import de.swfdtf.state.SaveSlotData;
 import de.swfdtf.ui.Frame;
 import de.swfdtf.ui.HBox;
 import de.swfdtf.ui.Screen;
@@ -30,6 +42,7 @@ import de.swfdtf.ui.TextButton;
 import de.swfdtf.ui.TextInput;
 import de.swfdtf.ui.TextWidget;
 import de.swfdtf.ui.ThemePalette;
+import de.swfdtf.ui.UiNode;
 import de.swfdtf.ui.VBox;
 import de.swfdtf.ui.Viewport;
 import de.swfdtf.ui.WindowBox;
@@ -47,8 +60,11 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Dual-Window Studio controller rendering Window A ("KAGAYAKI Studio") side-by-side
@@ -80,6 +96,9 @@ public final class StudioWindowController implements StudioBridge {
     /** Modal screen name for the {@code Ctrl+Shift+P} interactive Command Palette. */
     public static final String COMMAND_PALETTE_SCREEN_NAME = "studio_command_palette";
 
+    /** Modal screen name for the {@code F1} keyboard shortcut cheat-sheet overlay ({@code #0120}). */
+    public static final String SHORTCUT_OVERLAY_SCREEN_NAME = "studio_shortcut_overlay";
+
     private EngineAPI api;
     private long studioWindowHandle;
     private long gameWindowHandle;
@@ -94,6 +113,7 @@ public final class StudioWindowController implements StudioBridge {
     private Screen studioRootScreen;
     private Screen newProjectDialogScreen;
     private Screen commandPaletteScreen;
+    private Screen shortcutOverlayScreen;
 
     private Path activeProjectRoot;
     private StudioView activeView = StudioView.MAIN_MENU;
@@ -107,7 +127,50 @@ public final class StudioWindowController implements StudioBridge {
     private final AssetMetadataInspector assetMetadataInspector = new AssetMetadataInspector();
     private final UnusedAssetDetector unusedAssetDetector = new UnusedAssetDetector();
     private final ScriptFlowGraphExporter flowGraphExporter = new ScriptFlowGraphExporter();
+    private final ProjectSearchService searchService = new ProjectSearchService();
+    private final LabelBookmarkManager bookmarkManager = new LabelBookmarkManager();
+    private final ExportPreFlightChecker preFlightChecker = new ExportPreFlightChecker();
+    private final DiagnosticBundleExporter diagnosticBundleExporter = new DiagnosticBundleExporter();
+    private final ScriptWordCountAnalyzer wordCountAnalyzer = new ScriptWordCountAnalyzer();
+    private final AssetChecksumVerifier checksumVerifier = new AssetChecksumVerifier();
+    private final VJavaAutocompleteEngine autocompleteEngine = new VJavaAutocompleteEngine();
+    private final ProjectRefactorService refactorService = new ProjectRefactorService();
+    private final StudioAuthoringToolkit authoringToolkit = new StudioAuthoringToolkit();
+    private final StudioReportAndQaService reportAndQaService = new StudioReportAndQaService();
     private final Deque<List<String>> trashedAssetBatches = new ArrayDeque<>();
+
+    // Wave P2-2 Studio state, filters, metrics & overlays (#0101-#0168)
+    private ThemePalette.ThemeVariant themeVariant = ThemePalette.ThemeVariant.DARK_SLATE;
+    private EngineLogger.Level consoleMinLevel = EngineLogger.Level.DEBUG;
+    private String consoleCategoryFilter = "";
+    private String explorerFilterQuery = "";
+    private boolean autoReloadEnabled = false;
+    private HotReloadWatcher hotReloadWatcher;
+    private AssetChecksumVerifier.AssetManifest baselineAssetManifest;
+    private boolean shortcutOverlayVisible = false;
+    private boolean onboardingTourVisible = false;
+    private boolean keybindingTestOverlayVisible = false;
+    private float previewSpeedMultiplier = 1.0f;
+    private ColorBlindnessFilter.AccessibilityMode accessibilityPreviewMode =
+            ColorBlindnessFilter.AccessibilityMode.NONE;
+    private boolean dyslexiaFontPreview = false;
+    private String lastToastMessage = "";
+    private String liveTelemetryText = "0 FPS | 0 Textures | 0 KB";
+    private String gitStatusBadge = "no-git";
+    private ScriptSession lastGoodSession;
+    private final List<String> capturedBusEvents = new CopyOnWriteArrayList<>();
+    private final List<String> recordedTestKeys = new ArrayList<>();
+    private EventSubscription eventBusSnifferSub;
+    private final List<WindowBox> themedWindowBoxes = new ArrayList<>();
+    private final List<TextButton> themedButtons = new ArrayList<>();
+    private final List<TextButton> mainMenuFocusButtons = new ArrayList<>();
+    private final List<TextButton> toolbarFocusButtons = new ArrayList<>();
+    private int mainMenuFocusIndex = -1;
+    private int toolbarFocusIndex = -1;
+    private WindowBox explorerWindowBox;
+    private WindowBox lintWindowBox;
+    private WindowBox varsWindowBox;
+    private WindowBox consoleWindowBox;
 
     private VJavaAst.ProjectAst lastScannedAst;
     private VJavaLinter.LintReport lastLintReport;
@@ -197,7 +260,13 @@ public final class StudioWindowController implements StudioBridge {
         buildStudioUi();
         buildNewProjectDialogUi();
         buildCommandPaletteUi();
+        buildShortcutOverlayUi();
         registerPaletteCommands();
+        subscribeEventBusSniffer();
+        this.onboardingTourVisible = !workspaceState.isOnboardingTourCompleted();
+        applyLayoutPreset(workspaceState.getLayoutPreset());
+        refreshAssetManifestBaseline();
+        refreshGitStatusBadge();
         api.registerService(VariableWatchpointManager.class, watchpointManager);
         api.registerService(ScriptDebugger.class, scriptDebugger);
         api.registerService(StudioCommandPalette.class, commandPalette);
@@ -250,6 +319,12 @@ public final class StudioWindowController implements StudioBridge {
         actionRow.addChild(templateToggleButton);
         actionRow.addChild(openWorkspaceBtn);
         actionRow.addChild(openDemoBtn);
+        mainMenuFocusButtons.clear();
+        mainMenuFocusButtons.add(newProjectBtn);
+        mainMenuFocusButtons.add(templateToggleButton);
+        mainMenuFocusButtons.add(openWorkspaceBtn);
+        mainMenuFocusButtons.add(openDemoBtn);
+        themedButtons.addAll(mainMenuFocusButtons);
 
         // Overview columns: Recent Projects + Template Features
         HBox hubColumns = new HBox();
@@ -257,6 +332,7 @@ public final class StudioWindowController implements StudioBridge {
 
         WindowBox recentBox = new WindowBox("Zuletzt geöffnete Projekte");
         recentBox.setPreferredSize(900.0f, 560.0f);
+        themedWindowBoxes.add(recentBox);
         Viewport recentVp = new Viewport();
         mainMenuRecentWidget = new TextWidget("(noch keine Projekte)");
         mainMenuRecentWidget.setFontSize(18.0f).setColorHex(ThemePalette.TEXT_PRIMARY);
@@ -265,6 +341,7 @@ public final class StudioWindowController implements StudioBridge {
 
         WindowBox templateBox = new WindowBox("Vorlage & Engine-Funktionen (" + EngineVersion.VERSION + ")");
         templateBox.setPreferredSize(920.0f, 560.0f);
+        themedWindowBoxes.add(templateBox);
         Viewport templateVp = new Viewport();
         mainMenuStatusWidget = new TextWidget(
                 "• Vollständige Demo-Vorlage: Main Menu + Version, Save/Load (6 Slots + QuickSave),\n"
@@ -285,6 +362,11 @@ public final class StudioWindowController implements StudioBridge {
         studioMainMenuScreen.setRoot(hubLayout);
         studioMainMenuScreen.addKeyBinding(
                 GLFW.GLFW_KEY_P, GLFW.GLFW_MOD_CONTROL | GLFW.GLFW_MOD_SHIFT, this::openCommandPalette);
+        studioMainMenuScreen.addKeyBinding(GLFW.GLFW_KEY_F1, this::toggleShortcutOverlay);
+        studioMainMenuScreen.addKeyBinding(GLFW.GLFW_KEY_TAB, this::focusNextButton);
+        studioMainMenuScreen.addKeyBinding(GLFW.GLFW_KEY_TAB, GLFW.GLFW_MOD_SHIFT, this::focusPrevButton);
+        studioMainMenuScreen.addKeyBinding(GLFW.GLFW_KEY_ENTER, this::activateFocusedButton);
+        studioMainMenuScreen.addKeyBinding(GLFW.GLFW_KEY_ESCAPE, this::dismissOverlays);
         studioScreenManager.registerScreen(studioMainMenuScreen);
     }
 
@@ -336,6 +418,11 @@ public final class StudioWindowController implements StudioBridge {
         toolbar.addChild(renderModeButton);
         toolbar.addChild(exportBtn);
         toolbar.addChild(paletteBtn);
+        toolbarFocusButtons.clear();
+        toolbarFocusButtons.addAll(List.of(
+                mainMenuBtn, newTemplateBtn, saveScriptBtn, lintBtn, flowBtn,
+                stepIntoBtn, stepOverBtn, continueBtn, reloadBtn, renderModeButton, exportBtn, paletteBtn));
+        themedButtons.addAll(toolbarFocusButtons);
 
         // Main 3-column workspace (1888 x 780)
         HBox columns = new HBox();
@@ -346,6 +433,8 @@ public final class StudioWindowController implements StudioBridge {
         // Column 1: Embedded Code Editor (first so visible input 0 is editor), Files, Assets Preview & Cleanup
         WindowBox explorerBox = new WindowBox("Project Explorer, Editor & Assets");
         explorerBox.setPreferredSize(616.0f, 780.0f);
+        this.explorerWindowBox = explorerBox;
+        themedWindowBoxes.add(explorerBox);
         Viewport explorerVp = new Viewport();
         VBox explorerCol = new VBox();
         explorerCol.setSpacing(8.0f).setFillWidth(true);
@@ -389,6 +478,8 @@ public final class StudioWindowController implements StudioBridge {
         // Column 2: Static Analysis (VJavaLinter), Click-to-Line, Auto-Fix & Visual Flow Graph
         WindowBox lintBox = new WindowBox("Static Analysis & Story Flow-Graph");
         lintBox.setPreferredSize(624.0f, 780.0f);
+        this.lintWindowBox = lintBox;
+        themedWindowBoxes.add(lintBox);
         Viewport lintVp = new Viewport();
         VBox lintCol = new VBox();
         lintCol.setSpacing(8.0f).setFillWidth(true);
@@ -414,6 +505,8 @@ public final class StudioWindowController implements StudioBridge {
         // Column 3: Live State Variables, Debugger, Watchpoints & Live Director Snippet
         WindowBox varsBox = new WindowBox("Live State Variables & Debugger");
         varsBox.setPreferredSize(624.0f, 780.0f);
+        this.varsWindowBox = varsBox;
+        themedWindowBoxes.add(varsBox);
         Viewport varsVp = new Viewport();
         VBox varsCol = new VBox();
         varsCol.setSpacing(8.0f).setFillWidth(true);
@@ -445,6 +538,8 @@ public final class StudioWindowController implements StudioBridge {
         // Bottom Console (190px)
         WindowBox consoleBox = new WindowBox("Studio & Engine Console");
         consoleBox.setPreferredHeight(190.0f);
+        this.consoleWindowBox = consoleBox;
+        themedWindowBoxes.add(consoleBox);
         Viewport consoleVp = new Viewport();
         consoleLogWidget = new TextWidget("");
         consoleLogWidget.setFontSize(15.0f).setColorHex(ThemePalette.TEXT_MUTED);
@@ -459,7 +554,11 @@ public final class StudioWindowController implements StudioBridge {
         studioRootScreen.addKeyBinding(GLFW.GLFW_KEY_S, GLFW.GLFW_MOD_CONTROL, this::saveActiveEditorFile);
         studioRootScreen.addKeyBinding(
                 GLFW.GLFW_KEY_P, GLFW.GLFW_MOD_CONTROL | GLFW.GLFW_MOD_SHIFT, this::openCommandPalette);
-        studioRootScreen.addKeyBinding(GLFW.GLFW_KEY_ENTER, this::commitDirtyVariableInputs);
+        studioRootScreen.addKeyBinding(GLFW.GLFW_KEY_F1, this::toggleShortcutOverlay);
+        studioRootScreen.addKeyBinding(GLFW.GLFW_KEY_TAB, this::focusNextButton);
+        studioRootScreen.addKeyBinding(GLFW.GLFW_KEY_TAB, GLFW.GLFW_MOD_SHIFT, this::focusPrevButton);
+        studioRootScreen.addKeyBinding(GLFW.GLFW_KEY_ESCAPE, this::dismissOverlays);
+        studioRootScreen.addKeyBinding(GLFW.GLFW_KEY_ENTER, this::onWorkspaceEnterPressed);
         studioScreenManager.registerScreen(studioRootScreen);
     }
 
@@ -582,6 +681,43 @@ public final class StudioWindowController implements StudioBridge {
                 "assets.cleanup", "Unused Assets Cleanup", "Assets", "", this::cleanupUnusedAssets));
         commandPalette.register(new StudioCommandPalette.PaletteCommand(
                 "render.toggle", "Toggle Render Mode (2D/3D)", "View", "", this::toggleRenderMode));
+        commandPalette.register(new StudioCommandPalette.PaletteCommand(
+                "help.shortcuts", "Keyboard Shortcuts", "Help", "F1", this::toggleShortcutOverlay));
+        commandPalette.register(new StudioCommandPalette.PaletteCommand(
+                "qa.preflight", "Run Release PreFlight", "Release", "", this::runPreFlightCheck));
+    }
+
+    private void buildShortcutOverlayUi() {
+        shortcutOverlayScreen = new Screen(SHORTCUT_OVERLAY_SCREEN_NAME, 860, true);
+        Frame backdrop = new Frame();
+        backdrop.setBackgroundColorHex(ThemePalette.PANEL_GLASS).setPadding(360.0f, 160.0f);
+        Frame card = new Frame();
+        card.setBackgroundColorHex(ThemePalette.PANEL_SURFACE)
+                .setBorderColorHex(ThemePalette.ACCENT_IDLE)
+                .setBorderThickness(1.5f)
+                .setCornerRadius(10.0f)
+                .setPadding(24.0f);
+        VBox content = new VBox();
+        content.setSpacing(10.0f).setFillWidth(true);
+        TextWidget title = new TextWidget("Tastaturkürzel & Studio-Hilfe (F1)");
+        title.setFontSize(24.0f).setColorHex(ThemePalette.TEXT_PRIMARY);
+        TextWidget body = new TextWidget(
+                "• Allgemein: F1 = Hilfe ein/aus | Esc = Schließen | Ctrl+Shift+P = Befehlspalette\n"
+                        + "• Editor: Ctrl+S = Speichern & Lint | Tab / Shift+Tab = Fokus-Navigation\n"
+                        + "• Vorschau Window B: Shift+R = Live Reload | Shift+I = Style | Shift+C = Pick | D = Director"
+        );
+        body.setFontSize(17.0f).setColorHex(ThemePalette.TEXT_MUTED);
+        TextButton closeBtn = createToolbarButton("Schließen (Esc)", 180.0f, this::dismissOverlays);
+        content.addChild(title);
+        content.addChild(body);
+        content.addChild(closeBtn);
+        card.addChild(content);
+        backdrop.addChild(card);
+        shortcutOverlayScreen.setRoot(backdrop);
+        shortcutOverlayScreen.setVisible(false);
+        shortcutOverlayScreen.addKeyBinding(GLFW.GLFW_KEY_ESCAPE, this::dismissOverlays);
+        shortcutOverlayScreen.addKeyBinding(GLFW.GLFW_KEY_F1, this::toggleShortcutOverlay);
+        studioScreenManager.registerScreen(shortcutOverlayScreen);
     }
 
     @Override
@@ -591,6 +727,8 @@ public final class StudioWindowController implements StudioBridge {
         syncLiveRuntimePanels();
         if (refreshTimer >= 0.5) {
             refreshTimer = 0.0;
+            refreshLiveTelemetry();
+            pollAutoHotReload();
             refreshInspectors();
         }
         if (studioInput != null) {
@@ -989,7 +1127,7 @@ public final class StudioWindowController implements StudioBridge {
         }
 
         if (consoleLogWidget != null) {
-            List<EngineLogger.LogEntry> entries = api.getLogger().getRecentEntries(12);
+            List<EngineLogger.LogEntry> entries = getFilteredConsoleEntries(12);
             List<String> lines = new ArrayList<>(entries.size());
             for (EngineLogger.LogEntry e : entries) {
                 lines.add(e.format());
@@ -1053,7 +1191,8 @@ public final class StudioWindowController implements StudioBridge {
                     () -> openFileInEditor(script, 1));
             explorerFilesBox.addChild(btn);
         }
-        for (String asset : lastScannedAst.discoveredAssets()) {
+        List<String> visibleAssets = filterExplorerEntries(lastScannedAst.discoveredAssets(), explorerFilterQuery);
+        for (String asset : visibleAssets) {
             TextButton btn = createToolbarButton(asset, 540.0f, () -> inspectAssetItem(asset));
             explorerAssetsBox.addChild(btn);
         }
@@ -1466,6 +1605,10 @@ public final class StudioWindowController implements StudioBridge {
             return;
         }
         disposed = true;
+        if (eventBusSnifferSub != null) {
+            eventBusSnifferSub.unsubscribe();
+            eventBusSnifferSub = null;
+        }
         if (studioInput != null) {
             studioInput.dispose();
             studioInput = null;
@@ -1633,5 +1776,1020 @@ public final class StudioWindowController implements StudioBridge {
      */
     public InputManager getStudioInput() {
         return studioInput;
+    }
+
+    // ---- Wave P2-2 Studio IDE API & Features (#0101-#0168) ----
+
+    /**
+     * Searches project script/text files for {@code query} and returns deterministic matches ({@code #0101}).
+     *
+     * @param query         literal search query
+     * @param caseSensitive whether matching is case-sensitive
+     * @return immutable list of {@link ProjectSearchService.SearchMatch}
+     */
+    public List<ProjectSearchService.SearchMatch> searchProject(String query, boolean caseSensitive) {
+        return searchService.searchPlainText(getActiveProjectRoot(), query, caseSensitive);
+    }
+
+    /**
+     * Executes plain-text search-and-replace across the active project ({@code #0101}).
+     *
+     * @param query         search query
+     * @param replacement   replacement string
+     * @param caseSensitive whether matching is case-sensitive
+     * @param dryRun        when {@code true}, returns preview without writing files
+     * @return {@link ProjectSearchService.ReplaceResult}
+     */
+    public ProjectSearchService.ReplaceResult replaceProjectText(
+            String query,
+            String replacement,
+            boolean caseSensitive,
+            boolean dryRun
+    ) {
+        ProjectSearchService.ReplaceResult res = searchService.replacePlainText(
+                getActiveProjectRoot(), query, replacement, caseSensitive, dryRun);
+        if (!dryRun && res.modifiedFiles() > 0) {
+            refreshProjectAndLint();
+        }
+        return res;
+    }
+
+    /**
+     * Opens a matched search result directly in the embedded editor at its 1-based line ({@code #0101}).
+     *
+     * @param match search match entry
+     */
+    public void openSearchMatch(ProjectSearchService.SearchMatch match) {
+        if (match != null) {
+            openFileInEditor(match.file(), match.lineNumber());
+        }
+    }
+
+    /**
+     * Returns the Studio label bookmark manager ({@code #0102}).
+     *
+     * @return active {@link LabelBookmarkManager}
+     */
+    public LabelBookmarkManager getBookmarkManager() {
+        return bookmarkManager;
+    }
+
+    /**
+     * Saves a label bookmark and optionally jumps directly to it in editor and preview ({@code #0102}).
+     *
+     * @param labelName target script label
+     * @param category  bookmark category
+     * @param note      authoring note
+     * @return created/updated bookmark
+     */
+    public LabelBookmarkManager.LabelBookmark addBookmark(String labelName, String category, String note) {
+        return bookmarkManager.addOrUpdate(labelName, category, note);
+    }
+
+    /**
+     * Jumps to a bookmarked label in both the embedded script editor and active preview session ({@code #0102}).
+     *
+     * @param labelName target label name
+     */
+    public void jumpToBookmark(String labelName) {
+        if (labelName == null || labelName.isBlank()) {
+            return;
+        }
+        if (lastScannedAst != null && lastScannedAst.labels().containsKey(labelName)) {
+            VJavaAst.LabelNode node = lastScannedAst.labels().get(labelName);
+            if (node.sourceFile() != null && !node.sourceFile().isBlank()) {
+                openFileInEditor(getActiveProjectRoot().resolve(node.sourceFile()), Math.max(1, node.lineNumber()));
+            }
+        }
+        ScriptSession session = api != null ? api.getService(ScriptSession.class) : null;
+        if (session != null && session.getRuntime().getProjectAst().labels().containsKey(labelName)) {
+            session.getRuntime().jumpToLabel(labelName);
+            syncLiveRuntimePanels();
+        }
+    }
+
+    /**
+     * Runs {@link ExportPreFlightChecker} checklist validation on the active project ({@code #0103}).
+     *
+     * @return preflight validation report
+     */
+    public ExportPreFlightChecker.PreFlightReport runPreFlightCheck() {
+        return preFlightChecker.check(getActiveProjectRoot());
+    }
+
+    /**
+     * Inspects a packed {@code .vpak} archive via {@link VpakManifestInspector} ({@code #0104}).
+     *
+     * @param vpakFile archive path
+     * @return inspection report
+     * @throws IOException if reading archive fails
+     */
+    public VpakManifestInspector.VpakInspectionReport inspectVpakArchive(Path vpakFile) throws IOException {
+        return new VpakManifestInspector().inspect(vpakFile);
+    }
+
+    /**
+     * Builds editable Translation Matrix rows for {@code targetLanguage} ({@code #0105}).
+     *
+     * @param targetLanguage target language identifier
+     * @return translation matrix rows
+     */
+    public List<StudioReportAndQaService.TranslationMatrixRow> buildTranslationMatrix(String targetLanguage) {
+        if (lastScannedAst == null) {
+            return List.of();
+        }
+        return reportAndQaService.buildTranslationMatrix(lastScannedAst, targetLanguage);
+    }
+
+    /**
+     * Ranks label profiling hotspots from an active {@link ScriptProfiler} ({@code #0106}).
+     *
+     * @param profiler script profiler
+     * @param limit    max entries
+     * @return sorted list of {@link StudioReportAndQaService.ProfilerHotspot}
+     */
+    public List<StudioReportAndQaService.ProfilerHotspot> getProfilerHotspots(ScriptProfiler profiler, int limit) {
+        return reportAndQaService.rankHotspots(profiler, limit);
+    }
+
+    /**
+     * Exports a full ZIP diagnostic bundle containing logs, lint report, AST summary, and system info
+     * ({@code #0107}).
+     *
+     * @param outputZip destination ZIP file path
+     * @return path to exported ZIP archive
+     * @throws IOException if ZIP assembly fails
+     */
+    public Path exportDiagnosticZipBundle(Path outputZip) throws IOException {
+        return diagnosticBundleExporter.exportZipBundle(outputZip, api, lastLintReport, lastScannedAst, Map.of());
+    }
+
+    /**
+     * Sets the minimum severity level shown in the Studio live console ({@code #0108}).
+     *
+     * @param minLevel minimum log severity
+     */
+    public void setConsoleMinLevel(EngineLogger.Level minLevel) {
+        this.consoleMinLevel = minLevel != null ? minLevel : EngineLogger.Level.DEBUG;
+        refreshInspectorTextViews();
+    }
+
+    /**
+     * Filters the Studio live console by subsystem category (empty string disables filter) ({@code #0108}).
+     *
+     * @param category subsystem filter text
+     */
+    public void setConsoleCategoryFilter(String category) {
+        this.consoleCategoryFilter = category != null ? category.trim() : "";
+        refreshInspectorTextViews();
+    }
+
+    /**
+     * Returns filtered recent log entries matching active level and category filters ({@code #0108}).
+     *
+     * @param limit maximum entries to return
+     * @return filtered log entry list
+     */
+    public List<EngineLogger.LogEntry> getFilteredConsoleEntries(int limit) {
+        if (api == null) {
+            return List.of();
+        }
+        List<EngineLogger.LogEntry> raw = api.getLogger().getRecentEntries(Math.max(limit * 4, 64));
+        List<EngineLogger.LogEntry> filtered = new ArrayList<>();
+        for (EngineLogger.LogEntry entry : raw) {
+            if (entry.level().ordinal() < consoleMinLevel.ordinal()) {
+                continue;
+            }
+            if (!consoleCategoryFilter.isEmpty()
+                    && !entry.category().toLowerCase(Locale.ROOT).contains(
+                    consoleCategoryFilter.toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            filtered.add(entry);
+            if (filtered.size() >= limit) {
+                break;
+            }
+        }
+        return List.copyOf(filtered);
+    }
+
+    /**
+     * Applies a Studio workspace layout preset ({@code DOCKING}, {@code COMPACT}, {@code DEBUG})
+     * and persists it in {@link StudioWorkspaceState} ({@code #0109}).
+     *
+     * @param preset layout preset name
+     */
+    public void applyLayoutPreset(String preset) {
+        workspaceState.setLayoutPreset(preset);
+        Map<String, Boolean> vis = workspaceState.getPanelVisibility();
+        if (explorerWindowBox != null) {
+            explorerWindowBox.setVisible(vis.getOrDefault("explorer", Boolean.TRUE));
+        }
+        if (lintWindowBox != null) {
+            lintWindowBox.setVisible(vis.getOrDefault("linter", Boolean.TRUE));
+        }
+        if (varsWindowBox != null) {
+            varsWindowBox.setVisible(vis.getOrDefault("variables", Boolean.TRUE));
+        }
+        boolean showFlow = vis.getOrDefault("flowGraph", Boolean.FALSE);
+        this.flowGraphVisible = showFlow;
+        if (flowGraphBox != null) {
+            flowGraphBox.setVisible(showFlow);
+            rebuildFlowGraph();
+        }
+        layoutWorkspace();
+    }
+
+    /**
+     * Returns the persistent Studio workspace preferences object ({@code #0109}, {@code #0164}).
+     *
+     * @return workspace state instance
+     */
+    public StudioWorkspaceState getWorkspaceState() {
+        return workspaceState;
+    }
+
+    /**
+     * Runs {@link AutomatedPlaythroughRunner} asynchronously without blocking Window A ({@code #0110}).
+     *
+     * @param strategy choice selection strategy
+     * @param maxSteps maximum interaction steps
+     * @return future yielding {@link AutomatedPlaythroughRunner.PlaythroughReport}
+     */
+    public CompletableFuture<AutomatedPlaythroughRunner.PlaythroughReport> runPlaythroughAsync(
+            AutomatedPlaythroughRunner.ChoiceStrategy strategy,
+            int maxSteps
+    ) {
+        VJavaAst.ProjectAst ast = lastScannedAst;
+        if (ast == null) {
+            return CompletableFuture.completedFuture(new AutomatedPlaythroughRunner.PlaythroughReport(
+                    false, 0, 0, 0, java.util.Set.of(), 0.0, java.util.Optional.of("No project loaded")));
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            AutomatedPlaythroughRunner.PlaythroughReport report =
+                    new AutomatedPlaythroughRunner().run(ast, strategy, maxSteps);
+            if (api != null) {
+                api.getLogger().info("QA", "Playthrough (" + strategy + ") labelCoverage="
+                        + String.format(Locale.ROOT, "%.1f%%", report.labelCoveragePercent()));
+            }
+            return report;
+        });
+    }
+
+    /**
+     * Computes structural differences between two {@link SaveSlotData} snapshots ({@code #0111}).
+     *
+     * @param before baseline save slot
+     * @param after  target save slot
+     * @return structured state diff
+     */
+    public StateSnapshotDiffService.StateDiff diffSaveStates(SaveSlotData before, SaveSlotData after) {
+        return new StateSnapshotDiffService().diff(before, after);
+    }
+
+    /**
+     * Returns context-aware `.vjava` autocomplete suggestions for {@code linePrefix} ({@code #0112}).
+     *
+     * @param linePrefix line text before cursor
+     * @return completion suggestion list
+     */
+    public List<VJavaAutocompleteEngine.Suggestion> autocompleteAtCursor(String linePrefix) {
+        return autocompleteEngine.suggest(lastScannedAst, linePrefix);
+    }
+
+    /**
+     * Returns real-time script word counts and reading-time statistics ({@code #0115}).
+     *
+     * @return word count report
+     */
+    public ScriptWordCountAnalyzer.ScriptStatsReport getWordCountReport() {
+        return lastScannedAst != null
+                ? wordCountAnalyzer.analyze(lastScannedAst)
+                : new ScriptWordCountAnalyzer.ScriptStatsReport(0, 0, 0, 0.0, Map.of());
+    }
+
+    /**
+     * Captures an updated SHA-256 baseline manifest for project assets ({@code #0116}).
+     */
+    public void refreshAssetManifestBaseline() {
+        Path root = getActiveProjectRoot();
+        if (Files.isDirectory(root)) {
+            try {
+                this.baselineAssetManifest = checksumVerifier.generateManifest(root);
+            } catch (IOException ignored) {
+                this.baselineAssetManifest = null;
+            }
+        }
+    }
+
+    /**
+     * Verifies project assets against the recorded SHA-256 baseline ({@code #0116}).
+     *
+     * @return verification report showing valid, missing, modified, or unexpected assets
+     * @throws IOException if verification fails
+     */
+    public AssetChecksumVerifier.VerificationReport checkAssetIntegrity() throws IOException {
+        if (baselineAssetManifest == null) {
+            refreshAssetManifestBaseline();
+        }
+        if (baselineAssetManifest == null) {
+            return new AssetChecksumVerifier.VerificationReport(0, List.of(), List.of(), List.of());
+        }
+        return checksumVerifier.verify(getActiveProjectRoot(), baselineAssetManifest);
+    }
+
+    /**
+     * Refreshes the header Git status badge ({@code #0118}).
+     */
+    public void refreshGitStatusBadge() {
+        Path root = getActiveProjectRoot();
+        if (!Files.isDirectory(root) || !Files.exists(root.resolve(".git"))) {
+            this.gitStatusBadge = "no-git";
+            return;
+        }
+        try {
+            Process proc = new ProcessBuilder("git", "status", "--porcelain", "--branch")
+                    .directory(root.toFile())
+                    .redirectErrorStream(true)
+                    .start();
+            byte[] outBytes = proc.getInputStream().readAllBytes();
+            boolean finished = proc.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
+            if (!finished) {
+                proc.destroyForcibly();
+                this.gitStatusBadge = "git";
+                return;
+            }
+            if (proc.exitValue() != 0) {
+                this.gitStatusBadge = "git";
+                return;
+            }
+            String[] lines = new String(outBytes, StandardCharsets.UTF_8).split("\n");
+            String branch = "HEAD";
+            int dirty = 0;
+            for (String line : lines) {
+                if (line.startsWith("## ")) {
+                    String header = line.substring(3).trim();
+                    int dots = header.indexOf("...");
+                    branch = dots > 0 ? header.substring(0, dots) : header;
+                } else if (!line.isBlank()) {
+                    dirty++;
+                }
+            }
+            this.gitStatusBadge = dirty == 0
+                    ? branch + " (clean)"
+                    : branch + " (" + dirty + " changed)";
+        } catch (IOException | InterruptedException ex) {
+            if (ex instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            this.gitStatusBadge = "git";
+        }
+    }
+
+    /**
+     * Returns the formatted Studio header Git status badge text ({@code #0118}).
+     *
+     * @return formatted Git badge string
+     */
+    public String getGitStatusBadge() {
+        return gitStatusBadge;
+    }
+
+    /**
+     * Safely reloads project scripts while retaining {@code lastGoodSession} active if parsing or
+     * compilation fails, surfacing a clear diagnostic toast instead of crashing Window B ({@code #0119}).
+     *
+     * @return {@code true} if reload succeeded cleanly, {@code false} if rolled back to previous session
+     */
+    public boolean safeReloadScripts() {
+        ScriptSession currentSession = api != null ? api.getService(ScriptSession.class) : null;
+        if (currentSession != null) {
+            this.lastGoodSession = currentSession;
+        }
+        Path root = getActiveProjectRoot();
+        try {
+            VJavaAst.ProjectAst rescanned = ProjectScanner.scan(root);
+            VJavaLinter.LintReport lint = VJavaLinter.lint(rescanned);
+            if (lint.hasErrors()) {
+                this.lastLintReport = lint;
+                this.lastToastMessage = "Safe-Reload gestoppt (" + lint.errorCount()
+                        + " Lint-Fehler) — bisherige Session bleibt aktiv.";
+                if (api != null) {
+                    api.getLogger().warn("Studio", lastToastMessage);
+                }
+                return false;
+            }
+            this.lastScannedAst = rescanned;
+            this.lastLintReport = lint;
+            this.lastToastMessage = "Safe-Reload erfolgreich.";
+            if (api != null) {
+                api.requestLiveReload();
+            }
+            refreshInspectorTextViews();
+            return true;
+        } catch (Exception ex) {
+            this.lastToastMessage = "Safe-Reload Rollback (" + ex.getMessage()
+                    + ") — letzte funktionierende ScriptSession bleibt aktiv.";
+            if (api != null) {
+                api.getLogger().warn("Studio", lastToastMessage);
+                if (lastGoodSession != null) {
+                    api.registerService(ScriptSession.class, lastGoodSession);
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Returns the latest Studio status/rollback toast message ({@code #0119}).
+     *
+     * @return latest toast message
+     */
+    public String getLastToastMessage() {
+        return lastToastMessage;
+    }
+
+    /**
+     * Toggles the {@code F1} keyboard shortcut cheat-sheet overlay ({@code #0120}).
+     */
+    public void toggleShortcutOverlay() {
+        shortcutOverlayVisible = !shortcutOverlayVisible;
+        if (studioScreenManager == null || shortcutOverlayScreen == null) {
+            return;
+        }
+        if (shortcutOverlayVisible) {
+            studioScreenManager.showScreen(shortcutOverlayScreen);
+        } else {
+            studioScreenManager.hideScreenImmediate(SHORTCUT_OVERLAY_SCREEN_NAME);
+        }
+    }
+
+    /**
+     * Returns whether the {@code F1} keyboard shortcut overlay is currently open ({@code #0120}).
+     *
+     * @return {@code true} if shortcut overlay is visible
+     */
+    public boolean isShortcutOverlayVisible() {
+        return shortcutOverlayVisible;
+    }
+
+    /**
+     * Closes open modal Studio overlays ({@code Escape}) ({@code #0120}).
+     */
+    public void dismissOverlays() {
+        shortcutOverlayVisible = false;
+        if (studioScreenManager != null) {
+            studioScreenManager.hideScreenImmediate(SHORTCUT_OVERLAY_SCREEN_NAME);
+            studioScreenManager.hideScreenImmediate(COMMAND_PALETTE_SCREEN_NAME);
+            studioScreenManager.hideScreenImmediate(NEW_PROJECT_DIALOG_NAME);
+        }
+    }
+
+    /**
+     * Updates the Studio High-DPI UI scaling factor clamped to {@code [0.80, 1.50]} ({@code #0121}).
+     *
+     * @param scale scaling multiplier (e.g., {@code 1.25f})
+     */
+    public void setUiScale(float scale) {
+        workspaceState.setUiScale(scale);
+        if (studioScreenManager != null) {
+            float s = workspaceState.getUiScale();
+            studioScreenManager.setLogicalSize(1920.0f / s, 1080.0f / s);
+            layoutWorkspace();
+        }
+    }
+
+    /**
+     * Returns the current Studio High-DPI UI scale factor ({@code #0121}).
+     *
+     * @return UI scale factor in {@code [0.80, 1.50]}
+     */
+    public float getUiScale() {
+        return workspaceState.getUiScale();
+    }
+
+    /**
+     * Switches the active Studio project directory without restarting Studio ({@code #0122}).
+     *
+     * @param targetProjectRoot existing project root directory
+     */
+    public void switchActiveProject(Path targetProjectRoot) {
+        Objects.requireNonNull(targetProjectRoot, "targetProjectRoot must not be null");
+        Path normalized = targetProjectRoot.toAbsolutePath().normalize();
+        if (!Files.isDirectory(normalized)) {
+            throw new IllegalArgumentException("Project directory does not exist: " + normalized);
+        }
+        this.activeProjectRoot = normalized;
+        workspaceState.recordOpenedProject(normalized);
+        this.hotReloadWatcher = autoReloadEnabled ? new HotReloadWatcher(normalized) : null;
+        if (this.hotReloadWatcher != null) {
+            this.hotReloadWatcher.initializeSnapshot();
+        }
+        refreshProjectAndLint();
+        if (lastScannedAst != null && lastScannedAst.descriptor() != null && api != null) {
+            api.setProjectDescriptor(lastScannedAst.descriptor());
+        }
+        refreshAssetManifestBaseline();
+        refreshGitStatusBadge();
+        showWorkspace();
+        refreshInspectors();
+    }
+
+    /**
+     * Applies one of the curated Studio {@link ThemePalette.ThemeVariant} themes immediately
+     * across registered {@link WindowBox} and {@link TextButton} controls ({@code #0129}).
+     *
+     * @param variant target theme variant
+     */
+    public void applyThemeVariant(ThemePalette.ThemeVariant variant) {
+        ThemePalette.ThemeVariant effective = variant != null ? variant : ThemePalette.ThemeVariant.DARK_SLATE;
+        this.themeVariant = effective;
+        workspaceState.setThemeVariant(effective.name());
+        for (WindowBox wb : themedWindowBoxes) {
+            wb.setBackgroundColorHex(effective.panelSurface());
+            wb.setBorderColorHex(effective.border());
+        }
+        for (TextButton btn : themedButtons) {
+            btn.setBackgroundColorHex(effective.elevated());
+            btn.setBorderColorHex(effective.border());
+        }
+        applyRootScreenBackground(studioMainMenuScreen, effective.canvasBg());
+        applyRootScreenBackground(studioRootScreen, effective.canvasBg());
+    }
+
+    private static void applyRootScreenBackground(Screen screen, String hex) {
+        if (screen != null && screen.getRoot() != null) {
+            screen.getRoot().setBackgroundColorHex(hex);
+        }
+    }
+
+    /**
+     * Returns the currently active Studio {@link ThemePalette.ThemeVariant} ({@code #0129}).
+     *
+     * @return active theme variant
+     */
+    public ThemePalette.ThemeVariant getThemeVariant() {
+        return themeVariant;
+    }
+
+    private void refreshLiveTelemetry() {
+        int fps = api != null ? api.getClock().getCurrentFps() : 0;
+        int texCount = textureManager != null ? textureManager.getCacheSize() : 0;
+        int preloadCount = textureManager != null ? textureManager.getPreloadedCount() : 0;
+        long usedKb = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1024L;
+        this.liveTelemetryText = String.format(
+                Locale.ROOT,
+                "%d FPS | %d Tex (%d preloaded) | %d KB Heap",
+                fps, texCount, preloadCount, usedKb);
+    }
+
+    /**
+     * Returns formatted FPS, texture cache, and heap telemetry refreshed on a 0.5s cadence ({@code #0130}).
+     *
+     * @return formatted telemetry string
+     */
+    public String getLiveTelemetryText() {
+        return liveTelemetryText;
+    }
+
+    /**
+     * Warps the active preview {@link ScriptSession} directly to the label surrounding the active
+     * editor line while keeping state defaults intact ({@code #0133}).
+     *
+     * @param labelName target label name
+     * @return {@code true} if jump succeeded
+     */
+    public boolean jumpToLabelInPreview(String labelName) {
+        ScriptSession session = api != null ? api.getService(ScriptSession.class) : null;
+        if (session == null || labelName == null || labelName.isBlank()) {
+            return false;
+        }
+        seedDefaultVariablesFromAst();
+        session.getRuntime().jumpToLabel(labelName.trim());
+        syncLiveRuntimePanels();
+        return true;
+    }
+
+    /**
+     * Switches the active preview language immediately via {@link LocalizationManager} ({@code #0135}).
+     *
+     * @param language target language code (e.g., {@code "english"}, {@code "deutsch"})
+     */
+    public void switchPreviewLanguage(String language) {
+        if (api == null || language == null || language.isBlank()) {
+            return;
+        }
+        LocalizationManager loc = api.getService(LocalizationManager.class);
+        if (loc != null) {
+            loc.setLanguage(language.trim());
+        }
+        ScriptSession session = api.getService(ScriptSession.class);
+        if (session != null) {
+            session.getPreferencesState().setLanguage(language.trim());
+        }
+    }
+
+    /**
+     * Enables or disables automatic polling of external {@code .vjava} edits via
+     * {@link HotReloadWatcher} ({@code #0136}).
+     *
+     * @param enabled auto-reload mode flag
+     */
+    public void setAutoReloadEnabled(boolean enabled) {
+        this.autoReloadEnabled = enabled;
+        if (enabled && Files.isDirectory(getActiveProjectRoot())) {
+            this.hotReloadWatcher = new HotReloadWatcher(getActiveProjectRoot());
+            this.hotReloadWatcher.initializeSnapshot();
+        } else if (!enabled) {
+            this.hotReloadWatcher = null;
+        }
+    }
+
+    /**
+     * Returns whether automatic {@link HotReloadWatcher} polling is active ({@code #0136}).
+     *
+     * @return {@code true} if enabled
+     */
+    public boolean isAutoReloadEnabled() {
+        return autoReloadEnabled;
+    }
+
+    private void pollAutoHotReload() {
+        if (!autoReloadEnabled || hotReloadWatcher == null) {
+            return;
+        }
+        if (hotReloadWatcher.pollChanges().hasChanges()) {
+            safeReloadScripts();
+        }
+    }
+
+    /**
+     * Exports the active Story Flow Graph as Mermaid ({@code .mmd}) or Graphviz DOT ({@code .dot})
+     * ({@code #0138}).
+     *
+     * @param outputFile target output file path
+     * @param asDot      {@code true} for DOT, {@code false} for Mermaid
+     * @return written file path
+     * @throws IOException if writing fails
+     */
+    public Path exportFlowGraphFile(Path outputFile, boolean asDot) throws IOException {
+        Objects.requireNonNull(outputFile, "outputFile must not be null");
+        if (lastScannedAst == null) {
+            refreshProjectAndLint();
+        }
+        ScriptFlowGraphExporter.FlowGraph graph = flowGraphExporter.buildGraph(lastScannedAst);
+        String content = asDot ? flowGraphExporter.toDot(graph) : flowGraphExporter.toMermaid(graph);
+        Path norm = outputFile.toAbsolutePath().normalize();
+        if (norm.getParent() != null) {
+            Files.createDirectories(norm.getParent());
+        }
+        Files.writeString(norm, content, StandardCharsets.UTF_8);
+        return norm;
+    }
+
+    /**
+     * Mutes or unmutes a live OpenAL channel in real time ({@code #0141}).
+     *
+     * @param channelName channel identifier ({@code music}, {@code sound}, {@code voice}, {@code ambient})
+     * @param muted       mute state
+     */
+    public void setAudioChannelMuted(String channelName, boolean muted) {
+        AudioEngine audio = api != null ? api.getService(AudioEngine.class) : null;
+        if (audio == null || channelName == null || channelName.isBlank()) {
+            return;
+        }
+        AudioChannel ch = audio.getChannel(channelName);
+        if (ch != null) {
+            if (muted) {
+                ch.setChannelMixGain(0.0f);
+            } else {
+                audio.syncVolumesFromPreferences();
+            }
+        }
+    }
+
+    /**
+     * Configures live Studio accessibility preview (colorblindness simulation matrix and dyslexia-font
+     * preference flag) without mutating saved game files on disk ({@code #0144}).
+     *
+     * @param mode         accessibility matrix mode
+     * @param dyslexiaFont whether high-contrast dyslexia font toggle is previewed
+     */
+    public void setAccessibilityPreview(ColorBlindnessFilter.AccessibilityMode mode, boolean dyslexiaFont) {
+        this.accessibilityPreviewMode = mode != null ? mode : ColorBlindnessFilter.AccessibilityMode.NONE;
+        this.dyslexiaFontPreview = dyslexiaFont;
+        ScriptSession session = api != null ? api.getService(ScriptSession.class) : null;
+        if (session != null) {
+            session.getPreferencesState().setHighContrastDyslexiaFont(dyslexiaFont);
+        }
+        if (api != null) {
+            api.setProperty("studio.accessibilityMode", accessibilityPreviewMode.name());
+        }
+    }
+
+    /**
+     * Returns the active colorblindness preview mode.
+     *
+     * @return active colorblindness preview mode
+     */
+    public ColorBlindnessFilter.AccessibilityMode getAccessibilityPreviewMode() {
+        return accessibilityPreviewMode;
+    }
+
+    /**
+     * Returns whether dyslexia-friendly font preview is active.
+     *
+     * @return {@code true} if dyslexia font preview is active
+     */
+    public boolean isDyslexiaFontPreview() {
+        return dyslexiaFontPreview;
+    }
+
+    /**
+     * Jumps directly back to a historical rollback entry from {@link HistoryLog} ({@code #0145}).
+     *
+     * @param entry history log entry clicked in the rollback timeline
+     * @return {@code true} if rollback restored cleanly
+     */
+    public boolean jumpToRollbackHistoryEntry(HistoryLog.HistoryEntry entry) {
+        ScriptSession session = api != null ? api.getService(ScriptSession.class) : null;
+        if (session == null || entry == null) {
+            return false;
+        }
+        boolean ok = session.jumpToHistoryEntry(entry);
+        syncLiveRuntimePanels();
+        refreshInspectors();
+        return ok;
+    }
+
+    /**
+     * Sets the live Project Explorer search filter query ({@code #0154}).
+     *
+     * @param query substring filter (nullable clears filter)
+     */
+    public void setExplorerFilterQuery(String query) {
+        this.explorerFilterQuery = query != null ? query.trim() : "";
+        rebuildExplorerWidgets();
+    }
+
+    /**
+     * Fast case-insensitive substring filter over arbitrarily large asset/script lists ({@code #0154}).
+     *
+     * @param items source entries
+     * @param query filter substring
+     * @return matching entries preserving order
+     */
+    public List<String> filterExplorerEntries(List<String> items, String query) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        if (query == null || query.isBlank()) {
+            return items;
+        }
+        String needle = query.trim().toLowerCase(Locale.ROOT);
+        List<String> out = new ArrayList<>(Math.min(items.size(), 64));
+        for (int i = 0, n = items.size(); i < n; i++) {
+            String entry = items.get(i);
+            if (entry != null && entry.toLowerCase(Locale.ROOT).contains(needle)) {
+                out.add(entry);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Configures preview dialogue speed multiplier ({@code 0.5x}..{@code 4.0x}) inside Studio without
+     * overwriting persisted player save preferences ({@code #0156}).
+     *
+     * @param multiplier speed multiplier (clamped {@code [0.5f, 4.0f]})
+     */
+    public void setPreviewSpeedMultiplier(float multiplier) {
+        float clamped = Float.isFinite(multiplier) ? Math.max(0.5f, Math.min(4.0f, multiplier)) : 1.0f;
+        this.previewSpeedMultiplier = clamped;
+        ScriptSession session = api != null ? api.getService(ScriptSession.class) : null;
+        if (session != null) {
+            session.getPreferencesState().setTextSpeedCps(40.0f * clamped);
+        }
+    }
+
+    /**
+     * Returns the active Studio preview dialogue speed multiplier.
+     *
+     * @return active Studio preview dialogue speed multiplier
+     */
+    public float getPreviewSpeedMultiplier() {
+        return previewSpeedMultiplier;
+    }
+
+    /**
+     * Lists all plugins registered in {@link PluginRegistry} with ID, version, and enabled state ({@code #0157}).
+     *
+     * @return immutable list of plugin metadata lines
+     */
+    public List<String> listRegisteredPluginsSummary() {
+        PluginRegistry registry = api != null ? api.getService(PluginRegistry.class) : null;
+        if (registry == null) {
+            return List.of();
+        }
+        List<EnginePlugin> all = registry.listAll();
+        List<String> lines = new ArrayList<>(all.size());
+        for (EnginePlugin plugin : all) {
+            lines.add(plugin.id() + " (" + plugin.displayName() + " v" + plugin.version()
+                    + ") [" + (registry.isEnabled(plugin.id()) ? "ENABLED" : "DISABLED") + "]");
+        }
+        return List.copyOf(lines);
+    }
+
+    /**
+     * Enables or disables the live keybinding input tester overlay ({@code #0158}).
+     *
+     * @param visible overlay toggle
+     */
+    public void setKeybindingTestOverlayVisible(boolean visible) {
+        this.keybindingTestOverlayVisible = visible;
+    }
+
+    /**
+     * Returns whether the keybinding test overlay is enabled.
+     *
+     * @return {@code true} when keybinding test overlay is enabled
+     */
+    public boolean isKeybindingTestOverlayVisible() {
+        return keybindingTestOverlayVisible;
+    }
+
+    /**
+     * Records a key press sample into the bounded keybinding test buffer ({@code #0158}).
+     *
+     * @param keyLabel human-readable key name
+     */
+    public void recordKeybindingTestKey(String keyLabel) {
+        if (keyLabel != null && !keyLabel.isBlank()) {
+            recordedTestKeys.add(keyLabel.trim());
+            while (recordedTestKeys.size() > 32) {
+                recordedTestKeys.remove(0);
+            }
+        }
+    }
+
+    /**
+     * Returns an unmodifiable list of recently captured test keys.
+     *
+     * @return unmodifiable list of recently captured test keys
+     */
+    public List<String> getRecordedTestKeys() {
+        return List.copyOf(recordedTestKeys);
+    }
+
+    /**
+     * Subscribes the Studio EventBus Live Sniffer if an {@link EngineEventBus} service is registered
+     * ({@code #0162}).
+     */
+    public void subscribeEventBusSniffer() {
+        if (api == null || eventBusSnifferSub != null) {
+            return;
+        }
+        EngineEventBus bus = api.getService(EngineEventBus.class);
+        if (bus != null) {
+            this.eventBusSnifferSub = bus.subscribe(EngineEvent.class, event -> {
+                capturedBusEvents.add(event.getClass().getSimpleName() + ": " + event);
+                while (capturedBusEvents.size() > 100) {
+                    capturedBusEvents.remove(0);
+                }
+            });
+        }
+    }
+
+    /**
+     * Returns an immutable list of captured {@link EngineEventBus} events.
+     *
+     * @return immutable list of sniffed {@link EngineEventBus} events
+     */
+    public List<String> getCapturedBusEvents() {
+        return List.copyOf(capturedBusEvents);
+    }
+
+    /**
+     * Returns whether the Studio onboarding tour is visible.
+     *
+     * @return {@code true} when the Studio onboarding tour is visible
+     */
+    public boolean isOnboardingTourVisible() {
+        return onboardingTourVisible;
+    }
+
+    /**
+     * Marks the Studio onboarding tour completed/dismissed and stores preference ({@code #0164}).
+     */
+    public void completeOnboardingTour() {
+        this.onboardingTourVisible = false;
+        workspaceState.setOnboardingTourCompleted(true);
+    }
+
+    /**
+     * Increments the active project's semantic version and updates descriptor &amp; UI views ({@code #0166}).
+     *
+     * @param bump semantic bump component
+     * @return updated version string
+     * @throws IOException if persistence fails
+     */
+    public String bumpActiveProjectVersion(ProjectRefactorService.VersionBump bump) throws IOException {
+        String updated = refactorService.bumpProjectVersion(getActiveProjectRoot(), bump);
+        if (api != null) {
+            api.setProjectDescriptor(ProjectDescriptor.load(getActiveProjectRoot()));
+        }
+        refreshInspectorTextViews();
+        return updated;
+    }
+
+    private List<TextButton> activeNavigationButtons() {
+        return activeView == StudioView.MAIN_MENU ? mainMenuFocusButtons : toolbarFocusButtons;
+    }
+
+    private int activeFocusIndex() {
+        return activeView == StudioView.MAIN_MENU ? mainMenuFocusIndex : toolbarFocusIndex;
+    }
+
+    private void setActiveFocusIndex(int idx) {
+        if (activeView == StudioView.MAIN_MENU) {
+            mainMenuFocusIndex = idx;
+        } else {
+            toolbarFocusIndex = idx;
+        }
+    }
+
+    /**
+     * Moves keyboard focus forward across active Studio Main Menu or Toolbar buttons ({@code Tab})
+     * ({@code #0168}).
+     */
+    public void focusNextButton() {
+        List<TextButton> buttons = activeNavigationButtons();
+        if (buttons.isEmpty()) {
+            return;
+        }
+        clearButtonFocus(buttons);
+        int next = (activeFocusIndex() + 1) % buttons.size();
+        setActiveFocusIndex(next);
+        buttons.get(next).setFocused(true);
+    }
+
+    /**
+     * Moves keyboard focus backward across active Studio Main Menu or Toolbar buttons ({@code Shift+Tab})
+     * ({@code #0168}).
+     */
+    public void focusPrevButton() {
+        List<TextButton> buttons = activeNavigationButtons();
+        if (buttons.isEmpty()) {
+            return;
+        }
+        clearButtonFocus(buttons);
+        int cur = activeFocusIndex();
+        int prev = cur <= 0 ? buttons.size() - 1 : cur - 1;
+        setActiveFocusIndex(prev);
+        buttons.get(prev).setFocused(true);
+    }
+
+    /**
+     * Activates the currently focused Studio button ({@code Enter}) ({@code #0168}).
+     */
+    public void activateFocusedButton() {
+        TextButton focused = getFocusedButton();
+        if (focused != null) {
+            focused.click();
+        }
+    }
+
+    private void onWorkspaceEnterPressed() {
+        TextButton focused = getFocusedButton();
+        if (focused != null) {
+            focused.click();
+            return;
+        }
+        commitDirtyVariableInputs();
+    }
+
+    /**
+     * Returns the currently keyboard-focused {@link TextButton}, or {@code null} if none ({@code #0168}).
+     *
+     * @return focused button or {@code null}
+     */
+    public TextButton getFocusedButton() {
+        List<TextButton> buttons = activeNavigationButtons();
+        int idx = activeFocusIndex();
+        if (idx >= 0 && idx < buttons.size() && buttons.get(idx).isFocused()) {
+            return buttons.get(idx);
+        }
+        for (TextButton btn : buttons) {
+            if (btn.isFocused()) {
+                return btn;
+            }
+        }
+        return null;
+    }
+
+    private static void clearButtonFocus(List<TextButton> buttons) {
+        for (UiNode btn : buttons) {
+            btn.setFocused(false);
+        }
     }
 }

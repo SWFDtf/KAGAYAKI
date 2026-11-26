@@ -1,5 +1,9 @@
 package de.swfdtf.tools;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 import de.swfdtf.core.ProjectDescriptor;
 import de.swfdtf.graphics.ObjectMotionController;
 import de.swfdtf.graphics.Transition;
@@ -9,7 +13,9 @@ import de.swfdtf.parser.VJavaAst;
 import de.swfdtf.parser.VJavaCompileException;
 import de.swfdtf.parser.VJavaParseException;
 
+import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -243,7 +249,62 @@ public final class VJavaLinter {
         checkJavaBlocks(project, issues);
         checkUnusedSymbols(project, issues);
 
-        return createReport(issues);
+        List<LintIssue> effectiveIssues = applyProjectRuleOverrides(project.projectRoot(), issues);
+        return createReport(effectiveIssues);
+    }
+
+    /** File name of optional per-project lint rule configuration ({@code #0153}). */
+    public static final String LINT_CONFIG_FILE = ".vjavalint.json";
+
+    private static List<LintIssue> applyProjectRuleOverrides(Path projectRoot, List<LintIssue> issues) {
+        if (projectRoot == null || issues.isEmpty()) {
+            return issues;
+        }
+        Path configPath = projectRoot.resolve(LINT_CONFIG_FILE);
+        if (!Files.isRegularFile(configPath)) {
+            return issues;
+        }
+        Map<String, String> overrides = new LinkedHashMap<>();
+        try {
+            String raw = Files.readString(configPath, StandardCharsets.UTF_8);
+            JsonObject root = new Gson().fromJson(raw, JsonObject.class);
+            if (root != null) {
+                JsonObject rulesObj = root.has("rules") && root.get("rules").isJsonObject()
+                        ? root.getAsJsonObject("rules")
+                        : root;
+                for (Map.Entry<String, JsonElement> entry : rulesObj.entrySet()) {
+                    if (entry.getValue() != null && entry.getValue().isJsonPrimitive()) {
+                        overrides.put(entry.getKey().trim().toUpperCase(Locale.ROOT),
+                                entry.getValue().getAsString().trim().toUpperCase(Locale.ROOT));
+                    }
+                }
+            }
+        } catch (IOException | JsonParseException ignored) {
+            return issues;
+        }
+        if (overrides.isEmpty()) {
+            return issues;
+        }
+        List<LintIssue> adjusted = new ArrayList<>(issues.size());
+        for (LintIssue issue : issues) {
+            String ruleAction = overrides.get(issue.code().toUpperCase(Locale.ROOT));
+            if ("OFF".equals(ruleAction) || "NONE".equals(ruleAction) || "IGNORE".equals(ruleAction)) {
+                continue;
+            }
+            if ("ERROR".equals(ruleAction)) {
+                adjusted.add(new LintIssue(
+                        Severity.ERROR, issue.code(), issue.message(), issue.sourceFile(), issue.lineNumber()));
+            } else if ("WARNING".equals(ruleAction) || "WARN".equals(ruleAction)) {
+                adjusted.add(new LintIssue(
+                        Severity.WARNING, issue.code(), issue.message(), issue.sourceFile(), issue.lineNumber()));
+            } else if ("INFO".equals(ruleAction)) {
+                adjusted.add(new LintIssue(
+                        Severity.INFO, issue.code(), issue.message(), issue.sourceFile(), issue.lineNumber()));
+            } else {
+                adjusted.add(issue);
+            }
+        }
+        return adjusted;
     }
 
     private static String resolveEntryLabel(ProjectDescriptor descriptor) {

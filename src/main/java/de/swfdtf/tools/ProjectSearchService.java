@@ -157,6 +157,145 @@ public final class ProjectSearchService {
         return List.copyOf(matches);
     }
 
+    /**
+     * Preview of replacements applied to a single file.
+     *
+     * @param file           normalized file path
+     * @param replacements   number of matches replaced inside this file
+     * @param updatedPreview resulting file content preview
+     */
+    public record FileReplacePreview(Path file, int replacements, String updatedPreview) {
+    }
+
+    /**
+     * Summary result of a project-wide search-and-replace or dry-run preview operation.
+     *
+     * @param totalReplacements total occurrences replaced across all matched files
+     * @param modifiedFiles     number of files modified
+     * @param previews          immutable per-file replacement previews
+     */
+    public record ReplaceResult(
+            int totalReplacements,
+            int modifiedFiles,
+            List<FileReplacePreview> previews
+    ) {
+        /** Normalizes preview list. */
+        public ReplaceResult {
+            previews = previews != null ? List.copyOf(previews) : List.of();
+        }
+    }
+
+    /**
+     * Replaces all plain-text occurrences of {@code query} with {@code replacement} across text
+     * files under {@code projectRoot} ({@code dryRun=true} returns previews without writing files).
+     *
+     * @param projectRoot   project root directory
+     * @param query         non-empty literal search string
+     * @param replacement   replacement string
+     * @param caseSensitive whether matching is case-sensitive
+     * @param dryRun        when {@code true}, leaves disk untouched
+     * @return {@link ReplaceResult} detailing counts and per-file previews
+     */
+    public ReplaceResult replacePlainText(
+            Path projectRoot,
+            String query,
+            String replacement,
+            boolean caseSensitive,
+            boolean dryRun
+    ) {
+        Objects.requireNonNull(query, "query must not be null");
+        Objects.requireNonNull(replacement, "replacement must not be null");
+        if (query.isEmpty()) {
+            throw new IllegalArgumentException("query must not be empty");
+        }
+        Pattern compiled = caseSensitive
+                ? Pattern.compile(Pattern.quote(query))
+                : Pattern.compile(Pattern.quote(query), Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+        return executeRegexReplace(projectRoot, compiled, Matcher.quoteReplacement(replacement), dryRun);
+    }
+
+    /**
+     * Replaces all regex matches of {@code pattern} with {@code replacement} across text files
+     * under {@code projectRoot}.
+     *
+     * @param projectRoot project root directory
+     * @param pattern     compiled regex pattern
+     * @param replacement regex replacement string
+     * @param dryRun      when {@code true}, leaves disk untouched
+     * @return {@link ReplaceResult} detailing counts and per-file previews
+     */
+    public ReplaceResult replaceRegex(Path projectRoot, Pattern pattern, String replacement, boolean dryRun) {
+        Objects.requireNonNull(pattern, "pattern must not be null");
+        Objects.requireNonNull(replacement, "replacement must not be null");
+        if (pattern.pattern().isEmpty()) {
+            throw new IllegalArgumentException("pattern must not be empty");
+        }
+        return executeRegexReplace(projectRoot, pattern, replacement, dryRun);
+    }
+
+    private ReplaceResult executeRegexReplace(
+            Path projectRoot,
+            Pattern pattern,
+            String replacement,
+            boolean dryRun
+    ) {
+        Path normalizedRoot = validateProjectRoot(projectRoot);
+        List<Path> candidateFiles = discoverTextCandidateFiles(normalizedRoot);
+        List<FileReplacePreview> previews = new ArrayList<>();
+        int totalReplacements = 0;
+
+        for (Path file : candidateFiles) {
+            String raw;
+            try {
+                byte[] bytes = Files.readAllBytes(file);
+                if (containsZeroByte(bytes)) {
+                    continue;
+                }
+                raw = StandardCharsets.UTF_8.newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT)
+                        .decode(ByteBuffer.wrap(bytes))
+                        .toString();
+            } catch (CharacterCodingException ignored) {
+                continue;
+            } catch (IOException ex) {
+                throw new UncheckedIOException("Failed to read file for replace: " + file, ex);
+            }
+
+            Matcher matcher = pattern.matcher(raw);
+            int fileCount = 0;
+            StringBuffer sb = new StringBuffer();
+            while (matcher.find()) {
+                matcher.appendReplacement(sb, replacement);
+                fileCount++;
+            }
+            if (fileCount == 0) {
+                continue;
+            }
+            matcher.appendTail(sb);
+            String updated = sb.toString();
+            totalReplacements += fileCount;
+            previews.add(new FileReplacePreview(file, fileCount, updated));
+            if (!dryRun) {
+                try {
+                    Files.writeString(file, updated, StandardCharsets.UTF_8);
+                } catch (IOException ex) {
+                    throw new UncheckedIOException("Failed to write file after replace: " + file, ex);
+                }
+            }
+        }
+        return new ReplaceResult(totalReplacements, previews.size(), previews);
+    }
+
+    private static boolean containsZeroByte(byte[] bytes) {
+        for (byte b : bytes) {
+            if (b == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static Path validateProjectRoot(Path projectRoot) {
         Path normalized = projectRoot.toAbsolutePath().normalize();
         if (!Files.exists(normalized) || !Files.isDirectory(normalized)) {
