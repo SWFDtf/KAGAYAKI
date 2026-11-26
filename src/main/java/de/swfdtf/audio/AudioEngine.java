@@ -562,13 +562,17 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
         if (!Double.isFinite(durationSeconds) || durationSeconds <= 0.0) {
             throw new IllegalArgumentException("durationSeconds must be finite and > 0, got: " + durationSeconds);
         }
+        AudioChannel voiceChannel = getChannel(CHANNEL_VOICE);
+        String currentVoice = voiceChannel.getAssetPath();
+        if (voiceChannel.isPlaying() && currentVoice != null && !currentVoice.startsWith(BLEEP_PREFIX)) {
+            return;
+        }
         syncVolumesFromPreferences();
         String key = buildBleepKey(freqHz, durationSeconds);
         AudioDecoder.DecodedAudio bleep = bleepCache.computeIfAbsent(
                 key,
                 ignored -> AudioDecoder.synthesizeVoiceBleep(freqHz, durationSeconds, DEFAULT_SYNTH_SAMPLE_RATE)
         );
-        AudioChannel voiceChannel = getChannel(CHANNEL_VOICE);
         voiceChannel.clearQueue();
         voiceChannel.play(key, bleep, false, 0.0, 1.0f);
     }
