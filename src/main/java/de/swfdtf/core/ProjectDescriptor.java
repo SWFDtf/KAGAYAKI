@@ -40,6 +40,7 @@ public final class ProjectDescriptor {
     private String dialogueMode = "ADV";
     private String windowTitle = "";
     private String iconPath = "";
+    private String vpakEncryptionKey = "";
 
     /**
      * Creates a descriptor initialized with default settings (used by Gson during deserialization).
@@ -130,6 +131,27 @@ public final class ProjectDescriptor {
     }
 
     /**
+     * Deserializes and normalizes a {@link ProjectDescriptor} from a UTF-8 JSON string.
+     *
+     * @param json JSON representation of {@code project.vjava.json}
+     * @return parsed and normalized {@link ProjectDescriptor}
+     * @throws IOException if {@code json} is empty or malformed
+     */
+    public static ProjectDescriptor parseJson(String json) throws IOException {
+        Objects.requireNonNull(json, "json must not be null");
+        try {
+            ProjectDescriptor loaded = GSON.fromJson(json, ProjectDescriptor.class);
+            if (loaded == null) {
+                throw new IOException("Empty project descriptor JSON");
+            }
+            loaded.normalizeDefaults();
+            return loaded;
+        } catch (JsonParseException e) {
+            throw new IOException("Failed to parse project descriptor JSON: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Saves the specified {@link ProjectDescriptor} as formatted JSON to {@code projectDir/project.vjava.json}.
      *
      * @param projectDir root directory of the project
@@ -196,6 +218,9 @@ public final class ProjectDescriptor {
         }
         if (iconPath == null) {
             iconPath = "";
+        }
+        if (vpakEncryptionKey == null) {
+            vpakEncryptionKey = "";
         }
     }
 
@@ -395,6 +420,24 @@ public final class ProjectDescriptor {
      */
     public void setIconPath(String iconPath) {
         this.iconPath = iconPath;
+    }
+
+    /**
+     * Returns the optional encryption key used for AES-CTR {@code .vpak} packaging.
+     *
+     * @return encryption key string (empty when unencrypted)
+     */
+    public String getVpakEncryptionKey() {
+        return vpakEncryptionKey;
+    }
+
+    /**
+     * Sets the optional encryption key used when exporting encrypted {@code .vpak} archives.
+     *
+     * @param vpakEncryptionKey encryption key string (empty or {@code null} to disable encryption)
+     */
+    public void setVpakEncryptionKey(String vpakEncryptionKey) {
+        this.vpakEncryptionKey = vpakEncryptionKey != null ? vpakEncryptionKey : "";
     }
 
     @Override

@@ -1,6 +1,7 @@
 package de.swfdtf.graphics;
 
 import de.swfdtf.core.EngineLogger;
+import de.swfdtf.core.ResourceProvider;
 import org.lwjgl.stb.STBImage;
 import org.lwjgl.stb.STBImageWrite;
 import org.lwjgl.system.MemoryStack;
@@ -79,6 +80,7 @@ public final class TextureManager {
 
     private final EngineLogger logger;
     private volatile Path assetRoot;
+    private volatile ResourceProvider resourceProvider;
     private final Map<String, Texture> cache = new LinkedHashMap<>();
     private final Map<String, DecodedImage> preloadedImages = new ConcurrentHashMap<>();
     private final Map<String, CompletableFuture<Boolean>> inFlightPreloads = new ConcurrentHashMap<>();
@@ -259,6 +261,25 @@ public final class TextureManager {
         if (fileBytes.length == 0) {
             throw new IllegalStateException("Image file is empty: " + path);
         }
+        return decodeImageBytesRgba(fileBytes, outSize, path.toString());
+    }
+
+    /**
+     * Decodes in-memory image bytes (PNG, JPEG, BMP, TGA, or lossless WebP) into straight RGBA8.
+     *
+     * @param fileBytes  encoded image bytes (must not be {@code null} or empty)
+     * @param outSize    optional array of length {@code >= 2} receiving {@code [width, height]}
+     * @param sourceName logical source name for error diagnostics
+     * @return straight RGBA8 pixel bytes
+     */
+    public static byte[] decodeImageBytesRgba(byte[] fileBytes, int[] outSize, String sourceName) {
+        Objects.requireNonNull(fileBytes, "fileBytes must not be null");
+        if (outSize != null && outSize.length < 2) {
+            throw new IllegalArgumentException("outSize array must have length >= 2, got " + outSize.length);
+        }
+        if (fileBytes.length == 0) {
+            throw new IllegalStateException("Image bytes are empty: " + sourceName);
+        }
 
         if (WebpVp8lDecoder.isWebp(fileBytes)) {
             WebpVp8lDecoder.DecodedRgba decodedWebp = WebpVp8lDecoder.decode(fileBytes);
@@ -287,7 +308,8 @@ public final class TextureManager {
             if (decoded == null) {
                 String reason = STBImage.stbi_failure_reason();
                 throw new IllegalStateException(
-                        "Failed to decode image '" + path + "': " + (reason != null ? reason : "unknown STB error")
+                        "Failed to decode image '" + sourceName + "': "
+                                + (reason != null ? reason : "unknown STB error")
                 );
             }
 
@@ -295,7 +317,7 @@ public final class TextureManager {
             int height = hBuf.get(0);
             if (width <= 0 || height <= 0) {
                 throw new IllegalStateException(
-                        "Decoded invalid image dimensions " + width + "x" + height + " for " + path
+                        "Decoded invalid image dimensions " + width + "x" + height + " for " + sourceName
                 );
             }
 
@@ -315,6 +337,16 @@ public final class TextureManager {
             }
             MemoryUtil.memFree(rawFileBuffer);
         }
+    }
+
+    /**
+     * Attaches an optional {@link ResourceProvider} fallback for loading textures directly
+     * from packed {@code .vpak} archives when loose files are absent on disk.
+     *
+     * @param resourceProvider resource provider instance (may be {@code null})
+     */
+    public void setResourceProvider(ResourceProvider resourceProvider) {
+        this.resourceProvider = resourceProvider;
     }
 
     /**
@@ -377,8 +409,18 @@ public final class TextureManager {
         int[] size = new int[2];
         byte[] straightRgba;
         try {
-            straightRgba = readImageFileRgba(resolved, size);
-        } catch (RuntimeException ex) {
+            if (!Files.isRegularFile(resolved) && resourceProvider != null) {
+                String relKey = extractRelativeKey(path, resolved);
+                if (relKey != null && resourceProvider.contains(relKey)) {
+                    byte[] rawBytes = resourceProvider.readBytes(relKey);
+                    straightRgba = decodeImageBytesRgba(rawBytes, size, relKey);
+                } else {
+                    straightRgba = readImageFileRgba(resolved, size);
+                }
+            } else {
+                straightRgba = readImageFileRgba(resolved, size);
+            }
+        } catch (IOException | RuntimeException ex) {
             logger.warn(
                     LOG_CATEGORY,
                     "Missing or corrupt texture asset '" + resolved + "' (" + ex.getMessage()
@@ -390,6 +432,24 @@ public final class TextureManager {
         Texture uploaded = Texture.createFromRgba(size[0], size[1], straightRgba, false, cacheKey);
         cache.put(cacheKey, uploaded);
         return uploaded;
+    }
+
+    private String extractRelativeKey(Path originalPath, Path resolvedPath) {
+        Path root = assetRoot;
+        if (root != null) {
+            Path normRoot = root.toAbsolutePath().normalize();
+            if (resolvedPath.startsWith(normRoot)) {
+                return normRoot.relativize(resolvedPath).toString().replace('\\', '/');
+            }
+        }
+        String raw = originalPath.toString().replace('\\', '/');
+        while (raw.startsWith("./")) {
+            raw = raw.substring(2);
+        }
+        while (raw.startsWith("/")) {
+            raw = raw.substring(1);
+        }
+        return raw;
     }
 
     /**

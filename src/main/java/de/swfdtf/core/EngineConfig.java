@@ -16,6 +16,7 @@ import java.util.Objects;
  * @param targetFps      render frame cap when VSync is disabled (default {@code 120})
  * @param smokeTest      whether to run automated initialization/smoke verification and exit cleanly
  * @param headless       whether to skip creating native GLFW/OpenGL windows
+ * @param vpakKey        optional decryption key for encrypted {@code .vpak} archives
  */
 public record EngineConfig(
         EngineMode engineMode,
@@ -26,8 +27,37 @@ public record EngineConfig(
         boolean vsync,
         int targetFps,
         boolean smokeTest,
-        boolean headless
+        boolean headless,
+        String vpakKey
 ) {
+
+    /**
+     * Backwards-compatible 9-argument constructor without a decryption key.
+     *
+     * @param engineMode     execution mode
+     * @param renderModeName active render backend mode
+     * @param projectDir     project root directory
+     * @param logicalWidth   logical canvas width
+     * @param logicalHeight  logical canvas height
+     * @param vsync          whether vertical synchronization is enabled
+     * @param targetFps      render frame cap
+     * @param smokeTest      whether smoke test mode is enabled
+     * @param headless       whether headless mode is enabled
+     */
+    public EngineConfig(
+            EngineMode engineMode,
+            String renderModeName,
+            Path projectDir,
+            int logicalWidth,
+            int logicalHeight,
+            boolean vsync,
+            int targetFps,
+            boolean smokeTest,
+            boolean headless
+    ) {
+        this(engineMode, renderModeName, projectDir, logicalWidth, logicalHeight,
+                vsync, targetFps, smokeTest, headless, "");
+    }
 
     /**
      * Default logical canvas width (16:9 HD).
@@ -60,6 +90,7 @@ public record EngineConfig(
         if (targetFps <= 0) {
             throw new IllegalArgumentException("targetFps must be positive, got: " + targetFps);
         }
+        vpakKey = vpakKey != null ? vpakKey : "";
     }
 
     /**
@@ -141,6 +172,8 @@ public record EngineConfig(
                     builder.logicalHeight(parsePositiveInt(requireNextValue(args, i++, "--height"), "--height"));
                 case "--fps", "--target-fps" ->
                     builder.targetFps(parsePositiveInt(requireNextValue(args, i++, arg), arg));
+                case "--vpak-key" ->
+                    builder.vpakKey(requireNextValue(args, i++, "--vpak-key"));
                 default -> {
                     if (arg.startsWith("--project=")) {
                         builder.projectDir(Path.of(arg.substring("--project=".length())));
@@ -159,6 +192,8 @@ public record EngineConfig(
                         builder.targetFps(parsePositiveInt(arg.substring("--target-fps=".length()), "--target-fps"));
                     } else if (arg.startsWith("--vsync=")) {
                         builder.vsync(Boolean.parseBoolean(arg.substring("--vsync=".length())));
+                    } else if (arg.startsWith("--vpak-key=")) {
+                        builder.vpakKey(arg.substring("--vpak-key=".length()));
                     } else if (!arg.startsWith("-") && !projectExplicitlySet) {
                         builder.projectDir(Path.of(arg));
                         projectExplicitlySet = true;
@@ -242,6 +277,7 @@ public record EngineConfig(
         private int targetFps = DEFAULT_TARGET_FPS;
         private boolean smokeTest = false;
         private boolean headless = false;
+        private String vpakKey = "";
 
         private Builder() {
         }
@@ -256,6 +292,7 @@ public record EngineConfig(
             this.targetFps = config.targetFps();
             this.smokeTest = config.smokeTest();
             this.headless = config.headless();
+            this.vpakKey = config.vpakKey();
         }
 
         /**
@@ -358,6 +395,17 @@ public record EngineConfig(
         }
 
         /**
+         * Sets the optional decryption key for encrypted {@code .vpak} archives.
+         *
+         * @param vpakKey decryption key string (empty or {@code null} when unused)
+         * @return this builder
+         */
+        public Builder vpakKey(String vpakKey) {
+            this.vpakKey = vpakKey != null ? vpakKey : "";
+            return this;
+        }
+
+        /**
          * Builds an immutable {@link EngineConfig}.
          *
          * @return validated engine configuration
@@ -372,7 +420,8 @@ public record EngineConfig(
                     vsync,
                     targetFps,
                     smokeTest,
-                    headless
+                    headless,
+                    vpakKey
             );
         }
     }

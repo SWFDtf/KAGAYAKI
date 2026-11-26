@@ -9,6 +9,11 @@ import de.swfdtf.graphics.SceneGraph;
 import de.swfdtf.graphics.WindowManager;
 import de.swfdtf.math.Rect2f;
 
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -24,12 +29,16 @@ public final class EngineApplication implements AutoCloseable {
 
     private static final String STUDIO_CONTROLLER_CLASS = "de.swfdtf.tools.StudioWindowController";
     private static final String GAME_COORDINATOR_CLASS = "de.swfdtf.ui.GameRuntimeCoordinator";
+    private static final String VPAK_PROVIDER_CLASS = "de.swfdtf.tools.VpakResourceProvider";
     private static final int SMOKE_TEST_FRAMES = 5;
 
     private final EngineConfig config;
     private final EngineAPI api;
     private final SceneGraph sceneGraph;
     private final WindowManager windowManager;
+    private final PluginRegistry pluginRegistry;
+    private final List<URLClassLoader> pluginClassLoaders = new ArrayList<>();
+    private final ResourceProvider resourceProvider;
 
     private final List<Updatable> updatables = new ArrayList<>();
     private IRenderPipeline activePipeline;
@@ -81,7 +90,9 @@ public final class EngineApplication implements AutoCloseable {
      */
     public EngineApplication(EngineConfig config, StudioBridge studioBridge, GameHost gameHost) {
         this.config = Objects.requireNonNull(config, "config must not be null");
-        ProjectDescriptor descriptor = loadProjectDescriptorQuietly(config.projectDir());
+        ResourceProvider vpakProvider = openVpakIfStandaloneWithoutLooseDescriptor(
+                config.projectDir(), config.vpakKey());
+        ProjectDescriptor descriptor = loadProjectDescriptorQuietly(config.projectDir(), vpakProvider);
         EngineLogger logger = new EngineLogger();
         GameClock clock = new GameClock();
         InputManager input = new InputManager();
@@ -89,11 +100,17 @@ public final class EngineApplication implements AutoCloseable {
         this.api = new EngineAPI(config, descriptor, logger, clock, input);
         this.sceneGraph = new SceneGraph();
         this.windowManager = new WindowManager(logger);
+        this.pluginRegistry = new PluginRegistry(this.api);
+        this.resourceProvider = vpakProvider;
         this.studioBridge = studioBridge;
         this.gameHost = gameHost;
 
         this.api.registerService(SceneGraph.class, sceneGraph);
         this.api.registerService(EngineApplication.class, this);
+        this.api.registerService(PluginRegistry.class, pluginRegistry);
+        if (vpakProvider != null) {
+            this.api.registerService(ResourceProvider.class, vpakProvider);
+        }
     }
 
     /**
@@ -110,6 +127,11 @@ public final class EngineApplication implements AutoCloseable {
                 + " mode=" + config.engineMode()
                 + " render=" + requestedMode
                 + " headless=" + config.headless());
+        if (resourceProvider != null) {
+            api.getLogger().info("Engine", "Loaded project '" + api.getProjectDescriptor().getTitle()
+                    + "' from " + resourceProvider.getSourceDescription()
+                    + " (" + resourceProvider.listPaths().size() + " entries)");
+        }
 
         if (!config.headless()) {
             String gameTitle = buildGameWindowTitle();
@@ -136,6 +158,11 @@ public final class EngineApplication implements AutoCloseable {
 
         if (config.isStudioMode()) {
             initializeStudioBridgeIfAvailable();
+        }
+
+        if (config.projectDir() != null) {
+            pluginClassLoaders.addAll(PluginLoader.loadFromDirectory(
+                    config.projectDir().resolve("plugins"), pluginRegistry, api.getLogger()));
         }
 
         initialized = true;
@@ -464,6 +491,30 @@ public final class EngineApplication implements AutoCloseable {
 
         api.getInput().dispose();
         windowManager.dispose();
+
+        for (EnginePlugin plugin : pluginRegistry.listAll()) {
+            try {
+                pluginRegistry.unregister(plugin.id());
+            } catch (RuntimeException ex) {
+                api.getLogger().warn("PluginLoader", "Error unregistering plugin '" + plugin.id()
+                        + "': " + ex.getMessage());
+            }
+        }
+        for (URLClassLoader loader : pluginClassLoaders) {
+            try {
+                loader.close();
+            } catch (IOException ex) {
+                api.getLogger().warn("PluginLoader", "Error closing plugin classloader: " + ex.getMessage());
+            }
+        }
+        pluginClassLoaders.clear();
+        if (resourceProvider != null) {
+            try {
+                resourceProvider.close();
+            } catch (IOException ex) {
+                api.getLogger().warn("Engine", "Error closing ResourceProvider: " + ex.getMessage());
+            }
+        }
         api.getLogger().info("Engine", "KAGAYAKI shutdown complete.");
     }
 
@@ -492,6 +543,7 @@ public final class EngineApplication implements AutoCloseable {
     private void initializeGameHostIfApplicable() {
         Path projectDir = config.projectDir();
         boolean hasProject = gameHost != null
+                || resourceProvider != null
                 || (projectDir != null && Files.isRegularFile(projectDir.resolve(ProjectDescriptor.FILE_NAME)));
         if (!hasProject) {
             return;
@@ -571,7 +623,63 @@ public final class EngineApplication implements AutoCloseable {
         }
     }
 
-    private static ProjectDescriptor loadProjectDescriptorQuietly(Path projectDir) {
+    private static ResourceProvider openVpakIfStandaloneWithoutLooseDescriptor(Path projectDir, String vpakKey) {
+        if (projectDir == null) {
+            return null;
+        }
+        Path looseDescriptor = projectDir.resolve(ProjectDescriptor.FILE_NAME);
+        if (Files.isRegularFile(looseDescriptor)) {
+            return null;
+        }
+        Path vpakCandidate = null;
+        Path dirVpak = projectDir.resolve("game.vpak");
+        if (Files.isRegularFile(dirVpak)) {
+            vpakCandidate = dirVpak;
+        } else if (projectDir.toString().endsWith(".vpak") && Files.isRegularFile(projectDir)) {
+            vpakCandidate = projectDir;
+        }
+        if (vpakCandidate == null) {
+            return null;
+        }
+        ResourceProvider provider = null;
+        try {
+            Class<?> providerClass = Class.forName(VPAK_PROVIDER_CLASS);
+            Method openMethod = providerClass.getMethod("open", Path.class, String.class);
+            provider = (ResourceProvider) openMethod.invoke(null, vpakCandidate, vpakKey);
+            provider.verifyIntegrity();
+            return provider;
+        } catch (InvocationTargetException ex) {
+            closeProviderQuietly(provider);
+            Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+            throw new IllegalStateException("Failed to open/verify VPAK archive '"
+                    + vpakCandidate + "': " + cause.getMessage(), cause);
+        } catch (Exception ex) {
+            closeProviderQuietly(provider);
+            throw new IllegalStateException("Failed to open/verify VPAK archive '"
+                    + vpakCandidate + "': " + ex.getMessage(), ex);
+        }
+    }
+
+    private static void closeProviderQuietly(ResourceProvider provider) {
+        if (provider != null) {
+            try {
+                provider.close();
+            } catch (IOException ignored) {
+                // Best-effort cleanup during startup failure
+            }
+        }
+    }
+
+    private static ProjectDescriptor loadProjectDescriptorQuietly(Path projectDir, ResourceProvider provider) {
+        if (provider != null && provider.contains(ProjectDescriptor.FILE_NAME)) {
+            try {
+                String json = new String(
+                        provider.readBytes(ProjectDescriptor.FILE_NAME), StandardCharsets.UTF_8);
+                return ProjectDescriptor.parseJson(json);
+            } catch (Exception ignored) {
+                // Fall back to default descriptor when packed file cannot be parsed
+            }
+        }
         if (projectDir != null) {
             Path descriptorPath = projectDir.resolve(ProjectDescriptor.FILE_NAME);
             if (Files.isRegularFile(descriptorPath)) {

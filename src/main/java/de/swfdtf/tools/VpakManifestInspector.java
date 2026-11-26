@@ -78,10 +78,23 @@ public final class VpakManifestInspector {
      * @throws IOException if the archive file cannot be opened or has an invalid header/table of contents
      */
     public VpakInspectionReport inspect(Path vpakFile) throws IOException {
+        return inspect(vpakFile, null);
+    }
+
+    /**
+     * Opens {@code vpakFile} (plain v1 or AES-CTR encrypted v2 using {@code decryptionKey}),
+     * reads and verifies every entry, and returns an immutable {@link VpakInspectionReport}.
+     *
+     * @param vpakFile      path to the {@code .vpak} archive file (must not be {@code null})
+     * @param decryptionKey optional passphrase when inspecting encrypted archives (nullable)
+     * @return immutable {@link VpakInspectionReport} with size totals, extension breakdown, and corruption list
+     * @throws IOException if the archive file cannot be opened or has an invalid key/header/table of contents
+     */
+    public VpakInspectionReport inspect(Path vpakFile, String decryptionKey) throws IOException {
         Objects.requireNonNull(vpakFile, "vpakFile must not be null");
         Path normalizedPath = vpakFile.toAbsolutePath().normalize();
 
-        try (VpakArchiver.VpakArchive archive = VpakArchiver.open(normalizedPath)) {
+        try (VpakArchiver.VpakArchive archive = VpakArchiver.open(normalizedPath, decryptionKey)) {
             List<VpakArchiver.VpakEntryInfo> entries = archive.listEntries();
             long totalUncompressed = 0L;
             long totalCompressed = 0L;

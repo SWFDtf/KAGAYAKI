@@ -89,8 +89,10 @@ public final class StandaloneBuilder {
         Files.createDirectories(normalizedOutput);
 
         ProjectDescriptor descriptor = loadDescriptorOrDefault(normalizedProject);
+        String encryptionKey = descriptor.getVpakEncryptionKey();
         Path vpakFile = normalizedOutput.resolve(VPAK_FILE_NAME);
-        List<VpakArchiver.VpakEntryInfo> packedEntries = VpakArchiver.pack(normalizedProject, vpakFile);
+        List<VpakArchiver.VpakEntryInfo> packedEntries =
+                VpakArchiver.pack(normalizedProject, vpakFile, encryptionKey);
 
         Path bundledJar = bundleOrWriteRuntimeReference(normalizedOutput, optionalStandaloneJar);
         Path shLauncher = writeUnixLauncher(normalizedOutput);
@@ -231,6 +233,8 @@ public final class StandaloneBuilder {
         root.put("mainClass", STANDALONE_MAIN_CLASS);
         root.put("mainArgs", List.of("--standalone", "."));
         root.put("vpakFile", VPAK_FILE_NAME);
+        root.put("vpakEncrypted", descriptor.getVpakEncryptionKey() != null
+                && !descriptor.getVpakEncryptionKey().isBlank());
         root.put("packagedEntries", packagedEntries);
         root.put("standaloneJar", STANDALONE_JAR_NAME);
         root.put("standaloneJarBundled", jarBundled);

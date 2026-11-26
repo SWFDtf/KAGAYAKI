@@ -16,6 +16,9 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -28,6 +31,9 @@ import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Binary {@code .vpak} asset and script archive packer/reader for KAGAYAKI standalone builds.
@@ -40,11 +46,16 @@ public final class VpakArchiver {
     /** 4-byte ASCII magic header identifying a KAGAYAKI {@code .vpak} archive. */
     public static final String MAGIC = "VPAK";
 
-    /** Current binary container format version. */
+    /** Current unencrypted binary container format version. */
     public static final int FORMAT_VERSION = 1;
 
+    /** AES-CTR encrypted binary container format version. */
+    public static final int FORMAT_VERSION_ENCRYPTED = 2;
+
     private static final byte[] MAGIC_BYTES = MAGIC.getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] ENCRYPTED_TOC_MAGIC = "VPAKTOC2".getBytes(StandardCharsets.US_ASCII);
     private static final int HEADER_SIZE = 20;
+    private static final int SALT_SIZE = 16;
     private static final Set<String> EXCLUDED_DIRS = Set.of("saves", ".git", "build", "dist");
     private static final int IO_BUFFER_SIZE = 8192;
 
@@ -85,6 +96,25 @@ public final class VpakArchiver {
      * @throws IOException if scanning, compressing, or writing the archive fails
      */
     public static List<VpakEntryInfo> pack(Path projectDir, Path outputVpak) throws IOException {
+        return pack(projectDir, outputVpak, null);
+    }
+
+    /**
+     * Packs a KAGAYAKI project directory into a compressed {@code .vpak} archive at {@code outputVpak},
+     * optionally encrypting compressed payloads and the table of contents with AES-256 CTR when
+     * {@code encryptionKey} is non-blank.
+     *
+     * @param projectDir    project root directory
+     * @param outputVpak    destination {@code .vpak} file path
+     * @param encryptionKey optional passphrase to enable {@link #FORMAT_VERSION_ENCRYPTED} (nullable/blank = v1)
+     * @return immutable list of packed entry descriptors in deterministic archive order
+     * @throws IOException if scanning, compressing, encrypting, or writing the archive fails
+     */
+    public static List<VpakEntryInfo> pack(
+            Path projectDir,
+            Path outputVpak,
+            String encryptionKey
+    ) throws IOException {
         Objects.requireNonNull(projectDir, "projectDir must not be null");
         Objects.requireNonNull(outputVpak, "outputVpak must not be null");
 
@@ -99,7 +129,13 @@ public final class VpakArchiver {
             Files.createDirectories(outputParent);
         }
 
+        boolean encrypted = encryptionKey != null && !encryptionKey.isBlank();
+        byte[] aesKey = encrypted ? deriveAesKey(encryptionKey) : null;
         List<Path> filesToPack = collectPackableFiles(normalizedProject, normalizedOutput);
+        byte[] salt = encrypted ? deriveSalt(encryptionKey, filesToPack.size()) : null;
+        int version = encrypted ? FORMAT_VERSION_ENCRYPTED : FORMAT_VERSION;
+        long preambleSize = encrypted ? HEADER_SIZE + SALT_SIZE : HEADER_SIZE;
+
         List<StoredEntry> toc = new ArrayList<>(filesToPack.size());
 
         try (FileChannel channel = FileChannel.open(
@@ -108,33 +144,49 @@ public final class VpakArchiver {
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.WRITE
         )) {
-            writeFully(channel, ByteBuffer.allocate(HEADER_SIZE));
-            long currentOffset = HEADER_SIZE;
+            writeFully(channel, ByteBuffer.allocate((int) preambleSize));
+            long currentOffset = preambleSize;
 
             for (Path file : filesToPack) {
                 String relPath = toUnixRelativePath(normalizedProject, file);
                 byte[] rawBytes = Files.readAllBytes(file);
                 long crc = computeCrc32(rawBytes);
                 byte[] compressed = deflate(rawBytes);
+                byte[] storedPayload = encrypted
+                        ? aesCtrTransform(compressed, aesKey, deriveEntryIv(salt, relPath))
+                        : compressed;
 
-                writeFully(channel, ByteBuffer.wrap(compressed));
-                VpakEntryInfo info = new VpakEntryInfo(relPath, rawBytes.length, compressed.length, crc);
+                writeFully(channel, ByteBuffer.wrap(storedPayload));
+                VpakEntryInfo info = new VpakEntryInfo(relPath, rawBytes.length, storedPayload.length, crc);
                 toc.add(new StoredEntry(info, currentOffset));
-                currentOffset += compressed.length;
+                currentOffset += storedPayload.length;
             }
 
             long tocOffset = currentOffset;
             ByteBuffer tocBuffer = serializeToc(toc);
-            writeFully(channel, tocBuffer);
+            if (encrypted) {
+                byte[] rawToc = new byte[tocBuffer.remaining()];
+                tocBuffer.get(rawToc);
+                byte[] withMagic = new byte[ENCRYPTED_TOC_MAGIC.length + rawToc.length];
+                System.arraycopy(ENCRYPTED_TOC_MAGIC, 0, withMagic, 0, ENCRYPTED_TOC_MAGIC.length);
+                System.arraycopy(rawToc, 0, withMagic, ENCRYPTED_TOC_MAGIC.length, rawToc.length);
+                byte[] encToc = aesCtrTransform(withMagic, aesKey, deriveTocIv(salt));
+                writeFully(channel, ByteBuffer.wrap(encToc));
+            } else {
+                writeFully(channel, tocBuffer);
+            }
 
             channel.position(0);
-            ByteBuffer header = ByteBuffer.allocate(HEADER_SIZE).order(ByteOrder.BIG_ENDIAN);
-            header.put(MAGIC_BYTES);
-            header.putInt(FORMAT_VERSION);
-            header.putInt(toc.size());
-            header.putLong(tocOffset);
-            header.flip();
-            writeFully(channel, header);
+            ByteBuffer preamble = ByteBuffer.allocate((int) preambleSize).order(ByteOrder.BIG_ENDIAN);
+            preamble.put(MAGIC_BYTES);
+            preamble.putInt(version);
+            preamble.putInt(toc.size());
+            preamble.putLong(tocOffset);
+            if (encrypted) {
+                preamble.put(salt);
+            }
+            preamble.flip();
+            writeFully(channel, preamble);
         }
 
         return toc.stream().map(StoredEntry::info).toList();
@@ -148,6 +200,19 @@ public final class VpakArchiver {
      * @throws IOException if the file cannot be opened or has an invalid header/TOC
      */
     public static VpakArchive open(Path vpakFile) throws IOException {
+        return open(vpakFile, null);
+    }
+
+    /**
+     * Opens an existing {@code .vpak} archive (v1 plain or v2 AES-CTR encrypted) for indexed
+     * reading and CRC32-verified extraction.
+     *
+     * @param vpakFile      path to the {@code .vpak} archive
+     * @param decryptionKey optional passphrase required when the archive uses {@link #FORMAT_VERSION_ENCRYPTED}
+     * @return opened {@link VpakArchive} handle
+     * @throws IOException if the file cannot be opened, has an invalid key, or has a corrupt header/TOC
+     */
+    public static VpakArchive open(Path vpakFile, String decryptionKey) throws IOException {
         Objects.requireNonNull(vpakFile, "vpakFile must not be null");
         Path normalized = vpakFile.toAbsolutePath().normalize();
         FileChannel channel = FileChannel.open(normalized, StandardOpenOption.READ);
@@ -166,25 +231,62 @@ public final class VpakArchiver {
                 throw new IOException("Invalid VPAK magic header in " + normalized);
             }
             int version = header.getInt();
-            if (version != FORMAT_VERSION) {
+            if (version != FORMAT_VERSION && version != FORMAT_VERSION_ENCRYPTED) {
                 throw new IOException("Unsupported VPAK format version: " + version);
             }
+            boolean encrypted = version == FORMAT_VERSION_ENCRYPTED;
+            long minDataOffset = encrypted ? HEADER_SIZE + SALT_SIZE : HEADER_SIZE;
+
             int entryCount = header.getInt();
             long tocOffset = header.getLong();
-            if (entryCount < 0 || tocOffset < HEADER_SIZE || tocOffset > fileSize) {
+            if (entryCount < 0 || tocOffset < minDataOffset || tocOffset > fileSize) {
                 throw new IOException("Corrupt VPAK header metadata in " + normalized);
+            }
+
+            byte[] aesKey = null;
+            byte[] salt = null;
+            if (encrypted) {
+                if (decryptionKey == null || decryptionKey.isBlank()) {
+                    throw new IOException("Encrypted VPAK archive requires a decryption key (--vpak-key).");
+                }
+                aesKey = deriveAesKey(decryptionKey);
+                salt = new byte[SALT_SIZE];
+                ByteBuffer saltBuf = ByteBuffer.wrap(salt);
+                readFully(channel, HEADER_SIZE, saltBuf);
             }
 
             long tocLengthLong = fileSize - tocOffset;
             if (tocLengthLong > Integer.MAX_VALUE) {
                 throw new IOException("VPAK table of contents exceeds maximum buffer size");
             }
-            if (entryCount > 0 && (long) entryCount * 37L > tocLengthLong) {
-                throw new IOException("Corrupt VPAK entryCount exceeds available table of contents bytes");
+            long minTocBytes = (long) entryCount * 37L + (encrypted ? ENCRYPTED_TOC_MAGIC.length : 0L);
+            if ((encrypted && tocLengthLong < ENCRYPTED_TOC_MAGIC.length)
+                    || (entryCount > 0 && minTocBytes > tocLengthLong)) {
+                throw new IOException(
+                        "VPAK integrity/decryption error: invalid key or corrupt TOC in " + normalized);
             }
-            ByteBuffer tocBuf = ByteBuffer.allocate((int) tocLengthLong).order(ByteOrder.BIG_ENDIAN);
-            readFully(channel, tocOffset, tocBuf);
-            tocBuf.flip();
+
+            ByteBuffer rawTocBuf = ByteBuffer.allocate((int) tocLengthLong).order(ByteOrder.BIG_ENDIAN);
+            readFully(channel, tocOffset, rawTocBuf);
+            rawTocBuf.flip();
+
+            ByteBuffer tocBuf;
+            if (encrypted) {
+                byte[] decrypted = aesCtrTransform(rawTocBuf.array(), aesKey, deriveTocIv(salt));
+                byte[] prefix = Arrays.copyOfRange(decrypted, 0, ENCRYPTED_TOC_MAGIC.length);
+                if (!Arrays.equals(prefix, ENCRYPTED_TOC_MAGIC)) {
+                    throw new IOException(
+                            "VPAK decryption error: wrong decryption key or corrupted archive TOC in "
+                                    + normalized);
+                }
+                tocBuf = ByteBuffer.wrap(
+                                decrypted,
+                                ENCRYPTED_TOC_MAGIC.length,
+                                decrypted.length - ENCRYPTED_TOC_MAGIC.length)
+                        .order(ByteOrder.BIG_ENDIAN);
+            } else {
+                tocBuf = rawTocBuf;
+            }
 
             Map<String, StoredEntry> entries = new LinkedHashMap<>(Math.min(entryCount, 1024));
             for (int i = 0; i < entryCount; i++) {
@@ -192,7 +294,7 @@ public final class VpakArchiver {
                     throw new IOException("Truncated VPAK table of contents at entry " + i);
                 }
                 int pathLen = tocBuf.getInt();
-                if (pathLen <= 0 || pathLen > tocBuf.remaining()) {
+                if (pathLen <= 0 || pathLen > 4096 || pathLen > tocBuf.remaining()) {
                     throw new IOException("Invalid VPAK entry path length at entry " + i);
                 }
                 byte[] pathBytes = new byte[pathLen];
@@ -206,7 +308,7 @@ public final class VpakArchiver {
                 long compressedSize = tocBuf.getLong();
                 long crc32 = tocBuf.getLong();
 
-                if (dataOffset < HEADER_SIZE
+                if (dataOffset < minDataOffset
                         || dataOffset > tocOffset
                         || uncompressedSize < 0
                         || compressedSize < 0
@@ -217,7 +319,10 @@ public final class VpakArchiver {
                 VpakEntryInfo info = new VpakEntryInfo(entryPath, uncompressedSize, compressedSize, crc32);
                 entries.put(entryPath, new StoredEntry(info, dataOffset));
             }
-            return new VpakArchive(channel, entries);
+            if (tocBuf.hasRemaining()) {
+                throw new IOException("Corrupt trailing bytes in VPAK table of contents: " + normalized);
+            }
+            return new VpakArchive(channel, entries, aesKey, salt);
         } catch (IOException | RuntimeException ex) {
             channel.close();
             throw ex;
@@ -231,11 +336,15 @@ public final class VpakArchiver {
 
         private final FileChannel channel;
         private final Map<String, StoredEntry> entries;
+        private final byte[] aesKey;
+        private final byte[] salt;
         private boolean closed = false;
 
-        private VpakArchive(FileChannel channel, Map<String, StoredEntry> entries) {
+        private VpakArchive(FileChannel channel, Map<String, StoredEntry> entries, byte[] aesKey, byte[] salt) {
             this.channel = channel;
             this.entries = entries;
+            this.aesKey = aesKey;
+            this.salt = salt;
         }
 
         /**
@@ -285,6 +394,9 @@ public final class VpakArchiver {
             ByteBuffer compressedBuf = ByteBuffer.allocate((int) info.compressedSize());
             readFully(channel, stored.dataOffset(), compressedBuf);
             byte[] compressed = compressedBuf.array();
+            if (aesKey != null) {
+                compressed = aesCtrTransform(compressed, aesKey, deriveEntryIv(salt, normalized));
+            }
 
             byte[] uncompressed = inflate(compressed, (int) info.uncompressedSize(), normalized);
             long actualCrc = computeCrc32(uncompressed);
@@ -506,5 +618,50 @@ public final class VpakArchiver {
             s = s.substring(1);
         }
         return s;
+    }
+
+    private static byte[] deriveAesKey(String encryptionKey) throws IOException {
+        return sha256(encryptionKey.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static byte[] deriveSalt(String encryptionKey, int entryCount) throws IOException {
+        byte[] hash = sha256(("KAGAYAKI-VPAK2-SALT:" + encryptionKey + ":" + entryCount)
+                .getBytes(StandardCharsets.UTF_8));
+        return Arrays.copyOf(hash, SALT_SIZE);
+    }
+
+    private static byte[] deriveTocIv(byte[] salt) throws IOException {
+        return deriveIvWithLabel(salt, "TOC");
+    }
+
+    private static byte[] deriveEntryIv(byte[] salt, String relPath) throws IOException {
+        return deriveIvWithLabel(salt, "ENTRY:" + relPath);
+    }
+
+    private static byte[] deriveIvWithLabel(byte[] salt, String label) throws IOException {
+        byte[] labelBytes = label.getBytes(StandardCharsets.UTF_8);
+        byte[] combined = new byte[salt.length + labelBytes.length];
+        System.arraycopy(salt, 0, combined, 0, salt.length);
+        System.arraycopy(labelBytes, 0, combined, salt.length, labelBytes.length);
+        return Arrays.copyOf(sha256(combined), 16);
+    }
+
+    private static byte[] sha256(byte[] input) throws IOException {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(input);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IOException("SHA-256 unavailable for VPAK encryption", ex);
+        }
+    }
+
+    private static byte[] aesCtrTransform(byte[] payload, byte[] keyBytes, byte[] ivBytes) throws IOException {
+        try {
+            Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
+            SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "AES");
+            cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(ivBytes));
+            return cipher.doFinal(payload);
+        } catch (GeneralSecurityException ex) {
+            throw new IOException("VPAK AES-CTR cipher failure: " + ex.getMessage(), ex);
+        }
     }
 }

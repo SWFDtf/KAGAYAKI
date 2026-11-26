@@ -14,6 +14,7 @@ import de.swfdtf.core.GameHost;
 import de.swfdtf.core.GamepadNavigationRouter;
 import de.swfdtf.core.InputManager;
 import de.swfdtf.core.KeybindingRemapper;
+import de.swfdtf.core.ResourceProvider;
 import de.swfdtf.graphics.AnimationEngine;
 import de.swfdtf.graphics.ColorBlindnessFilter;
 import de.swfdtf.graphics.FontManager;
@@ -144,7 +145,9 @@ public final class GameRuntimeCoordinator implements GameHost {
         this.glEnabled = glEnabled;
 
         Path projectRoot = api.getConfig().projectDir().toAbsolutePath().normalize();
+        ResourceProvider resourceProvider = api.getService(ResourceProvider.class);
         this.textureManager = new TextureManager(api.getLogger(), projectRoot);
+        this.textureManager.setResourceProvider(resourceProvider);
         this.fontManager = new FontManager(projectRoot.resolve("assets/fonts"), true);
         this.animationEngine = new AnimationEngine();
         this.transitionManager = new TransitionManager();
@@ -193,6 +196,7 @@ public final class GameRuntimeCoordinator implements GameHost {
                 api.getLogger(),
                 api.getConfig().headless()
         );
+        this.audioEngine.setResourceProvider(resourceProvider);
         this.audioEngine.init();
         this.session.getRuntime().setAudioBridge(this.audioEngine.createScriptAudioBridge());
 
@@ -234,6 +238,10 @@ public final class GameRuntimeCoordinator implements GameHost {
     }
 
     private VJavaAst.ProjectAst loadProjectAst(Path projectRoot) {
+        ResourceProvider provider = api.getService(ResourceProvider.class);
+        if (provider != null) {
+            return ProjectScanner.scan(projectRoot, provider);
+        }
         if (Files.isDirectory(projectRoot)) {
             return ProjectScanner.scan(projectRoot);
         }

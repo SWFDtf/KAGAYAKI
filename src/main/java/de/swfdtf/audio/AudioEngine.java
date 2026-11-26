@@ -1,6 +1,7 @@
 package de.swfdtf.audio;
 
 import de.swfdtf.core.EngineLogger;
+import de.swfdtf.core.ResourceProvider;
 import de.swfdtf.parser.ScriptRuntime;
 import de.swfdtf.state.LocalizationManager;
 import de.swfdtf.state.PreferencesState;
@@ -72,6 +73,7 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
     private long voiceSequence = 1L;
 
     private Path projectRoot;
+    private volatile ResourceProvider resourceProvider;
     private PreferencesState preferencesState;
     private LocalizationManager localizationManager;
 
@@ -992,6 +994,10 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
 
         Path resolved = resolveAudioPath(trimmed);
         if (resolved == null) {
+            AudioDecoder.DecodedAudio packed = tryLoadFromResourceProvider(trimmed);
+            if (packed != null) {
+                return packed;
+            }
             logger.warn(LOG_CATEGORY, "Missing audio asset: " + assetPath);
             return null;
         }
@@ -1006,6 +1012,60 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
             return decoded;
         } catch (IOException e) {
             logger.warn(LOG_CATEGORY, "Failed to decode audio asset '" + resolved + "': " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Attaches an optional {@link ResourceProvider} fallback for loading audio streams/effects
+     * directly from packed {@code .vpak} archives when loose files are absent on disk.
+     *
+     * @param resourceProvider resource provider instance (may be {@code null})
+     */
+    public void setResourceProvider(ResourceProvider resourceProvider) {
+        this.resourceProvider = resourceProvider;
+    }
+
+    private AudioDecoder.DecodedAudio tryLoadFromResourceProvider(String assetPath) {
+        ResourceProvider provider = this.resourceProvider;
+        if (provider == null) {
+            return null;
+        }
+        String normalized = normalizeRelativeAssetPath(assetPath);
+        String candidate = null;
+        if (localizationManager != null) {
+            String lang = localizationManager.getCurrentLanguage();
+            if (lang != null && !lang.isBlank()) {
+                String localized = "tl/" + lang.trim().toLowerCase(Locale.ROOT) + "/" + normalized;
+                if (provider.contains(localized)) {
+                    candidate = localized;
+                }
+            }
+        }
+        if (candidate == null && provider.contains(normalized)) {
+            candidate = normalized;
+        }
+        if (candidate == null) {
+            return null;
+        }
+
+        String cacheKey = "vpak:" + candidate;
+        AudioDecoder.DecodedAudio cached = decodedFileCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+        try {
+            byte[] bytes = provider.readBytes(candidate);
+            boolean isOgg = candidate.toLowerCase(Locale.ROOT).endsWith(".ogg")
+                    || (bytes.length >= 4
+                    && bytes[0] == 'O' && bytes[1] == 'g' && bytes[2] == 'g' && bytes[3] == 'S');
+            AudioDecoder.DecodedAudio decoded = isOgg
+                    ? AudioDecoder.decodeOgg(bytes)
+                    : AudioDecoder.decodeWav(bytes);
+            decodedFileCache.put(cacheKey, decoded);
+            return decoded;
+        } catch (IOException ex) {
+            logger.warn(LOG_CATEGORY, "Failed to decode packed audio '" + candidate + "': " + ex.getMessage());
             return null;
         }
     }

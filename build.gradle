@@ -178,3 +178,37 @@ tasks.register('packageStandalone', Jar) {
         exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
     }
 }
+
+tasks.register('jpackageBundle', Exec) {
+    group = 'kagayaki'
+    description = 'Packages a native host OS app bundle (macOS .app / Windows .msi / Linux .AppImage) via jpackage with embedded JDK runtime.'
+    dependsOn tasks.named('packageStandalone')
+
+    def javaHome = System.getProperty('java.home')
+    def jpackageExe = new File(javaHome, isMac || !osName.contains('win') ? 'bin/jpackage' : 'bin/jpackage.exe').absolutePath
+    def bundleType = project.findProperty('kagayakiBundleType')?.toString() ?: 'app-image'
+    def destDir = layout.buildDirectory.dir('jpackage').get().asFile
+    def distDir = layout.buildDirectory.dir('dist').get().asFile
+
+    doFirst {
+        destDir.mkdirs()
+        delete fileTree(destDir) {
+            include 'KAGAYAKI*'
+        }
+        def argsList = [
+            jpackageExe,
+            '--type', bundleType,
+            '--dest', destDir.absolutePath,
+            '--input', distDir.absolutePath,
+            '--main-jar', "kagayaki-standalone-${project.version}.jar".toString(),
+            '--main-class', 'de.swfdtf.StandaloneMain',
+            '--name', 'KAGAYAKI',
+            '--app-version', project.version.toString(),
+            '--vendor', 'SWFDtf'
+        ]
+        if (isMac) {
+            argsList.addAll(['--java-options', '-XstartOnFirstThread'])
+        }
+        commandLine argsList
+    }
+}

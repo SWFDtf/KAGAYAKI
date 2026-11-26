@@ -1,6 +1,7 @@
 package de.swfdtf.parser;
 
 import de.swfdtf.core.ProjectDescriptor;
+import de.swfdtf.core.ResourceProvider;
 import de.swfdtf.parser.VJavaAst.CharacterDef;
 import de.swfdtf.parser.VJavaAst.ImageDef;
 import de.swfdtf.parser.VJavaAst.JavaBlockNode;
@@ -92,25 +93,21 @@ public final class ProjectScanner {
         for (Path scriptPath : scriptFiles) {
             String relativeSource = toUnixRelativePath(normalizedRoot, scriptPath);
             String content = readUtf8(scriptPath);
-            List<VJavaLexer.Token> tokens = VJavaLexer.tokenize(content, relativeSource);
-            ScriptFileAst fileAst = VJavaParser.parse(scriptPath, tokens);
-
-            mergeEntries("character", fileAst.characters(), characters, warnings,
-                    CharacterDef::id, CharacterDef::sourceFile, CharacterDef::lineNumber);
-            mergeEntries("image", fileAst.images(), images, warnings,
-                    ImageDef::fullKey, ImageDef::sourceFile, ImageDef::lineNumber);
-            mergeEntries("layeredimage", fileAst.layeredImages(), layeredImages, warnings,
-                    LayeredImageDef::name, LayeredImageDef::sourceFile, LayeredImageDef::lineNumber);
-            mergeEntries("transform", fileAst.transforms(), transforms, warnings,
-                    TransformDef::name, TransformDef::sourceFile, TransformDef::lineNumber);
-            mergeEntries("label", fileAst.labels(), labels, warnings,
-                    LabelNode::name, LabelNode::sourceFile, LabelNode::lineNumber);
-            mergeEntries("screen", fileAst.screens(), screens, warnings,
-                    ScreenDef::name, ScreenDef::sourceFile, ScreenDef::lineNumber);
-
-            translations.addAll(fileAst.translations());
-            topLevelJavaBlocks.addAll(fileAst.topLevelJavaBlocks());
-            defaultVariables.addAll(fileAst.defaultVariables());
+            mergeScriptContent(
+                    scriptPath,
+                    relativeSource,
+                    content,
+                    characters,
+                    images,
+                    layeredImages,
+                    transforms,
+                    labels,
+                    screens,
+                    translations,
+                    topLevelJavaBlocks,
+                    defaultVariables,
+                    warnings
+            );
         }
 
         return new ProjectAst(
@@ -129,6 +126,147 @@ public final class ProjectScanner {
                 discoveredAssets,
                 warnings
         );
+    }
+
+    /**
+     * Scans a packed project backed by {@link ResourceProvider} (e.g., {@code game.vpak}) without
+     * requiring loose files on disk.
+     *
+     * @param virtualRoot virtual project root path associated with the AST
+     * @param provider    resource provider serving {@code project.vjava.json}, scripts, and assets
+     * @return merged project AST
+     */
+    public static ProjectAst scan(Path virtualRoot, ResourceProvider provider) {
+        Objects.requireNonNull(virtualRoot, "virtualRoot must not be null");
+        Objects.requireNonNull(provider, "provider must not be null");
+        Path normalizedRoot = virtualRoot.toAbsolutePath().normalize();
+
+        ProjectDescriptor descriptor = loadDescriptorFromProvider(normalizedRoot, provider);
+        List<String> allPaths = provider.listPaths();
+        List<String> scriptRelPaths = allPaths.stream()
+                .filter(p -> p.endsWith(SCRIPT_EXTENSION) && !hasSkippedDirectory(p))
+                .sorted()
+                .toList();
+        List<String> discoveredAssets = allPaths.stream()
+                .filter(p -> p.startsWith(ASSETS_DIR_NAME + "/"))
+                .sorted()
+                .toList();
+
+        List<Path> scriptFiles = new ArrayList<>(scriptRelPaths.size());
+        Map<String, CharacterDef> characters = new LinkedHashMap<>();
+        Map<String, ImageDef> images = new LinkedHashMap<>();
+        Map<String, LayeredImageDef> layeredImages = new LinkedHashMap<>();
+        Map<String, TransformDef> transforms = new LinkedHashMap<>();
+        Map<String, LabelNode> labels = new LinkedHashMap<>();
+        Map<String, ScreenDef> screens = new LinkedHashMap<>();
+        List<TranslateBlock> translations = new ArrayList<>();
+        List<JavaBlockNode> topLevelJavaBlocks = new ArrayList<>();
+        List<SetVarStatement> defaultVariables = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+
+        for (String relPath : scriptRelPaths) {
+            Path virtualFile = normalizedRoot.resolve(relPath);
+            scriptFiles.add(virtualFile);
+            String content;
+            try {
+                content = new String(provider.readBytes(relPath), StandardCharsets.UTF_8);
+            } catch (IOException ex) {
+                throw new UncheckedIOException("Failed to read packed .vjava script: " + relPath, ex);
+            }
+            mergeScriptContent(
+                    virtualFile,
+                    relPath,
+                    content,
+                    characters,
+                    images,
+                    layeredImages,
+                    transforms,
+                    labels,
+                    screens,
+                    translations,
+                    topLevelJavaBlocks,
+                    defaultVariables,
+                    warnings
+            );
+        }
+
+        return new ProjectAst(
+                normalizedRoot,
+                descriptor,
+                scriptFiles,
+                characters,
+                images,
+                layeredImages,
+                transforms,
+                labels,
+                screens,
+                translations,
+                topLevelJavaBlocks,
+                defaultVariables,
+                discoveredAssets,
+                warnings
+        );
+    }
+
+    private static void mergeScriptContent(
+            Path scriptPath,
+            String relativeSource,
+            String content,
+            Map<String, CharacterDef> characters,
+            Map<String, ImageDef> images,
+            Map<String, LayeredImageDef> layeredImages,
+            Map<String, TransformDef> transforms,
+            Map<String, LabelNode> labels,
+            Map<String, ScreenDef> screens,
+            List<TranslateBlock> translations,
+            List<JavaBlockNode> topLevelJavaBlocks,
+            List<SetVarStatement> defaultVariables,
+            List<String> warnings
+    ) {
+        List<VJavaLexer.Token> tokens = VJavaLexer.tokenize(content, relativeSource);
+        ScriptFileAst fileAst = VJavaParser.parse(scriptPath, tokens);
+
+        mergeEntries("character", fileAst.characters(), characters, warnings,
+                CharacterDef::id, CharacterDef::sourceFile, CharacterDef::lineNumber);
+        mergeEntries("image", fileAst.images(), images, warnings,
+                ImageDef::fullKey, ImageDef::sourceFile, ImageDef::lineNumber);
+        mergeEntries("layeredimage", fileAst.layeredImages(), layeredImages, warnings,
+                LayeredImageDef::name, LayeredImageDef::sourceFile, LayeredImageDef::lineNumber);
+        mergeEntries("transform", fileAst.transforms(), transforms, warnings,
+                TransformDef::name, TransformDef::sourceFile, TransformDef::lineNumber);
+        mergeEntries("label", fileAst.labels(), labels, warnings,
+                LabelNode::name, LabelNode::sourceFile, LabelNode::lineNumber);
+        mergeEntries("screen", fileAst.screens(), screens, warnings,
+                ScreenDef::name, ScreenDef::sourceFile, ScreenDef::lineNumber);
+
+        translations.addAll(fileAst.translations());
+        topLevelJavaBlocks.addAll(fileAst.topLevelJavaBlocks());
+        defaultVariables.addAll(fileAst.defaultVariables());
+    }
+
+    private static ProjectDescriptor loadDescriptorFromProvider(Path virtualRoot, ResourceProvider provider) {
+        if (provider.contains(ProjectDescriptor.FILE_NAME)) {
+            try {
+                String json = new String(
+                        provider.readBytes(ProjectDescriptor.FILE_NAME), StandardCharsets.UTF_8);
+                return ProjectDescriptor.parseJson(json);
+            } catch (IOException ex) {
+                throw new UncheckedIOException("Failed to load packed " + ProjectDescriptor.FILE_NAME, ex);
+            }
+        }
+        Path fileName = virtualRoot.getFileName();
+        String fallbackTitle = fileName != null ? fileName.toString() : "Untitled KAGAYAKI Project";
+        return ProjectDescriptor.createDefault(fallbackTitle);
+    }
+
+    private static boolean hasSkippedDirectory(String relPath) {
+        String[] segments = relPath.split("/");
+        for (int i = 0; i < segments.length - 1; i++) {
+            if (SKIPPED_DIRECTORIES.contains(segments[i])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static ProjectDescriptor loadOrDefaultDescriptor(Path projectRoot) {

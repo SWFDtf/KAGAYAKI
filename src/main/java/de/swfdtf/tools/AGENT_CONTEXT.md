@@ -22,9 +22,10 @@ Entwickler-Werkzeuge, Dual-Window-Studio-UI und Standalone-Build-Pipeline von KA
 | `VJavaLinter.Severity` | `enum` | Schweregrad einer Lint-Diagnose (`ERROR`, `WARNING`). |
 | `VJavaLinter.LintIssue` | `record` | Einzelne Lint-Diagnose mit `severity`, `code`, `message`, `sourceFile` und 1-basierter `lineNumber`. |
 | `VJavaLinter.LintReport` | `record` | Aggregierter Lint-Bericht mit unveränderlicher `issues`-Liste sowie `errorCount`, `warningCount`, `isClean()` und `hasErrors()`. |
-| `VpakArchiver` | `final class` | Binärer `.vpak`-Packer und -Reader (`MAGIC = "VPAK"`, `FORMAT_VERSION = 1`) mit Deflate-Kompression und CRC32-Integritätsprüfung pro Eintrag. |
+| `VpakArchiver` | `final class` | Binärer `.vpak`-Packer und -Reader (`MAGIC = "VPAK"`, `FORMAT_VERSION = 1` bzw. `2` mit AES-256-CTR) mit Deflate-Kompression und CRC32-Integritätsprüfung pro Eintrag. |
 | `VpakArchiver.VpakEntryInfo` | `record` | Metadaten eines gepackten `.vpak`-Eintrags (`path`, `uncompressedSize`, `compressedSize`, `crc32`). |
 | `VpakArchiver.VpakArchive` | `static final class` | Geöffnetes `.vpak`-Archiv-Handle (`implements AutoCloseable`) für indiziertes Lesen, Pfadprüfung und CRC32-verifiziertes Entpacken. |
+| `VpakResourceProvider` | `final class` | `ResourceProvider`-Implementierung auf Basis von `VpakArchiver.VpakArchive` zum direkten Booten aus `game.vpak` ohne Entpacken. |
 | `StandaloneBuilder` | `final class` | Exportiert lint-validierte Projekte in eigenständige Standalone-Distributionen (`game.vpak`, `run_game.sh`/`run_game.bat` für `de.swfdtf.StandaloneMain --standalone .`, optionales JAR, `standalone-packaging.json`). |
 | `StandaloneBuilder.BuildResult` | `record` | Zusammenfassung eines abgeschlossenen Standalone-Exports mit Ausgabepfaden und Anzahl gepackter `.vpak`-Einträge. |
 | `LiveDirectorOverlay` | `class` | In-Engine-Live-Regie-Overlay (`extends Screen`, `Z = 1000`, `D`-Toggle) zur interaktiven Anpassung aktiver Bühnen-Sprites (`xpos`, `ypos`, `zoom`, `alpha`, Attribute) inklusive atomarem Zurückschreiben in `.vjava`. |

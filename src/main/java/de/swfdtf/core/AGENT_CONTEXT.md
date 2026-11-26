@@ -34,6 +34,8 @@ Zentrales Laufzeit-Fundament von KAGAYAKI: Ausführungsmodi (`STUDIO_DUAL_WINDOW
 | `CommandStack` | `final class` | Undo-/Redo-Verlauf mit konfigurierbarer Maximaltiefe, `Optional<String>`-Vorschau und Beschreibungsverlauf. |
 | `EnginePlugin` | `interface` | Lebenszyklus-Vertrag (`id()`, `displayName()`, `version()`, `onEnable`, `onDisable`) für Engine-Erweiterungen. |
 | `PluginRegistry` | `final class` | Registrierungs- und Lebenszyklus-Manager für `EnginePlugin`-Instanzen mit `Optional`-Suche und unveränderlichen Listen. |
+| `PluginLoader` | `final class` | Lädt Laufzeit-Plugins dynamisch aus `plugins/*.jar` per `ServiceLoader<EnginePlugin>` mit Fehlerisolation pro JAR. |
+| `ResourceProvider` | `interface` | Schreibgeschützte Schnittstelle für datei- oder `.vpak`-gestützten Projektressourcenzugriff (`contains`, `readBytes`, `listPaths`, `verifyIntegrity`). |
 | `KeybindingRemapper` | `final class` | Konfigurierbares Action-zu-GLFW-Tastenzuordnungssystem mit Konflikterkennung, Swap-Unterstützung und Gson-JSON-Persistenz. |
 | `GamepadNavigationRouter` | `final class` | Übersetzt `InputManager`-D-Pad-/Stick-Eingaben inklusive Deadzone und Wiederholungsrate in diskrete `NavigationDirection`-Ereignisse. |
 
