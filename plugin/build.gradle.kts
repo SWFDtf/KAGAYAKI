@@ -2,7 +2,7 @@ import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
     id("java")
-    id("org.jetbrains.intellij.platform") version "2.5.0"
+    id("org.jetbrains.intellij.platform") version "2.20.1"
 }
 
 group = "de.swfdtf.vjava"
@@ -34,7 +34,7 @@ intellijPlatform {
         version = "1.0.0"
         ideaVersion {
             sinceBuild = "243"
-            untilBuild = "251.*"
+            // untilBuild not set → no upper bound restriction
         }
     }
     publishing {
@@ -60,10 +60,9 @@ val generateLexer = tasks.register<JavaExec>("generateLexer") {
         dependencies.create("de.jflex:jflex:1.9.1")
     )
     mainClass.set("jflex.Main")
+    // JFlex 1.9.1 valid options only – no --generated_by, no --skel NONE
     args = listOf(
-        "--generated_by", "",
         "--nobak",
-        "--skel", "NONE",
         "--encoding", "UTF-8",
         "-d", outputDir.absolutePath,
         flexFile.absolutePath
