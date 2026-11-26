@@ -374,6 +374,35 @@ public final class ScriptFlowGraphExporter {
                         collectStatementEdges(fromLabel, branch.body(), combined, edges);
                     }
                 }
+            } else if (stmt instanceof VJavaAst.ParallelStatement ps) {
+                collectStatementEdges(fromLabel, ps.statements(), activeCondition, edges);
+            } else if (stmt instanceof VJavaAst.RepeatStatement rs) {
+                collectStatementEdges(fromLabel, rs.body(), activeCondition, edges);
+            } else if (stmt instanceof VJavaAst.WhileStatement ws) {
+                collectStatementEdges(fromLabel, ws.body(), activeCondition, edges);
+            } else if (stmt instanceof VJavaAst.RandomStatement rnd) {
+                for (VJavaAst.RandomBranch rb : rnd.branches()) {
+                    collectStatementEdges(fromLabel, rb.body(), activeCondition, edges);
+                }
+            } else if (stmt instanceof VJavaAst.AfterTimerStatement after && after.targetLabel() != null) {
+                edges.add(new FlowEdge(fromLabel, after.targetLabel().trim(),
+                        "call".equalsIgnoreCase(after.action()) ? EdgeKind.CALL : EdgeKind.JUMP,
+                        combineCondition(activeCondition, "after(" + after.delaySeconds() + "s)")));
+            } else if (stmt instanceof VJavaAst.OnInteractStatement interact && interact.targetLabel() != null) {
+                edges.add(new FlowEdge(fromLabel, interact.targetLabel().trim(),
+                        "call".equalsIgnoreCase(interact.action()) ? EdgeKind.CALL : EdgeKind.JUMP,
+                        combineCondition(activeCondition, "interact(" + interact.targetTag() + ")")));
+            } else if (stmt instanceof VJavaAst.OnTweenEndStatement ote && ote.targetLabel() != null) {
+                edges.add(new FlowEdge(fromLabel, ote.targetLabel().trim(),
+                        "call".equalsIgnoreCase(ote.action()) ? EdgeKind.CALL : EdgeKind.JUMP,
+                        combineCondition(activeCondition, "tween_end(" + ote.tag() + ")")));
+            } else if (stmt instanceof VJavaAst.OnEventStatement oe && oe.targetLabel() != null) {
+                edges.add(new FlowEdge(fromLabel, oe.targetLabel().trim(),
+                        "call".equalsIgnoreCase(oe.action()) ? EdgeKind.CALL : EdgeKind.JUMP,
+                        combineCondition(activeCondition, "event(" + oe.eventName() + ")")));
+            } else if (stmt instanceof VJavaAst.SpawnCutsceneStatement sc && sc.targetLabel() != null) {
+                edges.add(new FlowEdge(fromLabel, sc.targetLabel().trim(),
+                        EdgeKind.CALL, combineCondition(activeCondition, "cutscene")));
             }
         }
     }

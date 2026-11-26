@@ -566,6 +566,7 @@ public final class TextTagParser {
         private boolean inRubyBase = false;
         private int rubyBaseSpanStart = -1;
         private int rubyBaseSpanEnd = -1;
+        private String shorthandRubyReading = null;
 
         private boolean inRubyReading = false;
         private final StringBuilder rubyReadingBuffer = new StringBuilder();
@@ -583,7 +584,7 @@ public final class TextTagParser {
             if (currentRun.isEmpty()) {
                 return;
             }
-            spans.add(new TextSpan(currentRun.toString(), currentStyle(), null, null));
+            spans.add(new TextSpan(currentRun.toString(), currentStyle(), shorthandRubyReading, null));
             currentRun.setLength(0);
         }
 
@@ -656,6 +657,8 @@ public final class TextTagParser {
                 case "/rb" -> handleRubyBaseEnd(arg);
                 case "rt" -> handleRubyReadingStart(arg);
                 case "/rt" -> handleRubyReadingEnd(arg);
+                case "ruby" -> handleRubyShorthandStart(arg);
+                case "/ruby" -> handleRubyShorthandEnd(arg);
                 case "image" -> handleInlineImage(arg);
                 case "a" -> handleNonBlankPush(hyperlinkStack, arg);
                 case "/a" -> popStack(hyperlinkStack, arg);
@@ -876,6 +879,24 @@ public final class TextTagParser {
             }
             rubyBaseSpanStart = -1;
             rubyBaseSpanEnd = -1;
+            return true;
+        }
+
+        private boolean handleRubyShorthandStart(String arg) {
+            if (arg == null || arg.isEmpty()) {
+                return false;
+            }
+            flushSpan();
+            shorthandRubyReading = arg;
+            return true;
+        }
+
+        private boolean handleRubyShorthandEnd(String arg) {
+            if (arg != null) {
+                return false;
+            }
+            flushSpan();
+            shorthandRubyReading = null;
             return true;
         }
 

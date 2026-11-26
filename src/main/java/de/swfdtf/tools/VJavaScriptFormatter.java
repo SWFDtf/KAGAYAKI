@@ -7,12 +7,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Deterministic source formatter for KAGAYAKI {@code .vjava} hybrid scripts.
  *
  * <p>Normalizes line endings to {@code \n}, converts leading tabs on Visual Novel lines to
- * 4 spaces, strips trailing horizontal/line whitespace on Visual Novel lines, collapses more
+ * 4 spaces, canonicalizes horizontal whitespace inside motion/physics DSL commands, collapses more
  * than two consecutive blank lines to at most two, ensures a single trailing {@code \n} for
  * non-empty scripts, and preserves embedded {@code @->{ ... }<<} Java block interiors verbatim.</p>
  */
@@ -23,6 +24,17 @@ public final class VJavaScriptFormatter {
     private static final String JAVA_BLOCK_CLOSE = "}<<";
     private static final String KODE_PREFIX = "::";
     private static final int MAX_CONSECUTIVE_BLANK_LINES = 2;
+
+    private static final Set<String> CANONICAL_SPACE_KEYWORDS = Set.of(
+            "move", "move_by", "move_path", "rotate", "scale",
+            "wasd_init", "wasd_stop", "physics_init", "physics_stop",
+            "on_collide", "on_overlap", "solid_platform", "collision_mask", "hitbox",
+            "wait_move", "camera", "trigger_zone", "patrol", "follow",
+            "after", "on_interact", "collider", "shake", "knockback",
+            "climb_zone", "moving_platform", "attract", "spawn", "despawn",
+            "on_tween_end", "on_event", "spawn_cutscene", "time_scale",
+            "attach", "ysort", "point_click_init", "surface_friction", "impulse", "anim_state"
+    );
 
     private enum JavaLexState {
         NORMAL,
@@ -120,7 +132,7 @@ public final class VJavaScriptFormatter {
             }
 
             String formattedIndent = convertLeadingTabs(normalized, lineStart, indentEnd);
-            String strippedContent = stripTrailingWhitespace(rawContent);
+            String strippedContent = canonicalizeDslLineWhitespace(stripTrailingWhitespace(rawContent));
 
             flushPendingBlankLines(out, pendingBlankLines);
             pendingBlankLines = 0;
@@ -201,6 +213,52 @@ public final class VJavaScriptFormatter {
             }
         }
         return sb.toString();
+    }
+
+    private static String canonicalizeDslLineWhitespace(String content) {
+        int sp = content.indexOf(' ');
+        String kw = sp >= 0 ? content.substring(0, sp) : content;
+        if (!CANONICAL_SPACE_KEYWORDS.contains(kw)) {
+            return content;
+        }
+        StringBuilder out = new StringBuilder(content.length());
+        boolean inDouble = false;
+        boolean inSingle = false;
+        boolean escaped = false;
+        boolean prevSpace = false;
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+            if (escaped) {
+                out.append(c);
+                escaped = false;
+                prevSpace = false;
+                continue;
+            }
+            if ((inDouble || inSingle) && c == '\\') {
+                out.append(c);
+                escaped = true;
+                prevSpace = false;
+                continue;
+            }
+            if (c == '"' && !inSingle) {
+                inDouble = !inDouble;
+                out.append(c);
+                prevSpace = false;
+            } else if (c == '\'' && !inDouble) {
+                inSingle = !inSingle;
+                out.append(c);
+                prevSpace = false;
+            } else if (!inDouble && !inSingle && (c == ' ' || c == '\t')) {
+                if (!prevSpace) {
+                    out.append(' ');
+                    prevSpace = true;
+                }
+            } else {
+                out.append(c);
+                prevSpace = false;
+            }
+        }
+        return out.toString();
     }
 
     private static String stripTrailingWhitespace(String s) {

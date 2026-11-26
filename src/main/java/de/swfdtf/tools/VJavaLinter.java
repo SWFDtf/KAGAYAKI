@@ -38,6 +38,10 @@ import java.util.regex.Pattern;
 public final class VJavaLinter {
 
     private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+    private static final Pattern LABEL_REF_PATTERN = Pattern.compile("[A-Za-z_.][A-Za-z0-9_.]*");
+    private static final Set<String> BUILTIN_TRANSFORM_NAMES = Set.of(
+            "left", "center", "truecenter", "right", "offscreenleft", "offscreenright", "reset"
+    );
     private static final Pattern SCREEN_LABEL_ACTION_PATTERN =
             Pattern.compile("\\b(?:Jump|Call)\\(\\s*\"([^\"]+)\"\\s*\\)");
     private static final Set<String> IMAGE_ASSET_PROPERTIES = Set.of(
@@ -51,7 +55,9 @@ public final class VJavaLinter {
         /** Fatal issue blocking standalone builds or safe execution. */
         ERROR,
         /** Non-fatal diagnostic such as unreachable labels or undefined speaker IDs. */
-        WARNING
+        WARNING,
+        /** Informational hint such as unused symbols that does not fail {@link LintReport#isClean()}. */
+        INFO
     }
 
     /**
@@ -229,12 +235,13 @@ public final class VJavaLinter {
         Map<String, Set<String>> callGraph = new LinkedHashMap<>();
         for (VJavaAst.LabelNode label : project.labels().values()) {
             Set<String> outgoing = callGraph.computeIfAbsent(label.name(), ignored -> new LinkedHashSet<>());
-            checkStatements(project, label.statements(), outgoing, knownAssets, issues);
+            checkStatements(project, label.name(), label.statements(), outgoing, knownAssets, issues);
         }
 
         checkUnreachableLabels(project, entryLabel, callGraph, issues);
         checkStrictTypes(project, issues);
         checkJavaBlocks(project, issues);
+        checkUnusedSymbols(project, issues);
 
         return createReport(issues);
     }
@@ -523,6 +530,7 @@ public final class VJavaLinter {
 
     private static void checkStatements(
             VJavaAst.ProjectAst project,
+            String currentLabel,
             List<VJavaAst.Statement> statements,
             Set<String> outgoingEdges,
             Set<String> knownAssets,
@@ -531,69 +539,73 @@ public final class VJavaLinter {
         for (VJavaAst.Statement stmt : statements) {
             if (stmt instanceof VJavaAst.JumpStatement jump) {
                 if (!jump.isExpression()) {
-                    String target = jump.targetLabel() != null ? jump.targetLabel().trim() : "";
-                    if (target.isEmpty() || !project.labels().containsKey(target)) {
+                    String rawTarget = jump.targetLabel() != null ? jump.targetLabel().trim() : "";
+                    String resolved = resolveNamespaceLabel(project, currentLabel, rawTarget);
+                    if (resolved == null) {
                         issues.add(new LintIssue(
                                 Severity.ERROR,
                                 "MISSING_JUMP_TARGET",
-                                "Jump target label '" + target + "' is not defined.",
+                                "Jump target label '" + rawTarget + "' is not defined.",
                                 jump.sourceFile(),
                                 jump.lineNumber()
                         ));
                     } else {
-                        outgoingEdges.add(target);
+                        outgoingEdges.add(resolved);
                     }
                 }
             } else if (stmt instanceof VJavaAst.CallStatement call) {
-                String target = call.targetLabel() != null ? call.targetLabel().trim() : "";
-                if (IDENTIFIER_PATTERN.matcher(target).matches()) {
-                    if (!project.labels().containsKey(target)) {
+                String rawTarget = call.targetLabel() != null ? call.targetLabel().trim() : "";
+                if (LABEL_REF_PATTERN.matcher(rawTarget).matches()) {
+                    String resolved = resolveNamespaceLabel(project, currentLabel, rawTarget);
+                    if (resolved == null) {
                         issues.add(new LintIssue(
                                 Severity.ERROR,
                                 "MISSING_CALL_TARGET",
-                                "Call target label '" + target + "' is not defined.",
+                                "Call target label '" + rawTarget + "' is not defined.",
                                 call.sourceFile(),
                                 call.lineNumber()
                         ));
                     } else {
-                        outgoingEdges.add(target);
+                        outgoingEdges.add(resolved);
                     }
                 }
             } else if (stmt instanceof VJavaAst.MenuStatement menu) {
                 if (menu.timeoutJumpLabel() != null && !menu.timeoutJumpLabel().isBlank()) {
-                    String timeoutTarget = menu.timeoutJumpLabel().trim();
-                    if (!project.labels().containsKey(timeoutTarget)) {
+                    String rawTimeout = menu.timeoutJumpLabel().trim();
+                    String resolved = resolveNamespaceLabel(project, currentLabel, rawTimeout);
+                    if (resolved == null) {
                         issues.add(new LintIssue(
                                 Severity.ERROR,
                                 "MISSING_TIMEOUT_TARGET",
-                                "Menu timeout target label '" + timeoutTarget + "' is not defined.",
+                                "Menu timeout target label '" + rawTimeout + "' is not defined.",
                                 menu.sourceFile(),
                                 menu.lineNumber()
                         ));
                     } else {
-                        outgoingEdges.add(timeoutTarget);
+                        outgoingEdges.add(resolved);
                     }
                 }
                 for (VJavaAst.MenuChoice choice : menu.choices()) {
                     if (choice.inlineJumpTarget() != null && !choice.inlineJumpTarget().isBlank()) {
-                        String choiceTarget = choice.inlineJumpTarget().trim();
-                        if (!project.labels().containsKey(choiceTarget)) {
+                        String rawChoice = choice.inlineJumpTarget().trim();
+                        String resolved = resolveNamespaceLabel(project, currentLabel, rawChoice);
+                        if (resolved == null) {
                             issues.add(new LintIssue(
                                     Severity.ERROR,
                                     "MISSING_MENU_TARGET",
-                                    "Menu choice target label '" + choiceTarget + "' is not defined.",
+                                    "Menu choice target label '" + rawChoice + "' is not defined.",
                                     choice.sourceFile(),
                                     choice.lineNumber()
                             ));
                         } else {
-                            outgoingEdges.add(choiceTarget);
+                            outgoingEdges.add(resolved);
                         }
                     }
-                    checkStatements(project, choice.body(), outgoingEdges, knownAssets, issues);
+                    checkStatements(project, currentLabel, choice.body(), outgoingEdges, knownAssets, issues);
                 }
             } else if (stmt instanceof VJavaAst.IfStatement ifStmt) {
                 for (VJavaAst.IfBranch branch : ifStmt.branches()) {
-                    checkStatements(project, branch.body(), outgoingEdges, knownAssets, issues);
+                    checkStatements(project, currentLabel, branch.body(), outgoingEdges, knownAssets, issues);
                 }
             } else if (stmt instanceof VJavaAst.MatchStatement matchStmt) {
                 Set<String> seenPatterns = new HashSet<>();
@@ -608,7 +620,7 @@ public final class VJavaLinter {
                                 mc.lineNumber()
                         ));
                     }
-                    checkStatements(project, mc.body(), outgoingEdges, knownAssets, issues);
+                    checkStatements(project, currentLabel, mc.body(), outgoingEdges, knownAssets, issues);
                 }
                 if (matchStmt.defaultBody() == null) {
                     issues.add(new LintIssue(
@@ -619,10 +631,40 @@ public final class VJavaLinter {
                             matchStmt.lineNumber()
                     ));
                 } else {
-                    checkStatements(project, matchStmt.defaultBody(), outgoingEdges, knownAssets, issues);
+                    checkStatements(project, currentLabel, matchStmt.defaultBody(),
+                            outgoingEdges, knownAssets, issues);
                 }
             } else if (stmt instanceof VJavaAst.ParallelStatement parallelStmt) {
-                checkStatements(project, parallelStmt.statements(), outgoingEdges, knownAssets, issues);
+                checkStatements(project, currentLabel, parallelStmt.statements(),
+                        outgoingEdges, knownAssets, issues);
+            } else if (stmt instanceof VJavaAst.RepeatStatement repStmt) {
+                checkStatements(project, currentLabel, repStmt.body(), outgoingEdges, knownAssets, issues);
+            } else if (stmt instanceof VJavaAst.WhileStatement whileStmt) {
+                checkStatements(project, currentLabel, whileStmt.body(), outgoingEdges, knownAssets, issues);
+            } else if (stmt instanceof VJavaAst.RandomStatement rndStmt) {
+                for (VJavaAst.RandomBranch rb : rndStmt.branches()) {
+                    checkStatements(project, currentLabel, rb.body(), outgoingEdges, knownAssets, issues);
+                }
+            } else if (stmt instanceof VJavaAst.AfterTimerStatement afterStmt) {
+                checkResolvedTarget(project, currentLabel, afterStmt.targetLabel(), "MISSING_TIMER_TARGET",
+                        "Timer target label", afterStmt.sourceFile(), afterStmt.lineNumber(),
+                        outgoingEdges, issues);
+            } else if (stmt instanceof VJavaAst.OnInteractStatement interactStmt) {
+                checkResolvedTarget(project, currentLabel, interactStmt.targetLabel(), "MISSING_INTERACT_TARGET",
+                        "Interact target label", interactStmt.sourceFile(), interactStmt.lineNumber(),
+                        outgoingEdges, issues);
+            } else if (stmt instanceof VJavaAst.OnTweenEndStatement tweenEndStmt) {
+                checkResolvedTarget(project, currentLabel, tweenEndStmt.targetLabel(), "MISSING_TWEEN_END_TARGET",
+                        "Tween-end target label", tweenEndStmt.sourceFile(), tweenEndStmt.lineNumber(),
+                        outgoingEdges, issues);
+            } else if (stmt instanceof VJavaAst.OnEventStatement eventStmt) {
+                checkResolvedTarget(project, currentLabel, eventStmt.targetLabel(), "MISSING_EVENT_TARGET",
+                        "Event target label", eventStmt.sourceFile(), eventStmt.lineNumber(),
+                        outgoingEdges, issues);
+            } else if (stmt instanceof VJavaAst.SpawnCutsceneStatement cutsceneStmt) {
+                checkResolvedTarget(project, currentLabel, cutsceneStmt.targetLabel(), "MISSING_CUTSCENE_TARGET",
+                        "Cutscene target label", cutsceneStmt.sourceFile(), cutsceneStmt.lineNumber(),
+                        outgoingEdges, issues);
             } else if (stmt instanceof VJavaAst.SayStatement say) {
                 if (say.speakerId() != null && !say.speakerId().isBlank()) {
                     String speakerId = say.speakerId().trim();
@@ -660,6 +702,7 @@ public final class VJavaLinter {
                         show.lineNumber(),
                         issues
                 );
+                checkTransformReference(project, show.positionExpr(), show.sourceFile(), show.lineNumber(), issues);
                 verifyTransitionAssets(
                         project, knownAssets, show.transitionExpr(), show.sourceFile(), show.lineNumber(), issues
                 );
@@ -686,44 +729,17 @@ public final class VJavaLinter {
                 verifyAssetExists(
                         project, knownAssets, voice.assetPath(), voice.sourceFile(), voice.lineNumber(), issues);
             } else if (stmt instanceof VJavaAst.OnCollideStatement collide) {
-                String target = collide.targetLabel() != null ? collide.targetLabel().trim() : "";
-                if (target.isEmpty() || !project.labels().containsKey(target)) {
-                    issues.add(new LintIssue(
-                            Severity.ERROR,
-                            "MISSING_COLLIDE_TARGET",
-                            "Collision target label '" + target + "' is not defined.",
-                            collide.sourceFile(),
-                            collide.lineNumber()
-                    ));
-                } else {
-                    outgoingEdges.add(target);
-                }
+                checkResolvedTarget(project, currentLabel, collide.targetLabel(), "MISSING_COLLIDE_TARGET",
+                        "Collision target label", collide.sourceFile(), collide.lineNumber(),
+                        outgoingEdges, issues);
             } else if (stmt instanceof VJavaAst.OnOverlapStatement overlap) {
-                String target = overlap.targetLabel() != null ? overlap.targetLabel().trim() : "";
-                if (target.isEmpty() || !project.labels().containsKey(target)) {
-                    issues.add(new LintIssue(
-                            Severity.ERROR,
-                            "MISSING_OVERLAP_TARGET",
-                            "Overlap target label '" + target + "' is not defined.",
-                            overlap.sourceFile(),
-                            overlap.lineNumber()
-                    ));
-                } else {
-                    outgoingEdges.add(target);
-                }
+                checkResolvedTarget(project, currentLabel, overlap.targetLabel(), "MISSING_OVERLAP_TARGET",
+                        "Overlap target label", overlap.sourceFile(), overlap.lineNumber(),
+                        outgoingEdges, issues);
             } else if (stmt instanceof VJavaAst.TriggerZoneStatement zone) {
-                String target = zone.targetLabel() != null ? zone.targetLabel().trim() : "";
-                if (target.isEmpty() || !project.labels().containsKey(target)) {
-                    issues.add(new LintIssue(
-                            Severity.ERROR,
-                            "MISSING_TRIGGER_TARGET",
-                            "Trigger zone target label '" + target + "' is not defined.",
-                            zone.sourceFile(),
-                            zone.lineNumber()
-                    ));
-                } else {
-                    outgoingEdges.add(target);
-                }
+                checkResolvedTarget(project, currentLabel, zone.targetLabel(), "MISSING_TRIGGER_TARGET",
+                        "Trigger zone target label", zone.sourceFile(), zone.lineNumber(),
+                        outgoingEdges, issues);
             } else if (stmt instanceof VJavaAst.MovePathStatement path) {
                 checkDurationAndEasing(
                         path.tag(), path.durationSeconds(), path.easing(),
@@ -1494,10 +1510,249 @@ public final class VJavaLinter {
         for (LintIssue issue : issues) {
             if (issue.severity() == Severity.ERROR) {
                 errors++;
-            } else {
+            } else if (issue.severity() == Severity.WARNING) {
                 warnings++;
             }
         }
         return new LintReport(issues, errors, warnings);
+    }
+
+    private static String resolveNamespaceLabel(
+            VJavaAst.ProjectAst project,
+            String currentLabel,
+            String rawTarget
+    ) {
+        if (rawTarget == null || rawTarget.isBlank()) {
+            return null;
+        }
+        String trimmed = rawTarget.trim();
+        if (project.labels().containsKey(trimmed)) {
+            return trimmed;
+        }
+        if (currentLabel != null) {
+            int dotIdx = currentLabel.lastIndexOf('.');
+            if (dotIdx > 0) {
+                String ns = currentLabel.substring(0, dotIdx);
+                String rel = trimmed.startsWith(".") ? ns + trimmed : ns + "." + trimmed;
+                if (project.labels().containsKey(rel)) {
+                    return rel;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static void checkResolvedTarget(
+            VJavaAst.ProjectAst project,
+            String currentLabel,
+            String rawTarget,
+            String code,
+            String labelKind,
+            String sourceFile,
+            int lineNumber,
+            Set<String> outgoingEdges,
+            List<LintIssue> issues
+    ) {
+        String resolved = resolveNamespaceLabel(project, currentLabel, rawTarget);
+        if (resolved == null) {
+            issues.add(new LintIssue(
+                    Severity.ERROR,
+                    code,
+                    labelKind + " '" + (rawTarget != null ? rawTarget.trim() : "") + "' is not defined.",
+                    sourceFile,
+                    lineNumber
+            ));
+        } else {
+            outgoingEdges.add(resolved);
+        }
+    }
+
+    private static void checkTransformReference(
+            VJavaAst.ProjectAst project,
+            String positionExpr,
+            String sourceFile,
+            int lineNumber,
+            List<LintIssue> issues
+    ) {
+        if (positionExpr == null || positionExpr.isBlank()) {
+            return;
+        }
+        String pos = positionExpr.trim();
+        if (!IDENTIFIER_PATTERN.matcher(pos).matches()) {
+            return;
+        }
+        String lower = pos.toLowerCase(Locale.ROOT);
+        if (BUILTIN_TRANSFORM_NAMES.contains(lower) || project.transforms().containsKey(pos)) {
+            return;
+        }
+        String best = findClosestTransform(pos, project.transforms().keySet());
+        String hint = best != null ? " — did you mean '" + best + "'?" : ".";
+        issues.add(new LintIssue(
+                Severity.WARNING,
+                "UNKNOWN_TRANSFORM",
+                "Unknown transform or position '" + pos + "'" + hint,
+                sourceFile,
+                lineNumber
+        ));
+    }
+
+    private static String findClosestTransform(String target, Set<String> customTransforms) {
+        List<String> candidates = new ArrayList<>(BUILTIN_TRANSFORM_NAMES);
+        candidates.addAll(customTransforms);
+        String best = null;
+        int bestDist = 4;
+        String lowerTarget = target.toLowerCase(Locale.ROOT);
+        for (String cand : candidates) {
+            int d = levenshteinDistance(lowerTarget, cand.toLowerCase(Locale.ROOT));
+            if (d < bestDist) {
+                bestDist = d;
+                best = cand;
+            }
+        }
+        return best;
+    }
+
+    private static int levenshteinDistance(String a, String b) {
+        int[][] dp = new int[a.length() + 1][b.length() + 1];
+        for (int i = 0; i <= a.length(); i++) {
+            dp[i][0] = i;
+        }
+        for (int j = 0; j <= b.length(); j++) {
+            dp[0][j] = j;
+        }
+        for (int i = 1; i <= a.length(); i++) {
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                dp[i][j] = Math.min(Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1),
+                        dp[i - 1][j - 1] + cost);
+            }
+        }
+        return dp[a.length()][b.length()];
+    }
+
+    private static void checkUnusedSymbols(VJavaAst.ProjectAst project, List<LintIssue> issues) {
+        Set<String> usedSpeakers = new HashSet<>();
+        StringBuilder codeCorpus = new StringBuilder();
+        for (VJavaAst.JavaBlockNode jbn : project.topLevelJavaBlocks()) {
+            codeCorpus.append(jbn.code()).append('\n');
+        }
+        for (VJavaAst.LabelNode lbl : project.labels().values()) {
+            collectUsageFromStatements(lbl.statements(), usedSpeakers, codeCorpus);
+        }
+        for (VJavaAst.ScreenDef screen : project.screens().values()) {
+            for (VJavaAst.ScreenItem item : screen.items()) {
+                collectScreenCorpus(item, codeCorpus);
+            }
+        }
+        String corpus = codeCorpus.toString();
+
+        for (VJavaAst.CharacterDef ch : project.characters().values()) {
+            if (!usedSpeakers.contains(ch.id()) && !containsWholeWord(corpus, ch.id())) {
+                issues.add(new LintIssue(
+                        Severity.INFO,
+                        "UNUSED_CHARACTER",
+                        "Character '" + ch.id() + "' is defined but never referenced.",
+                        ch.sourceFile(),
+                        ch.lineNumber()
+                ));
+            }
+        }
+        Set<String> seenVars = new HashSet<>();
+        for (VJavaAst.SetVarStatement dv : project.defaultVariables()) {
+            if (!dv.isDefaultOnly() || !seenVars.add(dv.varName())) {
+                continue;
+            }
+            if (!containsWholeWord(corpus, dv.varName())) {
+                issues.add(new LintIssue(
+                        Severity.INFO,
+                        "UNUSED_VARIABLE",
+                        "Default variable '" + dv.varName() + "' is initialized but never read.",
+                        dv.sourceFile(),
+                        dv.lineNumber()
+                ));
+            }
+        }
+    }
+
+    private static void collectUsageFromStatements(
+            List<VJavaAst.Statement> statements,
+            Set<String> usedSpeakers,
+            StringBuilder corpus
+    ) {
+        for (VJavaAst.Statement stmt : statements) {
+            if (stmt instanceof VJavaAst.SayStatement say) {
+                if (say.speakerId() != null) {
+                    usedSpeakers.add(say.speakerId().trim());
+                }
+                if (say.text() != null) {
+                    corpus.append(say.text()).append('\n');
+                }
+            } else if (stmt instanceof VJavaAst.ShowStatement show) {
+                usedSpeakers.add(show.tag());
+            } else if (stmt instanceof VJavaAst.JavaBlockStatement jbs) {
+                corpus.append(jbs.block().code()).append('\n');
+            } else if (stmt instanceof VJavaAst.SetVarStatement sv && !sv.isDefaultOnly()) {
+                corpus.append(sv.expression()).append('\n');
+            } else if (stmt instanceof VJavaAst.LocalVarStatement lv) {
+                corpus.append(lv.expression()).append('\n');
+            } else if (stmt instanceof VJavaAst.JumpStatement js) {
+                corpus.append(js.targetLabel()).append('\n');
+            } else if (stmt instanceof VJavaAst.IfStatement ifs) {
+                for (VJavaAst.IfBranch br : ifs.branches()) {
+                    if (br.conditionExpr() != null) {
+                        corpus.append(br.conditionExpr()).append('\n');
+                    }
+                    collectUsageFromStatements(br.body(), usedSpeakers, corpus);
+                }
+            } else if (stmt instanceof VJavaAst.MatchStatement ms) {
+                corpus.append(ms.subjectExpr()).append('\n');
+                for (VJavaAst.MatchCase mc : ms.cases()) {
+                    corpus.append(mc.patternExpr()).append('\n');
+                    collectUsageFromStatements(mc.body(), usedSpeakers, corpus);
+                }
+                if (ms.defaultBody() != null) {
+                    collectUsageFromStatements(ms.defaultBody(), usedSpeakers, corpus);
+                }
+            } else if (stmt instanceof VJavaAst.MenuStatement menu) {
+                for (VJavaAst.MenuChoice ch : menu.choices()) {
+                    if (ch.conditionExpr() != null) {
+                        corpus.append(ch.conditionExpr()).append('\n');
+                    }
+                    corpus.append(ch.text()).append('\n');
+                    collectUsageFromStatements(ch.body(), usedSpeakers, corpus);
+                }
+            } else if (stmt instanceof VJavaAst.ParallelStatement ps) {
+                collectUsageFromStatements(ps.statements(), usedSpeakers, corpus);
+            } else if (stmt instanceof VJavaAst.RepeatStatement rs) {
+                corpus.append(rs.countExpr()).append('\n');
+                collectUsageFromStatements(rs.body(), usedSpeakers, corpus);
+            } else if (stmt instanceof VJavaAst.WhileStatement ws) {
+                corpus.append(ws.conditionExpr()).append('\n');
+                collectUsageFromStatements(ws.body(), usedSpeakers, corpus);
+            } else if (stmt instanceof VJavaAst.RandomStatement rnd) {
+                for (VJavaAst.RandomBranch rb : rnd.branches()) {
+                    collectUsageFromStatements(rb.body(), usedSpeakers, corpus);
+                }
+            }
+        }
+    }
+
+    private static void collectScreenCorpus(VJavaAst.ScreenItem item, StringBuilder corpus) {
+        if (item.primaryArg() != null) {
+            corpus.append(item.primaryArg()).append('\n');
+        }
+        for (String val : item.properties().values()) {
+            corpus.append(val).append('\n');
+        }
+        for (VJavaAst.ScreenItem child : item.children()) {
+            collectScreenCorpus(child, corpus);
+        }
+    }
+
+    private static boolean containsWholeWord(String corpus, String word) {
+        if (word == null || word.isEmpty()) {
+            return false;
+        }
+        return Pattern.compile("\\b" + Pattern.quote(word) + "\\b").matcher(corpus).find();
     }
 }

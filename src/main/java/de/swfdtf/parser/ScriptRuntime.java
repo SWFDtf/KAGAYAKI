@@ -2,10 +2,14 @@ package de.swfdtf.parser;
 
 import de.swfdtf.core.EngineAPI;
 import de.swfdtf.core.EngineConfig;
+import de.swfdtf.core.EngineEvent;
+import de.swfdtf.core.EngineEventBus;
+import de.swfdtf.core.EventSubscription;
 import de.swfdtf.graphics.ObjectMotionController;
 import de.swfdtf.graphics.SceneController;
 import de.swfdtf.graphics.SceneGraph;
 import de.swfdtf.graphics.TextTagParser;
+import de.swfdtf.math.Rect2f;
 import de.swfdtf.math.ScreenShake;
 import de.swfdtf.math.Transform2D;
 import de.swfdtf.state.IcuMessageFormatter;
@@ -18,10 +22,16 @@ import de.swfdtf.state.StateStore;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
+import java.util.Set;
 
 /**
  * Non-blocking state-machine interpreter executing a compiled {@link VJavaAst.ProjectAst}.
@@ -34,6 +44,69 @@ import java.util.Objects;
 public final class ScriptRuntime {
 
     private static final int MAX_CONSECUTIVE_STEPS = 100_000;
+    private static final int DEFAULT_MAX_LOOP_ITERATIONS = 1_000;
+
+    /**
+     * Named custom event dispatched through {@link EngineEventBus} for {@code on_event} script hooks.
+     *
+     * @param name    event identifier matched against {@code on_event "<name>"}
+     * @param payload optional event payload map
+     */
+    public record ScriptNamedEvent(String name, Map<String, Object> payload) implements EngineEvent {
+        /** Normalizes null payload maps to an empty immutable map. */
+        public ScriptNamedEvent {
+            Objects.requireNonNull(name, "name must not be null");
+            payload = payload != null ? Collections.unmodifiableMap(new LinkedHashMap<>(payload)) : Map.of();
+        }
+    }
+
+    private static final class ScheduledTimer {
+        private double remainingSeconds;
+        private final boolean callAction;
+        private final String targetLabel;
+
+        private ScheduledTimer(double remainingSeconds, boolean callAction, String targetLabel) {
+            this.remainingSeconds = remainingSeconds;
+            this.callAction = callAction;
+            this.targetLabel = targetLabel;
+        }
+    }
+
+    private static final class CutsceneCoroutine {
+        private final List<VJavaAst.Statement> statements;
+        private int index = 0;
+        private double waitSeconds = 0.0;
+
+        private CutsceneCoroutine(List<VJavaAst.Statement> statements) {
+            this.statements = statements;
+        }
+    }
+
+    private static final class LoopControl {
+        private final boolean isWhile;
+        private final String condExpr;
+        private int remainingRepeat;
+        private int iterations;
+
+        private LoopControl(boolean isWhile, String condExpr, int remainingRepeat, int iterations) {
+            this.isWhile = isWhile;
+            this.condExpr = condExpr;
+            this.remainingRepeat = remainingRepeat;
+            this.iterations = iterations;
+        }
+    }
+
+    private static final class EventListenerBinding {
+        private final String eventName;
+        private final boolean callAction;
+        private final String targetLabel;
+
+        private EventListenerBinding(String eventName, boolean callAction, String targetLabel) {
+            this.eventName = eventName;
+            this.callAction = callAction;
+            this.targetLabel = targetLabel;
+        }
+    }
 
     /**
      * Execution states of the {@link ScriptRuntime} state machine.
@@ -413,6 +486,18 @@ public final class ScriptRuntime {
     private String waitingMoveTag = null;
     private String windowAction = "auto";
     private final List<AudioEvent> audioEvents = new ArrayList<>();
+    private final List<ScheduledTimer> scheduledTimers = new ArrayList<>();
+    private final List<CutsceneCoroutine> activeCutscenes = new ArrayList<>();
+    private final Map<Integer, LoopControl> activeLoopFrames = new HashMap<>();
+    private final Map<Integer, Map<String, Object>> localVarPrevValues = new HashMap<>();
+    private final Map<Integer, Set<String>> localVarAddedKeys = new HashMap<>();
+    private final List<EventListenerBinding> eventListenerBindings = new ArrayList<>();
+
+    private ScriptCoverageTracker coverageTracker;
+    private EngineEventBus boundEventBus;
+    private EventSubscription eventBusSubscription;
+    private Random randomGenerator = new Random();
+    private int maxLoopIterations = DEFAULT_MAX_LOOP_ITERATIONS;
 
     /**
      * Creates a headless-capable {@code ScriptRuntime} with default in-memory subsystems.
@@ -645,7 +730,105 @@ public final class ScriptRuntime {
     }
 
     /**
-     * Advances timed {@link Status#PAUSING} countdowns and {@link Status#WAITING_MENU} timeouts
+     * Binds an optional {@link ScriptCoverageTracker} to record executed statements and branch arms.
+     *
+     * @param tracker coverage tracker (nullable to disable)
+     * @return {@code this} for fluent chaining
+     */
+    public ScriptRuntime setCoverageTracker(ScriptCoverageTracker tracker) {
+        this.coverageTracker = tracker;
+        return this;
+    }
+
+    /**
+     * Sets the maximum iterations allowed per {@code repeat}/{@code while} loop before raising
+     * {@link ScriptExecutionException}.
+     *
+     * @param maxLoopIterations positive iteration cap
+     * @return {@code this} for fluent chaining
+     */
+    public ScriptRuntime setMaxLoopIterations(int maxLoopIterations) {
+        if (maxLoopIterations < 1) {
+            throw new IllegalArgumentException("maxLoopIterations must be >= 1");
+        }
+        this.maxLoopIterations = maxLoopIterations;
+        return this;
+    }
+
+    /**
+     * Seeds the internal PRNG used by {@code random:} DSL blocks for deterministic replay/testing.
+     *
+     * @param seed PRNG seed
+     * @return {@code this} for fluent chaining
+     */
+    public ScriptRuntime setRandomSeed(long seed) {
+        this.randomGenerator = new Random(seed);
+        return this;
+    }
+
+    /**
+     * Subscribes this runtime to an {@link EngineEventBus} so {@code on_event} hooks dispatch
+     * deterministically when matching events are published.
+     *
+     * @param eventBus event bus to listen on (nullable unbinds)
+     * @return {@code this} for fluent chaining
+     */
+    public ScriptRuntime bindEventBus(EngineEventBus eventBus) {
+        if (this.eventBusSubscription != null) {
+            this.eventBusSubscription.unsubscribe();
+            this.eventBusSubscription = null;
+        }
+        this.boundEventBus = eventBus;
+        if (eventBus != null) {
+            this.eventBusSubscription = eventBus.subscribe(EngineEvent.class, this::onEngineEvent);
+        }
+        return this;
+    }
+
+    private void onEngineEvent(EngineEvent event) {
+        if (event == null || eventListenerBindings.isEmpty() || status == Status.ENDED) {
+            return;
+        }
+        String eventName = event instanceof ScriptNamedEvent sne
+                ? sne.name()
+                : event.getClass().getSimpleName();
+        for (EventListenerBinding binding : List.copyOf(eventListenerBindings)) {
+            if (binding.eventName.equalsIgnoreCase(eventName)
+                    || binding.eventName.equals(event.getClass().getName())) {
+                if (binding.callAction) {
+                    handleSubroutineCallback(resolveLabelName(binding.targetLabel));
+                } else {
+                    handleCollisionJump(resolveLabelName(binding.targetLabel));
+                }
+            }
+        }
+    }
+
+    /**
+     * Evaluates standalone {@code .vjava} statements (e.g. from {@link VJavaReplEvaluator}) immediately
+     * without disrupting the current script label or call stack.
+     *
+     * @param statements parsed single-line or block statements to run
+     */
+    public void executeReplStatements(List<VJavaAst.Statement> statements) {
+        if (statements == null || statements.isEmpty()) {
+            return;
+        }
+        int savedIdx = this.statementIndex;
+        List<VJavaAst.Statement> savedStmts = this.currentStatements;
+        try {
+            for (VJavaAst.Statement s : statements) {
+                executeStatement(s);
+            }
+        } finally {
+            this.currentStatements = savedStmts;
+            this.statementIndex = savedIdx;
+        }
+    }
+
+    /**
+     * Advances timed {@link Status#PAUSING} countdowns, {@link Status#WAITING_MENU} timeouts,
+     * scheduled {@code after} timers, and background {@code spawn_cutscene} coroutines
      * without blocking the render thread.
      *
      * @param dt frame delta time in seconds
@@ -654,7 +837,11 @@ public final class ScriptRuntime {
         if (dt <= 0.0 || !Double.isFinite(dt)) {
             return;
         }
-        sceneController.updateAtl(dt);
+        double timeScale = sceneController.getMotionController().getTimeScale();
+        double scaledDt = dt * timeScale;
+        sceneController.updateAtl(scaledDt);
+        updateScheduledTimers(scaledDt);
+        updateActiveCutscenes(scaledDt);
         if (status == Status.PAUSING && waitingMoveTag != null) {
             if (!sceneController.getMotionController().hasActiveTween(waitingMoveTag)) {
                 waitingMoveTag = null;
@@ -671,6 +858,10 @@ public final class ScriptRuntime {
             }
         } else if (status == Status.WAITING_MENU && activeMenu != null && activeMenu.timeoutSeconds() != null) {
             double remaining = Math.max(0.0, activeMenu.remainingSeconds() - dt);
+            double total = activeMenu.timeoutSeconds();
+            double ratio = total > 0.0 ? Math.max(0.0, Math.min(1.0, remaining / total)) : 0.0;
+            stateStore.set("_menu_timeout_remaining", remaining);
+            stateStore.set("_menu_timeout_progress", ratio);
             activeMenu = new MenuPrompt(
                     activeMenu.caption(),
                     activeMenu.timeoutSeconds(),
@@ -683,7 +874,7 @@ public final class ScriptRuntime {
                     activeMenu = null;
                     activeMenuAst = null;
                     unwindLocalBlockFrames();
-                    enterLabel(jumpTarget.trim());
+                    enterLabel(resolveLabelName(jumpTarget.trim()));
                     status = Status.READY;
                     stepUntilPause();
                 } else {
@@ -703,6 +894,78 @@ public final class ScriptRuntime {
                 }
             }
         }
+    }
+
+    private void updateScheduledTimers(double dt) {
+        if (scheduledTimers.isEmpty() || dt <= 0.0) {
+            return;
+        }
+        List<ScheduledTimer> expired = null;
+        Iterator<ScheduledTimer> it = scheduledTimers.iterator();
+        while (it.hasNext()) {
+            ScheduledTimer timer = it.next();
+            timer.remainingSeconds -= dt;
+            if (timer.remainingSeconds <= 0.0) {
+                it.remove();
+                if (expired == null) {
+                    expired = new ArrayList<>(2);
+                }
+                expired.add(timer);
+            }
+        }
+        if (expired != null) {
+            for (ScheduledTimer timer : expired) {
+                String resolved = resolveLabelName(timer.targetLabel);
+                if (timer.callAction) {
+                    handleSubroutineCallback(resolved);
+                } else {
+                    handleCollisionJump(resolved);
+                }
+            }
+        }
+    }
+
+    private void updateActiveCutscenes(double dt) {
+        if (activeCutscenes.isEmpty() || dt <= 0.0) {
+            return;
+        }
+        Iterator<CutsceneCoroutine> it = activeCutscenes.iterator();
+        while (it.hasNext()) {
+            CutsceneCoroutine co = it.next();
+            if (co.waitSeconds > 0.0) {
+                co.waitSeconds -= dt;
+                if (co.waitSeconds > 0.0) {
+                    continue;
+                }
+                co.waitSeconds = 0.0;
+            }
+            if (!advanceCutsceneCoroutine(co)) {
+                it.remove();
+            }
+        }
+    }
+
+    private boolean advanceCutsceneCoroutine(CutsceneCoroutine co) {
+        int steps = 0;
+        while (co.index < co.statements.size() && steps++ < MAX_CONSECUTIVE_STEPS) {
+            VJavaAst.Statement cs = co.statements.get(co.index++);
+            if (cs instanceof VJavaAst.PauseStatement ps) {
+                if (ps.seconds() != null && ps.seconds() > 0.0) {
+                    co.waitSeconds = ps.seconds();
+                    return true;
+                }
+                continue;
+            }
+            int savedIdx = this.statementIndex;
+            List<VJavaAst.Statement> savedStmts = this.currentStatements;
+            try {
+                executeStatement(cs);
+            } finally {
+                this.statementIndex = savedIdx;
+                this.currentStatements = savedStmts;
+            }
+        }
+        return false;
     }
 
     /**
@@ -972,7 +1235,28 @@ public final class ScriptRuntime {
     }
 
     private boolean popCompletedFrameOrEnd() {
+        LoopControl activeLoop = activeLoopFrames.get(callStack.size());
+        if (activeLoop != null) {
+            if (activeLoop.isWhile) {
+                if (ConditionEvaluator.evaluateBoolean(activeLoop.condExpr, stateStore, persistentAccess)) {
+                    activeLoop.iterations++;
+                    if (activeLoop.iterations > maxLoopIterations) {
+                        throw new ScriptExecutionException(
+                                "While loop exceeded maximum iterations (" + maxLoopIterations
+                                        + ") near label '" + currentLabel + "'");
+                    }
+                    statementIndex = 0;
+                    return true;
+                }
+            } else if (activeLoop.remainingRepeat > 0) {
+                activeLoop.remainingRepeat--;
+                statementIndex = 0;
+                return true;
+            }
+            activeLoopFrames.remove(callStack.size());
+        }
         if (callStack.isEmpty()) {
+            cleanupLocalsForDepth(0);
             status = Status.ENDED;
             activeDialogue = null;
             activeMenu = null;
@@ -981,7 +1265,12 @@ public final class ScriptRuntime {
             activeVoicePath = null;
             return false;
         }
+        int poppingCallDepth = callStack.get(callStack.size() - 1).isCallBoundary()
+                ? countCallBoundaries() : -1;
         StackFrame top = callStack.remove(callStack.size() - 1);
+        if (poppingCallDepth > 0) {
+            cleanupLocalsForDepth(poppingCallDepth);
+        }
         this.currentLabel = top.labelName();
         this.statementIndex = top.statementIndex();
         if (!top.statements().isEmpty()) {
@@ -995,6 +1284,9 @@ public final class ScriptRuntime {
     }
 
     private boolean executeStatement(VJavaAst.Statement stmt) {
+        if (coverageTracker != null) {
+            coverageTracker.recordStatement(stmt);
+        }
         if (stmt instanceof VJavaAst.JavaBlockStatement jbs) {
             executeJavaBlock(jbs.block());
             statementIndex++;
@@ -1035,7 +1327,7 @@ public final class ScriptRuntime {
                     ? String.valueOf(ConditionEvaluator.evaluate(jump.targetLabel(), stateStore, persistentAccess))
                     : jump.targetLabel();
             unwindLocalBlockFrames();
-            enterLabel(target.trim());
+            enterLabel(resolveLabelName(target.trim()));
             return false;
         }
         if (stmt instanceof VJavaAst.CallStatement call) {
@@ -1047,7 +1339,7 @@ public final class ScriptRuntime {
                 stateStore.set("_call_args", List.copyOf(evaluated));
             }
             callStack.add(new StackFrame(currentLabel, statementIndex + 1, currentStatements, List.of(), true));
-            enterLabel(call.targetLabel().trim());
+            enterLabel(resolveLabelName(call.targetLabel().trim()));
             return false;
         }
         if (stmt instanceof VJavaAst.ReturnStatement ret) {
@@ -1168,11 +1460,15 @@ public final class ScriptRuntime {
             return true;
         }
         if (stmt instanceof VJavaAst.IfStatement ifs) {
-            for (VJavaAst.IfBranch branch : ifs.branches()) {
+            for (int armIdx = 0; armIdx < ifs.branches().size(); armIdx++) {
+                VJavaAst.IfBranch branch = ifs.branches().get(armIdx);
                 boolean matched = branch.conditionExpr() == null
                         || branch.conditionExpr().isBlank()
                         || ConditionEvaluator.evaluateBoolean(branch.conditionExpr(), stateStore, persistentAccess);
                 if (matched) {
+                    if (coverageTracker != null) {
+                        coverageTracker.recordBranch(ifs.sourceFile(), ifs.lineNumber(), armIdx);
+                    }
                     if (!branch.body().isEmpty()) {
                         pushNestedBlock(branch.body());
                     } else {
@@ -1186,9 +1482,13 @@ public final class ScriptRuntime {
         }
         if (stmt instanceof VJavaAst.MatchStatement match) {
             Object subject = ConditionEvaluator.evaluate(match.subjectExpr(), stateStore, persistentAccess);
-            for (VJavaAst.MatchCase mc : match.cases()) {
+            for (int caseIdx = 0; caseIdx < match.cases().size(); caseIdx++) {
+                VJavaAst.MatchCase mc = match.cases().get(caseIdx);
                 Object pattern = ConditionEvaluator.evaluate(mc.patternExpr(), stateStore, persistentAccess);
                 if (valuesMatch(subject, pattern)) {
+                    if (coverageTracker != null) {
+                        coverageTracker.recordBranch(match.sourceFile(), mc.lineNumber(), caseIdx);
+                    }
                     if (!mc.body().isEmpty()) {
                         pushNestedBlock(mc.body());
                     } else {
@@ -1197,11 +1497,16 @@ public final class ScriptRuntime {
                     return false;
                 }
             }
-            if (match.defaultBody() != null && !match.defaultBody().isEmpty()) {
-                pushNestedBlock(match.defaultBody());
-            } else {
-                statementIndex++;
+            if (match.defaultBody() != null) {
+                if (coverageTracker != null) {
+                    coverageTracker.recordBranch(match.sourceFile(), match.lineNumber(), match.cases().size());
+                }
+                if (!match.defaultBody().isEmpty()) {
+                    pushNestedBlock(match.defaultBody());
+                    return false;
+                }
             }
+            statementIndex++;
             return false;
         }
         if (stmt instanceof VJavaAst.SetVarStatement setVar) {
@@ -1239,14 +1544,24 @@ public final class ScriptRuntime {
             return false;
         }
         if (stmt instanceof VJavaAst.MoveStatement move) {
-            sceneController.getMotionController().startMove(
-                    move.tag(),
-                    (float) move.targetX(),
-                    (float) move.targetY(),
-                    move.relative(),
-                    move.durationSeconds(),
-                    move.easing()
-            );
+            if (move.viewportRelative()) {
+                sceneController.getMotionController().startRelativeViewportMove(
+                        move.tag(),
+                        (float) move.targetX(),
+                        (float) move.targetY(),
+                        move.durationSeconds(),
+                        move.easing()
+                );
+            } else {
+                sceneController.getMotionController().startMove(
+                        move.tag(),
+                        (float) move.targetX(),
+                        (float) move.targetY(),
+                        move.relative(),
+                        move.durationSeconds(),
+                        move.easing()
+                );
+            }
             statementIndex++;
             return false;
         }
@@ -1362,7 +1677,9 @@ public final class ScriptRuntime {
                     wasdInit.maxY() != null ? wasdInit.maxY().floatValue() : null,
                     wasdInit.normalizeDiagonal(),
                     (float) wasdInit.friction(),
-                    (float) wasdInit.acceleration()
+                    (float) wasdInit.acceleration(),
+                    wasdInit.autoFlip(),
+                    wasdInit.dashKey()
             );
             statementIndex++;
             return false;
@@ -1393,6 +1710,246 @@ public final class ScriptRuntime {
                     collide.tagB(),
                     collide.targetLabel()
             );
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.PatrolStatement patrol) {
+            sceneController.getMotionController().startPatrol(
+                    patrol.tag(), (float) patrol.x1(), (float) patrol.y1(),
+                    (float) patrol.x2(), (float) patrol.y2(),
+                    (float) patrol.speedPxPerSec(), patrol.pingPong());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.FollowStatement follow) {
+            sceneController.getMotionController().startFollow(
+                    follow.tag(), follow.targetTag(), (float) follow.speedPxPerSec(),
+                    (float) follow.stopRadius(), (float) follow.resumeRadius());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.AfterTimerStatement timer) {
+            scheduledTimers.add(new ScheduledTimer(
+                    Math.max(0.0, timer.delaySeconds()),
+                    "call".equalsIgnoreCase(timer.action()),
+                    timer.targetLabel()));
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.CameraClampStatement clamp) {
+            sceneController.getMotionController().setCameraClamp(
+                    (float) clamp.minX(), (float) clamp.minY(),
+                    (float) clamp.maxX(), (float) clamp.maxY());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.OnInteractStatement interact) {
+            sceneController.getMotionController().registerInteractTrigger(
+                    interact.targetTag(), (float) interact.maxDistancePx(),
+                    interact.targetLabel(), "call".equalsIgnoreCase(interact.action()));
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.RepeatStatement rep) {
+            Object rawCount = ConditionEvaluator.evaluate(rep.countExpr(), stateStore, persistentAccess);
+            int count = rawCount instanceof Number n ? n.intValue() : 0;
+            if (count > maxLoopIterations) {
+                throw new ScriptExecutionException(
+                        "Repeat loop count (" + count + ") exceeds limit (" + maxLoopIterations + ")");
+            }
+            if (count <= 0 || rep.body().isEmpty()) {
+                statementIndex++;
+                return false;
+            }
+            pushNestedBlock(rep.body());
+            activeLoopFrames.put(callStack.size(), new LoopControl(false, null, count - 1, 1));
+            return false;
+        }
+        if (stmt instanceof VJavaAst.WhileStatement wh) {
+            boolean cond = ConditionEvaluator.evaluateBoolean(wh.conditionExpr(), stateStore, persistentAccess);
+            if (!cond || wh.body().isEmpty()) {
+                statementIndex++;
+                return false;
+            }
+            pushNestedBlock(wh.body());
+            activeLoopFrames.put(callStack.size(), new LoopControl(true, wh.conditionExpr(), 0, 1));
+            return false;
+        }
+        if (stmt instanceof VJavaAst.AnimStateStatement anim) {
+            sceneController.getMotionController().registerAnimState(
+                    anim.tag(), anim.idleAttr(), anim.walkAttr(), anim.jumpAttr());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.ColliderWallStatement wall) {
+            List<Rect2f> rects = new ArrayList<>(wall.boxes().size());
+            for (VJavaAst.ColliderBox box : wall.boxes()) {
+                rects.add(new Rect2f((float) box.x(), (float) box.y(),
+                        (float) box.width(), (float) box.height()));
+            }
+            sceneController.getMotionController().addCompoundCollider(wall.id(), rects);
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.ShakeLayerStatement shake) {
+            sceneController.getSceneGraph().shakeLayer(
+                    shake.layerName(), (float) shake.amplitudePx(), (float) shake.durationSeconds());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.KnockbackStatement kb) {
+            sceneController.getMotionController().applyKnockback(
+                    kb.tag(), (float) kb.vx(), (float) kb.vy(), (float) kb.invulnSeconds(), 6.0f);
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.ClimbZoneStatement cz) {
+            sceneController.getMotionController().addClimbZone(
+                    cz.id(), (float) cz.x(), (float) cz.y(), (float) cz.width(), (float) cz.height());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.MovingPlatformStatement mp) {
+            sceneController.getMotionController().registerMovingPlatform(
+                    mp.tag(), (float) mp.x1(), (float) mp.y1(),
+                    (float) mp.x2(), (float) mp.y2(), (float) mp.speedPxPerSec(), mp.oneWay());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.AttractStatement at) {
+            sceneController.getMotionController().registerAttract(
+                    at.tag(), at.targetTag(), (float) at.radiusPx(), (float) at.speedPxPerSec());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.SpawnStatement sp) {
+            sceneController.spawnSprite(
+                    sp.tag(),
+                    sp.assetOrTag(),
+                    sp.x() != null ? sp.x().floatValue() : null,
+                    sp.y() != null ? sp.y().floatValue() : null);
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.DespawnStatement ds) {
+            sceneController.despawnSprite(ds.tag());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.OnTweenEndStatement ote) {
+            sceneController.getMotionController().registerTweenEndTrigger(
+                    ote.tag(), ote.targetLabel(), "call".equalsIgnoreCase(ote.action()));
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.OnEventStatement oe) {
+            eventListenerBindings.add(new EventListenerBinding(
+                    oe.eventName(), "call".equalsIgnoreCase(oe.action()), oe.targetLabel()));
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.SpawnCutsceneStatement sc) {
+            String resolved = resolveLabelName(sc.targetLabel().trim());
+            VJavaAst.LabelNode lbl = projectAst.labels().get(resolved);
+            if (lbl != null && !lbl.statements().isEmpty()) {
+                CutsceneCoroutine co = new CutsceneCoroutine(lbl.statements());
+                if (advanceCutsceneCoroutine(co)) {
+                    activeCutscenes.add(co);
+                }
+            }
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.RandomStatement rnd) {
+            double totalWeight = 0.0;
+            for (VJavaAst.RandomBranch branch : rnd.branches()) {
+                totalWeight += Math.max(0.0, branch.weight());
+            }
+            double pick = randomGenerator.nextDouble() * totalWeight;
+            double acc = 0.0;
+            int selectedIdx = rnd.branches().size() - 1;
+            for (int i = 0; i < rnd.branches().size(); i++) {
+                acc += Math.max(0.0, rnd.branches().get(i).weight());
+                if (pick < acc) {
+                    selectedIdx = i;
+                    break;
+                }
+            }
+            VJavaAst.RandomBranch chosen = rnd.branches().get(selectedIdx);
+            if (coverageTracker != null) {
+                coverageTracker.recordBranch(rnd.sourceFile(), chosen.lineNumber(), selectedIdx);
+            }
+            if (!chosen.body().isEmpty()) {
+                pushNestedBlock(chosen.body());
+            } else {
+                statementIndex++;
+            }
+            return false;
+        }
+        if (stmt instanceof VJavaAst.SetBlockStatement sb) {
+            List<Object> vals = new ArrayList<>(sb.assignments().size());
+            for (VJavaAst.SetVarStatement sv : sb.assignments()) {
+                vals.add(ConditionEvaluator.evaluate(sv.expression(), stateStore, persistentAccess));
+            }
+            for (int i = 0; i < sb.assignments().size(); i++) {
+                stateStore.set(sb.assignments().get(i).varName(), vals.get(i));
+            }
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.LocalVarStatement lv) {
+            int depth = countCallBoundaries();
+            Map<String, Object> prevs = localVarPrevValues.computeIfAbsent(depth, k -> new LinkedHashMap<>());
+            Set<String> added = localVarAddedKeys.computeIfAbsent(depth, k -> new LinkedHashSet<>());
+            if (!prevs.containsKey(lv.varName()) && !added.contains(lv.varName())) {
+                if (stateStore.has(lv.varName())) {
+                    prevs.put(lv.varName(), stateStore.get(lv.varName()));
+                } else {
+                    added.add(lv.varName());
+                }
+            }
+            Object val = ConditionEvaluator.evaluate(lv.expression(), stateStore, persistentAccess);
+            stateStore.set(lv.varName(), val);
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.TimeScaleStatement ts) {
+            sceneController.setTimeScale((float) ts.factor());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.AttachStatement att) {
+            sceneController.getMotionController().attachChild(
+                    att.childTag(), att.parentTag(), (float) att.offsetX(), (float) att.offsetY());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.YSortStatement ys) {
+            sceneController.setYSortEnabled(ys.enabled());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.PointClickInitStatement pc) {
+            sceneController.getMotionController().enablePointClick(
+                    pc.tag(),
+                    (float) pc.speedPxPerSec(),
+                    pc.minX() != null ? pc.minX().floatValue() : null,
+                    pc.minY() != null ? pc.minY().floatValue() : null,
+                    pc.maxX() != null ? pc.maxX().floatValue() : null,
+                    pc.maxY() != null ? pc.maxY().floatValue() : null);
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.SurfaceFrictionStatement sf) {
+            sceneController.getMotionController().addSurfaceFrictionZone(
+                    sf.id(), (float) sf.x(), (float) sf.y(),
+                    (float) sf.width(), (float) sf.height(), (float) sf.frictionFactor());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.ImpulseStatement imp) {
+            sceneController.getMotionController().applyImpulse(
+                    imp.tag(), (float) imp.vx(), (float) imp.vy());
             statementIndex++;
             return false;
         }
@@ -1633,13 +2190,60 @@ public final class ScriptRuntime {
     }
 
     private void enterLabel(String labelName) {
-        VJavaAst.LabelNode label = projectAst.labels().get(labelName);
+        String resolvedName = resolveLabelName(labelName);
+        VJavaAst.LabelNode label = projectAst.labels().get(resolvedName);
         if (label == null) {
             throw new IllegalArgumentException("Unknown script label: '" + labelName + "'");
         }
         this.currentLabel = label.name();
         this.currentStatements = label.statements();
         this.statementIndex = 0;
+    }
+
+    private String resolveLabelName(String rawTarget) {
+        if (rawTarget == null) {
+            return null;
+        }
+        String trimmed = rawTarget.trim();
+        if (projectAst.labels().containsKey(trimmed)) {
+            return trimmed;
+        }
+        if (currentLabel != null) {
+            int dotIdx = currentLabel.lastIndexOf('.');
+            if (dotIdx > 0) {
+                String ns = currentLabel.substring(0, dotIdx);
+                String rel = trimmed.startsWith(".") ? ns + trimmed : ns + "." + trimmed;
+                if (projectAst.labels().containsKey(rel)) {
+                    return rel;
+                }
+            }
+        }
+        return trimmed;
+    }
+
+    private int countCallBoundaries() {
+        int c = 0;
+        for (StackFrame sf : callStack) {
+            if (sf.isCallBoundary()) {
+                c++;
+            }
+        }
+        return c;
+    }
+
+    private void cleanupLocalsForDepth(int depth) {
+        Map<String, Object> prevs = localVarPrevValues.remove(depth);
+        if (prevs != null) {
+            for (Map.Entry<String, Object> entry : prevs.entrySet()) {
+                stateStore.set(entry.getKey(), entry.getValue());
+            }
+        }
+        Set<String> added = localVarAddedKeys.remove(depth);
+        if (added != null) {
+            for (String key : added) {
+                stateStore.remove(key);
+            }
+        }
     }
 
     private void pushNestedBlock(List<VJavaAst.Statement> childBody) {
@@ -1650,6 +2254,7 @@ public final class ScriptRuntime {
 
     private void unwindLocalBlockFrames() {
         while (!callStack.isEmpty() && !callStack.get(callStack.size() - 1).isCallBoundary()) {
+            activeLoopFrames.remove(callStack.size());
             callStack.remove(callStack.size() - 1);
         }
     }
@@ -1660,6 +2265,12 @@ public final class ScriptRuntime {
         this.currentStatements = List.of();
         this.statementIndex = 0;
         this.callStack.clear();
+        this.activeLoopFrames.clear();
+        this.scheduledTimers.clear();
+        this.activeCutscenes.clear();
+        this.localVarPrevValues.clear();
+        this.localVarAddedKeys.clear();
+        this.eventListenerBindings.clear();
         this.activeDialogue = null;
         this.activeMenu = null;
         this.activeMenuAst = null;
@@ -1669,7 +2280,6 @@ public final class ScriptRuntime {
         this.activeVoicePath = null;
         this.pauseRemainingSeconds = 0.0;
         this.pauseTimed = false;
-        this.waitingMoveTag = null;
         this.waitingMoveTag = null;
         this.windowAction = "auto";
         this.audioEvents.clear();

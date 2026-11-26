@@ -64,7 +64,35 @@ public final class VJavaAst {
             PhysicsInitStatement,
             PhysicsStopStatement,
             OnCollideStatement,
-            MatchStatement {
+            MatchStatement,
+            PatrolStatement,
+            FollowStatement,
+            AfterTimerStatement,
+            CameraClampStatement,
+            OnInteractStatement,
+            RepeatStatement,
+            WhileStatement,
+            AnimStateStatement,
+            ColliderWallStatement,
+            ShakeLayerStatement,
+            KnockbackStatement,
+            ClimbZoneStatement,
+            MovingPlatformStatement,
+            AttractStatement,
+            SpawnStatement,
+            DespawnStatement,
+            OnTweenEndStatement,
+            OnEventStatement,
+            SpawnCutsceneStatement,
+            RandomStatement,
+            SetBlockStatement,
+            LocalVarStatement,
+            TimeScaleStatement,
+            AttachStatement,
+            YSortStatement,
+            PointClickInitStatement,
+            SurfaceFrictionStatement,
+            ImpulseStatement {
 
         /**
          * Returns the source file path where this statement appears.
@@ -766,32 +794,58 @@ public final class VJavaAst {
     }
 
     /**
-     * Moves a sprite to an absolute or relative stage coordinate, optionally animated over time.
+     * Moves a sprite to an absolute, viewport-relative, or delta stage coordinate, optionally animated over time.
      *
-     * @param tag             target sprite tag
-     * @param targetX         target X coordinate (or relative delta X)
-     * @param targetY         target Y coordinate (or relative delta Y)
-     * @param relative        {@code true} for {@code move_by}, {@code false} for {@code move ... to}
-     * @param durationSeconds tween duration in seconds ({@code 0} for instant placement)
-     * @param easing          easing curve name ({@code linear}, {@code ease_in}, {@code ease_out}, {@code ease_in_out})
-     * @param sourceFile      source script path
-     * @param lineNumber      1-based line number
+     * @param tag              target sprite tag
+     * @param targetX          target X coordinate (or relative delta/fraction X)
+     * @param targetY          target Y coordinate (or relative delta/fraction Y)
+     * @param relative         {@code true} for {@code move_by}, {@code false} for {@code move ... to/rel}
+     * @param viewportRelative {@code true} when coordinates represent normalized {@code [0, 1]} viewport fractions
+     * @param durationSeconds  tween duration in seconds ({@code 0} for instant placement)
+     * @param easing           easing curve name ({@code linear}, {@code ease_in}, {@code ease_out}, {@code spring})
+     * @param sourceFile       source script path
+     * @param lineNumber       1-based line number
      */
     public record MoveStatement(
             String tag,
             double targetX,
             double targetY,
             boolean relative,
+            boolean viewportRelative,
             double durationSeconds,
             String easing,
             String sourceFile,
             int lineNumber
     ) implements Statement {
+        /**
+         * Backwards-compatible 8-argument constructor without viewport-relative flag.
+         *
+         * @param tag             target sprite tag
+         * @param targetX         target X coordinate
+         * @param targetY         target Y coordinate
+         * @param relative        {@code true} for relative delta
+         * @param durationSeconds tween duration in seconds
+         * @param easing          easing curve name
+         * @param sourceFile      source script path
+         * @param lineNumber      1-based line number
+         */
+        public MoveStatement(
+                String tag,
+                double targetX,
+                double targetY,
+                boolean relative,
+                double durationSeconds,
+                String easing,
+                String sourceFile,
+                int lineNumber
+        ) {
+            this(tag, targetX, targetY, relative, false, durationSeconds, easing, sourceFile, lineNumber);
+        }
     }
 
     /**
      * Binds interactive WASD / arrow-key movement to a sprite tag with optional speed, bounds,
-     * and inertia parameters.
+     * inertia, auto-flip, and dash configuration.
      *
      * @param tag               target sprite tag
      * @param speedPxPerSec     speed in logical pixels per second
@@ -802,6 +856,8 @@ public final class VJavaAst {
      * @param normalizeDiagonal whether diagonal vectors are normalized to constant speed
      * @param friction          deceleration damping rate when input is released ({@code <= 0} disables inertia)
      * @param acceleration      acceleration responsiveness when input is held ({@code <= 0} uses instant speed)
+     * @param autoFlip          whether to mirror {@code xzoom} automatically along movement direction
+     * @param dashKey           optional dash key identifier (nullable)
      * @param sourceFile        source script path
      * @param lineNumber        1-based line number
      */
@@ -815,9 +871,43 @@ public final class VJavaAst {
             boolean normalizeDiagonal,
             double friction,
             double acceleration,
+            boolean autoFlip,
+            String dashKey,
             String sourceFile,
             int lineNumber
     ) implements Statement {
+        /**
+         * Backwards-compatible constructor without auto-flip and dash key parameters.
+         *
+         * @param tag               target sprite tag
+         * @param speedPxPerSec     speed in logical pixels per second
+         * @param minX              optional minimum X clamp (nullable)
+         * @param minY              optional minimum Y clamp (nullable)
+         * @param maxX              optional maximum X clamp (nullable)
+         * @param maxY              optional maximum Y clamp (nullable)
+         * @param normalizeDiagonal whether diagonal vectors are normalized to constant speed
+         * @param friction          deceleration damping rate when input is released
+         * @param acceleration      acceleration responsiveness when input is held
+         * @param sourceFile        source script path
+         * @param lineNumber        1-based line number
+         */
+        public WasdInitStatement(
+                String tag,
+                double speedPxPerSec,
+                Double minX,
+                Double minY,
+                Double maxX,
+                Double maxY,
+                boolean normalizeDiagonal,
+                double friction,
+                double acceleration,
+                String sourceFile,
+                int lineNumber
+        ) {
+            this(tag, speedPxPerSec, minX, minY, maxX, maxY, normalizeDiagonal,
+                    friction, acceleration, false, null, sourceFile, lineNumber);
+        }
+
         /**
          * Backwards-compatible constructor without explicit inertia parameters.
          *
@@ -842,7 +932,8 @@ public final class VJavaAst {
                 String sourceFile,
                 int lineNumber
         ) {
-            this(tag, speedPxPerSec, minX, minY, maxX, maxY, normalizeDiagonal, 0.0, 0.0, sourceFile, lineNumber);
+            this(tag, speedPxPerSec, minX, minY, maxX, maxY, normalizeDiagonal,
+                    0.0, 0.0, false, null, sourceFile, lineNumber);
         }
     }
 
@@ -1172,6 +1263,570 @@ public final class VJavaAst {
     }
 
     /**
+     * Weighted branch inside a {@link RandomStatement}.
+     *
+     * @param weight     relative selection weight ({@code > 0})
+     * @param body       branch statements
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record RandomBranch(double weight, List<Statement> body, String sourceFile, int lineNumber) {
+        /** Copies branch statements defensively. */
+        public RandomBranch {
+            body = body != null ? List.copyOf(body) : List.of();
+        }
+    }
+
+    /**
+     * Rectangle definition used by compound wall colliders.
+     *
+     * @param x      left X
+     * @param y      top Y
+     * @param width  width
+     * @param height height
+     */
+    public record ColliderBox(double x, double y, double width, double height) {
+    }
+
+    /**
+     * Waypoint patrol statement ({@code patrol <tag> between x1 y1 x2 y2 [speed <s>] [loop <bool>]}).
+     *
+     * @param tag           target sprite tag
+     * @param x1            start X
+     * @param y1            start Y
+     * @param x2            end X
+     * @param y2            end Y
+     * @param speedPxPerSec travel speed in pixels/sec
+     * @param pingPong      {@code true} to bounce between waypoints, {@code false} to wrap loop
+     * @param sourceFile    source script path
+     * @param lineNumber    1-based line number
+     */
+    public record PatrolStatement(
+            String tag,
+            double x1,
+            double y1,
+            double x2,
+            double y2,
+            double speedPxPerSec,
+            boolean pingPong,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Pursuit AI statement ({@code follow <tag> target <targetTag> [speed <s>] [stop_radius <r>]}).
+     *
+     * @param tag           follower sprite tag
+     * @param targetTag     target sprite tag
+     * @param speedPxPerSec chase speed in pixels/sec
+     * @param stopRadius    halt distance radius
+     * @param resumeRadius  resume pursuit distance radius
+     * @param sourceFile    source script path
+     * @param lineNumber    1-based line number
+     */
+    public record FollowStatement(
+            String tag,
+            String targetTag,
+            double speedPxPerSec,
+            double stopRadius,
+            double resumeRadius,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Delayed timer jump/call statement ({@code after <sec> jump|call <label>}).
+     *
+     * @param delaySeconds timer delay in seconds
+     * @param action       {@code "jump"} or {@code "call"}
+     * @param targetLabel  target label name
+     * @param sourceFile   source script path
+     * @param lineNumber   1-based line number
+     */
+    public record AfterTimerStatement(
+            double delaySeconds,
+            String action,
+            String targetLabel,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Clamps camera follow offset within a rectangular region ({@code camera clamp x1 y1 x2 y2}).
+     *
+     * @param minX       minimum X offset
+     * @param minY       minimum Y offset
+     * @param maxX       maximum X offset
+     * @param maxY       maximum Y offset
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record CameraClampStatement(
+            double minX,
+            double minY,
+            double maxX,
+            double maxY,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Proximity interact trigger ({@code on_interact <tag> <dist> jump|call <label>}).
+     *
+     * @param targetTag     target sprite tag
+     * @param maxDistancePx interaction distance radius in pixels
+     * @param action        {@code "jump"} or {@code "call"}
+     * @param targetLabel   target label name
+     * @param sourceFile    source script path
+     * @param lineNumber    1-based line number
+     */
+    public record OnInteractStatement(
+            String targetTag,
+            double maxDistancePx,
+            String action,
+            String targetLabel,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Fixed-count loop block ({@code repeat <countExpr>:}).
+     *
+     * @param countExpr  integer count expression
+     * @param body       loop body statements
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record RepeatStatement(
+            String countExpr,
+            List<Statement> body,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+        /** Copies loop body defensively. */
+        public RepeatStatement {
+            body = body != null ? List.copyOf(body) : List.of();
+        }
+    }
+
+    /**
+     * Conditional loop block guarded against infinite loops ({@code while <condExpr>:}).
+     *
+     * @param conditionExpr boolean loop condition
+     * @param body          loop body statements
+     * @param sourceFile    source script path
+     * @param lineNumber    1-based line number
+     */
+    public record WhileStatement(
+            String conditionExpr,
+            List<Statement> body,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+        /** Copies loop body defensively. */
+        public WhileStatement {
+            body = body != null ? List.copyOf(body) : List.of();
+        }
+    }
+
+    /**
+     * Maps {@code idle}/{@code walk}/{@code jump} attribute states onto a stage sprite.
+     *
+     * @param tag        sprite tag
+     * @param idleAttr   attribute for idle state
+     * @param walkAttr   attribute for walking state
+     * @param jumpAttr   attribute for airborne state
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record AnimStateStatement(
+            String tag,
+            String idleAttr,
+            String walkAttr,
+            String jumpAttr,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Solid blocking wall or compound multi-box collider ({@code collider wall/compound ...}).
+     *
+     * @param id         collider ID
+     * @param boxes      blocking collider boxes
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record ColliderWallStatement(
+            String id,
+            List<ColliderBox> boxes,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+        /** Copies collider boxes defensively. */
+        public ColliderWallStatement {
+            boxes = boxes != null ? List.copyOf(boxes) : List.of();
+        }
+    }
+
+    /**
+     * Layer-local damped screen shake ({@code shake <layer> amp <px> dur <s>}).
+     *
+     * @param layerName       target {@code SceneLayer} name
+     * @param amplitudePx     shake amplitude in pixels
+     * @param durationSeconds shake duration in seconds
+     * @param sourceFile      source script path
+     * @param lineNumber      1-based line number
+     */
+    public record ShakeLayerStatement(
+            String layerName,
+            double amplitudePx,
+            double durationSeconds,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Knockback impulse with temporary invulnerability ({@code knockback <tag> vx <x> vy <y>}).
+     *
+     * @param tag            sprite tag
+     * @param vx             horizontal impulse velocity
+     * @param vy             vertical impulse velocity
+     * @param invulnSeconds  invulnerability window in seconds
+     * @param sourceFile     source script path
+     * @param lineNumber     1-based line number
+     */
+    public record KnockbackStatement(
+            String tag,
+            double vx,
+            double vy,
+            double invulnSeconds,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Ladder/climbable gravity-free zone ({@code climb_zone <id> rect <x> <y> <w> <h>}).
+     *
+     * @param id         zone identifier
+     * @param x          left X
+     * @param y          top Y
+     * @param width      width
+     * @param height     height
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record ClimbZoneStatement(
+            String id,
+            double x,
+            double y,
+            double width,
+            double height,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Moving solid/one-way platform carrying standing sprites ({@code moving_platform ...}).
+     *
+     * @param tag           platform sprite tag
+     * @param x1            start X
+     * @param y1            start Y
+     * @param x2            end X
+     * @param y2            end Y
+     * @param speedPxPerSec speed in pixels/sec
+     * @param oneWay        whether platform allows upward passage from below
+     * @param sourceFile    source script path
+     * @param lineNumber    1-based line number
+     */
+    public record MovingPlatformStatement(
+            String tag,
+            double x1,
+            double y1,
+            double x2,
+            double y2,
+            double speedPxPerSec,
+            boolean oneWay,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Magnetic pickup pull toward a target sprite ({@code attract <tag> target <player> radius <r>}).
+     *
+     * @param tag           pickup sprite tag
+     * @param targetTag     magnet target tag
+     * @param radiusPx      activation radius
+     * @param speedPxPerSec pull speed
+     * @param sourceFile    source script path
+     * @param lineNumber    1-based line number
+     */
+    public record AttractStatement(
+            String tag,
+            String targetTag,
+            double radiusPx,
+            double speedPxPerSec,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Dynamically spawns a sprite on stage ({@code spawn <tag> <asset> [at <x> <y>]}).
+     *
+     * @param tag         new sprite tag
+     * @param assetOrTag  registered image tag or asset path
+     * @param x           optional initial X (nullable)
+     * @param y           optional initial Y (nullable)
+     * @param sourceFile  source script path
+     * @param lineNumber  1-based line number
+     */
+    public record SpawnStatement(
+            String tag,
+            String assetOrTag,
+            Double x,
+            Double y,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Removes a spawned sprite and purges all motion bindings ({@code despawn <tag>}).
+     *
+     * @param tag        sprite tag
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record DespawnStatement(String tag, String sourceFile, int lineNumber) implements Statement {
+    }
+
+    /**
+     * Triggers a jump or call once a sprite's active tween completes ({@code on_tween_end <tag> jump <label>}).
+     *
+     * @param tag         sprite tag
+     * @param action      {@code "jump"} or {@code "call"}
+     * @param targetLabel destination label name
+     * @param sourceFile  source script path
+     * @param lineNumber  1-based line number
+     */
+    public record OnTweenEndStatement(
+            String tag,
+            String action,
+            String targetLabel,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Subscribes to an {@code EngineEventBus} event name ({@code on_event "<name>" call|jump <label>}).
+     *
+     * @param eventName   event identifier
+     * @param action      {@code "call"} or {@code "jump"}
+     * @param targetLabel handler label name
+     * @param sourceFile  source script path
+     * @param lineNumber  1-based line number
+     */
+    public record OnEventStatement(
+            String eventName,
+            String action,
+            String targetLabel,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Launches an asynchronous background cutscene coroutine ({@code spawn_cutscene <label>}).
+     *
+     * @param targetLabel cutscene label name
+     * @param sourceFile  source script path
+     * @param lineNumber  1-based line number
+     */
+    public record SpawnCutsceneStatement(
+            String targetLabel,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Weighted random branch selector ({@code random:}).
+     *
+     * @param branches   weighted candidate branches
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record RandomStatement(
+            List<RandomBranch> branches,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+        /** Copies branches defensively. */
+        public RandomStatement {
+            branches = branches != null ? List.copyOf(branches) : List.of();
+        }
+    }
+
+    /**
+     * Atomic multi-variable assignment group ({@code set:}).
+     *
+     * @param assignments ordered variable assignments executed atomically
+     * @param sourceFile  source script path
+     * @param lineNumber  1-based line number
+     */
+    public record SetBlockStatement(
+            List<SetVarStatement> assignments,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+        /** Copies assignments defensively. */
+        public SetBlockStatement {
+            assignments = assignments != null ? List.copyOf(assignments) : List.of();
+        }
+    }
+
+    /**
+     * Frame-scoped local variable assignment ({@code local $tmp = <expr>}).
+     *
+     * @param varName    variable name
+     * @param expression initializer expression
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record LocalVarStatement(
+            String varName,
+            String expression,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Adjusts motion/physics time dilation scale ({@code time_scale <factor>}).
+     *
+     * @param factor     time multiplier ({@code >= 0})
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record TimeScaleStatement(
+            double factor,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Attaches a child sprite to track parent position and rotation ({@code attach <child> to <parent>}).
+     *
+     * @param childTag   child sprite tag
+     * @param parentTag  parent sprite tag
+     * @param offsetX    local X offset
+     * @param offsetY    local Y offset
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record AttachStatement(
+            String childTag,
+            String parentTag,
+            double offsetX,
+            double offsetY,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Enables or disables Y-position depth sorting on the master sprite layer ({@code ysort true|false}).
+     *
+     * @param enabled    whether Y-sorting is enabled
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record YSortStatement(
+            boolean enabled,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Enables point-and-click stage movement for a sprite ({@code point_click_init <tag> ...}).
+     *
+     * @param tag           target sprite tag
+     * @param speedPxPerSec walk speed in pixels/sec
+     * @param minX          optional left bound (nullable)
+     * @param minY          optional top bound (nullable)
+     * @param maxX          optional right bound (nullable)
+     * @param maxY          optional bottom bound (nullable)
+     * @param sourceFile    source script path
+     * @param lineNumber    1-based line number
+     */
+    public record PointClickInitStatement(
+            String tag,
+            double speedPxPerSec,
+            Double minX,
+            Double minY,
+            Double maxX,
+            Double maxY,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Defines a floor surface friction multiplier zone ({@code surface_friction <id> rect x y w h factor <f>}).
+     *
+     * @param id             zone identifier
+     * @param x              left X
+     * @param y              top Y
+     * @param width          zone width
+     * @param height         zone height
+     * @param frictionFactor multiplier for acceleration and release friction
+     * @param sourceFile     source script path
+     * @param lineNumber     1-based line number
+     */
+    public record SurfaceFrictionStatement(
+            String id,
+            double x,
+            double y,
+            double width,
+            double height,
+            double frictionFactor,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Applies an instantaneous physics/velocity impulse ({@code impulse <tag> vx <x> vy <y>}).
+     *
+     * @param tag        sprite tag
+     * @param vx         horizontal impulse velocity
+     * @param vy         vertical impulse velocity
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record ImpulseStatement(
+            String tag,
+            double vx,
+            double vy,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
      * Single parsed {@code .vjava} source unit prior to global project merging.
      *
      * @param filePath           source file path
@@ -1184,6 +1839,8 @@ public final class VJavaAst {
      * @param translations       translation blocks
      * @param topLevelJavaBlocks top-level embedded Java blocks
      * @param defaultVariables   default variable declarations
+     * @param configValues       declarative {@code config:} key-value entries
+     * @param includes           declared {@code include} script paths
      */
     public record ScriptFileAst(
             Path filePath,
@@ -1195,9 +1852,41 @@ public final class VJavaAst {
             List<ScreenDef> screens,
             List<TranslateBlock> translations,
             List<JavaBlockNode> topLevelJavaBlocks,
-            List<SetVarStatement> defaultVariables
+            List<SetVarStatement> defaultVariables,
+            Map<String, String> configValues,
+            List<String> includes
     ) {
-        /** Copies all AST collection lists defensively. */
+        /**
+         * Backwards-compatible 10-argument constructor without {@code config:} or {@code include} metadata.
+         *
+         * @param filePath           source file path
+         * @param characters         character definitions
+         * @param images             standalone image definitions
+         * @param layeredImages      layered image definitions
+         * @param transforms         ATL transform definitions
+         * @param labels             label definitions
+         * @param screens            UI screen definitions
+         * @param translations       translation blocks
+         * @param topLevelJavaBlocks top-level embedded Java blocks
+         * @param defaultVariables   default variable declarations
+         */
+        public ScriptFileAst(
+                Path filePath,
+                List<CharacterDef> characters,
+                List<ImageDef> images,
+                List<LayeredImageDef> layeredImages,
+                List<TransformDef> transforms,
+                List<LabelNode> labels,
+                List<ScreenDef> screens,
+                List<TranslateBlock> translations,
+                List<JavaBlockNode> topLevelJavaBlocks,
+                List<SetVarStatement> defaultVariables
+        ) {
+            this(filePath, characters, images, layeredImages, transforms, labels, screens,
+                    translations, topLevelJavaBlocks, defaultVariables, Map.of(), List.of());
+        }
+
+        /** Copies all AST collection lists and maps defensively. */
         public ScriptFileAst {
             characters = List.copyOf(characters);
             images = List.copyOf(images);
@@ -1208,6 +1897,9 @@ public final class VJavaAst {
             translations = List.copyOf(translations);
             topLevelJavaBlocks = List.copyOf(topLevelJavaBlocks);
             defaultVariables = List.copyOf(defaultVariables);
+            configValues = configValues != null ? Collections.unmodifiableMap(new LinkedHashMap<>(configValues))
+                    : Map.of();
+            includes = includes != null ? List.copyOf(includes) : List.of();
         }
     }
 
@@ -1229,6 +1921,8 @@ public final class VJavaAst {
      * @param defaultVariables   all default variable declarations
      * @param discoveredAssets   project-relative paths of discovered asset files
      * @param warnings           non-fatal scanner warnings
+     * @param configValues       merged declarative {@code config:} entries
+     * @param includes           ordered resolved include paths
      */
     public record ProjectAst(
             Path projectRoot,
@@ -1244,8 +1938,49 @@ public final class VJavaAst {
             List<JavaBlockNode> topLevelJavaBlocks,
             List<SetVarStatement> defaultVariables,
             List<String> discoveredAssets,
-            List<String> warnings
+            List<String> warnings,
+            Map<String, String> configValues,
+            List<String> includes
     ) {
+        /**
+         * Backwards-compatible 14-argument constructor without {@code config:} or {@code include} metadata.
+         *
+         * @param projectRoot        normalized project root directory
+         * @param descriptor         loaded project descriptor
+         * @param scriptFiles        scanned script file paths
+         * @param characters         merged character definitions keyed by ID
+         * @param images             merged image definitions keyed by full key
+         * @param layeredImages      merged layered image definitions keyed by name
+         * @param transforms         merged transform definitions keyed by name
+         * @param labels             merged label definitions keyed by name
+         * @param screens            merged screen definitions keyed by name
+         * @param translations       all translation blocks
+         * @param topLevelJavaBlocks all top-level embedded Java blocks
+         * @param defaultVariables   all default variable declarations
+         * @param discoveredAssets   project-relative paths of discovered asset files
+         * @param warnings           non-fatal scanner warnings
+         */
+        public ProjectAst(
+                Path projectRoot,
+                ProjectDescriptor descriptor,
+                List<Path> scriptFiles,
+                Map<String, CharacterDef> characters,
+                Map<String, ImageDef> images,
+                Map<String, LayeredImageDef> layeredImages,
+                Map<String, TransformDef> transforms,
+                Map<String, LabelNode> labels,
+                Map<String, ScreenDef> screens,
+                List<TranslateBlock> translations,
+                List<JavaBlockNode> topLevelJavaBlocks,
+                List<SetVarStatement> defaultVariables,
+                List<String> discoveredAssets,
+                List<String> warnings
+        ) {
+            this(projectRoot, descriptor, scriptFiles, characters, images, layeredImages, transforms,
+                    labels, screens, translations, topLevelJavaBlocks, defaultVariables,
+                    discoveredAssets, warnings, Map.of(), List.of());
+        }
+
         /** Defensively copies all AST collections and maps. */
         public ProjectAst {
             scriptFiles = List.copyOf(scriptFiles);
@@ -1260,6 +1995,9 @@ public final class VJavaAst {
             defaultVariables = List.copyOf(defaultVariables);
             discoveredAssets = List.copyOf(discoveredAssets);
             warnings = List.copyOf(warnings);
+            configValues = configValues != null ? Collections.unmodifiableMap(new LinkedHashMap<>(configValues))
+                    : Map.of();
+            includes = includes != null ? List.copyOf(includes) : List.of();
         }
     }
 }

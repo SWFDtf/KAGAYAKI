@@ -1,5 +1,8 @@
 package de.swfdtf.graphics;
 
+import de.swfdtf.math.ScreenShake;
+import de.swfdtf.math.Vec2f;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -11,6 +14,7 @@ import java.util.Objects;
  * Named, Z-ordered layer within a {@link SceneGraph}.
  *
  * <p>Holds an ordered list of {@link SceneNode}s, controls layer visibility and parallax weighting,
+ * supports optional Y-position depth sorting ({@code ysort}) and per-layer {@link ScreenShake},
  * and exposes blueprint-standard Z-order constants ranging from {@link #Z_BACKGROUND} ({@code -100})
  * to {@link #Z_INSPECTOR} ({@code 1000}).</p>
  */
@@ -43,10 +47,16 @@ public final class SceneLayer {
     private static final Comparator<SceneNode> NODE_Z_COMPARATOR =
             Comparator.comparingInt(SceneNode::getZOrder);
 
+    private static final Comparator<SceneNode> NODE_YSORT_COMPARATOR =
+            Comparator.comparingInt(SceneNode::getZOrder)
+                    .thenComparingDouble(n -> n.getTransform().getYpos());
+
     private final String name;
     private int zOrder;
     private boolean visible = true;
+    private boolean ysortEnabled = false;
     private float parallaxFactor = 0.0f;
+    private ScreenShake layerShake;
     private final List<SceneNode> nodes = new ArrayList<>();
 
     /**
@@ -263,7 +273,7 @@ public final class SceneLayer {
 
     /**
      * Returns an unmodifiable snapshot of top-level nodes stably sorted by {@link SceneNode#getZOrder()}
-     * in ascending order.
+     * (and by {@code ypos} when {@link #isYSortEnabled()} is active) in ascending order.
      *
      * @return sorted node list
      */
@@ -272,7 +282,69 @@ public final class SceneLayer {
             return List.of();
         }
         List<SceneNode> sorted = new ArrayList<>(nodes);
-        sorted.sort(NODE_Z_COMPARATOR);
+        sorted.sort(ysortEnabled ? NODE_YSORT_COMPARATOR : NODE_Z_COMPARATOR);
         return Collections.unmodifiableList(sorted);
+    }
+
+    /**
+     * Returns whether Y-position depth sorting is enabled on this layer.
+     *
+     * @return {@code true} if Y-sort is active
+     */
+    public boolean isYSortEnabled() {
+        return ysortEnabled;
+    }
+
+    /**
+     * Enables or disables Y-position depth sorting so sprites lower on screen render in front.
+     *
+     * @param ysortEnabled {@code true} to sort by ascending Y within the same Z-order
+     * @return {@code this} for fluent chaining
+     */
+    public SceneLayer setYSortEnabled(boolean ysortEnabled) {
+        this.ysortEnabled = ysortEnabled;
+        return this;
+    }
+
+    /**
+     * Starts or replaces a layer-local damped screen shake without mutating node transforms.
+     *
+     * @param amplitudePx     maximum shake amplitude in logical pixels
+     * @param durationSeconds total shake duration in seconds
+     */
+    public void triggerShake(float amplitudePx, float durationSeconds) {
+        if (!Float.isFinite(amplitudePx) || !Float.isFinite(durationSeconds) || durationSeconds <= 0.0f) {
+            this.layerShake = null;
+            return;
+        }
+        float amp = Math.max(0.0f, amplitudePx);
+        this.layerShake = ScreenShake.custom(
+                amp, amp * 0.7f, ScreenShake.DEFAULT_DECAY, ScreenShake.DEFAULT_OMEGA, durationSeconds);
+    }
+
+    /**
+     * Advances any active layer-local shake by {@code dt} seconds and clears it on expiry.
+     *
+     * @param dt elapsed delta seconds ({@code >= 0})
+     */
+    public void updateShake(float dt) {
+        if (layerShake != null && dt >= 0.0f && Float.isFinite(dt)) {
+            layerShake.update(dt);
+            if (layerShake.isFinished()) {
+                layerShake = null;
+            }
+        }
+    }
+
+    /**
+     * Returns the current render-time shake offset for this layer, or {@link Vec2f#ZERO} when inactive.
+     *
+     * @return render shake offset
+     */
+    public Vec2f getShakeOffset() {
+        if (layerShake == null || layerShake.isFinished()) {
+            return Vec2f.ZERO;
+        }
+        return layerShake.getOffset();
     }
 }

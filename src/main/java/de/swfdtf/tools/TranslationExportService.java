@@ -249,6 +249,14 @@ public final class TranslationExportService {
                 }
             } else if (stmt instanceof VJavaAst.ParallelStatement parallelStmt) {
                 collectFromStatements(parallelStmt.statements(), rows, seq);
+            } else if (stmt instanceof VJavaAst.RepeatStatement repStmt) {
+                collectFromStatements(repStmt.body(), rows, seq);
+            } else if (stmt instanceof VJavaAst.WhileStatement whileStmt) {
+                collectFromStatements(whileStmt.body(), rows, seq);
+            } else if (stmt instanceof VJavaAst.RandomStatement rndStmt) {
+                for (VJavaAst.RandomBranch rb : rndStmt.branches()) {
+                    collectFromStatements(rb.body(), rows, seq);
+                }
             }
         }
     }

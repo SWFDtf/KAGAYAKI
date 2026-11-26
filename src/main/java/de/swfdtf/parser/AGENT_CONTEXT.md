@@ -54,6 +54,12 @@ Vollständige `.vjava`-Skript-Pipeline von KAGAYAKI (Meilenstein M3 + M4): einr�
 | `VJavaLocalizationBridge` | `final class` | Brücke zwischen `VJavaAst.ProjectAst` und dem AST-freien `LocalizationManager` (`indexProject`, `toTranslationBlocks`, `extractTranslationTemplate`). |
 | `HotReloadWatcher` | `final class` | Nicht-blockierender Polling-Dateiwächter für `**/*.vjava` und `project.vjava.json` (`ReloadDelta` mit `added`/`modified`/`deleted`). |
 | `ScriptDebugger` | `final class` | Interaktiver AST-Statement-Debugger (`Breakpoint`, `DebugMode`, `stepInto`, `stepOver`, `continueExecution`, Call-Stack-Zusammenfassung). |
+| `ScriptExecutionException` | `class` | Laufzeitausnahme bei Verstößen gegen Skript-Schutzgrenzen (z. B. `while`-Iterationslimit). |
+| `AstJsonSerializer` | `final class` | Strukturierter JSON-Export von `VJavaAst.ProjectAst` für externe Story-, LQA- und CI-Werkzeuge. |
+| `TextMateGrammarGenerator` | `final class` | Generator für offizielle TextMate-Syntaxgrammatik (`vjava.tmLanguage.json`) aller DSL-Schlüsselwörter. |
+| `VJavaReplEvaluator` | `final class` | Interaktiver Einzelzeilen-REPL-Evaluator für Live-`.vjava`-Befehle und `?`-Ausdrücke in `ScriptRuntime`. |
+| `ScriptCoverageTracker` | `final class` | Laufzeit-Coverage-Tracker für Statement- und Branch-Abdeckung je `.vjava`-Datei. |
+| `VJavaDslReferenceGenerator` | `final class` | Automatischer Markdown-Referenz-Generator inklusive Parse-Verifikation für jedes `VJavaAst.Statement`. |
 
 ## Öffentliche API-Signaturen
 

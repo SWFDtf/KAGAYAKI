@@ -12,7 +12,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -29,8 +31,11 @@ public final class ObjectMotionController {
 
     /** Supported easing curves for {@code move}, {@code move_path}, {@code rotate}, and {@code scale} tweens. */
     public static final Set<String> SUPPORTED_EASINGS = Set.of(
-            "linear", "ease_in", "ease_out", "ease_in_out"
+            "linear", "ease_in", "ease_out", "ease_in_out", "spring"
     );
+
+    /** Fixed deterministic physics substep duration (1/120 s) to prevent high-speed tunneling. */
+    public static final double FIXED_PHYSICS_STEP = 1.0 / 120.0;
 
     /** Coyote-time grace window after walking off a platform edge in seconds. */
     public static final float COYOTE_TIME_SECONDS = 0.10f;
@@ -41,25 +46,56 @@ public final class ObjectMotionController {
     private static final float LOGICAL_WIDTH = RenderPipeline2D.DEFAULT_LOGICAL_WIDTH;
     private static final float LOGICAL_HEIGHT = RenderPipeline2D.DEFAULT_LOGICAL_HEIGHT;
     private static final float FALLBACK_HITBOX_SIZE = 64.0f;
+    private static final int MAX_PHYSICS_SUBSTEPS = 64;
+    private static final float DEFAULT_DASH_MULTIPLIER = 2.5f;
+    private static final float DEFAULT_DASH_DURATION = 0.18f;
+    private static final float DEFAULT_DASH_COOLDOWN = 0.80f;
 
     /**
-     * Frame-level directional and jump input passed to {@link #update(double, MotionInput)}.
+     * Frame-level directional, analog, jump, dash, and interact input passed to
+     * {@link #update(double, MotionInput)}.
      *
-     * @param up          whether upward input (W / ArrowUp) is held
-     * @param down        whether downward input (S / ArrowDown) is held
-     * @param left        whether leftward input (A / ArrowLeft) is held
-     * @param right       whether rightward input (D / ArrowRight) is held
-     * @param jumpPressed whether jump (Space / W) transitioned down this frame
+     * @param up              whether upward input (W / ArrowUp) is held
+     * @param down            whether downward input (S / ArrowDown) is held
+     * @param left            whether leftward input (A / ArrowLeft) is held
+     * @param right           whether rightward input (D / ArrowRight) is held
+     * @param jumpPressed     whether jump (Space / W) transitioned down this frame
+     * @param analogX         normalized analog stick horizontal deflection in {@code [-1, 1]}
+     * @param analogY         normalized analog stick vertical deflection in {@code [-1, 1]}
+     * @param dashPressed     whether dash transitioned down this frame
+     * @param interactPressed whether interact (E / Enter) transitioned down this frame
      */
     public record MotionInput(
             boolean up,
             boolean down,
             boolean left,
             boolean right,
-            boolean jumpPressed
+            boolean jumpPressed,
+            float analogX,
+            float analogY,
+            boolean dashPressed,
+            boolean interactPressed
     ) {
         /** Neutral zero-input state used when no hardware input is sampled. */
-        public static final MotionInput NONE = new MotionInput(false, false, false, false, false);
+        public static final MotionInput NONE =
+                new MotionInput(false, false, false, false, false, 0.0f, 0.0f, false, false);
+
+        /**
+         * Backwards-compatible 5-argument digital-only constructor.
+         *
+         * @param up          whether upward input is held
+         * @param down        whether downward input is held
+         * @param left        whether leftward input is held
+         * @param right       whether rightward input is held
+         * @param jumpPressed whether jump transitioned down this frame
+         */
+        public MotionInput(boolean up, boolean down, boolean left, boolean right, boolean jumpPressed) {
+            this(up, down, left, right, jumpPressed, 0.0f, 0.0f, false, false);
+        }
+
+        private MotionInput heldOnly() {
+            return new MotionInput(up, down, left, right, false, analogX, analogY, false, false);
+        }
     }
 
     /**
@@ -366,6 +402,13 @@ public final class ObjectMotionController {
         private final boolean normalizeDiagonal;
         private final float friction;
         private final float acceleration;
+        private boolean autoFlip;
+        private String dashKey;
+        private float dashSpeedMultiplier = DEFAULT_DASH_MULTIPLIER;
+        private float dashDurationSeconds = DEFAULT_DASH_DURATION;
+        private float dashCooldownSeconds = DEFAULT_DASH_COOLDOWN;
+        private float dashTimer;
+        private float dashCooldownTimer;
         private float velX;
         private float velY;
 
@@ -389,6 +432,136 @@ public final class ObjectMotionController {
             this.friction = Float.isFinite(friction) && friction > 0.0f ? friction : 0.0f;
             this.acceleration = Float.isFinite(acceleration) && acceleration > 0.0f ? acceleration : 0.0f;
         }
+    }
+
+    private static final class PatrolState {
+        private final String tag;
+        private final float x1;
+        private final float y1;
+        private final float x2;
+        private final float y2;
+        private final float speedPxPerSec;
+        private final float distance;
+        private final boolean pingPong;
+        private float travelled = 0.0f;
+        private float direction = 1.0f;
+
+        private PatrolState(
+                String tag,
+                float x1,
+                float y1,
+                float x2,
+                float y2,
+                float speedPxPerSec,
+                boolean pingPong
+        ) {
+            this.tag = tag;
+            this.x1 = x1;
+            this.y1 = y1;
+            this.x2 = x2;
+            this.y2 = y2;
+            this.speedPxPerSec = Math.max(0.0f, speedPxPerSec);
+            this.distance = (float) Math.hypot(x2 - x1, y2 - y1);
+            this.pingPong = pingPong;
+        }
+    }
+
+    private static final class FollowState {
+        private final String tag;
+        private final String targetTag;
+        private final float speedPxPerSec;
+        private final float stopRadius;
+        private final float resumeRadius;
+        private boolean moving = true;
+
+        private FollowState(
+                String tag,
+                String targetTag,
+                float speedPxPerSec,
+                float stopRadius,
+                float resumeRadius
+        ) {
+            this.tag = tag;
+            this.targetTag = targetTag;
+            this.speedPxPerSec = Math.max(0.0f, speedPxPerSec);
+            this.stopRadius = Math.max(0.0f, stopRadius);
+            this.resumeRadius = Math.max(this.stopRadius, resumeRadius);
+        }
+    }
+
+    private static final class MovingPlatformState {
+        private final String tag;
+        private final float x1;
+        private final float y1;
+        private final float x2;
+        private final float y2;
+        private final float speedPxPerSec;
+        private final float distance;
+        private float travelled = 0.0f;
+        private float direction = 1.0f;
+
+        private MovingPlatformState(String tag, float x1, float y1, float x2, float y2, float speedPxPerSec) {
+            this.tag = tag;
+            this.x1 = x1;
+            this.y1 = y1;
+            this.x2 = x2;
+            this.y2 = y2;
+            this.speedPxPerSec = Math.max(0.0f, speedPxPerSec);
+            this.distance = (float) Math.hypot(x2 - x1, y2 - y1);
+        }
+    }
+
+    private record AttractState(String tag, String targetTag, float radiusPx, float speedPxPerSec) {
+    }
+
+    private record AttachState(String childTag, String parentTag, float offsetX, float offsetY) {
+    }
+
+    private static final class AnimStateConfig {
+        private final String idleAttr;
+        private final String walkAttr;
+        private final String jumpAttr;
+        private String currentState;
+
+        private AnimStateConfig(String idleAttr, String walkAttr, String jumpAttr) {
+            this.idleAttr = idleAttr;
+            this.walkAttr = walkAttr;
+            this.jumpAttr = jumpAttr;
+        }
+    }
+
+    private record FrictionZone(Rect2f rect, float factor) {
+    }
+
+    private static final class KnockbackState {
+        private float vx;
+        private float vy;
+        private float invulnTimer;
+        private final float frictionDecel;
+
+        private KnockbackState(float vx, float vy, float invulnTimer, float frictionDecel) {
+            this.vx = vx;
+            this.vy = vy;
+            this.invulnTimer = Math.max(0.0f, invulnTimer);
+            this.frictionDecel = Math.max(0.1f, frictionDecel);
+        }
+    }
+
+    private record PointClickConfig(
+            String tag,
+            float speedPxPerSec,
+            Float minX,
+            Float minY,
+            Float maxX,
+            Float maxY,
+            boolean hasBounds
+    ) {
+    }
+
+    private record InteractTrigger(String targetTag, float maxDistancePx, String targetLabel, boolean callAction) {
+    }
+
+    private record TweenEndTrigger(String tag, String targetLabel, boolean callAction) {
     }
 
     private static final class PhysicsBody {
@@ -477,14 +650,38 @@ public final class ObjectMotionController {
     private final Map<String, CollisionMask> collisionMasks = new LinkedHashMap<>();
     private final Map<String, HitboxSpec> customHitboxes = new LinkedHashMap<>();
 
+    private final Map<String, PatrolState> patrolStates = new LinkedHashMap<>();
+    private final Map<String, FollowState> followStates = new LinkedHashMap<>();
+    private final Map<String, MovingPlatformState> movingPlatforms = new LinkedHashMap<>();
+    private final Map<String, AttractState> attractStates = new LinkedHashMap<>();
+    private final Map<String, AttachState> attachStates = new LinkedHashMap<>();
+    private final Map<String, AnimStateConfig> animStates = new LinkedHashMap<>();
+    private final Map<String, List<Rect2f>> blockingColliders = new LinkedHashMap<>();
+    private final Map<String, FrictionZone> frictionZones = new LinkedHashMap<>();
+    private final Map<String, Rect2f> climbZones = new LinkedHashMap<>();
+    private final Map<String, KnockbackState> knockbacks = new LinkedHashMap<>();
+    private final Map<String, PointClickConfig> pointClickConfigs = new LinkedHashMap<>();
+    private final List<InteractTrigger> interactTriggers = new ArrayList<>();
+    private final List<TweenEndTrigger> tweenEndTriggers = new ArrayList<>();
+
+    private float timeScale = 1.0f;
+    private float logicalViewportWidth = LOGICAL_WIDTH;
+    private float logicalViewportHeight = LOGICAL_HEIGHT;
+
     private String cameraFollowTag;
     private float cameraSmoothFactor = 0.0f;
     private float cameraOffsetX = 0.0f;
     private float cameraOffsetY = 0.0f;
+    private boolean cameraClampActive = false;
+    private float cameraClampMinX = 0.0f;
+    private float cameraClampMinY = 0.0f;
+    private float cameraClampMaxX = 0.0f;
+    private float cameraClampMaxY = 0.0f;
 
     private Consumer<String> collisionJumpListener;
     private Consumer<String> subroutineCallListener;
     private Consumer<String> tweenCompleteListener;
+    private BiConsumer<String, String> animStateListener;
 
     /**
      * Creates an {@code ObjectMotionController} backed by {@code activeSprites}.
@@ -664,7 +861,7 @@ public final class ObjectMotionController {
     }
 
     /**
-     * Enables WASD / arrow-key movement for {@code tag} with optional acceleration and release friction.
+     * Enables WASD / arrow-key movement for {@code tag} with optional inertia, auto-flip, and dash.
      *
      * @param tag               semantic sprite tag
      * @param speedPxPerSec     maximum movement speed in logical pixels per second
@@ -687,14 +884,100 @@ public final class ObjectMotionController {
             float friction,
             float acceleration
     ) {
+        enableWasd(tag, speedPxPerSec, minX, minY, maxX, maxY, normalizeDiagonal,
+                friction, acceleration, false, null);
+    }
+
+    /**
+     * Enables WASD / arrow-key movement for {@code tag} with optional inertia, auto-flip, and dash key.
+     *
+     * @param tag               semantic sprite tag
+     * @param speedPxPerSec     maximum movement speed in logical pixels per second
+     * @param minX              optional left bound (nullable)
+     * @param minY              optional top bound (nullable)
+     * @param maxX              optional right bound (nullable)
+     * @param maxY              optional bottom bound (nullable)
+     * @param normalizeDiagonal whether diagonal movement is scaled by {@code 1 / sqrt(2)}
+     * @param friction          exponential decay rate on release ({@code 0} = instant stop)
+     * @param acceleration      exponential acceleration rate when held ({@code 0} = instant full speed)
+     * @param autoFlip          whether to mirror {@code xzoom} automatically along movement direction
+     * @param dashKey           optional dash key identifier (nullable)
+     */
+    public void enableWasd(
+            String tag,
+            float speedPxPerSec,
+            Float minX,
+            Float minY,
+            Float maxX,
+            Float maxY,
+            boolean normalizeDiagonal,
+            float friction,
+            float acceleration,
+            boolean autoFlip,
+            String dashKey
+    ) {
         Objects.requireNonNull(tag, "tag must not be null");
         WasdBinding binding = new WasdBinding(
                 speedPxPerSec, minX, minY, maxX, maxY, normalizeDiagonal, friction, acceleration);
+        binding.autoFlip = autoFlip;
+        binding.dashKey = (dashKey != null && !dashKey.isBlank()) ? dashKey.trim() : null;
         wasdBindings.put(tag, binding);
         SpriteNode sprite = activeSprites.get(tag);
         if (sprite != null) {
             normalizeToAbsoluteCoords(sprite);
         }
+    }
+
+    /**
+     * Configures horizontal sprite flip behavior for an existing WASD binding.
+     *
+     * @param tag      sprite tag
+     * @param autoFlip {@code true} to mirror {@code xzoom} when walking left
+     */
+    public void setWasdAutoFlip(String tag, boolean autoFlip) {
+        WasdBinding binding = wasdBindings.get(tag);
+        if (binding != null) {
+            binding.autoFlip = autoFlip;
+        }
+    }
+
+    /**
+     * Configures dash speed boost, burst duration, and cooldown for an existing WASD binding.
+     *
+     * @param tag                 sprite tag
+     * @param speedMultiplier     speed multiplier during active dash ({@code >= 1})
+     * @param durationSeconds     burst duration in seconds
+     * @param cooldownSeconds     cooldown duration before next dash
+     */
+    public void configureDash(String tag, float speedMultiplier, float durationSeconds, float cooldownSeconds) {
+        WasdBinding binding = wasdBindings.get(tag);
+        if (binding != null) {
+            binding.dashSpeedMultiplier = Math.max(1.0f, speedMultiplier);
+            binding.dashDurationSeconds = Math.max(0.01f, durationSeconds);
+            binding.dashCooldownSeconds = Math.max(0.0f, cooldownSeconds);
+        }
+    }
+
+    /**
+     * Returns whether {@code tag} is currently inside an active dash burst.
+     *
+     * @param tag sprite tag
+     * @return {@code true} while dashing
+     */
+    public boolean isDashing(String tag) {
+        WasdBinding binding = wasdBindings.get(tag);
+        return binding != null && binding.dashTimer > 0.0f;
+    }
+
+    /**
+     * Returns remaining dash cooldown time in seconds for {@code tag}.
+     *
+     * @param tag sprite tag
+     * @return remaining cooldown seconds ({@code 0} when ready)
+     */
+    public float getDashCooldownRemaining(String tag) {
+        WasdBinding binding = wasdBindings.get(tag);
+        return binding != null ? Math.max(0.0f, binding.dashCooldownTimer) : 0.0f;
     }
 
     /**
@@ -886,6 +1169,522 @@ public final class ObjectMotionController {
     }
 
     /**
+     * Clamps tracked camera viewport offsets within {@code [minX, maxX]} and {@code [minY, maxY]}.
+     *
+     * @param minX minimum camera X offset
+     * @param minY minimum camera Y offset
+     * @param maxX maximum camera X offset
+     * @param maxY maximum camera Y offset
+     */
+    public void setCameraClamp(float minX, float minY, float maxX, float maxY) {
+        this.cameraClampActive = true;
+        this.cameraClampMinX = Math.min(minX, maxX);
+        this.cameraClampMinY = Math.min(minY, maxY);
+        this.cameraClampMaxX = Math.max(minX, maxX);
+        this.cameraClampMaxY = Math.max(minY, maxY);
+        clampCameraOffsets();
+    }
+
+    /** Clears active camera viewport clamp bounds. */
+    public void clearCameraClamp() {
+        this.cameraClampActive = false;
+    }
+
+    /**
+     * Sets time dilation scale applied to tweens, WASD, physics, patrols, and timers ({@code 1.0f} = real-time).
+     *
+     * @param timeScale time multiplier ({@code >= 0.0f})
+     */
+    public void setTimeScale(float timeScale) {
+        this.timeScale = Float.isFinite(timeScale) && timeScale >= 0.0f ? timeScale : 1.0f;
+    }
+
+    /**
+     * Returns the current motion/physics time scale multiplier.
+     *
+     * @return current time scale multiplier
+     */
+    public float getTimeScale() {
+        return timeScale;
+    }
+
+    /**
+     * Sets logical viewport dimensions used by {@link #startRelativeViewportMove}.
+     *
+     * @param width  logical viewport width
+     * @param height logical viewport height
+     */
+    public void setLogicalViewport(float width, float height) {
+        if (Float.isFinite(width) && width > 0.0f) {
+            this.logicalViewportWidth = width;
+        }
+        if (Float.isFinite(height) && height > 0.0f) {
+            this.logicalViewportHeight = height;
+        }
+    }
+
+    /**
+     * Starts a move tween targeting normalized viewport coordinates {@code (relX, relY)} in {@code [0, 1]}.
+     *
+     * @param tag             sprite tag
+     * @param relX            normalized horizontal viewport fraction
+     * @param relY            normalized vertical viewport fraction
+     * @param durationSeconds duration in seconds
+     * @param easing          easing curve name
+     */
+    public void startRelativeViewportMove(
+            String tag,
+            float relX,
+            float relY,
+            double durationSeconds,
+            String easing
+    ) {
+        startMove(tag, relX * logicalViewportWidth, relY * logicalViewportHeight,
+                false, durationSeconds, easing);
+    }
+
+    /**
+     * Starts automated waypoint patrol between {@code (x1, y1)} and {@code (x2, y2)}.
+     *
+     * @param tag           sprite tag
+     * @param x1            start X
+     * @param y1            start Y
+     * @param x2            end X
+     * @param y2            end Y
+     * @param speedPxPerSec travel speed in pixels/sec
+     * @param pingPong      {@code true} to bounce back and forth, {@code false} to loop
+     */
+    public void startPatrol(
+            String tag,
+            float x1,
+            float y1,
+            float x2,
+            float y2,
+            float speedPxPerSec,
+            boolean pingPong
+    ) {
+        Objects.requireNonNull(tag, "tag must not be null");
+        PatrolState patrol = new PatrolState(tag, x1, y1, x2, y2, speedPxPerSec, pingPong);
+        patrolStates.put(tag, patrol);
+        SpriteNode sprite = activeSprites.get(tag);
+        if (sprite != null) {
+            applyAbsolutePos(sprite, x1, y1);
+        }
+    }
+
+    /**
+     * Stops active patrol behavior for {@code tag}.
+     *
+     * @param tag sprite tag
+     */
+    public void stopPatrol(String tag) {
+        if (tag != null) {
+            patrolStates.remove(tag);
+        }
+    }
+
+    /**
+     * Starts pursuit/follow AI moving {@code tag} toward {@code targetTag} with distance hysteresis.
+     *
+     * @param tag           follower sprite tag
+     * @param targetTag     target sprite tag
+     * @param speedPxPerSec movement speed in pixels/sec
+     * @param stopRadius    radius at which pursuit halts
+     * @param resumeRadius  radius at which pursuit resumes ({@code >= stopRadius})
+     */
+    public void startFollow(
+            String tag,
+            String targetTag,
+            float speedPxPerSec,
+            float stopRadius,
+            float resumeRadius
+    ) {
+        Objects.requireNonNull(tag, "tag must not be null");
+        Objects.requireNonNull(targetTag, "targetTag must not be null");
+        followStates.put(tag, new FollowState(tag, targetTag, speedPxPerSec, stopRadius, resumeRadius));
+    }
+
+    /**
+     * Stops follow AI for {@code tag}.
+     *
+     * @param tag sprite tag
+     */
+    public void stopFollow(String tag) {
+        if (tag != null) {
+            followStates.remove(tag);
+        }
+    }
+
+    /**
+     * Registers a proximity interaction trigger activated by {@code E}/{@code Enter} within {@code maxDistancePx}.
+     *
+     * @param targetTag     target sprite tag
+     * @param maxDistancePx maximum Euclidean distance from active player sprite
+     * @param targetLabel   label to jump or call when interacted
+     * @param callAction    {@code true} for {@code call}, {@code false} for {@code jump}
+     */
+    public void registerInteractTrigger(
+            String targetTag,
+            float maxDistancePx,
+            String targetLabel,
+            boolean callAction
+    ) {
+        Objects.requireNonNull(targetTag, "targetTag must not be null");
+        Objects.requireNonNull(targetLabel, "targetLabel must not be null");
+        interactTriggers.removeIf(t -> t.targetTag().equals(targetTag) && t.targetLabel().equals(targetLabel));
+        interactTriggers.add(new InteractTrigger(
+                targetTag, Math.max(0.0f, maxDistancePx), targetLabel, callAction));
+    }
+
+    /**
+     * Registers automatic {@code idle}/{@code walk}/{@code jump} sprite state mapping for {@code tag}.
+     *
+     * @param tag      sprite tag
+     * @param idleAttr attribute name while stationary
+     * @param walkAttr attribute name while moving horizontally
+     * @param jumpAttr attribute name while airborne
+     */
+    public void registerAnimState(String tag, String idleAttr, String walkAttr, String jumpAttr) {
+        Objects.requireNonNull(tag, "tag must not be null");
+        animStates.put(tag, new AnimStateConfig(
+                idleAttr != null ? idleAttr : "idle",
+                walkAttr != null ? walkAttr : "walk",
+                jumpAttr != null ? jumpAttr : "jump"));
+    }
+
+    /**
+     * Clears automatic animation state mapping for {@code tag}.
+     *
+     * @param tag sprite tag
+     */
+    public void clearAnimState(String tag) {
+        if (tag != null) {
+            animStates.remove(tag);
+        }
+    }
+
+    /**
+     * Returns the current resolved animation state attribute name for {@code tag}, if tracked.
+     *
+     * @param tag sprite tag
+     * @return optional current animation state name
+     */
+    public Optional<String> getCurrentAnimState(String tag) {
+        AnimStateConfig cfg = tag != null ? animStates.get(tag) : null;
+        return cfg != null ? Optional.ofNullable(cfg.currentState) : Optional.empty();
+    }
+
+    /**
+     * Sets a listener invoked whenever a tracked sprite's animation state changes.
+     *
+     * @param listener consumer receiving {@code (spriteTag, attrName)}
+     */
+    public void setAnimStateListener(BiConsumer<String, String> listener) {
+        this.animStateListener = listener;
+    }
+
+    /**
+     * Adds a solid rectangular wall collider that blocks WASD movement with axis sliding.
+     *
+     * @param id     collider identifier
+     * @param x      left X coordinate
+     * @param y      top Y coordinate
+     * @param width  collider width
+     * @param height collider height
+     */
+    public void addWallCollider(String id, float x, float y, float width, float height) {
+        addCompoundCollider(id, List.of(new Rect2f(x, y, Math.max(1.0f, width), Math.max(1.0f, height))));
+    }
+
+    /**
+     * Adds a multi-box compound collider blocking WASD movement across all component rectangles.
+     *
+     * @param id    collider identifier
+     * @param boxes non-empty list of collider rectangles
+     */
+    public void addCompoundCollider(String id, List<Rect2f> boxes) {
+        Objects.requireNonNull(id, "id must not be null");
+        Objects.requireNonNull(boxes, "boxes must not be null");
+        blockingColliders.put(id, List.copyOf(boxes));
+    }
+
+    /**
+     * Removes a wall or compound collider by {@code id}.
+     *
+     * @param id collider identifier
+     */
+    public void removeCollider(String id) {
+        if (id != null) {
+            blockingColliders.remove(id);
+        }
+    }
+
+    /**
+     * Applies a decaying knockback impulse and temporary invulnerability window to {@code tag}.
+     *
+     * @param tag                   sprite tag
+     * @param vx                    initial horizontal velocity
+     * @param vy                    initial vertical velocity
+     * @param invulnerabilitySec    invulnerability window duration in seconds
+     * @param frictionDecel         exponential decay rate
+     */
+    public void applyKnockback(
+            String tag,
+            float vx,
+            float vy,
+            float invulnerabilitySec,
+            float frictionDecel
+    ) {
+        Objects.requireNonNull(tag, "tag must not be null");
+        knockbacks.put(tag, new KnockbackState(vx, vy, invulnerabilitySec, frictionDecel));
+    }
+
+    /**
+     * Returns whether {@code tag} is currently inside a knockback invulnerability window.
+     *
+     * @param tag sprite tag
+     * @return {@code true} if invulnerable
+     */
+    public boolean isInvulnerable(String tag) {
+        KnockbackState state = tag != null ? knockbacks.get(tag) : null;
+        return state != null && state.invulnTimer > 0.0f;
+    }
+
+    /**
+     * Applies an instantaneous velocity impulse to {@code tag} (e.g. jump pad or catapult).
+     *
+     * @param tag sprite tag
+     * @param vx  horizontal velocity delta in pixels/sec
+     * @param vy  vertical velocity delta in pixels/sec (negative launches upward)
+     */
+    public void applyImpulse(String tag, float vx, float vy) {
+        Objects.requireNonNull(tag, "tag must not be null");
+        PhysicsBody body = physicsBodies.get(tag);
+        if (body != null && Float.isFinite(vy)) {
+            body.velocityY += vy;
+            if (vy < 0.0f) {
+                body.grounded = false;
+            }
+        }
+        WasdBinding wasd = wasdBindings.get(tag);
+        if (wasd != null && Float.isFinite(vx)) {
+            wasd.velX += vx;
+        } else if (Float.isFinite(vx) && vx != 0.0f) {
+            knockbacks.put(tag, new KnockbackState(vx, body == null ? vy : 0.0f, 0.0f, 6.0f));
+        }
+    }
+
+    /**
+     * Registers a rectangular climbing zone suspending gravity and enabling W/S vertical climb.
+     *
+     * @param id     climb zone identifier
+     * @param x      left X
+     * @param y      top Y
+     * @param width  width
+     * @param height height
+     */
+    public void addClimbZone(String id, float x, float y, float width, float height) {
+        Objects.requireNonNull(id, "id must not be null");
+        climbZones.put(id, new Rect2f(x, y, Math.max(1.0f, width), Math.max(1.0f, height)));
+    }
+
+    /**
+     * Registers a moving platform oscillating along {@code (x1, y1) <-> (x2, y2)} and carrying riders.
+     *
+     * @param tag           platform sprite tag
+     * @param x1            start X
+     * @param y1            start Y
+     * @param x2            end X
+     * @param y2            end Y
+     * @param speedPxPerSec speed in pixels/sec
+     * @param oneWay        whether platform allows upward passage from below
+     */
+    public void registerMovingPlatform(
+            String tag,
+            float x1,
+            float y1,
+            float x2,
+            float y2,
+            float speedPxPerSec,
+            boolean oneWay
+    ) {
+        Objects.requireNonNull(tag, "tag must not be null");
+        registerSolidPlatform(tag, oneWay);
+        movingPlatforms.put(tag, new MovingPlatformState(tag, x1, y1, x2, y2, speedPxPerSec));
+        SpriteNode sprite = activeSprites.get(tag);
+        if (sprite != null) {
+            applyAbsolutePos(sprite, x1, y1);
+        }
+    }
+
+    /**
+     * Registers magnetic pickup attraction pulling {@code tag} toward {@code targetTag} inside {@code radiusPx}.
+     *
+     * @param tag           pickup sprite tag
+     * @param targetTag     magnet target tag
+     * @param radiusPx      activation radius in pixels
+     * @param speedPxPerSec pull speed in pixels/sec
+     */
+    public void registerAttract(String tag, String targetTag, float radiusPx, float speedPxPerSec) {
+        Objects.requireNonNull(tag, "tag must not be null");
+        Objects.requireNonNull(targetTag, "targetTag must not be null");
+        attractStates.put(tag, new AttractState(
+                tag, targetTag, Math.max(0.0f, radiusPx), Math.max(1.0f, speedPxPerSec)));
+    }
+
+    /**
+     * Registers an automatic jump or subroutine call executed when {@code tag}'s tween finishes.
+     *
+     * @param tag         sprite tag
+     * @param targetLabel label to jump or call
+     * @param callAction  {@code true} for subroutine {@code call}, {@code false} for {@code jump}
+     */
+    public void registerTweenEndTrigger(String tag, String targetLabel, boolean callAction) {
+        Objects.requireNonNull(tag, "tag must not be null");
+        Objects.requireNonNull(targetLabel, "targetLabel must not be null");
+        tweenEndTriggers.add(new TweenEndTrigger(tag, targetLabel, callAction));
+    }
+
+    /**
+     * Attaches {@code childTag} to {@code parentTag} so its position and rotation follow automatically.
+     *
+     * @param childTag  child sprite tag
+     * @param parentTag parent sprite tag
+     * @param offsetX   local X offset relative to parent
+     * @param offsetY   local Y offset relative to parent
+     */
+    public void attachChild(String childTag, String parentTag, float offsetX, float offsetY) {
+        Objects.requireNonNull(childTag, "childTag must not be null");
+        Objects.requireNonNull(parentTag, "parentTag must not be null");
+        attachStates.put(childTag, new AttachState(childTag, parentTag, offsetX, offsetY));
+        updateAttachedChildren();
+    }
+
+    /**
+     * Detaches a previously attached child sprite.
+     *
+     * @param childTag child sprite tag
+     */
+    public void detachChild(String childTag) {
+        if (childTag != null) {
+            attachStates.remove(childTag);
+        }
+    }
+
+    /**
+     * Enables point-and-click stage movement for {@code tag}.
+     *
+     * @param tag           sprite tag
+     * @param speedPxPerSec walking speed in pixels/sec
+     * @param minX          optional left bound
+     * @param minY          optional top bound
+     * @param maxX          optional right bound
+     * @param maxY          optional bottom bound
+     */
+    public void enablePointClick(
+            String tag,
+            float speedPxPerSec,
+            Float minX,
+            Float minY,
+            Float maxX,
+            Float maxY
+    ) {
+        Objects.requireNonNull(tag, "tag must not be null");
+        boolean hasBounds = minX != null && minY != null && maxX != null && maxY != null;
+        pointClickConfigs.put(tag, new PointClickConfig(
+                tag, Math.max(1.0f, speedPxPerSec), minX, minY, maxX, maxY, hasBounds));
+    }
+
+    /**
+     * Handles a stage click at {@code (stageX, stageY)} by starting {@link MoveTween}s for all
+     * enabled {@code point_click_init} bindings.
+     *
+     * @param stageX target logical X coordinate
+     * @param stageY target logical Y coordinate
+     * @return {@code true} if at least one sprite started moving
+     */
+    public boolean handleStageClick(float stageX, float stageY) {
+        if (pointClickConfigs.isEmpty()) {
+            return false;
+        }
+        boolean started = false;
+        for (PointClickConfig cfg : pointClickConfigs.values()) {
+            SpriteNode sprite = activeSprites.get(cfg.tag());
+            if (sprite == null) {
+                continue;
+            }
+            normalizeToAbsoluteCoords(sprite);
+            float tx = stageX;
+            float ty = stageY;
+            if (cfg.hasBounds()) {
+                tx = Math.clamp(tx, cfg.minX(), cfg.maxX());
+                ty = Math.clamp(ty, cfg.minY(), cfg.maxY());
+            }
+            float dx = tx - sprite.getTransform().getXpos();
+            float dy = ty - sprite.getTransform().getYpos();
+            double dist = Math.hypot(dx, dy);
+            double dur = dist / cfg.speedPxPerSec();
+            startMove(cfg.tag(), tx, ty, false, dur, "linear");
+            started = true;
+        }
+        return started;
+    }
+
+    /**
+     * Registers a surface friction zone multiplying WASD acceleration and friction inside the rectangle.
+     *
+     * @param id             zone ID
+     * @param x              left X
+     * @param y              top Y
+     * @param width          width
+     * @param height         height
+     * @param frictionFactor multiplier ({@code < 1.0} = slippery ice, {@code > 1.0} = sticky mud)
+     */
+    public void addSurfaceFrictionZone(String id, float x, float y, float width, float height, float frictionFactor) {
+        Objects.requireNonNull(id, "id must not be null");
+        float factor = Float.isFinite(frictionFactor) && frictionFactor > 0.0f ? frictionFactor : 1.0f;
+        frictionZones.put(id, new FrictionZone(
+                new Rect2f(x, y, Math.max(1.0f, width), Math.max(1.0f, height)), factor));
+    }
+
+    /**
+     * Removes all motion, physics, AI, trigger, and attachment bindings referencing {@code tag}.
+     *
+     * @param tag sprite tag to purge
+     */
+    public void removeAllBindingsForTag(String tag) {
+        if (tag == null || tag.isBlank()) {
+            return;
+        }
+        activeTweens.remove(tag);
+        activeRotateTweens.remove(tag);
+        activeScaleTweens.remove(tag);
+        wasdBindings.remove(tag);
+        physicsBodies.remove(tag);
+        patrolStates.remove(tag);
+        followStates.remove(tag);
+        movingPlatforms.remove(tag);
+        attractStates.remove(tag);
+        attachStates.remove(tag);
+        attachStates.values().removeIf(a -> a.parentTag().equals(tag));
+        followStates.values().removeIf(f -> f.targetTag.equals(tag));
+        attractStates.values().removeIf(a -> a.targetTag().equals(tag));
+        animStates.remove(tag);
+        knockbacks.remove(tag);
+        pointClickConfigs.remove(tag);
+        solidPlatforms.remove(tag);
+        collisionMasks.remove(tag);
+        customHitboxes.remove(tag);
+        collisionTriggers.removeIf(t -> t.tagA.equals(tag) || t.tagB.equals(tag));
+        overlapTriggers.removeIf(t -> t.tagA.equals(tag) || t.tagB.equals(tag));
+        interactTriggers.removeIf(t -> t.targetTag().equals(tag));
+        tweenEndTriggers.removeIf(t -> t.tag().equals(tag));
+        if (tag.equals(cameraFollowTag)) {
+            disableCameraFollow();
+        }
+    }
+
+    /**
      * Sets the listener notified with the destination label name whenever an {@code on_collide}
      * or jump {@code trigger_zone} fires.
      *
@@ -926,6 +1725,21 @@ public final class ObjectMotionController {
         triggerZones.clear();
         collisionMasks.clear();
         customHitboxes.clear();
+        patrolStates.clear();
+        followStates.clear();
+        movingPlatforms.clear();
+        attractStates.clear();
+        attachStates.clear();
+        animStates.clear();
+        blockingColliders.clear();
+        frictionZones.clear();
+        climbZones.clear();
+        knockbacks.clear();
+        pointClickConfigs.clear();
+        interactTriggers.clear();
+        tweenEndTriggers.clear();
+        timeScale = 1.0f;
+        clearCameraClamp();
         disableCameraFollow();
     }
 
@@ -1056,8 +1870,8 @@ public final class ObjectMotionController {
     }
 
     /**
-     * Advances tweens, WASD input movement, 2D physics, camera follow, and collision/zone triggers
-     * by {@code dt} seconds.
+     * Advances tweens, WASD input movement, 2D physics (with fixed-timestep substepping),
+     * AI behaviors, camera follow/clamp, and collision/zone triggers by {@code dt} seconds.
      *
      * @param dt    frame delta in seconds
      * @param input frame motion input (defaults to {@link MotionInput#NONE} if null)
@@ -1067,12 +1881,38 @@ public final class ObjectMotionController {
         if (dt <= 0.0 || !Double.isFinite(dt)) {
             return List.of();
         }
+        double scaledDt = dt * timeScale;
+        if (scaledDt <= 0.0 || !Double.isFinite(scaledDt)) {
+            return List.of();
+        }
         MotionInput safeInput = input != null ? input : MotionInput.NONE;
-        updateTweens(dt);
-        updateWasd(dt, safeInput);
-        updatePhysics(dt, safeInput);
-        updateCameraFollow(dt);
-        return checkCollisions();
+        int steps = Math.max(1, Math.min(MAX_PHYSICS_SUBSTEPS, (int) Math.ceil(scaledDt / FIXED_PHYSICS_STEP)));
+        double subDt = scaledDt / steps;
+        List<String> allJumps = null;
+        for (int i = 0; i < steps; i++) {
+            MotionInput stepInput = i == 0 ? safeInput : safeInput.heldOnly();
+            updateTweens(subDt);
+            updateMovingPlatforms(subDt);
+            updatePatrols(subDt);
+            updateFollows(subDt);
+            updateAttracts(subDt);
+            updateWasd(subDt, stepInput);
+            updateKnockbacks(subDt);
+            updatePhysics(subDt, stepInput);
+            updateAttachedChildren();
+            updateAnimStates();
+            updateCameraFollow(subDt);
+            checkInteractTriggers(stepInput);
+            List<String> jumps = checkCollisions();
+            if (!jumps.isEmpty()) {
+                if (allJumps == null) {
+                    allJumps = new ArrayList<>(jumps);
+                } else {
+                    allJumps.addAll(jumps);
+                }
+            }
+        }
+        return allJumps == null ? List.of() : Collections.unmodifiableList(allJumps);
     }
 
     private void updateTweens(double dt) {
@@ -1095,7 +1935,9 @@ public final class ObjectMotionController {
                 continue;
             }
             tween.elapsed += dt;
-            double rawT = Math.min(1.0, tween.elapsed / tween.durationSeconds);
+            double rawT = tween.elapsed >= tween.durationSeconds - 1e-9
+                    ? 1.0
+                    : Math.min(1.0, tween.elapsed / tween.durationSeconds);
             float t = (float) applyEasing(tween.easing, rawT);
             float nx;
             float ny;
@@ -1139,7 +1981,9 @@ public final class ObjectMotionController {
                 continue;
             }
             tween.elapsed += dt;
-            double rawT = Math.min(1.0, tween.elapsed / tween.durationSeconds);
+            double rawT = tween.elapsed >= tween.durationSeconds - 1e-9
+                    ? 1.0
+                    : Math.min(1.0, tween.elapsed / tween.durationSeconds);
             float t = (float) applyEasing(tween.easing, rawT);
             float angle = tween.startDegrees + tween.shortestDeltaDegrees * t;
             if (Float.isFinite(angle)) {
@@ -1168,7 +2012,9 @@ public final class ObjectMotionController {
                 continue;
             }
             tween.elapsed += dt;
-            double rawT = Math.min(1.0, tween.elapsed / tween.durationSeconds);
+            double rawT = tween.elapsed >= tween.durationSeconds - 1e-9
+                    ? 1.0
+                    : Math.min(1.0, tween.elapsed / tween.durationSeconds);
             float t = (float) applyEasing(tween.easing, rawT);
             float zx = tween.startXZoom + (tween.targetXZoom - tween.startXZoom) * t;
             float zy = tween.startYZoom + (tween.targetYZoom - tween.startYZoom) * t;
@@ -1204,68 +2050,379 @@ public final class ObjectMotionController {
         if (tweenCompleteListener != null && !hasActiveTween(tag)) {
             tweenCompleteListener.accept(tag);
         }
+        if (!tweenEndTriggers.isEmpty() && !hasActiveTween(tag)) {
+            Iterator<TweenEndTrigger> it = tweenEndTriggers.iterator();
+            List<TweenEndTrigger> fired = null;
+            while (it.hasNext()) {
+                TweenEndTrigger trigger = it.next();
+                if (trigger.tag().equals(tag)) {
+                    it.remove();
+                    if (fired == null) {
+                        fired = new ArrayList<>(2);
+                    }
+                    fired.add(trigger);
+                }
+            }
+            if (fired != null) {
+                for (TweenEndTrigger trigger : fired) {
+                    if (trigger.callAction() && subroutineCallListener != null) {
+                        subroutineCallListener.accept(trigger.targetLabel());
+                    } else if (!trigger.callAction() && collisionJumpListener != null) {
+                        collisionJumpListener.accept(trigger.targetLabel());
+                    }
+                }
+            }
+        }
+    }
+
+    private void updateMovingPlatforms(double dt) {
+        if (movingPlatforms.isEmpty()) {
+            return;
+        }
+        float dtF = (float) dt;
+        for (MovingPlatformState mp : movingPlatforms.values()) {
+            SpriteNode platSprite = activeSprites.get(mp.tag);
+            if (platSprite == null || mp.distance <= 1e-4f || mp.speedPxPerSec <= 0.0f) {
+                continue;
+            }
+            normalizeToAbsoluteCoords(platSprite);
+            float prevX = platSprite.getTransform().getXpos();
+            float prevY = platSprite.getTransform().getYpos();
+            Rect2f oldPlatBounds = resolveSpriteBounds(platSprite);
+            float oldTop = oldPlatBounds.y();
+
+            mp.travelled += mp.direction * mp.speedPxPerSec * dtF;
+            if (mp.travelled >= mp.distance) {
+                mp.travelled = mp.distance - (mp.travelled - mp.distance);
+                mp.direction = -1.0f;
+            } else if (mp.travelled <= 0.0f) {
+                mp.travelled = -mp.travelled;
+                mp.direction = 1.0f;
+            }
+            float t = Math.clamp(mp.travelled / mp.distance, 0.0f, 1.0f);
+            float nextX = mp.x1 + (mp.x2 - mp.x1) * t;
+            float nextY = mp.y1 + (mp.y2 - mp.y1) * t;
+            platSprite.getTransform().setXpos(nextX).setYpos(nextY);
+            float platDx = nextX - prevX;
+            float platDy = nextY - prevY;
+            if (platDx == 0.0f && platDy == 0.0f) {
+                continue;
+            }
+
+            for (Map.Entry<String, PhysicsBody> entry : physicsBodies.entrySet()) {
+                String riderTag = entry.getKey();
+                if (riderTag.equals(mp.tag)) {
+                    continue;
+                }
+                SpriteNode rider = activeSprites.get(riderTag);
+                if (rider == null) {
+                    continue;
+                }
+                PhysicsBody body = entry.getValue();
+                if (!body.grounded || body.velocityY < 0.0f) {
+                    continue;
+                }
+                Rect2f rBounds = resolveSpriteBounds(rider);
+                boolean horiz = rBounds.x() < oldPlatBounds.x() + oldPlatBounds.width()
+                        && rBounds.x() + rBounds.width() > oldPlatBounds.x();
+                float riderFoot = rBounds.y() + rBounds.height();
+                if (horiz && Math.abs(riderFoot - oldTop) <= 3.0f) {
+                    Transform2D rtf = rider.getTransform();
+                    rtf.setXpos(rtf.getXpos() + platDx).setYpos(rtf.getYpos() + platDy);
+                }
+            }
+        }
+    }
+
+    private void updatePatrols(double dt) {
+        if (patrolStates.isEmpty()) {
+            return;
+        }
+        float dtF = (float) dt;
+        for (PatrolState patrol : patrolStates.values()) {
+            SpriteNode sprite = activeSprites.get(patrol.tag);
+            if (sprite == null || patrol.distance <= 1e-4f || patrol.speedPxPerSec <= 0.0f) {
+                continue;
+            }
+            normalizeToAbsoluteCoords(sprite);
+            patrol.travelled += patrol.direction * patrol.speedPxPerSec * dtF;
+            if (patrol.pingPong) {
+                while (patrol.travelled > patrol.distance || patrol.travelled < 0.0f) {
+                    if (patrol.travelled > patrol.distance) {
+                        patrol.travelled = patrol.distance - (patrol.travelled - patrol.distance);
+                        patrol.direction = -1.0f;
+                    } else if (patrol.travelled < 0.0f) {
+                        patrol.travelled = -patrol.travelled;
+                        patrol.direction = 1.0f;
+                    }
+                }
+            } else {
+                patrol.travelled = patrol.travelled % patrol.distance;
+                if (patrol.travelled < 0.0f) {
+                    patrol.travelled += patrol.distance;
+                }
+            }
+            float t = Math.clamp(patrol.travelled / patrol.distance, 0.0f, 1.0f);
+            float nx = patrol.x1 + (patrol.x2 - patrol.x1) * t;
+            float ny = patrol.y1 + (patrol.y2 - patrol.y1) * t;
+            sprite.getTransform().setXpos(nx).setYpos(ny);
+        }
+    }
+
+    private void updateFollows(double dt) {
+        if (followStates.isEmpty()) {
+            return;
+        }
+        float dtF = (float) dt;
+        for (FollowState follow : followStates.values()) {
+            SpriteNode follower = activeSprites.get(follow.tag);
+            SpriteNode target = activeSprites.get(follow.targetTag);
+            if (follower == null || target == null || follow.speedPxPerSec <= 0.0f) {
+                continue;
+            }
+            normalizeToAbsoluteCoords(follower);
+            normalizeToAbsoluteCoords(target);
+            Transform2D ftf = follower.getTransform();
+            Transform2D ttf = target.getTransform();
+            float dx = ttf.getXpos() - ftf.getXpos();
+            float dy = ttf.getYpos() - ftf.getYpos();
+            float dist = (float) Math.hypot(dx, dy);
+            if (follow.moving && dist <= follow.stopRadius) {
+                follow.moving = false;
+                continue;
+            }
+            if (!follow.moving && dist > follow.resumeRadius) {
+                follow.moving = true;
+            }
+            if (!follow.moving || dist <= 1e-4f) {
+                continue;
+            }
+            float step = Math.min(dist - follow.stopRadius * 0.5f, follow.speedPxPerSec * dtF);
+            step = Math.max(0.0f, step);
+            ftf.setXpos(ftf.getXpos() + (dx / dist) * step)
+                    .setYpos(ftf.getYpos() + (dy / dist) * step);
+        }
+    }
+
+    private void updateAttracts(double dt) {
+        if (attractStates.isEmpty()) {
+            return;
+        }
+        float dtF = (float) dt;
+        for (AttractState attract : attractStates.values()) {
+            SpriteNode pickup = activeSprites.get(attract.tag());
+            SpriteNode target = activeSprites.get(attract.targetTag());
+            if (pickup == null || target == null) {
+                continue;
+            }
+            normalizeToAbsoluteCoords(pickup);
+            normalizeToAbsoluteCoords(target);
+            Transform2D ptf = pickup.getTransform();
+            Transform2D ttf = target.getTransform();
+            float dx = ttf.getXpos() - ptf.getXpos();
+            float dy = ttf.getYpos() - ptf.getYpos();
+            float dist = (float) Math.hypot(dx, dy);
+            if (dist <= 1e-4f || dist > attract.radiusPx()) {
+                continue;
+            }
+            float step = Math.min(dist, attract.speedPxPerSec() * dtF);
+            ptf.setXpos(ptf.getXpos() + (dx / dist) * step)
+                    .setYpos(ptf.getYpos() + (dy / dist) * step);
+        }
     }
 
     private void updateWasd(double dt, MotionInput input) {
-        float dx = (input.right() ? 1.0f : 0.0f) - (input.left() ? 1.0f : 0.0f);
-        float dy = (input.down() ? 1.0f : 0.0f) - (input.up() ? 1.0f : 0.0f);
+        float rawDx = (input.right() ? 1.0f : 0.0f) - (input.left() ? 1.0f : 0.0f);
+        float rawDy = (input.down() ? 1.0f : 0.0f) - (input.up() ? 1.0f : 0.0f);
+        if (Float.isFinite(input.analogX()) && input.analogX() != 0.0f) {
+            rawDx = Math.clamp(rawDx + input.analogX(), -1.0f, 1.0f);
+        }
+        if (Float.isFinite(input.analogY()) && input.analogY() != 0.0f) {
+            rawDy = Math.clamp(rawDy + input.analogY(), -1.0f, 1.0f);
+        }
         float dtF = (float) dt;
 
         for (Map.Entry<String, WasdBinding> entry : wasdBindings.entrySet()) {
-            SpriteNode sprite = activeSprites.get(entry.getKey());
+            String tag = entry.getKey();
+            SpriteNode sprite = activeSprites.get(tag);
             if (sprite == null) {
                 continue;
             }
             WasdBinding binding = entry.getValue();
             normalizeToAbsoluteCoords(sprite);
-            boolean hasPhysics = physicsBodies.containsKey(entry.getKey());
-            float stepDx = dx;
-            float stepDy = hasPhysics ? 0.0f : dy;
+
+            if (binding.dashTimer > 0.0f) {
+                binding.dashTimer = Math.max(0.0f, binding.dashTimer - dtF);
+            }
+            if (binding.dashCooldownTimer > 0.0f) {
+                binding.dashCooldownTimer = Math.max(0.0f, binding.dashCooldownTimer - dtF);
+            }
+            if (input.dashPressed() && binding.dashCooldownTimer <= 0.0f) {
+                binding.dashTimer = binding.dashDurationSeconds;
+                binding.dashCooldownTimer = binding.dashCooldownSeconds;
+            }
+            float effectiveSpeed = binding.speedPxPerSec
+                    * (binding.dashTimer > 0.0f ? binding.dashSpeedMultiplier : 1.0f);
+
+            boolean hasPhysics = physicsBodies.containsKey(tag);
+            boolean inClimb = isSpriteInClimbZone(tag, sprite);
+            float stepDx = rawDx;
+            float stepDy = (hasPhysics && !inClimb) ? 0.0f : rawDy;
             if (binding.normalizeDiagonal && stepDx != 0.0f && stepDy != 0.0f) {
-                float invSqrt2 = (float) (1.0 / Math.sqrt(2.0));
-                stepDx *= invSqrt2;
-                stepDy *= invSqrt2;
+                float mag = (float) Math.hypot(stepDx, stepDy);
+                if (mag > 1.0f) {
+                    stepDx /= mag;
+                    stepDy /= mag;
+                }
             }
 
-            boolean inertiaMode = binding.friction > 0.0f || binding.acceleration > 0.0f;
+            float zoneFrictionFactor = resolveFrictionMultiplier(tag, sprite);
+            float effectiveFriction = binding.friction * zoneFrictionFactor;
+            float effectiveAccel = binding.acceleration * zoneFrictionFactor;
+
+            boolean inertiaMode = effectiveFriction > 0.0f || effectiveAccel > 0.0f;
             if (!inertiaMode) {
                 if (stepDx == 0.0f && stepDy == 0.0f) {
+                    binding.velX = 0.0f;
+                    binding.velY = 0.0f;
                     continue;
                 }
-                binding.velX = stepDx * binding.speedPxPerSec;
-                binding.velY = stepDy * binding.speedPxPerSec;
+                binding.velX = stepDx * effectiveSpeed;
+                binding.velY = stepDy * effectiveSpeed;
             } else {
-                float targetVx = stepDx * binding.speedPxPerSec;
-                float targetVy = stepDy * binding.speedPxPerSec;
+                float targetVx = stepDx * effectiveSpeed;
+                float targetVy = stepDy * effectiveSpeed;
                 binding.velX = stepAxisVelocity(binding.velX, targetVx, stepDx != 0.0f,
-                        binding.acceleration, binding.friction, dtF);
-                binding.velY = hasPhysics ? 0.0f : stepAxisVelocity(
-                        binding.velY, targetVy, stepDy != 0.0f, binding.acceleration, binding.friction, dtF);
+                        effectiveAccel, effectiveFriction, dtF);
+                binding.velY = (hasPhysics && !inClimb) ? 0.0f : stepAxisVelocity(
+                        binding.velY, targetVy, stepDy != 0.0f, effectiveAccel, effectiveFriction, dtF);
                 if (binding.velX == 0.0f && binding.velY == 0.0f) {
                     continue;
                 }
             }
 
-            Transform2D tf = sprite.getTransform();
-            float nextX = tf.getXpos() + binding.velX * dtF;
-            float nextY = tf.getYpos() + binding.velY * dtF;
-            if (binding.hasBounds) {
-                if (nextX < binding.minX) {
-                    nextX = binding.minX;
-                    binding.velX = 0.0f;
-                } else if (nextX > binding.maxX) {
-                    nextX = binding.maxX;
-                    binding.velX = 0.0f;
-                }
-                if (nextY < binding.minY) {
-                    nextY = binding.minY;
-                    binding.velY = 0.0f;
-                } else if (nextY > binding.maxY) {
-                    nextY = binding.maxY;
-                    binding.velY = 0.0f;
+            if (binding.autoFlip && Math.abs(binding.velX) > 1e-3f) {
+                Transform2D tf = sprite.getTransform();
+                float magZoom = Math.max(1e-3f, Math.abs(tf.getXzoom()));
+                tf.setXzoom(binding.velX < 0.0f ? -magZoom : magZoom);
+            }
+
+            moveSpriteWithCollidersAndBounds(tag, sprite, binding, binding.velX * dtF, binding.velY * dtF);
+        }
+    }
+
+    private void moveSpriteWithCollidersAndBounds(
+            String tag,
+            SpriteNode sprite,
+            WasdBinding binding,
+            float deltaX,
+            float deltaY
+    ) {
+        Transform2D tf = sprite.getTransform();
+        float oldX = tf.getXpos();
+        float targetX = oldX + deltaX;
+        if (binding.hasBounds) {
+            if (targetX < binding.minX) {
+                targetX = binding.minX;
+                binding.velX = 0.0f;
+            } else if (targetX > binding.maxX) {
+                targetX = binding.maxX;
+                binding.velX = 0.0f;
+            }
+        }
+        tf.setXpos(targetX);
+        if (!blockingColliders.isEmpty() && overlapsAnyBlockingCollider(tag, sprite)) {
+            tf.setXpos(oldX);
+            binding.velX = 0.0f;
+        }
+
+        float oldY = tf.getYpos();
+        float targetY = oldY + deltaY;
+        if (binding.hasBounds) {
+            if (targetY < binding.minY) {
+                targetY = binding.minY;
+                binding.velY = 0.0f;
+            } else if (targetY > binding.maxY) {
+                targetY = binding.maxY;
+                binding.velY = 0.0f;
+            }
+        }
+        tf.setYpos(targetY);
+        if (!blockingColliders.isEmpty() && overlapsAnyBlockingCollider(tag, sprite)) {
+            tf.setYpos(oldY);
+            binding.velY = 0.0f;
+        }
+    }
+
+    private boolean overlapsAnyBlockingCollider(String tag, SpriteNode sprite) {
+        Rect2f hitbox = toHitboxRect(resolveSpriteBounds(sprite), customHitboxes.get(tag));
+        for (List<Rect2f> boxes : blockingColliders.values()) {
+            for (Rect2f box : boxes) {
+                if (rectsOverlap(hitbox, box)) {
+                    return true;
                 }
             }
-            tf.setXpos(nextX).setYpos(nextY);
+        }
+        return false;
+    }
+
+    private float resolveFrictionMultiplier(String tag, SpriteNode sprite) {
+        if (frictionZones.isEmpty()) {
+            return 1.0f;
+        }
+        Rect2f hitbox = toHitboxRect(resolveSpriteBounds(sprite), customHitboxes.get(tag));
+        for (FrictionZone zone : frictionZones.values()) {
+            if (rectsOverlap(hitbox, zone.rect())) {
+                return zone.factor();
+            }
+        }
+        return 1.0f;
+    }
+
+    private boolean isSpriteInClimbZone(String tag, SpriteNode sprite) {
+        if (climbZones.isEmpty()) {
+            return false;
+        }
+        Rect2f hitbox = toHitboxRect(resolveSpriteBounds(sprite), customHitboxes.get(tag));
+        for (Rect2f zone : climbZones.values()) {
+            if (rectsOverlap(hitbox, zone)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void updateKnockbacks(double dt) {
+        if (knockbacks.isEmpty()) {
+            return;
+        }
+        float dtF = (float) dt;
+        Iterator<Map.Entry<String, KnockbackState>> it = knockbacks.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, KnockbackState> entry = it.next();
+            String tag = entry.getKey();
+            KnockbackState kb = entry.getValue();
+            kb.invulnTimer = Math.max(0.0f, kb.invulnTimer - dtF);
+
+            SpriteNode sprite = activeSprites.get(tag);
+            if (sprite != null && (Math.abs(kb.vx) > 0.01f || Math.abs(kb.vy) > 0.01f)) {
+                normalizeToAbsoluteCoords(sprite);
+                Transform2D tf = sprite.getTransform();
+                float nx = tf.getXpos() + kb.vx * dtF;
+                float ny = tf.getYpos() + kb.vy * dtF;
+                WasdBinding bounds = wasdBindings.get(tag);
+                if (bounds != null && bounds.hasBounds) {
+                    nx = Math.clamp(nx, bounds.minX, bounds.maxX);
+                    ny = Math.clamp(ny, bounds.minY, bounds.maxY);
+                }
+                tf.setXpos(nx).setYpos(ny);
+            }
+            float decay = (float) Math.exp(-kb.frictionDecel * dtF);
+            kb.vx = Math.abs(kb.vx * decay) < 0.5f ? 0.0f : kb.vx * decay;
+            kb.vy = Math.abs(kb.vy * decay) < 0.5f ? 0.0f : kb.vy * decay;
+            if (kb.vx == 0.0f && kb.vy == 0.0f && kb.invulnTimer <= 0.0f) {
+                it.remove();
+            }
         }
     }
 
@@ -1301,6 +2458,11 @@ public final class ObjectMotionController {
             }
             normalizeToAbsoluteCoords(sprite);
             PhysicsBody body = entry.getValue();
+            if (isSpriteInClimbZone(tag, sprite)) {
+                body.velocityY = 0.0f;
+                body.grounded = true;
+                continue;
+            }
             Transform2D tf = sprite.getTransform();
             float prevY = tf.getYpos();
 
@@ -1392,6 +2554,88 @@ public final class ObjectMotionController {
         }
     }
 
+    private void updateAttachedChildren() {
+        if (attachStates.isEmpty()) {
+            return;
+        }
+        for (AttachState attach : attachStates.values()) {
+            SpriteNode child = activeSprites.get(attach.childTag());
+            SpriteNode parent = activeSprites.get(attach.parentTag());
+            if (child == null || parent == null) {
+                continue;
+            }
+            normalizeToAbsoluteCoords(parent);
+            Transform2D ptf = parent.getTransform();
+            double rad = Math.toRadians(ptf.getRotate());
+            float cos = (float) Math.cos(rad);
+            float sin = (float) Math.sin(rad);
+            float rx = attach.offsetX() * cos - attach.offsetY() * sin;
+            float ry = attach.offsetX() * sin + attach.offsetY() * cos;
+            applyAbsolutePos(child, ptf.getXpos() + rx, ptf.getYpos() + ry);
+            child.getTransform().setRotate(ptf.getRotate());
+        }
+    }
+
+    private void updateAnimStates() {
+        if (animStates.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, AnimStateConfig> entry : animStates.entrySet()) {
+            String tag = entry.getKey();
+            AnimStateConfig cfg = entry.getValue();
+            PhysicsBody body = physicsBodies.get(tag);
+            WasdBinding wasd = wasdBindings.get(tag);
+            String resolved;
+            if (body != null && !body.grounded) {
+                resolved = cfg.jumpAttr;
+            } else if ((wasd != null && Math.abs(wasd.velX) > 1e-2f) || activeTweens.containsKey(tag)) {
+                resolved = cfg.walkAttr;
+            } else {
+                resolved = cfg.idleAttr;
+            }
+            if (!Objects.equals(cfg.currentState, resolved)) {
+                cfg.currentState = resolved;
+                if (animStateListener != null) {
+                    animStateListener.accept(tag, resolved);
+                }
+            }
+        }
+    }
+
+    private void checkInteractTriggers(MotionInput input) {
+        if (!input.interactPressed() || interactTriggers.isEmpty()) {
+            return;
+        }
+        String actorTag = getPrimaryWasdTag();
+        if (actorTag == null && !physicsBodies.isEmpty()) {
+            actorTag = physicsBodies.keySet().iterator().next();
+        }
+        SpriteNode actor = actorTag != null ? activeSprites.get(actorTag) : null;
+        if (actor == null) {
+            return;
+        }
+        normalizeToAbsoluteCoords(actor);
+        float ax = actor.getTransform().getXpos();
+        float ay = actor.getTransform().getYpos();
+        for (InteractTrigger trigger : List.copyOf(interactTriggers)) {
+            SpriteNode target = activeSprites.get(trigger.targetTag());
+            if (target == null) {
+                continue;
+            }
+            normalizeToAbsoluteCoords(target);
+            float dx = target.getTransform().getXpos() - ax;
+            float dy = target.getTransform().getYpos() - ay;
+            if (Math.hypot(dx, dy) <= trigger.maxDistancePx()) {
+                if (trigger.callAction() && subroutineCallListener != null) {
+                    subroutineCallListener.accept(trigger.targetLabel());
+                } else if (!trigger.callAction() && collisionJumpListener != null) {
+                    collisionJumpListener.accept(trigger.targetLabel());
+                }
+                break;
+            }
+        }
+    }
+
     private void updateCameraFollow(double dt) {
         if (cameraFollowTag == null) {
             return;
@@ -1408,6 +2652,15 @@ public final class ObjectMotionController {
                 : 1.0f;
         cameraOffsetX += (desiredX - cameraOffsetX) * alpha;
         cameraOffsetY += (desiredY - cameraOffsetY) * alpha;
+        clampCameraOffsets();
+    }
+
+    private void clampCameraOffsets() {
+        if (!cameraClampActive) {
+            return;
+        }
+        cameraOffsetX = Math.clamp(cameraOffsetX, cameraClampMinX, cameraClampMaxX);
+        cameraOffsetY = Math.clamp(cameraOffsetY, cameraClampMinY, cameraClampMaxY);
     }
 
     private List<String> checkCollisions() {
@@ -1696,6 +2949,9 @@ public final class ObjectMotionController {
             case "ease_in_out" -> clamped < 0.5
                     ? 2.0 * clamped * clamped
                     : 1.0 - Math.pow(-2.0 * clamped + 2.0, 2.0) / 2.0;
+            case "spring" -> clamped <= 0.0 ? 0.0
+                    : (clamped >= 1.0 ? 1.0
+                            : 1.0 - Math.exp(-3.2 * clamped) * Math.cos(clamped * Math.PI * 1.5));
             default -> clamped;
         };
     }

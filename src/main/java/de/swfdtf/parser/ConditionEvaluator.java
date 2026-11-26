@@ -10,7 +10,9 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -169,6 +171,8 @@ public final class ConditionEvaluator {
         RPAREN,
         LBRACKET,
         RBRACKET,
+        LBRACE,
+        RBRACE,
         DOT,
         COMMA,
         QUESTION,
@@ -256,6 +260,8 @@ public final class ConditionEvaluator {
                 case ')' -> TokenKind.RPAREN;
                 case '[' -> TokenKind.LBRACKET;
                 case ']' -> TokenKind.RBRACKET;
+                case '{' -> TokenKind.LBRACE;
+                case '}' -> TokenKind.RBRACE;
                 case '.' -> TokenKind.DOT;
                 case ',' -> TokenKind.COMMA;
                 case '?' -> TokenKind.QUESTION;
@@ -563,6 +569,31 @@ public final class ConditionEvaluator {
                     expect(TokenKind.RPAREN, "Expected matching ')'");
                     yield inner;
                 }
+                case LBRACKET -> {
+                    advance();
+                    List<ExprNode> elements = new ArrayList<>();
+                    if (!check(TokenKind.RBRACKET)) {
+                        do {
+                            elements.add(parseTernary());
+                        } while (match(TokenKind.COMMA));
+                    }
+                    expect(TokenKind.RBRACKET, "Expected closing ']' in list literal");
+                    yield new ListLiteralNode(elements);
+                }
+                case LBRACE -> {
+                    advance();
+                    List<MapEntryNode> entries = new ArrayList<>();
+                    if (!check(TokenKind.RBRACE)) {
+                        do {
+                            ExprNode key = parseTernary();
+                            expect(TokenKind.COLON, "Expected ':' in map literal");
+                            ExprNode val = parseTernary();
+                            entries.add(new MapEntryNode(key, val));
+                        } while (match(TokenKind.COMMA));
+                    }
+                    expect(TokenKind.RBRACE, "Expected closing '}' in map literal");
+                    yield new MapLiteralNode(entries);
+                }
                 default -> throw syntaxError("Expected expression near '" + tok.text() + "'", tok);
             };
         }
@@ -622,6 +653,8 @@ public final class ConditionEvaluator {
     private sealed interface ExprNode permits
             LiteralNode,
             IdentNode,
+            ListLiteralNode,
+            MapLiteralNode,
             UnaryOpNode,
             BinaryOpNode,
             TernaryNode,
@@ -629,6 +662,31 @@ public final class ConditionEvaluator {
             MethodCallNode,
             IndexAccessNode {
         Object eval(EvalContext ctx);
+    }
+
+    private record ListLiteralNode(List<ExprNode> elements) implements ExprNode {
+        @Override
+        public Object eval(EvalContext ctx) {
+            List<Object> evaluated = new ArrayList<>(elements.size());
+            for (ExprNode elem : elements) {
+                evaluated.add(elem.eval(ctx));
+            }
+            return Collections.unmodifiableList(evaluated);
+        }
+    }
+
+    private record MapEntryNode(ExprNode key, ExprNode value) {
+    }
+
+    private record MapLiteralNode(List<MapEntryNode> entries) implements ExprNode {
+        @Override
+        public Object eval(EvalContext ctx) {
+            Map<Object, Object> evaluated = new LinkedHashMap<>(entries.size());
+            for (MapEntryNode entry : entries) {
+                evaluated.put(entry.key().eval(ctx), entry.value().eval(ctx));
+            }
+            return Collections.unmodifiableMap(evaluated);
+        }
     }
 
     private record LiteralNode(Object value) implements ExprNode {
@@ -650,11 +708,22 @@ public final class ConditionEvaluator {
             if ("Math".equals(name)) {
                 return Math.class;
             }
-            if (ctx.state() != null && ctx.state().has(name)) {
-                return ctx.state().get(name);
+            String key = name.startsWith("$") && name.length() > 1 ? name.substring(1) : name;
+            if (ctx.state() != null) {
+                if (ctx.state().has(name)) {
+                    return ctx.state().get(name);
+                }
+                if (!key.equals(name) && ctx.state().has(key)) {
+                    return ctx.state().get(key);
+                }
             }
-            if (ctx.persistent() != null && ctx.persistent().has(name)) {
-                return ctx.persistent().get(name);
+            if (ctx.persistent() != null) {
+                if (ctx.persistent().has(name)) {
+                    return ctx.persistent().get(name);
+                }
+                if (!key.equals(name) && ctx.persistent().has(key)) {
+                    return ctx.persistent().get(key);
+                }
             }
             return null;
         }

@@ -175,7 +175,8 @@ public final class SceneGraph {
     }
 
     /**
-     * Advances active time-dependent scene effects (such as {@link ScreenShake}) by {@code dt} seconds.
+     * Advances active time-dependent scene effects (such as {@link ScreenShake} and per-layer shakes)
+     * by {@code dt} seconds.
      *
      * @param dt elapsed time in seconds ({@code >= 0})
      */
@@ -186,6 +187,37 @@ public final class SceneGraph {
                 screenShake = null;
             }
         }
+        for (SceneLayer layer : layers.values()) {
+            layer.updateShake(dt);
+        }
+    }
+
+    /**
+     * Triggers a layer-local damped screen shake on {@code layerName} without altering sprite coordinates.
+     *
+     * @param layerName       target layer name (e.g. {@link #LAYER_MASTER} or {@link #LAYER_BACKGROUND})
+     * @param amplitudePx     shake amplitude in logical pixels
+     * @param durationSeconds duration in seconds
+     * @return {@code true} if the target layer exists
+     */
+    public boolean shakeLayer(String layerName, float amplitudePx, float durationSeconds) {
+        SceneLayer layer = getLayer(layerName);
+        if (layer == null) {
+            return false;
+        }
+        layer.triggerShake(amplitudePx, durationSeconds);
+        return true;
+    }
+
+    /**
+     * Returns the current render-time shake offset for {@code layerName}.
+     *
+     * @param layerName target layer name
+     * @return layer shake offset, or {@link Vec2f#ZERO}
+     */
+    public Vec2f getLayerShakeOffset(String layerName) {
+        SceneLayer layer = getLayer(layerName);
+        return layer != null ? layer.getShakeOffset() : Vec2f.ZERO;
     }
 
     /**

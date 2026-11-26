@@ -89,6 +89,8 @@ public final class ProjectScanner {
         List<JavaBlockNode> topLevelJavaBlocks = new ArrayList<>();
         List<SetVarStatement> defaultVariables = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
+        Map<String, String> configValues = new LinkedHashMap<>();
+        List<String> includes = new ArrayList<>();
 
         for (Path scriptPath : scriptFiles) {
             String relativeSource = toUnixRelativePath(normalizedRoot, scriptPath);
@@ -106,6 +108,8 @@ public final class ProjectScanner {
                     translations,
                     topLevelJavaBlocks,
                     defaultVariables,
+                    configValues,
+                    includes,
                     warnings
             );
         }
@@ -124,7 +128,9 @@ public final class ProjectScanner {
                 topLevelJavaBlocks,
                 defaultVariables,
                 discoveredAssets,
-                warnings
+                warnings,
+                configValues,
+                includes
         );
     }
 
@@ -163,6 +169,8 @@ public final class ProjectScanner {
         List<JavaBlockNode> topLevelJavaBlocks = new ArrayList<>();
         List<SetVarStatement> defaultVariables = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
+        Map<String, String> configValues = new LinkedHashMap<>();
+        List<String> includes = new ArrayList<>();
 
         for (String relPath : scriptRelPaths) {
             Path virtualFile = normalizedRoot.resolve(relPath);
@@ -186,6 +194,8 @@ public final class ProjectScanner {
                     translations,
                     topLevelJavaBlocks,
                     defaultVariables,
+                    configValues,
+                    includes,
                     warnings
             );
         }
@@ -204,7 +214,9 @@ public final class ProjectScanner {
                 topLevelJavaBlocks,
                 defaultVariables,
                 discoveredAssets,
-                warnings
+                warnings,
+                configValues,
+                includes
         );
     }
 
@@ -221,9 +233,12 @@ public final class ProjectScanner {
             List<TranslateBlock> translations,
             List<JavaBlockNode> topLevelJavaBlocks,
             List<SetVarStatement> defaultVariables,
+            Map<String, String> configValues,
+            List<String> includes,
             List<String> warnings
     ) {
-        List<VJavaLexer.Token> tokens = VJavaLexer.tokenize(content, relativeSource);
+        String preprocessed = MacroRegistry.preprocessSource(content);
+        List<VJavaLexer.Token> tokens = VJavaLexer.tokenize(preprocessed, relativeSource);
         ScriptFileAst fileAst = VJavaParser.parse(scriptPath, tokens);
 
         mergeEntries("character", fileAst.characters(), characters, warnings,
@@ -242,6 +257,8 @@ public final class ProjectScanner {
         translations.addAll(fileAst.translations());
         topLevelJavaBlocks.addAll(fileAst.topLevelJavaBlocks());
         defaultVariables.addAll(fileAst.defaultVariables());
+        configValues.putAll(fileAst.configValues());
+        includes.addAll(fileAst.includes());
     }
 
     private static ProjectDescriptor loadDescriptorFromProvider(Path virtualRoot, ResourceProvider provider) {

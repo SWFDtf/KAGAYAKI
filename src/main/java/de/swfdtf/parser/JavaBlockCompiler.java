@@ -103,8 +103,51 @@ public final class JavaBlockCompiler {
     ) {
     }
 
+    private static final List<String> SANDBOX_FORBIDDEN_APIS = List.of(
+            "java.io.File",
+            "java.io.FileInputStream",
+            "java.io.FileOutputStream",
+            "java.io.FileWriter",
+            "java.io.FileReader",
+            "java.io.RandomAccessFile",
+            "java.nio.file.",
+            "Runtime.getRuntime",
+            "ProcessBuilder",
+            "java.net.Socket",
+            "java.net.ServerSocket",
+            "java.net.URL",
+            "java.net.HttpURLConnection",
+            "java.net.http.",
+            "System.exit",
+            "System.load",
+            "Class.forName",
+            "java.lang.reflect."
+    );
+
+    private boolean sandboxEnabled;
+
     /** Creates a new {@code JavaBlockCompiler} instance. */
     public JavaBlockCompiler() {
+    }
+
+    /**
+     * Enables or disables the security allowlist sandbox checking {@code @->{ ... }<<} Java blocks.
+     *
+     * @param sandboxEnabled {@code true} to reject filesystem, process, network, and reflection APIs
+     * @return {@code this} for fluent chaining
+     */
+    public JavaBlockCompiler setSandboxEnabled(boolean sandboxEnabled) {
+        this.sandboxEnabled = sandboxEnabled;
+        return this;
+    }
+
+    /**
+     * Returns whether the embedded Java block security sandbox is active.
+     *
+     * @return {@code true} if sandbox checks are active
+     */
+    public boolean isSandboxEnabled() {
+        return sandboxEnabled;
     }
 
     private static final Set<String> STATEMENT_KEYWORDS = Set.of(
@@ -283,6 +326,9 @@ public final class JavaBlockCompiler {
         Objects.requireNonNull(blocks, "blocks must not be null");
         if (blocks.isEmpty()) {
             return new CompiledProjectBlocks(Map.of(), resolveParentClassLoader(), false);
+        }
+        if (sandboxEnabled) {
+            enforceSandboxAllowlist(blocks);
         }
 
         ClassLoader parentLoader = resolveParentClassLoader();
@@ -596,12 +642,65 @@ public final class JavaBlockCompiler {
                 }
             } else if (stmt instanceof VJavaAst.ParallelStatement ps) {
                 collectFromStatements(ps.statements(), out, seenIds);
+            } else if (stmt instanceof VJavaAst.RepeatStatement rs) {
+                collectFromStatements(rs.body(), out, seenIds);
+            } else if (stmt instanceof VJavaAst.WhileStatement ws) {
+                collectFromStatements(ws.body(), out, seenIds);
+            } else if (stmt instanceof VJavaAst.RandomStatement rnd) {
+                for (VJavaAst.RandomBranch rb : rnd.branches()) {
+                    collectFromStatements(rb.body(), out, seenIds);
+                }
             } else if (stmt instanceof VJavaAst.MenuStatement ms) {
                 for (VJavaAst.MenuChoice choice : ms.choices()) {
                     collectFromStatements(choice.body(), out, seenIds);
                 }
             }
         }
+    }
+
+    private static void enforceSandboxAllowlist(List<VJavaAst.JavaBlockNode> blocks) {
+        for (VJavaAst.JavaBlockNode block : blocks) {
+            String stripped = stripJavaCommentsAndStrings(block.code());
+            for (String forbidden : SANDBOX_FORBIDDEN_APIS) {
+                if (stripped.contains(forbidden) || block.code().contains(forbidden)) {
+                    throw new VJavaCompileException(
+                            "Sandbox security violation in Java block '" + block.id()
+                                    + "': forbidden API reference '" + forbidden + "'",
+                            block.id(),
+                            block.sourceFile(),
+                            block.lineNumber(),
+                            List.of(),
+                            block.code(),
+                            null
+                    );
+                }
+            }
+        }
+    }
+
+    private static String stripJavaCommentsAndStrings(String code) {
+        StringBuilder sb = new StringBuilder(code.length());
+        int len = code.length();
+        for (int i = 0; i < len; i++) {
+            char c = code.charAt(i);
+            if (c == '/' && i + 1 < len && code.charAt(i + 1) == '/') {
+                while (i < len && code.charAt(i) != '\n') {
+                    i++;
+                }
+                sb.append('\n');
+                continue;
+            }
+            if (c == '/' && i + 1 < len && code.charAt(i + 1) == '*') {
+                i += 2;
+                while (i + 1 < len && !(code.charAt(i) == '*' && code.charAt(i + 1) == '/')) {
+                    i++;
+                }
+                i++;
+                continue;
+            }
+            sb.append(c);
+        }
+        return sb.toString();
     }
 
     private void compileUserTypes(

@@ -148,7 +148,29 @@ public final class SceneController {
         this.logger = logger != null ? logger : new EngineLogger();
         this.projectRoot = projectRoot;
         this.glTextureUploadEnabled = glTextureUploadEnabled;
+        this.motionController.setAnimStateListener(this::applyAnimStateAttribute);
         registerBuiltinPositions();
+    }
+
+    private void applyAnimStateAttribute(String tag, String attrName) {
+        SpriteNode existing = activeSprites.get(tag);
+        if (existing == null || attrName == null || attrName.isBlank()) {
+            return;
+        }
+        String trimmedAttr = attrName.trim();
+        if (existing.getCustomDisplayable() instanceof LayeredImage layered) {
+            layered.setAttributes(List.of(trimmedAttr), stateStore, persistentAccess);
+            if (!layered.getResolvedLayerAssets().isEmpty()) {
+                List<String> resolved = layered.getResolvedLayerAssets();
+                existing.setAssetPath(resolved.get(resolved.size() - 1));
+            }
+            return;
+        }
+        String resolvedAsset = resolveImageAssetPath(tag, List.of(trimmedAttr));
+        existing.setAssetPath(resolvedAsset);
+        if (glTextureUploadEnabled && textureManager != null) {
+            existing.setTexture(textureManager.loadTexture(resolvedAsset));
+        }
     }
 
     private void registerBuiltinPositions() {
@@ -463,18 +485,86 @@ public final class SceneController {
     }
 
     /**
+     * Dynamically spawns a temporary or pooled sprite instance on the master stage without requiring
+     * a prior {@code define}/{@code image} entry when an asset path is supplied.
+     *
+     * @param tag         unique dynamic sprite tag
+     * @param imageOrPath registered image tag or relative asset path
+     * @param x           optional initial X coordinate (nullable defaults to centered)
+     * @param y           optional initial Y coordinate (nullable defaults to centered)
+     * @return spawned {@link SpriteNode}
+     */
+    public SpriteNode spawnSprite(String tag, String imageOrPath, Float x, Float y) {
+        Objects.requireNonNull(tag, "tag must not be null");
+        String resolvedPath = (imageOrPath != null && !imageOrPath.isBlank())
+                ? resolveImageAssetPath(imageOrPath.trim(), List.of())
+                : resolveImageAssetPath(tag, List.of());
+        despawnSprite(tag);
+        SpriteNode sprite = new SpriteNode("spawn:" + tag, tag, List.of());
+        sprite.setAssetPath(resolvedPath);
+        sprite.setSize(600.0f, 960.0f);
+        Transform2D tf = sprite.getTransform();
+        if (x != null && y != null) {
+            tf.setXalign(Float.NaN).setYalign(Float.NaN).setXpos(x).setYpos(y);
+        } else {
+            tf.setXalign(0.5f).setYalign(1.0f);
+        }
+        if (glTextureUploadEnabled && textureManager != null) {
+            sprite.setTexture(textureManager.loadTexture(resolvedPath));
+        }
+        activeSprites.put(tag, sprite);
+        sceneGraph.addNode(SceneGraph.LAYER_MASTER, sprite);
+        return sprite;
+    }
+
+    /**
+     * Despawns {@code tag} completely from the scene graph, sprite map, ATL registry, and motion controller.
+     *
+     * @param tag sprite tag to despawn
+     * @return {@code true} if a sprite was active and removed
+     */
+    public boolean despawnSprite(String tag) {
+        boolean removed = hideSprite(tag, null);
+        motionController.removeAllBindingsForTag(tag);
+        return removed;
+    }
+
+    /**
+     * Enables or disables Y-position depth sorting on the master sprite layer.
+     *
+     * @param enabled {@code true} to render sprites with higher Y in front of sprites with lower Y
+     */
+    public void setYSortEnabled(boolean enabled) {
+        SceneLayer master = sceneGraph.getLayer(SceneGraph.LAYER_MASTER);
+        if (master != null) {
+            master.setYSortEnabled(enabled);
+        }
+    }
+
+    /**
+     * Sets the global motion/ATL time dilation factor ({@code 1.0f} = normal speed).
+     *
+     * @param timeScale time dilation factor ({@code >= 0})
+     */
+    public void setTimeScale(float timeScale) {
+        motionController.setTimeScale(timeScale);
+    }
+
+    /**
      * Advances active displayables plus sprite movement tweens, WASD controls, 2D physics,
-     * camera follow offsets, and collision triggers using the supplied {@link ObjectMotionController.MotionInput}.
+     * camera follow offsets, layer shakes, and collision triggers using {@code motionInput}.
      *
      * @param dt          elapsed frame delta in seconds
      * @param motionInput frame movement and jump input (nullable)
      */
     public void updateMotion(double dt, ObjectMotionController.MotionInput motionInput) {
+        double scaledDt = dt * motionController.getTimeScale();
+        sceneGraph.update((float) Math.max(0.0, dt));
         if (backgroundNode != null) {
-            backgroundNode.update(dt);
+            backgroundNode.update(scaledDt);
         }
         for (SpriteNode sprite : activeSprites.values()) {
-            sprite.update(dt);
+            sprite.update(scaledDt);
         }
         motionController.update(dt, motionInput);
         if (motionController.isCameraFollowActive() && backgroundNode != null) {
