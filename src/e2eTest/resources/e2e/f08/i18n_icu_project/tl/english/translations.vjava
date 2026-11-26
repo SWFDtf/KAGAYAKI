@@ -1,0 +1,11 @@
+translate english line_01:
+    # lena "Willkommen, [spieler_name]! Du hast {b}[star_count]{/b} Sterne."
+    lena "Welcome, [spieler_name]! You have {b}[star_count]{/b} stars."
+
+translate english line_02:
+    # lena "{star_count, plural, one {# Stern gefunden.} other {# Sterne gefunden.}}"
+    lena "{star_count, plural, one {# star found.} other {# stars found.}}"
+
+translate english line_03:
+    # lena "{speaker_gender, select, female {Sie ist bereit.} male {Er ist bereit.} other {Bereit.}}"
+    lena "{speaker_gender, select, female {She is ready.} male {He is ready.} other {Ready.}}"

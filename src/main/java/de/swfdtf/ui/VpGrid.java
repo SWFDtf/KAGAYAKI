@@ -64,27 +64,47 @@ public class VpGrid extends UiNode {
         return this;
     }
 
-    /** @return column count */
+    /**
+     * Returns column count.
+     *
+     * @return column count
+     */
     public int getColumns() {
         return columns;
     }
 
-    /** @return fixed cell width */
+    /**
+     * Returns fixed cell width.
+     *
+     * @return fixed cell width
+     */
     public float getCellWidth() {
         return cellWidth;
     }
 
-    /** @return fixed cell height */
+    /**
+     * Returns fixed cell height.
+     *
+     * @return fixed cell height
+     */
     public float getCellHeight() {
         return cellHeight;
     }
 
-    /** @return horizontal spacing between cells */
+    /**
+     * Returns horizontal spacing between cells.
+     *
+     * @return horizontal spacing between cells
+     */
     public float getHorizontalSpacing() {
         return horizontalSpacing;
     }
 
-    /** @return vertical spacing between rows */
+    /**
+     * Returns vertical spacing between rows.
+     *
+     * @return vertical spacing between rows
+     */
     public float getVerticalSpacing() {
         return verticalSpacing;
     }
@@ -102,32 +122,56 @@ public class VpGrid extends UiNode {
         return this;
     }
 
-    /** @return current vertical scroll offset */
+    /**
+     * Returns current vertical scroll offset.
+     *
+     * @return current vertical scroll offset
+     */
     public float getScrollY() {
         return scrollY;
     }
 
-    /** @return maximum vertical scroll offset */
+    /**
+     * Returns maximum vertical scroll offset.
+     *
+     * @return maximum vertical scroll offset
+     */
     public float getMaxScrollY() {
         return maxScrollY;
     }
 
-    /** @return total logical height of all rows */
+    /**
+     * Returns total logical height of all rows.
+     *
+     * @return total logical height of all rows
+     */
     public float getTotalContentHeight() {
         return totalContentHeight;
     }
 
-    /** @return total number of rows across all visible children */
+    /**
+     * Returns total number of rows across all visible children.
+     *
+     * @return total number of rows across all visible children
+     */
     public int getTotalRows() {
         return totalRows;
     }
 
-    /** @return inclusive index of the first visible row */
+    /**
+     * Returns inclusive index of the first visible row.
+     *
+     * @return inclusive index of the first visible row
+     */
     public int getFirstVisibleRow() {
         return firstVisibleRow;
     }
 
-    /** @return inclusive index of the last visible row ({@code -1} when empty) */
+    /**
+     * Returns inclusive index of the last visible row ({@code -1} when empty).
+     *
+     * @return inclusive index of the last visible row ({@code -1} when empty)
+     */
     public int getLastVisibleRow() {
         return lastVisibleRow;
     }
@@ -143,7 +187,11 @@ public class VpGrid extends UiNode {
         return this;
     }
 
-    /** @return {@code true} if scrollbar is enabled */
+    /**
+     * Returns {@code true} if scrollbar is enabled.
+     *
+     * @return {@code true} if scrollbar is enabled
+     */
     public boolean isScrollbarVisible() {
         return scrollbarVisible;
     }
@@ -161,7 +209,11 @@ public class VpGrid extends UiNode {
         return this;
     }
 
-    /** @return scroll step per mouse wheel notch */
+    /**
+     * Returns scroll step per mouse wheel notch.
+     *
+     * @return scroll step per mouse wheel notch
+     */
     public float getScrollStep() {
         return scrollStep;
     }
@@ -170,7 +222,9 @@ public class VpGrid extends UiNode {
     public Vec2f measure(float availableWidth, float availableHeight) {
         float naturalW = columns * cellWidth + Math.max(0, columns - 1) * horizontalSpacing
                 + getPaddingLeft() + getPaddingRight();
-        float w = getPreferredWidth() > 0.0f ? getPreferredWidth() : Math.min(availableWidth > 0 ? availableWidth : naturalW, naturalW);
+        float w = getPreferredWidth() > 0.0f
+                ? getPreferredWidth()
+                : Math.min(availableWidth > 0 ? availableWidth : naturalW, naturalW);
         float h = getPreferredHeight() > 0.0f ? getPreferredHeight() : availableHeight;
         return new Vec2f(w, h);
     }
@@ -382,7 +436,8 @@ public class VpGrid extends UiNode {
         if (track.height() <= 0.0f || maxScrollY <= 0.0f || totalContentHeight <= 0.0f) {
             return;
         }
-        float thumbH = Math.min(track.height(), Math.max(24.0f, track.height() * (inner.height() / totalContentHeight)));
+        float thumbH = Math.min(
+                track.height(), Math.max(24.0f, track.height() * (inner.height() / totalContentHeight)));
         float travel = Math.max(1.0f, track.height() - thumbH);
         float ratio = Math.clamp((ly - track.y() - thumbH * 0.5f) / travel, 0.0f, 1.0f);
         setScrollY(ratio * maxScrollY);

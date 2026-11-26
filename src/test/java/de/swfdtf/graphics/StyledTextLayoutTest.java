@@ -100,7 +100,8 @@ class StyledTextLayoutTest {
 
             StyledTextLayout narrow = new StyledTextLayout(rich, fontManager, 180.0f, 24.0f, 1.2f, "#f0f6fc", false);
             assertTrue(narrow.getLineCount() >= 3, "Expected multi-line wrap, got " + narrow.getLineCount());
-            assertTrue(narrow.getTotalWidth() <= 185.0f, "Expected wrapped width <= maxWidth, got " + narrow.getTotalWidth());
+            assertTrue(narrow.getTotalWidth() <= 185.0f,
+                    "Expected wrapped width <= maxWidth, got " + narrow.getTotalWidth());
             assertTrue(narrow.getTotalHeight() > wide.getTotalHeight() * 2.5f);
 
             for (int i = 1; i < narrow.getLines().size(); i++) {

@@ -59,12 +59,20 @@ public final class FontAtlas implements AutoCloseable {
             float u1,
             float v1
     ) {
-        /** @return unscaled glyph bitmap width in pixels */
+        /**
+         * Returns the unscaled glyph bitmap width in pixels.
+         *
+         * @return unscaled glyph bitmap width in pixels
+         */
         public float width() {
             return x1 - x0;
         }
 
-        /** @return unscaled glyph bitmap height in pixels */
+        /**
+         * Returns the unscaled glyph bitmap height in pixels.
+         *
+         * @return unscaled glyph bitmap height in pixels
+         */
         public float height() {
             return y1 - y0;
         }
@@ -251,8 +259,8 @@ public final class FontAtlas implements AutoCloseable {
             bakeCodepoint(cp);
         }
         int[] extraPunctuation = {
-                0x2013, 0x2014, 0x2018, 0x2019, 0x201A, 0x201C, 0x201D, 0x201E,
-                0x2022, 0x2026, 0x20AC, 0x2190, 0x2191, 0x2192, 0x2193, 0x25A1, 0xFFFD
+            0x2013, 0x2014, 0x2018, 0x2019, 0x201A, 0x201C, 0x201D, 0x201E,
+            0x2022, 0x2026, 0x20AC, 0x2190, 0x2191, 0x2192, 0x2193, 0x25A1, 0xFFFD
         };
         for (int cp : extraPunctuation) {
             bakeCodepoint(cp);
@@ -396,72 +404,131 @@ public final class FontAtlas implements AutoCloseable {
         return Math.max(0.0f, width);
     }
 
-    /** @return {@code true} if {@code codepoint} is already cached in this atlas */
+    /**
+     * Returns whether {@code codepoint} is already cached in this atlas.
+     *
+     * @param codepoint Unicode code point
+     * @return {@code true} if {@code codepoint} is already cached in this atlas
+     */
     public boolean hasGlyph(int codepoint) {
         return glyphs.containsKey(codepoint);
     }
 
-    /** @return OpenGL texture ID, or {@code 0} if not uploaded (e.g. headless mode) */
+    /**
+     * Returns the OpenGL texture ID.
+     *
+     * @return OpenGL texture ID, or {@code 0} if not uploaded (e.g. headless mode)
+     */
     public int getGlTextureId() {
         return glTextureId;
     }
 
-    /** @return atlas bake pixel size */
+    /**
+     * Returns the atlas bake pixel size.
+     *
+     * @return atlas bake pixel size
+     */
     public float getBaseSize() {
         return baseSize;
     }
 
-    /** @return distance above baseline in pixels at {@link #getBaseSize()} */
+    /**
+     * Returns the distance above baseline at base size.
+     *
+     * @return distance above baseline in pixels at {@link #getBaseSize()}
+     */
     public float getAscent() {
         return ascent;
     }
 
-    /** @return distance above baseline scaled to {@code fontSize} */
+    /**
+     * Returns the distance above baseline scaled to {@code fontSize}.
+     *
+     * @param fontSize target pixel size
+     * @return distance above baseline scaled to {@code fontSize}
+     */
     public float getAscent(float fontSize) {
         return ascent * (fontSize / baseSize);
     }
 
-    /** @return signed descent below baseline in pixels at {@link #getBaseSize()} (typically {@code <= 0}) */
+    /**
+     * Returns the signed descent below baseline at base size.
+     *
+     * @return signed descent below baseline in pixels at {@link #getBaseSize()} (typically {@code <= 0})
+     */
     public float getDescent() {
         return descent;
     }
 
-    /** @return recommended inter-line gap in pixels at {@link #getBaseSize()} */
+    /**
+     * Returns the recommended inter-line gap at base size.
+     *
+     * @return recommended inter-line gap in pixels at {@link #getBaseSize()}
+     */
     public float getLineGap() {
         return lineGap;
     }
 
-    /** @return full line height {@code ascent - descent + lineGap} at {@link #getBaseSize()} */
+    /**
+     * Returns the full line height at base size.
+     *
+     * @return full line height {@code ascent - descent + lineGap} at {@link #getBaseSize()}
+     */
     public float getLineHeight() {
         return Math.max(1.0f, ascent - descent + lineGap);
     }
 
-    /** @return full line height scaled to {@code fontSize} */
+    /**
+     * Returns the full line height scaled to {@code fontSize}.
+     *
+     * @param fontSize target pixel size
+     * @return full line height scaled to {@code fontSize}
+     */
     public float getLineHeight(float fontSize) {
         return getLineHeight() * (fontSize / baseSize);
     }
 
-    /** @return atlas texture width in pixels */
+    /**
+     * Returns the atlas texture width in pixels.
+     *
+     * @return atlas texture width in pixels
+     */
     public int getAtlasWidth() {
         return atlasWidth;
     }
 
-    /** @return atlas texture height in pixels */
+    /**
+     * Returns the atlas texture height in pixels.
+     *
+     * @return atlas texture height in pixels
+     */
     public int getAtlasHeight() {
         return atlasHeight;
     }
 
-    /** @return {@code true} if this atlas uses CPU procedural fallback bitmaps */
+    /**
+     * Returns whether this atlas uses CPU procedural fallback bitmaps.
+     *
+     * @return {@code true} if this atlas uses CPU procedural fallback bitmaps
+     */
     public boolean isBuiltinFallback() {
         return builtinFallback;
     }
 
-    /** @return {@code true} if {@link #dispose()} has been called */
+    /**
+     * Returns whether this atlas has been disposed.
+     *
+     * @return {@code true} if {@link #dispose()} has been called
+     */
     public boolean isDisposed() {
         return disposed;
     }
 
-    /** @return defensive copy of the CPU-side RGBA8 premultiplied atlas buffer */
+    /**
+     * Returns a defensive copy of the CPU-side atlas pixel buffer.
+     *
+     * @return defensive copy of the CPU-side RGBA8 premultiplied atlas buffer
+     */
     public byte[] getAtlasRgbaCopy() {
         return atlasRgba.clone();
     }

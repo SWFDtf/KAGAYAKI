@@ -56,6 +56,12 @@ public final class RenderPipeline2D implements IRenderPipeline {
     private static final Comparator<SceneNode> CHILD_Z_COMPARATOR =
             Comparator.comparingInt(SceneNode::getZOrder);
 
+    /**
+     * Creates an uninitialized {@code RenderPipeline2D}; call {@link #init(int, int)} before rendering.
+     */
+    public RenderPipeline2D() {
+    }
+
     private static final String QUAD_VERTEX_SHADER = """
             #version 330 core
             layout(location = 0) in vec2 aPos;
@@ -246,14 +252,14 @@ public final class RenderPipeline2D implements IRenderPipeline {
 
     private void initQuadGeometry() {
         float[] vertices = {
-                // x,    y,    u,    v
-                0.0f, 0.0f, 0.0f, 0.0f,
-                1.0f, 0.0f, 1.0f, 0.0f,
-                1.0f, 1.0f, 1.0f, 1.0f,
+            // x,    y,    u,    v
+            0.0f, 0.0f, 0.0f, 0.0f,
+            1.0f, 0.0f, 1.0f, 0.0f,
+            1.0f, 1.0f, 1.0f, 1.0f,
 
-                0.0f, 0.0f, 0.0f, 0.0f,
-                1.0f, 1.0f, 1.0f, 1.0f,
-                0.0f, 1.0f, 0.0f, 1.0f
+            0.0f, 0.0f, 0.0f, 0.0f,
+            1.0f, 1.0f, 1.0f, 1.0f,
+            0.0f, 1.0f, 0.0f, 1.0f
         };
 
         quadVao = GL30.glGenVertexArrays();
@@ -608,10 +614,10 @@ public final class RenderPipeline2D implements IRenderPipeline {
 
         float fillA = Math.clamp(fillRgba[3], 0.0f, 1.0f);
         float[] fillPremul = new float[]{
-                fillRgba[0] * fillA,
-                fillRgba[1] * fillA,
-                fillRgba[2] * fillA,
-                fillA
+            fillRgba[0] * fillA,
+            fillRgba[1] * fillA,
+            fillRgba[2] * fillA,
+            fillA
         };
 
         float[] borderPremul = NO_BORDER_COLOR;
@@ -622,10 +628,10 @@ public final class RenderPipeline2D implements IRenderPipeline {
             }
             float borderA = Math.clamp(borderRgba[3], 0.0f, 1.0f);
             borderPremul = new float[]{
-                    borderRgba[0] * borderA,
-                    borderRgba[1] * borderA,
-                    borderRgba[2] * borderA,
-                    borderA
+                borderRgba[0] * borderA,
+                borderRgba[1] * borderA,
+                borderRgba[2] * borderA,
+                borderA
             };
         }
 
@@ -991,7 +997,11 @@ public final class RenderPipeline2D implements IRenderPipeline {
         initialized = false;
     }
 
-    /** @return defensive copy of the logical orthographic projection matrix */
+    /**
+     * Returns a defensive copy of the logical orthographic projection matrix.
+     *
+     * @return defensive copy of the logical orthographic projection matrix
+     */
     public Matrix4f getLogicalProjection() {
         return new Matrix4f(logicalProjection);
     }
@@ -1056,27 +1066,47 @@ public final class RenderPipeline2D implements IRenderPipeline {
         return currentAnchorY;
     }
 
-    /** @return most recently computed letterbox/pillarbox destination rectangle from {@link #endFrame()} */
+    /**
+     * Returns the most recently computed letterbox or pillarbox viewport rectangle.
+     *
+     * @return most recently computed letterbox/pillarbox destination rectangle from {@link #endFrame()}
+     */
     public Rect2f getLastLetterboxViewport() {
         return lastLetterboxViewport;
     }
 
-    /** @return offscreen logical-resolution {@link Framebuffer}, or {@code null} if uninitialized */
+    /**
+     * Returns the offscreen logical-resolution framebuffer.
+     *
+     * @return offscreen logical-resolution {@link Framebuffer}, or {@code null} if uninitialized
+     */
     public Framebuffer getOffscreenFramebuffer() {
         return offscreenFbo;
     }
 
-    /** @return configured logical canvas width in pixels */
+    /**
+     * Returns the configured logical canvas width in pixels.
+     *
+     * @return configured logical canvas width in pixels
+     */
     public int getLogicalWidth() {
         return logicalWidth;
     }
 
-    /** @return configured logical canvas height in pixels */
+    /**
+     * Returns the configured logical canvas height in pixels.
+     *
+     * @return configured logical canvas height in pixels
+     */
     public int getLogicalHeight() {
         return logicalHeight;
     }
 
-    /** @return {@code true} if GPU resources have been initialized */
+    /**
+     * Returns whether GPU resources have been initialized.
+     *
+     * @return {@code true} if GPU resources have been initialized
+     */
     public boolean isInitialized() {
         return initialized;
     }

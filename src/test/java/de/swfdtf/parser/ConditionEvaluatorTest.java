@@ -95,8 +95,12 @@ class ConditionEvaluatorTest {
 
         assertEquals("Sternenkompass", ConditionEvaluator.evaluate("aktives_item.name", state, persistent));
         assertEquals("Nachtsicht", ConditionEvaluator.evaluate("aktives_item.effekt", state, persistent));
-        assertEquals("Sternenkompass (100)", ConditionEvaluator.evaluate("aktives_item.beschreibung", state, persistent));
-        assertEquals("Sternenkompass (100)", ConditionEvaluator.evaluate("aktives_item.getBeschreibung()", state, persistent));
+        assertEquals(
+                "Sternenkompass (100)",
+                ConditionEvaluator.evaluate("aktives_item.beschreibung", state, persistent));
+        assertEquals(
+                "Sternenkompass (100)",
+                ConditionEvaluator.evaluate("aktives_item.getBeschreibung()", state, persistent));
         assertEquals("rank", ConditionEvaluator.evaluate("pair.key", state, persistent));
         assertEquals(99, ConditionEvaluator.evaluate("pair.score", state, persistent));
         assertEquals("Schlüssel", ConditionEvaluator.evaluate("items[1]", state, persistent));

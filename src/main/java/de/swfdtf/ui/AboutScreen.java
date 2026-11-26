@@ -144,11 +144,66 @@ public class AboutScreen extends Screen {
         }
     }
 
-    public TextWidget getProjectTitleValue() { return projectTitleValue; }
-    public TextWidget getProjectVersionValue() { return projectVersionValue; }
-    public TextWidget getAuthorValue() { return authorValue; }
-    public TextWidget getEngineVersionValue() { return engineVersionValue; }
-    public TextWidget getBackendValue() { return backendValue; }
-    public TextWidget getRenderModeValue() { return renderModeValue; }
-    public TextWidget getLicenseSummary() { return licenseSummary; }
+    /**
+     * Returns the project title widget.
+     *
+     * @return title widget
+     */
+    public TextWidget getProjectTitleValue() {
+        return projectTitleValue;
+    }
+
+    /**
+     * Returns the project version widget.
+     *
+     * @return version widget
+     */
+    public TextWidget getProjectVersionValue() {
+        return projectVersionValue;
+    }
+
+    /**
+     * Returns the author widget.
+     *
+     * @return author widget
+     */
+    public TextWidget getAuthorValue() {
+        return authorValue;
+    }
+
+    /**
+     * Returns the engine version widget.
+     *
+     * @return engine version widget
+     */
+    public TextWidget getEngineVersionValue() {
+        return engineVersionValue;
+    }
+
+    /**
+     * Returns the render backend widget.
+     *
+     * @return backend widget
+     */
+    public TextWidget getBackendValue() {
+        return backendValue;
+    }
+
+    /**
+     * Returns the active render mode widget.
+     *
+     * @return render mode widget
+     */
+    public TextWidget getRenderModeValue() {
+        return renderModeValue;
+    }
+
+    /**
+     * Returns the license summary widget.
+     *
+     * @return license summary widget
+     */
+    public TextWidget getLicenseSummary() {
+        return licenseSummary;
+    }
 }

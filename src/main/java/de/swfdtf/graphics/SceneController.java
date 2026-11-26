@@ -43,6 +43,7 @@ public final class SceneController {
             String assetPath,
             Transform2D transform
     ) {
+        /** Normalizes null collections and copies the node transform defensively. */
         public StageEntry {
             attributes = attributes != null ? List.copyOf(attributes) : List.of();
             transform = transform != null ? transform.copy() : new Transform2D();
@@ -63,6 +64,7 @@ public final class SceneController {
             Transform2D backgroundTransform,
             Map<String, StageEntry> activeSprites
     ) {
+        /** Normalizes the background transform and defensively copies active sprite entries. */
         public StageSnapshot {
             backgroundTransform = backgroundTransform != null ? backgroundTransform.copy() : new Transform2D();
             Map<String, StageEntry> copy = new LinkedHashMap<>();
@@ -429,32 +431,57 @@ public final class SceneController {
         sceneGraph.getLayer(SceneGraph.LAYER_MASTER).clear();
     }
 
-    /** @return active sprite node for {@code tag}, or {@code null} */
+    /**
+     * Returns the active sprite node for the given tag.
+     *
+     * @param tag sprite tag to look up
+     * @return active sprite node for {@code tag}, or {@code null}
+     */
     public SpriteNode getActiveSprite(String tag) {
         return activeSprites.get(tag);
     }
 
-    /** @return immutable view of currently active sprites by tag */
+    /**
+     * Returns an immutable view of currently active sprites keyed by tag.
+     *
+     * @return immutable view of currently active sprites by tag
+     */
     public Map<String, SpriteNode> getActiveSprites() {
         return Collections.unmodifiableMap(new LinkedHashMap<>(activeSprites));
     }
 
-    /** @return active background tag or {@code null} */
+    /**
+     * Returns the active background tag, if any.
+     *
+     * @return active background tag or {@code null}
+     */
     public String getBackgroundTag() {
         return backgroundTag;
     }
 
-    /** @return active background node or {@code null} */
+    /**
+     * Returns the active background node, if any.
+     *
+     * @return active background node or {@code null}
+     */
     public SpriteNode getBackgroundNode() {
         return backgroundNode;
     }
 
-    /** @return most recent transition expression requested, or {@code null} */
+    /**
+     * Returns the most recent transition expression requested.
+     *
+     * @return most recent transition expression requested, or {@code null}
+     */
     public String getLastTransitionExpr() {
         return lastTransitionExpr;
     }
 
-    /** @return underlying {@link SceneGraph} */
+    /**
+     * Returns the underlying {@link SceneGraph}.
+     *
+     * @return underlying {@link SceneGraph}
+     */
     public SceneGraph getSceneGraph() {
         return sceneGraph;
     }

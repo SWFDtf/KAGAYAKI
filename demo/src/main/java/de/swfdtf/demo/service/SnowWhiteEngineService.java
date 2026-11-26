@@ -217,6 +217,12 @@ public final class SnowWhiteEngineService {
 
     /**
      * Gebündelte Laufzeit-Ressourcen für sauberes {@code try-with-resources}-Lifecycle-Management.
+     *
+     * @param projectAst     geparster Projekt-AST
+     * @param api            Engine-API-Instanz
+     * @param textureManager Textur-Manager für Bühnenbilder und Figuren
+     * @param audioEngine    Audio-Engine für Musik und Effekte
+     * @param session        laufende Skript-Session
      */
     public record SessionContext(
             VJavaAst.ProjectAst projectAst,

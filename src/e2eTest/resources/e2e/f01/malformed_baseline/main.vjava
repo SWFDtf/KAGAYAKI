@@ -1,0 +1,5 @@
+label start:
+    :: Kode für VN: Unclosed Java block @->{
+        state.set("x", 1);
+    "Unreachable"
+    return

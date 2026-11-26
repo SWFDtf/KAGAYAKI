@@ -539,27 +539,47 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
         }
     }
 
-    /** @return {@code true} if native OpenAL output was successfully initialized and is active */
+    /**
+     * Returns whether native OpenAL output is active.
+     *
+     * @return {@code true} if native OpenAL output was successfully initialized and is active
+     */
     public synchronized boolean isOpenAlActive() {
         return openAlActive;
     }
 
-    /** @return {@code true} if {@link #init()} has been called */
+    /**
+     * Returns whether this engine has been initialized.
+     *
+     * @return {@code true} if {@link #init()} has been called
+     */
     public synchronized boolean isInitialized() {
         return initialized;
     }
 
-    /** @return {@code true} if {@link #dispose()} has been called */
+    /**
+     * Returns whether this engine has been disposed.
+     *
+     * @return {@code true} if {@link #dispose()} has been called
+     */
     public synchronized boolean isDisposed() {
         return disposed;
     }
 
-    /** @return {@code true} if configured to run headless without hardware OpenAL */
+    /**
+     * Returns whether headless mode is configured.
+     *
+     * @return {@code true} if configured to run headless without hardware OpenAL
+     */
     public boolean isHeadless() {
         return headless;
     }
 
-    /** @return configured project root directory, or {@code null} */
+    /**
+     * Returns the configured project root directory.
+     *
+     * @return configured project root directory, or {@code null}
+     */
     public synchronized Path getProjectRoot() {
         return projectRoot;
     }
@@ -574,7 +594,11 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
         this.decodedFileCache.clear();
     }
 
-    /** @return attached {@link PreferencesState} */
+    /**
+     * Returns the attached {@link PreferencesState}.
+     *
+     * @return attached {@link PreferencesState}
+     */
     public synchronized PreferencesState getPreferencesState() {
         return preferencesState;
     }
@@ -589,7 +613,11 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
         syncVolumesFromPreferences();
     }
 
-    /** @return attached {@link LocalizationManager}, or {@code null} */
+    /**
+     * Returns the attached {@link LocalizationManager}.
+     *
+     * @return attached {@link LocalizationManager}, or {@code null}
+     */
     public synchronized LocalizationManager getLocalizationManager() {
         return localizationManager;
     }
@@ -603,7 +631,11 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
         this.localizationManager = localizationManager;
     }
 
-    /** @return structured logger used by this audio engine */
+    /**
+     * Returns the structured logger used by this audio engine.
+     *
+     * @return structured logger used by this audio engine
+     */
     public EngineLogger getLogger() {
         return logger;
     }

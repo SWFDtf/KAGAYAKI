@@ -100,23 +100,37 @@ public class MovieSprite extends SpriteNode implements AutoCloseable {
         return this;
     }
 
+    /** Pauses video playback on the backing player. */
     public void pause() {
         videoPlayer.pause();
     }
 
+    /** Resumes video playback on the backing player. */
     public void resume() {
         videoPlayer.resume();
     }
 
+    /** Stops video playback and resets the playback cursor. */
     public void stop() {
         videoPlayer.stop();
     }
 
+    /**
+     * Enables or disables looping video playback.
+     *
+     * @param loop {@code true} to loop playback
+     * @return {@code this} for fluent chaining
+     */
     public MovieSprite setLoop(boolean loop) {
         videoPlayer.setLoop(loop);
         return this;
     }
 
+    /**
+     * Returns whether looping video playback is enabled.
+     *
+     * @return {@code true} if looping is enabled
+     */
     public boolean isLoop() {
         return videoPlayer.isLoop();
     }
@@ -143,7 +157,11 @@ public class MovieSprite extends SpriteNode implements AutoCloseable {
         }
     }
 
-    /** @return backing {@link VideoPlayer} instance */
+    /**
+     * Returns the backing {@link VideoPlayer} instance.
+     *
+     * @return backing {@link VideoPlayer} instance
+     */
     public VideoPlayer getVideoPlayer() {
         return videoPlayer;
     }

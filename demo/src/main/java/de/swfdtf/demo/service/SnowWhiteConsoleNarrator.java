@@ -29,6 +29,10 @@ public final class SnowWhiteConsoleNarrator {
     private String lastBackground = "";
     private int lastAudioEventCount = 0;
 
+    /** Erstellt einen neuen Konsolen-Erzähler für die Demo. */
+    public SnowWhiteConsoleNarrator() {
+    }
+
     /**
      * Gibt das Startbanner mit Projekt-Metadaten aus.
      *

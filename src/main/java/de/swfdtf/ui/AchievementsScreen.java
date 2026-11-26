@@ -21,6 +21,12 @@ public class AchievementsScreen extends Screen {
 
     /**
      * View representation of a single achievement row.
+     *
+     * @param definition       backing achievement definition
+     * @param unlocked         whether the achievement is unlocked
+     * @param titleLabel       title text widget
+     * @param descriptionLabel description text widget
+     * @param statusLabel      status badge text widget
      */
     public record AchievementRowView(
             AchievementManager.AchievementDef definition,
@@ -162,14 +168,29 @@ public class AchievementsScreen extends Screen {
         }
     }
 
+    /**
+     * Returns the rendered achievement row views.
+     *
+     * @return immutable list of achievement rows
+     */
     public List<AchievementRowView> getRows() {
         return Collections.unmodifiableList(rows);
     }
 
+    /**
+     * Returns the unlocked count summary label.
+     *
+     * @return summary label
+     */
     public TextWidget getSummaryLabel() {
         return summaryLabel;
     }
 
+    /**
+     * Returns the overall achievement completion progress bar.
+     *
+     * @return progress bar
+     */
     public Bar getProgressBar() {
         return progressBar;
     }

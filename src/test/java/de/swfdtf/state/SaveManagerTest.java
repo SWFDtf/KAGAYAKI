@@ -6,7 +6,6 @@ import de.swfdtf.graphics.SceneController;
 import de.swfdtf.graphics.SceneGraph;
 import de.swfdtf.math.ColorMatrix4f;
 import de.swfdtf.math.Rect2f;
-import de.swfdtf.math.Transform2D;
 import de.swfdtf.parser.JavaBlockCompiler;
 import de.swfdtf.parser.VJavaAst;
 import de.swfdtf.state.SaveSlotData.SaveMetadata;
@@ -65,16 +64,16 @@ class SaveManagerTest {
         int width = 4;
         int height = 2;
         byte[] topToBottomRgba = new byte[]{
-                // Row 0 (top): red, green, blue, white
-                (byte) 255, 0, 0, (byte) 255,
-                0, (byte) 255, 0, (byte) 255,
-                0, 0, (byte) 255, (byte) 255,
-                (byte) 255, (byte) 255, (byte) 255, (byte) 200,
-                // Row 1 (bottom): yellow, cyan, magenta, translucent gray
-                (byte) 255, (byte) 255, 0, (byte) 255,
-                0, (byte) 255, (byte) 255, (byte) 255,
-                (byte) 255, 0, (byte) 255, (byte) 255,
-                64, 64, 64, (byte) 128
+            // Row 0 (top): red, green, blue, white
+            (byte) 255, 0, 0, (byte) 255,
+            0, (byte) 255, 0, (byte) 255,
+            0, 0, (byte) 255, (byte) 255,
+            (byte) 255, (byte) 255, (byte) 255, (byte) 200,
+            // Row 1 (bottom): yellow, cyan, magenta, translucent gray
+            (byte) 255, (byte) 255, 0, (byte) 255,
+            0, (byte) 255, (byte) 255, (byte) 255,
+            (byte) 255, 0, (byte) 255, (byte) 255,
+            64, 64, 64, (byte) 128
         };
 
         byte[] png = SaveManager.encodeRgbaToPng(width, height, topToBottomRgba);
@@ -164,10 +163,10 @@ class SaveManagerTest {
 
         // Generate PNG thumbnail via LWJGL STBImageWrite
         byte[] thumbRgba = new byte[]{
-                (byte) 20, (byte) 40, (byte) 80, (byte) 255,
-                (byte) 200, (byte) 100, (byte) 50, (byte) 255,
-                (byte) 10, (byte) 220, (byte) 120, (byte) 255,
-                (byte) 255, (byte) 255, (byte) 255, (byte) 255
+            (byte) 20, (byte) 40, (byte) 80, (byte) 255,
+            (byte) 200, (byte) 100, (byte) 50, (byte) 255,
+            (byte) 10, (byte) 220, (byte) 120, (byte) 255,
+            (byte) 255, (byte) 255, (byte) 255, (byte) 255
         };
         byte[] thumbPng = SaveManager.encodeRgbaToPng(2, 2, thumbRgba);
 

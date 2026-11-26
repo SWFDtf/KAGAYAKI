@@ -304,7 +304,8 @@ public final class WeatherOverlayController {
         return switch (preset) {
             case CLEAR -> null;
             case RAIN -> ParticleSystem.rain(Math.round(DEFAULT_RAIN_PARTICLES * scale), DEFAULT_RAIN_SPEED, windX);
-            case SNOW -> ParticleSystem.snowBlossom(Math.round(DEFAULT_SNOW_PARTICLES * scale), DEFAULT_SNOW_SPEED, windX);
+            case SNOW -> ParticleSystem.snowBlossom(
+                    Math.round(DEFAULT_SNOW_PARTICLES * scale), DEFAULT_SNOW_SPEED, windX);
             case FOG -> ParticleSystem.dust(Math.round(DEFAULT_FOG_PARTICLES * scale));
             case EMBERS -> ParticleSystem.sparks(Math.round(DEFAULT_EMBER_PARTICLES * scale));
         };

@@ -22,19 +22,19 @@ class TextureMathTest {
     @Test
     void premultiplyRgbaComputesExactRoundedScaledChannelsWithoutMutatingInput() {
         byte[] straight = new byte[]{
-                (byte) 255, (byte) 128, (byte) 64, (byte) 255,   // opaque: unchanged
-                (byte) 255, (byte) 128, (byte) 64, (byte) 0,     // transparent: zero RGB, zero A
-                (byte) 255, (byte) 200, (byte) 50, (byte) 128,   // (c * 128 + 127) / 255 -> 128, 100, 25, 128
-                (byte) 255, (byte) 100, (byte) 1,  (byte) 1      // (255*1+127)/255=1, (100*1+127)/255=0, (1*1+127)/255=0
+            (byte) 255, (byte) 128, (byte) 64, (byte) 255,   // opaque: unchanged
+            (byte) 255, (byte) 128, (byte) 64, (byte) 0,     // transparent: zero RGB, zero A
+            (byte) 255, (byte) 200, (byte) 50, (byte) 128,   // (c * 128 + 127) / 255 -> 128, 100, 25, 128
+            (byte) 255, (byte) 100, (byte) 1,  (byte) 1      // (255*1+127)/255=1, (100*1+127)/255=0
         };
         byte[] snapshot = straight.clone();
 
         byte[] actual = Texture.premultiplyRgba(straight);
         byte[] expected = new byte[]{
-                (byte) 255, (byte) 128, (byte) 64, (byte) 255,
-                (byte) 0,   (byte) 0,   (byte) 0,  (byte) 0,
-                (byte) 128, (byte) 100, (byte) 25, (byte) 128,
-                (byte) 1,   (byte) 0,   (byte) 0,  (byte) 1
+            (byte) 255, (byte) 128, (byte) 64, (byte) 255,
+            (byte) 0,   (byte) 0,   (byte) 0,  (byte) 0,
+            (byte) 128, (byte) 100, (byte) 25, (byte) 128,
+            (byte) 1,   (byte) 0,   (byte) 0,  (byte) 1
         };
 
         assertArrayEquals(expected, actual);
@@ -94,24 +94,24 @@ class TextureMathTest {
         int width = 5;
         int height = 3;
         byte[] original = new byte[]{
-                // Row 0 (top)
-                (byte) 255, (byte) 0,   (byte) 0,   (byte) 255,
-                (byte) 0,   (byte) 255, (byte) 0,   (byte) 255,
-                (byte) 0,   (byte) 0,   (byte) 255, (byte) 255,
-                (byte) 255, (byte) 255, (byte) 0,   (byte) 180,
-                (byte) 12,  (byte) 34,  (byte) 56,  (byte) 0,
-                // Row 1 (middle)
-                (byte) 200, (byte) 100, (byte) 50,  (byte) 255,
-                (byte) 10,  (byte) 20,  (byte) 30,  (byte) 90,
-                (byte) 128, (byte) 128, (byte) 128, (byte) 255,
-                (byte) 255, (byte) 0,   (byte) 255, (byte) 255,
-                (byte) 26,  (byte) 10,  (byte) 30,  (byte) 255,
-                // Row 2 (bottom)
-                (byte) 0,   (byte) 255, (byte) 255, (byte) 255,
-                (byte) 250, (byte) 240, (byte) 230, (byte) 255,
-                (byte) 1,   (byte) 2,   (byte) 3,   (byte) 4,
-                (byte) 64,  (byte) 128, (byte) 192, (byte) 220,
-                (byte) 255, (byte) 255, (byte) 255, (byte) 255
+            // Row 0 (top)
+            (byte) 255, (byte) 0,   (byte) 0,   (byte) 255,
+            (byte) 0,   (byte) 255, (byte) 0,   (byte) 255,
+            (byte) 0,   (byte) 0,   (byte) 255, (byte) 255,
+            (byte) 255, (byte) 255, (byte) 0,   (byte) 180,
+            (byte) 12,  (byte) 34,  (byte) 56,  (byte) 0,
+            // Row 1 (middle)
+            (byte) 200, (byte) 100, (byte) 50,  (byte) 255,
+            (byte) 10,  (byte) 20,  (byte) 30,  (byte) 90,
+            (byte) 128, (byte) 128, (byte) 128, (byte) 255,
+            (byte) 255, (byte) 0,   (byte) 255, (byte) 255,
+            (byte) 26,  (byte) 10,  (byte) 30,  (byte) 255,
+            // Row 2 (bottom)
+            (byte) 0,   (byte) 255, (byte) 255, (byte) 255,
+            (byte) 250, (byte) 240, (byte) 230, (byte) 255,
+            (byte) 1,   (byte) 2,   (byte) 3,   (byte) 4,
+            (byte) 64,  (byte) 128, (byte) 192, (byte) 220,
+            (byte) 255, (byte) 255, (byte) 255, (byte) 255
         };
 
         Path pngPath = tempDir.resolve("nested/assets/test_frame.png");

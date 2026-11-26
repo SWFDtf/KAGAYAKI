@@ -14,6 +14,15 @@ public class Fixed extends UiNode {
 
     /**
      * Optional alignment placement for children without an explicit pixel rectangle.
+     *
+     * @param xPos      horizontal pixel offset
+     * @param yPos      vertical pixel offset
+     * @param xAlign    normalized horizontal alignment
+     * @param yAlign    normalized vertical alignment
+     * @param hasXPos   whether {@code xPos} is set
+     * @param hasYPos   whether {@code yPos} is set
+     * @param hasXAlign whether {@code xAlign} is set
+     * @param hasYAlign whether {@code yAlign} is set
      */
     public record AlignmentSpec(
             float xPos,

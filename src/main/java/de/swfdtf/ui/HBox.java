@@ -29,7 +29,11 @@ public class HBox extends UiNode {
         return this;
     }
 
-    /** @return horizontal spacing between children */
+    /**
+     * Returns horizontal spacing between children.
+     *
+     * @return horizontal spacing between children
+     */
     public float getSpacing() {
         return spacing;
     }
@@ -45,7 +49,11 @@ public class HBox extends UiNode {
         return this;
     }
 
-    /** @return {@code true} if children are vertically centered */
+    /**
+     * Returns {@code true} if children are vertically centered.
+     *
+     * @return {@code true} if children are vertically centered
+     */
     public boolean isAlignCenterY() {
         return alignCenterY;
     }
@@ -61,7 +69,11 @@ public class HBox extends UiNode {
         return this;
     }
 
-    /** @return {@code true} if children stretch vertically */
+    /**
+     * Returns {@code true} if children stretch vertically.
+     *
+     * @return {@code true} if children stretch vertically
+     */
     public boolean isFillHeight() {
         return fillHeight;
     }

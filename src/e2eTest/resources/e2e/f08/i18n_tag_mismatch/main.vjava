@@ -1,0 +1,11 @@
+define lena = Character("Lena", color="#58a6ff")
+
+default spieler_name = "Kaito"
+
+image bg_sky = "assets/images/bg/bg_sky.png"
+
+label start:
+    scene bg_sky
+    lena "Hallo {b}[spieler_name]{/b},{w=0.4} willkommen im Turm!"
+    lena "Zweite Zeile ohne englische Übersetzung."
+    return

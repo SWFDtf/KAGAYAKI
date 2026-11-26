@@ -5,16 +5,6 @@ import de.swfdtf.graphics.SceneController;
 import de.swfdtf.math.Transform2D;
 import de.swfdtf.state.StateStore;
 
-import javax.tools.Diagnostic;
-import javax.tools.DiagnosticCollector;
-import javax.tools.FileObject;
-import javax.tools.ForwardingJavaFileManager;
-import javax.tools.JavaCompiler;
-import javax.tools.JavaFileObject;
-import javax.tools.SimpleJavaFileObject;
-import javax.tools.StandardJavaFileManager;
-import javax.tools.StandardLocation;
-import javax.tools.ToolProvider;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -40,6 +30,16 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import javax.tools.Diagnostic;
+import javax.tools.DiagnosticCollector;
+import javax.tools.FileObject;
+import javax.tools.ForwardingJavaFileManager;
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.SimpleJavaFileObject;
+import javax.tools.StandardJavaFileManager;
+import javax.tools.StandardLocation;
+import javax.tools.ToolProvider;
 
 /**
  * In-memory Java 21 compiler for embedded {@code @->{ ... }<<} script blocks inside
@@ -74,6 +74,11 @@ public final class JavaBlockCompiler {
     private static final Set<String> VISIBILITY_OR_STATIC_MODIFIERS = Set.of(
             "public", "private", "protected", "static"
     );
+
+    /** Creates a new {@code JavaBlockCompiler} instance. */
+    public JavaBlockCompiler() {
+    }
+
     private static final Set<String> STATEMENT_KEYWORDS = Set.of(
             "if", "else", "for", "while", "do", "switch", "try", "catch", "finally",
             "synchronized", "return", "throw", "assert", "break", "continue", "yield", "new"
@@ -434,7 +439,8 @@ public final class JavaBlockCompiler {
         InMemorySourceFile sourceObj = new InMemorySourceFile(USER_TYPES_BINARY_NAME, generatedSource);
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
 
-        try (StandardJavaFileManager stdManager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8);
+        try (StandardJavaFileManager stdManager = compiler.getStandardFileManager(
+                diagnostics, Locale.ROOT, StandardCharsets.UTF_8);
              InMemoryFileManager fileManager = new InMemoryFileManager(stdManager, compiledBytecode)) {
 
             List<String> options = buildCompilerOptions(classpath);
@@ -467,7 +473,8 @@ public final class JavaBlockCompiler {
                 .toList();
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
 
-        try (StandardJavaFileManager stdManager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8);
+        try (StandardJavaFileManager stdManager = compiler.getStandardFileManager(
+                diagnostics, Locale.ROOT, StandardCharsets.UTF_8);
              InMemoryFileManager fileManager = new InMemoryFileManager(stdManager, compiledBytecode)) {
 
             List<String> options = buildCompilerOptions(classpath);
@@ -608,7 +615,8 @@ public final class JavaBlockCompiler {
         return block.lineNumber() + relative;
     }
 
-    private static String formatDiagnosticSummary(String prefix, List<VJavaCompileException.CompileDiagnostic> entries) {
+    private static String formatDiagnosticSummary(
+            String prefix, List<VJavaCompileException.CompileDiagnostic> entries) {
         if (entries.isEmpty()) {
             return prefix;
         }
@@ -658,7 +666,8 @@ public final class JavaBlockCompiler {
         src.append('\n');
         src.append("public final class ").append(className).append(" implements VJavaExecutable {\n");
         src.append("    @Override\n");
-        src.append("    public void execute(StateStore state, PersistentAccess persistent, EngineAPI engine, SceneController scene) throws Exception {\n");
+        src.append("    public void execute(StateStore state, PersistentAccess persistent, ");
+        src.append("EngineAPI engine, SceneController scene) throws Exception {\n");
         currentLine += 4;
 
         int bodyStartLine = currentLine;
@@ -870,7 +879,8 @@ public final class JavaBlockCompiler {
                         }
                         String nextWord = peekWord(code, lookahead);
                         if ("else".equals(nextWord) || "catch".equals(nextWord) || "finally".equals(nextWord)
-                                || ("while".equals(nextWord) && startsWithKeyword(code.substring(segmentStart, i), "do"))) {
+                                || ("while".equals(nextWord)
+                                        && startsWithKeyword(code.substring(segmentStart, i), "do"))) {
                             continue;
                         }
                     }
@@ -918,7 +928,9 @@ public final class JavaBlockCompiler {
         }
 
         // Handle static initializer block: static { ... }
-        if ("static".equals(first.text()) && idx + 1 < headerTokens.size() && "{".equals(headerTokens.get(idx + 1).text())) {
+        if ("static".equals(first.text())
+                && idx + 1 < headerTokens.size()
+                && "{".equals(headerTokens.get(idx + 1).text())) {
             return SegmentKind.STATIC_MEMBER;
         }
 
@@ -946,7 +958,9 @@ public final class JavaBlockCompiler {
                 return SegmentKind.TYPE_DECLARATION;
             }
             // Annotation type declaration: @interface Foo
-            if ("@".equals(kw) && modCursor + 1 < headerTokens.size() && "interface".equals(headerTokens.get(modCursor + 1).text())) {
+            if ("@".equals(kw)
+                    && modCursor + 1 < headerTokens.size()
+                    && "interface".equals(headerTokens.get(modCursor + 1).text())) {
                 return SegmentKind.TYPE_DECLARATION;
             }
         }

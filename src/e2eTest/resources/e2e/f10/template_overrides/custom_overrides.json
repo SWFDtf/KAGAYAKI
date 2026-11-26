@@ -1,0 +1,21 @@
+{
+  "expectedShowcaseFiles": [
+    "snowwhite-flow.mmd",
+    "snowwhite-audit.md",
+    "snowwhite-diagnostics.json",
+    "snowwhite-asset-manifest.json",
+    "snowwhite-preflight.md"
+  ],
+  "expectedCodexEntries": [
+    "schneewittchen",
+    "zauberspiegel",
+    "sieben_zwerge",
+    "schnuerriemen",
+    "giftkamm",
+    "giftapfel",
+    "glassarg",
+    "koenigssohn"
+  ],
+  "expectedChapters": 7,
+  "expectedActionAdventureTemplate": "ACTION_ADVENTURE_2D"
+}

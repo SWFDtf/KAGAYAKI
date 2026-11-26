@@ -119,15 +119,31 @@ public interface PersistentAccess {
      */
     boolean isAchievementUnlocked(String achievementId);
 
-    /** @return immutable view of unlocked CG IDs */
+    /**
+     * Returns an immutable view of unlocked CG IDs.
+     *
+     * @return immutable view of unlocked CG IDs
+     */
     Set<String> getUnlockedCgs();
 
-    /** @return immutable view of unlocked track IDs */
+    /**
+     * Returns an immutable view of unlocked track IDs.
+     *
+     * @return immutable view of unlocked track IDs
+     */
     Set<String> getUnlockedTracks();
 
-    /** @return immutable view of unlocked ending IDs */
+    /**
+     * Returns an immutable view of unlocked ending IDs.
+     *
+     * @return immutable view of unlocked ending IDs
+     */
     Set<String> getUnlockedEndings();
 
-    /** @return immutable view of unlocked achievement IDs */
+    /**
+     * Returns an immutable view of unlocked achievement IDs.
+     *
+     * @return immutable view of unlocked achievement IDs
+     */
     Set<String> getUnlockedAchievements();
 }

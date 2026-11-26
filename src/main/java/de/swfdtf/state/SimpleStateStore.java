@@ -15,6 +15,10 @@ public class SimpleStateStore implements StateStore {
     private final Map<String, Object> variables = new LinkedHashMap<>();
     private boolean rollbackBlocked = false;
 
+    /** Creates a new empty in-memory {@code SimpleStateStore}. */
+    public SimpleStateStore() {
+    }
+
     @Override
     public synchronized void set(String key, Object value) {
         Objects.requireNonNull(key, "key must not be null");

@@ -104,7 +104,11 @@ public final class SessionState {
         return Collections.unmodifiableMap(new LinkedHashMap<>(sessionFlags));
     }
 
-    /** @return timestamp when the current session started or was reset */
+    /**
+     * Returns the session start timestamp.
+     *
+     * @return timestamp when the current session started or was reset
+     */
     public synchronized Instant getSessionStartTime() {
         return sessionStartTime;
     }
@@ -118,7 +122,11 @@ public final class SessionState {
         this.sessionStartTime = Objects.requireNonNull(sessionStartTime, "sessionStartTime must not be null");
     }
 
-    /** @return accumulated playtime in seconds */
+    /**
+     * Returns the accumulated playtime in seconds.
+     *
+     * @return accumulated playtime in seconds
+     */
     public synchronized double getPlaytimeSeconds() {
         return playtimeSeconds;
     }
@@ -135,7 +143,11 @@ public final class SessionState {
         this.playtimeSeconds = playtimeSeconds;
     }
 
-    /** @return identifier of the currently active save slot, or {@code null} if unsaved */
+    /**
+     * Returns the currently active save slot identifier.
+     *
+     * @return identifier of the currently active save slot, or {@code null} if unsaved
+     */
     public synchronized String getActiveSaveSlotId() {
         return activeSaveSlotId;
     }
@@ -149,7 +161,11 @@ public final class SessionState {
         this.activeSaveSlotId = activeSaveSlotId;
     }
 
-    /** @return timestamp of the most recent auto-save, or {@code null} if none in this session */
+    /**
+     * Returns the timestamp of the most recent auto-save.
+     *
+     * @return timestamp of the most recent auto-save, or {@code null} if none in this session
+     */
     public synchronized Instant getLastAutoSaveTime() {
         return lastAutoSaveTime;
     }

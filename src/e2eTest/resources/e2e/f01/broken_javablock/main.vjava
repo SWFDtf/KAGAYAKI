@@ -1,0 +1,7 @@
+label start:
+    :: Kode für VN: Defekter Java-Block @->{
+        int x = "not_an_int";
+        state.set("x", x);
+    }<<
+    "Fertig."
+    return

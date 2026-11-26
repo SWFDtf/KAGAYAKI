@@ -89,7 +89,8 @@ class NineSliceDrawableTest {
         assertThrows(IllegalArgumentException.class, () -> new NineSliceDrawable(tex, -1.0f, 4.0f, 4.0f, 4.0f));
         assertThrows(IllegalArgumentException.class, () -> new NineSliceDrawable(tex, 20.0f, 4.0f, 13.0f, 4.0f));
         assertThrows(IllegalArgumentException.class, () -> new NineSliceDrawable(tex, 4.0f, 20.0f, 4.0f, 13.0f));
-        assertThrows(IllegalArgumentException.class, () -> new NineSliceDrawable(1, 0.0f, 32.0f, 4.0f, 4.0f, 4.0f, 4.0f));
+        assertThrows(IllegalArgumentException.class,
+                () -> new NineSliceDrawable(1, 0.0f, 32.0f, 4.0f, 4.0f, 4.0f, 4.0f));
     }
 
     private static void assertNonOverlappingAndExactCoverage(

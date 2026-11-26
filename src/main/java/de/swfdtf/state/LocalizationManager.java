@@ -1,10 +1,9 @@
 package de.swfdtf.state;
 
-import de.swfdtf.parser.VJavaAst;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -16,9 +15,8 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * Manages live runtime language switching, {@code .vjava} {@link VJavaAst.TranslateBlock}
- * indexing and lookup, {@code tl/<lang>/} localized asset resolution, and automatic
- * {@code .vjava} translation template generation.
+ * Manages live runtime language switching, AST-free {@link TranslationBlock} /
+ * {@link TranslationEntry} indexing and lookup, and {@code tl/<lang>/} localized asset resolution.
  *
  * <p>Thread-safe for concurrent access across script execution, UI screen layout,
  * and asset loading. Language switching notifies registered listeners immediately
@@ -27,8 +25,26 @@ import java.util.function.Consumer;
 public class LocalizationManager {
 
     private static final String DEFAULT_FALLBACK_LANGUAGE = "deutsch";
-    private static final Set<String> TRANSLATABLE_SCREEN_WIDGETS = Set.of("text", "textbutton", "label");
-    private static final List<String> TRANSLATABLE_SCREEN_PROPERTIES = List.of("tooltip", "placeholder");
+
+    /**
+     * AST-free translation block grouping entries for a language and optional block identifier.
+     *
+     * @param language target language identifier (must not be {@code null})
+     * @param id       block identifier (e.g., dialogue block ID or {@code "strings"}, nullable)
+     * @param entries  ordered list of translation entries in this block
+     */
+    public record TranslationBlock(String language, String id, List<TranslationEntry> entries) {
+
+        /**
+         * Validates non-null {@code language} and defensively copies {@code entries}.
+         *
+         * @throws NullPointerException if {@code language} is {@code null}
+         */
+        public TranslationBlock {
+            Objects.requireNonNull(language, "language must not be null");
+            entries = entries != null ? List.copyOf(entries) : List.of();
+        }
+    }
 
     private String defaultLanguage;
     private String currentLanguage;
@@ -68,6 +84,8 @@ public class LocalizationManager {
      * if the language changed.
      *
      * @param language target language identifier (must not be null or blank)
+     * @throws NullPointerException     if {@code language} is {@code null}
+     * @throws IllegalArgumentException if {@code language} is blank
      */
     public void setLanguage(String language) {
         Objects.requireNonNull(language, "language must not be null");
@@ -113,6 +131,7 @@ public class LocalizationManager {
      * Registers a listener notified whenever {@link #setLanguage(String)} switches to a new language.
      *
      * @param listener consumer receiving the newly active language identifier
+     * @throws NullPointerException if {@code listener} is {@code null}
      */
     public synchronized void addLanguageChangeListener(Consumer<String> listener) {
         Objects.requireNonNull(listener, "listener must not be null");
@@ -131,27 +150,31 @@ public class LocalizationManager {
     }
 
     /**
-     * Indexes all {@link VJavaAst.TranslateBlock} entries from a parsed {@link VJavaAst.ProjectAst}
-     * by both {@code (language, id)} and {@code (language, originalText)}.
+     * Indexes all {@link TranslationBlock} entries by both {@code (language, id)} and
+     * {@code (language, sourceText)}.
      *
      * <p>Replaces any previously indexed project translations while preserving manually registered
-     * translations via {@link #registerTranslation(String, String, String)}. Empty translation values
+     * translations via {@link #registerTranslation(String, String, String)} or
+     * {@link #registerTranslation(String, TranslationEntry)}. Empty translation values
      * (such as unedited template stubs) are skipped so dialogue and UI fall back cleanly to their
      * original text.</p>
      *
-     * @param project parsed project AST
+     * @param projectDefaultLanguage optional project default language identifier (nullable/blank to keep current)
+     * @param blocks                 collection of {@link TranslationBlock} entries to index
+     * @throws NullPointerException if {@code blocks} is {@code null}
      */
-    public synchronized void indexProject(VJavaAst.ProjectAst project) {
-        Objects.requireNonNull(project, "project must not be null");
+    public synchronized void indexTranslationBlocks(
+            String projectDefaultLanguage,
+            Collection<TranslationBlock> blocks
+    ) {
+        Objects.requireNonNull(blocks, "blocks must not be null");
 
         projectById.clear();
         projectByOriginal.clear();
         indexedLanguages.clear();
 
-        if (project.descriptor() != null
-                && project.descriptor().getDefaultLanguage() != null
-                && !project.descriptor().getDefaultLanguage().isBlank()) {
-            String descLang = project.descriptor().getDefaultLanguage().trim();
+        if (projectDefaultLanguage != null && !projectDefaultLanguage.isBlank()) {
+            String descLang = projectDefaultLanguage.trim();
             this.defaultLanguage = descLang;
             recordLanguageDisplayName(descLang);
             if (!this.languageExplicitlySet) {
@@ -159,8 +182,8 @@ public class LocalizationManager {
             }
         }
 
-        for (VJavaAst.TranslateBlock block : project.translations()) {
-            if (block.language() == null || block.language().isBlank()) {
+        for (TranslationBlock block : blocks) {
+            if (block == null || block.language() == null || block.language().isBlank()) {
                 continue;
             }
             String displayLang = block.language().trim();
@@ -168,26 +191,34 @@ public class LocalizationManager {
             recordLanguageDisplayName(displayLang);
             indexedLanguages.add(langKey);
 
-            List<VJavaAst.TranslateEntry> entries = block.entries();
+            List<TranslationEntry> entries = block.entries();
             String blockId = block.id() != null ? block.id().trim() : "";
             boolean isStringsBlock = "strings".equalsIgnoreCase(blockId);
 
-            for (VJavaAst.TranslateEntry entry : entries) {
+            for (TranslationEntry entry : entries) {
+                if (entry == null) {
+                    continue;
+                }
                 String translated = entry.translatedText();
                 if (translated == null || translated.isEmpty()) {
                     continue;
                 }
-                if (entry.originalText() != null) {
+                if (entry.sourceText() != null) {
                     projectByOriginal
                             .computeIfAbsent(langKey, ignored -> new LinkedHashMap<>())
-                            .put(entry.originalText(), translated);
+                            .put(entry.sourceText(), translated);
                 }
-                if (!blockId.isEmpty() && !isStringsBlock) {
-                    Map<String, String> byIdMap = projectById.computeIfAbsent(langKey, ignored -> new LinkedHashMap<>());
+                String effectiveId = !blockId.isEmpty()
+                        ? blockId
+                        : (entry.id() != null ? entry.id().trim() : "");
+                boolean entryIsStrings = isStringsBlock || "strings".equalsIgnoreCase(effectiveId);
+                if (!effectiveId.isEmpty() && !entryIsStrings) {
+                    Map<String, String> byIdMap =
+                            projectById.computeIfAbsent(langKey, ignored -> new LinkedHashMap<>());
                     if (entries.size() == 1) {
-                        byIdMap.put(blockId, translated);
+                        byIdMap.put(effectiveId, translated);
                     } else {
-                        byIdMap.putIfAbsent(blockId, translated);
+                        byIdMap.putIfAbsent(effectiveId, translated);
                     }
                 }
             }
@@ -195,11 +226,58 @@ public class LocalizationManager {
     }
 
     /**
+     * Indexes translation entries grouped by language identifier.
+     *
+     * <p>Groups entries per language by {@link TranslationEntry#id()} into {@link TranslationBlock}
+     * instances and delegates to {@link #indexTranslationBlocks(String, Collection)}.</p>
+     *
+     * @param projectDefaultLanguage optional project default language identifier (nullable/blank to keep current)
+     * @param entriesByLanguage      mapping from language identifier to ordered {@link TranslationEntry} list
+     * @throws NullPointerException if {@code entriesByLanguage} is {@code null}
+     */
+    public synchronized void indexTranslations(
+            String projectDefaultLanguage,
+            Map<String, List<TranslationEntry>> entriesByLanguage
+    ) {
+        Objects.requireNonNull(entriesByLanguage, "entriesByLanguage must not be null");
+        List<TranslationBlock> blocks = new ArrayList<>();
+        for (Map.Entry<String, List<TranslationEntry>> langEntry : entriesByLanguage.entrySet()) {
+            String language = langEntry.getKey();
+            List<TranslationEntry> entries = langEntry.getValue();
+            if (language == null || language.isBlank() || entries == null) {
+                continue;
+            }
+            if (entries.isEmpty()) {
+                blocks.add(new TranslationBlock(language, "", List.of()));
+                continue;
+            }
+            Map<String, List<TranslationEntry>> groupedById = new LinkedHashMap<>();
+            for (TranslationEntry entry : entries) {
+                if (entry == null) {
+                    continue;
+                }
+                String blockId = entry.id() != null ? entry.id().trim() : "";
+                groupedById.computeIfAbsent(blockId, ignored -> new ArrayList<>()).add(entry);
+            }
+            if (groupedById.isEmpty()) {
+                blocks.add(new TranslationBlock(language, "", List.of()));
+            } else {
+                for (Map.Entry<String, List<TranslationEntry>> group : groupedById.entrySet()) {
+                    blocks.add(new TranslationBlock(language, group.getKey(), group.getValue()));
+                }
+            }
+        }
+        indexTranslationBlocks(projectDefaultLanguage, blocks);
+    }
+
+    /**
      * Registers or overrides a single translation entry for the specified language.
      *
      * @param language       target language identifier
      * @param keyOrOriginal  dialogue line ID, UI key, or original source text
-     * @param translatedText translated text (passing {@code null} removes the override)
+     * @param translatedText translated text (passing {@code null} or empty string removes the override)
+     * @throws NullPointerException     if {@code language} or {@code keyOrOriginal} is {@code null}
+     * @throws IllegalArgumentException if {@code language} is blank
      */
     public synchronized void registerTranslation(String language, String keyOrOriginal, String translatedText) {
         Objects.requireNonNull(language, "language must not be null");
@@ -209,14 +287,73 @@ public class LocalizationManager {
             throw new IllegalArgumentException("language must not be blank");
         }
         String langKey = normalizeLanguageKey(displayLang);
+
+        if (translatedText == null || translatedText.isEmpty()) {
+            Map<String, String> existing = manualTranslations.get(langKey);
+            if (existing != null) {
+                existing.remove(keyOrOriginal);
+                pruneManualLanguageIfEmpty(langKey);
+            }
+            return;
+        }
+
         recordLanguageDisplayName(displayLang);
         manualLanguages.add(langKey);
+        manualTranslations.computeIfAbsent(langKey, ignored -> new LinkedHashMap<>())
+                .put(keyOrOriginal, translatedText);
+    }
 
+    /**
+     * Registers or removes a manual translation override from an AST-free {@link TranslationEntry}.
+     *
+     * <p>Registers under {@link TranslationEntry#id()} (when non-blank and not {@code "strings"})
+     * and {@link TranslationEntry#sourceText()} (when non-null). Passing a {@code null} or empty
+     * {@link TranslationEntry#translatedText()} removes matching overrides without polluting
+     * {@link #getAvailableLanguages()}.</p>
+     *
+     * @param language target language identifier (must not be null or blank)
+     * @param entry    translation entry describing key/source and target text (must not be null)
+     * @throws NullPointerException     if {@code language} or {@code entry} is {@code null}
+     * @throws IllegalArgumentException if {@code language} is blank
+     */
+    public synchronized void registerTranslation(String language, TranslationEntry entry) {
+        Objects.requireNonNull(language, "language must not be null");
+        Objects.requireNonNull(entry, "entry must not be null");
+        String displayLang = language.trim();
+        if (displayLang.isEmpty()) {
+            throw new IllegalArgumentException("language must not be blank");
+        }
+        String langKey = normalizeLanguageKey(displayLang);
+        String entryId = entry.id() != null ? entry.id().trim() : "";
+        boolean hasUsableId = !entryId.isEmpty() && !"strings".equalsIgnoreCase(entryId);
+        String translated = entry.translatedText();
+
+        if (translated == null || translated.isEmpty()) {
+            Map<String, String> existing = manualTranslations.get(langKey);
+            if (existing != null) {
+                if (hasUsableId) {
+                    existing.remove(entryId);
+                }
+                if (entry.sourceText() != null) {
+                    existing.remove(entry.sourceText());
+                }
+                pruneManualLanguageIfEmpty(langKey);
+            }
+            return;
+        }
+
+        if (!hasUsableId && entry.sourceText() == null) {
+            return;
+        }
+
+        recordLanguageDisplayName(displayLang);
+        manualLanguages.add(langKey);
         Map<String, String> langMap = manualTranslations.computeIfAbsent(langKey, ignored -> new LinkedHashMap<>());
-        if (translatedText == null) {
-            langMap.remove(keyOrOriginal);
-        } else {
-            langMap.put(keyOrOriginal, translatedText);
+        if (hasUsableId) {
+            langMap.put(entryId, translated);
+        }
+        if (entry.sourceText() != null) {
+            langMap.put(entry.sourceText(), translated);
         }
     }
 
@@ -225,7 +362,7 @@ public class LocalizationManager {
      *
      * <p>Performs a fast O(1) fallback to {@code originalText} when the default language is active
      * and no override translations have been registered for it. Otherwise checks registered and
-     * project-indexed translations by {@code lineId} first, then by {@code originalText}.</p>
+     * project-indexed translations by trimmed {@code lineId} first, then by {@code originalText}.</p>
      *
      * @param lineId       canonical dialogue line identifier (nullable)
      * @param originalText original script dialogue text
@@ -237,13 +374,16 @@ public class LocalizationManager {
             return originalText;
         }
         if (lineId != null) {
-            String byManualId = lookupMap(manualTranslations, langKey, lineId);
-            if (byManualId != null) {
-                return byManualId;
-            }
-            String byProjectId = lookupMap(projectById, langKey, lineId);
-            if (byProjectId != null) {
-                return byProjectId;
+            String trimmedLineId = lineId.trim();
+            if (!trimmedLineId.isEmpty()) {
+                String byManualId = lookupMap(manualTranslations, langKey, trimmedLineId);
+                if (byManualId != null) {
+                    return byManualId;
+                }
+                String byProjectId = lookupMap(projectById, langKey, trimmedLineId);
+                if (byProjectId != null) {
+                    return byProjectId;
+                }
             }
         }
         if (originalText != null) {
@@ -349,13 +489,14 @@ public class LocalizationManager {
 
     /**
      * Returns an immutable ordered set of all available languages (default language plus any
-     * languages discovered in indexed {@link VJavaAst.TranslateBlock}s or manual registrations).
+     * languages discovered in indexed {@link TranslationBlock}s or manual registrations).
      *
      * @return immutable set of language identifiers
      */
     public synchronized Set<String> getAvailableLanguages() {
         Set<String> available = new LinkedHashSet<>();
-        available.add(defaultLanguage);
+        String defaultKey = normalizeLanguageKey(defaultLanguage);
+        available.add(languageDisplayNames.getOrDefault(defaultKey, defaultLanguage));
         for (String langKey : indexedLanguages) {
             available.add(languageDisplayNames.getOrDefault(langKey, langKey));
         }
@@ -365,66 +506,19 @@ public class LocalizationManager {
         return Collections.unmodifiableSet(available);
     }
 
-    /**
-     * Scans all {@link VJavaAst.LabelNode} dialogue lines, {@link VJavaAst.MenuStatement} choices
-     * (and captions), and {@link VJavaAst.ScreenDef} UI texts in {@code project} and generates valid
-     * {@code .vjava} {@code translate <targetLanguage> <id>:} blocks ready for translation and
-     * clean re-parsing by {@code VJavaParser}.
-     *
-     * @param project        parsed project AST to scan
-     * @param targetLanguage target language identifier for generated {@code translate} headers
-     * @return formatted {@code .vjava} translation template script
-     */
-    public static String extractTranslationTemplate(VJavaAst.ProjectAst project, String targetLanguage) {
-        Objects.requireNonNull(project, "project must not be null");
-        Objects.requireNonNull(targetLanguage, "targetLanguage must not be null");
-        String sanitizedLang = targetLanguage.trim().replaceAll("\\s+", "_");
-        if (sanitizedLang.isEmpty()) {
-            throw new IllegalArgumentException("targetLanguage must not be blank");
-        }
-
-        List<ExtractedDialogue> dialogues = new ArrayList<>();
-        Set<String> uiStrings = new LinkedHashSet<>();
-        Set<String> usedBlockIds = new LinkedHashSet<>();
-
-        for (VJavaAst.LabelNode label : project.labels().values()) {
-            collectFromStatements(label.name(), label.statements(), dialogues, uiStrings, usedBlockIds);
-        }
-        for (VJavaAst.ScreenDef screen : project.screens().values()) {
-            collectFromScreenItems(screen.items(), uiStrings);
-        }
-
-        StringBuilder out = new StringBuilder();
-        out.append("// KAGAYAKI translation template for language: ").append(sanitizedLang).append('\n');
-
-        for (ExtractedDialogue dlg : dialogues) {
-            out.append('\n');
-            out.append("translate ").append(sanitizedLang).append(' ').append(dlg.blockId()).append(":\n");
-            String escapedOriginal = escapeVJavaString(dlg.originalText());
-            if (dlg.speakerId() != null && !dlg.speakerId().isBlank()) {
-                String speaker = sanitizeIdentifier(dlg.speakerId());
-                out.append("    # ").append(speaker).append(" \"").append(escapedOriginal).append("\"\n");
-                out.append("    ").append(speaker).append(" \"\"\n");
-            } else {
-                out.append("    # \"").append(escapedOriginal).append("\"\n");
-                out.append("    \"\"\n");
-            }
-        }
-
-        if (!uiStrings.isEmpty()) {
-            out.append('\n');
-            out.append("translate ").append(sanitizedLang).append(" strings:\n");
-            for (String uiText : uiStrings) {
-                String escaped = escapeVJavaString(uiText);
-                out.append("    old \"").append(escaped).append("\"\n");
-                out.append("    new \"\"\n");
-            }
-        }
-
-        return out.toString();
-    }
-
     // ---- Internal Helpers ----
+
+    private void pruneManualLanguageIfEmpty(String langKey) {
+        Map<String, String> langMap = manualTranslations.get(langKey);
+        if (langMap == null || langMap.isEmpty()) {
+            manualTranslations.remove(langKey);
+            manualLanguages.remove(langKey);
+            if (!indexedLanguages.contains(langKey)
+                    && !langKey.equals(normalizeLanguageKey(defaultLanguage))) {
+                languageDisplayNames.remove(langKey);
+            }
+        }
+    }
 
     private boolean isDefaultFastPath(String langKey) {
         if (!langKey.equals(normalizeLanguageKey(defaultLanguage))) {
@@ -467,116 +561,5 @@ public class LocalizationManager {
         } catch (RuntimeException ignored) {
             return false;
         }
-    }
-
-    private record ExtractedDialogue(String blockId, String speakerId, String originalText) {
-    }
-
-    private static void collectFromStatements(
-            String labelName,
-            List<VJavaAst.Statement> statements,
-            List<ExtractedDialogue> dialogues,
-            Set<String> uiStrings,
-            Set<String> usedBlockIds
-    ) {
-        for (int i = 0; i < statements.size(); i++) {
-            VJavaAst.Statement stmt = statements.get(i);
-            if (stmt instanceof VJavaAst.SayStatement say) {
-                if (say.text() != null && !say.text().isEmpty()) {
-                    String blockId = buildUniqueDialogueId(labelName, i, say, usedBlockIds);
-                    dialogues.add(new ExtractedDialogue(blockId, say.speakerId(), say.text()));
-                }
-            } else if (stmt instanceof VJavaAst.MenuStatement menu) {
-                if (menu.caption() != null && !menu.caption().isBlank()) {
-                    uiStrings.add(menu.caption());
-                }
-                for (VJavaAst.MenuChoice choice : menu.choices()) {
-                    if (choice.text() != null && !choice.text().isBlank()) {
-                        uiStrings.add(choice.text());
-                    }
-                    if (!choice.body().isEmpty()) {
-                        collectFromStatements(labelName, choice.body(), dialogues, uiStrings, usedBlockIds);
-                    }
-                }
-            } else if (stmt instanceof VJavaAst.IfStatement ifs) {
-                for (VJavaAst.IfBranch branch : ifs.branches()) {
-                    if (!branch.body().isEmpty()) {
-                        collectFromStatements(labelName, branch.body(), dialogues, uiStrings, usedBlockIds);
-                    }
-                }
-            }
-        }
-    }
-
-    private static void collectFromScreenItems(List<VJavaAst.ScreenItem> items, Set<String> uiStrings) {
-        for (VJavaAst.ScreenItem item : items) {
-            String keyword = item.keyword() != null ? item.keyword().toLowerCase(Locale.ROOT) : "";
-            if ("java_block".equals(keyword)) {
-                continue;
-            }
-            if (TRANSLATABLE_SCREEN_WIDGETS.contains(keyword)
-                    && item.primaryArg() != null
-                    && !item.primaryArg().isBlank()) {
-                uiStrings.add(item.primaryArg());
-            }
-            for (String propKey : TRANSLATABLE_SCREEN_PROPERTIES) {
-                String propVal = item.properties().get(propKey);
-                if (propVal != null && !propVal.isBlank()) {
-                    uiStrings.add(propVal);
-                }
-            }
-            if (!item.children().isEmpty()) {
-                collectFromScreenItems(item.children(), uiStrings);
-            }
-        }
-    }
-
-    private static String buildUniqueDialogueId(
-            String labelName,
-            int statementIndex,
-            VJavaAst.SayStatement say,
-            Set<String> usedBlockIds
-    ) {
-        String loc;
-        if (say.sourceFile() != null && !say.sourceFile().isBlank() && say.lineNumber() > 0) {
-            loc = sanitizeIdentifier(say.sourceFile().replace('\\', '/')) + ":" + say.lineNumber();
-        } else {
-            loc = sanitizeIdentifier(labelName) + ":" + statementIndex;
-        }
-        int hash = Objects.hash(say.speakerId(), say.text());
-        String baseId = loc + ":" + Integer.toHexString(hash);
-
-        String candidate = baseId;
-        int suffix = 2;
-        while (!usedBlockIds.add(candidate)) {
-            candidate = baseId + "_" + suffix++;
-        }
-        return candidate;
-    }
-
-    private static String sanitizeIdentifier(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return "line";
-        }
-        return raw.trim().replaceAll("\\s+", "_");
-    }
-
-    private static String escapeVJavaString(String raw) {
-        if (raw == null || raw.isEmpty()) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder(raw.length() + 8);
-        for (int i = 0; i < raw.length(); i++) {
-            char c = raw.charAt(i);
-            switch (c) {
-                case '\\' -> sb.append("\\\\");
-                case '"' -> sb.append("\\\"");
-                case '\n' -> sb.append("\\n");
-                case '\r' -> sb.append("\\r");
-                case '\t' -> sb.append("\\t");
-                default -> sb.append(c);
-            }
-        }
-        return sb.toString();
     }
 }

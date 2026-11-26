@@ -113,7 +113,8 @@ public final class AutoSaveScheduler {
      * Explicitly triggers an immediate rotating auto-save regardless of elapsed time,
      * pending step count, or enabled state.
      *
-     * @return saved slot identifier wrapped in {@link Optional}, or {@link Optional#empty()} if the snapshot provider returned {@code null}
+     * @return saved slot identifier wrapped in {@link Optional}, or {@link Optional#empty()}
+     *         if the snapshot provider returned {@code null}
      */
     public synchronized Optional<String> forceSave() {
         return performSave();

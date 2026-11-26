@@ -252,10 +252,13 @@ final class UiMediaSupport {
             }
             Texture tex = resolveTexture(textureManager);
             if (tex != null && !tex.isDisposed() && tex.getTextureId() > 0) {
-                pipeline.drawTexturedQuad(tex.getTextureId(), bounds.x(), bounds.y(), bounds.width(), bounds.height(), null, getAlpha());
+                pipeline.drawTexturedQuad(
+                        tex.getTextureId(), bounds.x(), bounds.y(), bounds.width(), bounds.height(),
+                        null, getAlpha());
             } else {
                 float[] accent = ThemePalette.premultipliedRgba(ThemePalette.ELEVATED, getAlpha());
-                pipeline.drawRoundedRect(bounds.x(), bounds.y(), bounds.width(), bounds.height(), 4.0f, accent, 0.0f, null);
+                pipeline.drawRoundedRect(
+                        bounds.x(), bounds.y(), bounds.width(), bounds.height(), 4.0f, accent, 0.0f, null);
             }
         }
     }

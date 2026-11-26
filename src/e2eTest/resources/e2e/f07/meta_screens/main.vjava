@@ -1,0 +1,46 @@
+define lena = Character("Lena", color="#58a6ff", image="lena")
+
+image bg_room = "assets/images/bg/bg_room.png"
+image lena = "assets/images/char/lena.png"
+
+screen template_save_screen():
+    modal true
+    zorder 420
+    frame:
+        xalign 0.5
+        yalign 0.5
+        vbox:
+            spacing 8
+            text "Spielstand speichern" size 28
+            textbutton "Schnellspeichern" action "QuickSave()"
+            textbutton "Zurück" action "Return()"
+
+screen template_load_screen():
+    modal true
+    zorder 420
+    frame:
+        xalign 0.5
+        yalign 0.5
+        vbox:
+            spacing 8
+            text "Spielstand laden" size 28
+            textbutton "Schnellladen" action "QuickLoad()"
+            textbutton "Zurück" action "Return()"
+
+label start:
+    scene bg_room
+    show lena at center
+    lena "Erste Zeile im Kapitel eins."
+    lena "Zweite Zeile vor der Auswahl."
+    lena "Dritte Zeile kurz vor dem Menu."
+    menu "Pfad":
+        "Weiter zu Kapitel 2" -> jump chapter_2
+    return
+
+label chapter_1:
+    lena "Kapitel 1 direkt gestartet."
+    return
+
+label chapter_2:
+    lena "Kapitel 2 erreicht."
+    return

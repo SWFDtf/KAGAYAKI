@@ -28,7 +28,8 @@ class GitControllerTest {
                 message
         );
 
-        for (String allowed : List.of("feat", "fix", "arch", "render", "parser", "audio", "ui", "docs", "test", "build")) {
+        for (String allowed : List.of(
+                "feat", "fix", "arch", "render", "parser", "audio", "ui", "docs", "test", "build")) {
             String formatted = GitController.formatCommitMessage(allowed, "mod", "Valid summary", List.of("item"));
             assertTrue(formatted.startsWith(allowed + "(mod): Valid summary"));
         }

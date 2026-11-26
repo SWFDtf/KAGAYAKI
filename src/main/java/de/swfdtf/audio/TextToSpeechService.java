@@ -120,7 +120,11 @@ public final class TextToSpeechService implements AutoCloseable {
         }
     }
 
-    /** @return {@code true} if self-voicing speech output is enabled */
+    /**
+     * Returns whether self-voicing speech output is enabled.
+     *
+     * @return {@code true} if self-voicing speech output is enabled
+     */
     public boolean isEnabled() {
         return enabled;
     }
@@ -134,7 +138,11 @@ public final class TextToSpeechService implements AutoCloseable {
         this.osCommandExecutionEnabled = osCommandExecutionEnabled;
     }
 
-    /** @return {@code true} if OS speech commands are executed for spoken utterances */
+    /**
+     * Returns whether OS speech commands are executed.
+     *
+     * @return {@code true} if OS speech commands are executed for spoken utterances
+     */
     public boolean isOsCommandExecutionEnabled() {
         return osCommandExecutionEnabled;
     }
@@ -252,7 +260,11 @@ public final class TextToSpeechService implements AutoCloseable {
         }
     }
 
-    /** @return {@code true} if {@link #dispose()} has been called */
+    /**
+     * Returns whether this service has been disposed.
+     *
+     * @return {@code true} if {@link #dispose()} has been called
+     */
     public boolean isDisposed() {
         synchronized (stateLock) {
             return disposed;

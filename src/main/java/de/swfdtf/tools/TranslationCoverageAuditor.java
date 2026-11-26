@@ -143,7 +143,8 @@ public final class TranslationCoverageAuditor {
             String displayName = block.language().trim();
             String normKey = displayName.toLowerCase(Locale.ROOT);
             displayNames.putIfAbsent(normKey, displayName);
-            Set<String> translatedOriginals = translatedByLang.computeIfAbsent(normKey, ignored -> new LinkedHashSet<>());
+            Set<String> translatedOriginals = translatedByLang.computeIfAbsent(
+                    normKey, ignored -> new LinkedHashSet<>());
 
             for (VJavaAst.TranslateEntry entry : block.entries()) {
                 if (entry.originalText() != null

@@ -171,7 +171,8 @@ public class NotificationToastOverlay extends Screen {
     private void updateStatusPill() {
         boolean skip = manualSkipStatus;
         boolean auto = manualAutoStatus;
-        if (screenManager != null && screenManager.getScreen(AdvDialogueScreen.SCREEN_NAME) instanceof AdvDialogueScreen adv) {
+        if (screenManager != null
+                && screenManager.getScreen(AdvDialogueScreen.SCREEN_NAME) instanceof AdvDialogueScreen adv) {
             skip = skip || adv.isSkipActive();
             auto = auto || adv.isAutoActive();
         }
@@ -189,36 +190,76 @@ public class NotificationToastOverlay extends Screen {
         }
     }
 
+    /**
+     * Sets the skipPillActive value.
+     *
+     * @param active the active argument
+     */
     public void setSkipPillActive(boolean active) {
         this.manualSkipStatus = active;
         updateStatusPill();
     }
 
+    /**
+     * Sets the autoPillActive value.
+     *
+     * @param active the active argument
+     */
     public void setAutoPillActive(boolean active) {
         this.manualAutoStatus = active;
         updateStatusPill();
     }
 
+    /**
+     * Returns whether toastVisible is active.
+     *
+     * @return the resulting value
+     */
     public boolean isToastVisible() {
         return activeToast != null && toastCard.isVisible();
     }
 
+    /**
+     * Returns the activeToast value.
+     *
+     * @return the resulting value
+     */
     public ToastPayload getActiveToast() {
         return activeToast;
     }
 
+    /**
+     * Returns the pendingToastCount value.
+     *
+     * @return the resulting value
+     */
     public int getPendingToastCount() {
         return pendingToasts.size();
     }
 
+    /**
+     * Returns the toastCard value.
+     *
+     * @return the resulting value
+     */
     public Frame getToastCard() {
         return toastCard;
     }
 
+    /**
+     * Returns the statusPill value.
+     *
+     * @return the resulting value
+     */
     public Frame getStatusPill() {
         return statusPill;
     }
 
+    /**
+     * Returns the statusPillText value.
+     *
+     * @return the resulting value
+     */
     public TextWidget getStatusPillText() {
         return statusPillText;
     }

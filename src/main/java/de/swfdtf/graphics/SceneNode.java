@@ -87,28 +87,28 @@ public class SceneNode {
         }
         return switch (raw.length()) {
             case 3 -> new float[]{
-                    parseHexNibble(raw.charAt(0)) / 15.0f,
-                    parseHexNibble(raw.charAt(1)) / 15.0f,
-                    parseHexNibble(raw.charAt(2)) / 15.0f,
-                    1.0f
+                parseHexNibble(raw.charAt(0)) / 15.0f,
+                parseHexNibble(raw.charAt(1)) / 15.0f,
+                parseHexNibble(raw.charAt(2)) / 15.0f,
+                1.0f
             };
             case 4 -> new float[]{
-                    parseHexNibble(raw.charAt(0)) / 15.0f,
-                    parseHexNibble(raw.charAt(1)) / 15.0f,
-                    parseHexNibble(raw.charAt(2)) / 15.0f,
-                    parseHexNibble(raw.charAt(3)) / 15.0f
+                parseHexNibble(raw.charAt(0)) / 15.0f,
+                parseHexNibble(raw.charAt(1)) / 15.0f,
+                parseHexNibble(raw.charAt(2)) / 15.0f,
+                parseHexNibble(raw.charAt(3)) / 15.0f
             };
             case 6 -> new float[]{
-                    parseHexByte(raw, 0) / 255.0f,
-                    parseHexByte(raw, 2) / 255.0f,
-                    parseHexByte(raw, 4) / 255.0f,
-                    1.0f
+                parseHexByte(raw, 0) / 255.0f,
+                parseHexByte(raw, 2) / 255.0f,
+                parseHexByte(raw, 4) / 255.0f,
+                1.0f
             };
             case 8 -> new float[]{
-                    parseHexByte(raw, 0) / 255.0f,
-                    parseHexByte(raw, 2) / 255.0f,
-                    parseHexByte(raw, 4) / 255.0f,
-                    parseHexByte(raw, 6) / 255.0f
+                parseHexByte(raw, 0) / 255.0f,
+                parseHexByte(raw, 2) / 255.0f,
+                parseHexByte(raw, 4) / 255.0f,
+                parseHexByte(raw, 6) / 255.0f
             };
             default -> throw new IllegalArgumentException("Invalid hex color: " + hex);
         };
@@ -126,7 +126,11 @@ public class SceneNode {
         return (parseHexNibble(hex.charAt(index)) << 4) | parseHexNibble(hex.charAt(index + 1));
     }
 
-    /** @return optional node identifier, or {@code null} */
+    /**
+     * Returns optional node identifier, or {@code null}.
+     *
+     * @return optional node identifier, or {@code null}
+     */
     public String getId() {
         return id;
     }
@@ -142,7 +146,11 @@ public class SceneNode {
         return this;
     }
 
-    /** @return optional lookup tag, or {@code null} */
+    /**
+     * Returns optional lookup tag, or {@code null}.
+     *
+     * @return optional lookup tag, or {@code null}
+     */
     public String getTag() {
         return tag;
     }
@@ -158,7 +166,11 @@ public class SceneNode {
         return this;
     }
 
-    /** @return local Z-order within the owning layer or parent */
+    /**
+     * Returns local Z-order within the owning layer or parent.
+     *
+     * @return local Z-order within the owning layer or parent
+     */
     public int getZOrder() {
         return zOrder;
     }
@@ -174,7 +186,11 @@ public class SceneNode {
         return this;
     }
 
-    /** @return {@code true} if this node and its subtree should be rendered */
+    /**
+     * Returns {@code true} if this node and its subtree should be rendered.
+     *
+     * @return {@code true} if this node and its subtree should be rendered
+     */
     public boolean isVisible() {
         return visible;
     }
@@ -190,7 +206,11 @@ public class SceneNode {
         return this;
     }
 
-    /** @return non-null mutable {@link Transform2D} for this node */
+    /**
+     * Returns non-null mutable {@link Transform2D} for this node.
+     *
+     * @return non-null mutable {@link Transform2D} for this node
+     */
     public Transform2D getTransform() {
         return transform;
     }
@@ -206,7 +226,11 @@ public class SceneNode {
         return this;
     }
 
-    /** @return unscaled source width in logical pixels */
+    /**
+     * Returns unscaled source width in logical pixels.
+     *
+     * @return unscaled source width in logical pixels
+     */
     public float getWidth() {
         return width;
     }
@@ -222,7 +246,11 @@ public class SceneNode {
         return this;
     }
 
-    /** @return unscaled source height in logical pixels */
+    /**
+     * Returns unscaled source height in logical pixels.
+     *
+     * @return unscaled source height in logical pixels
+     */
     public float getHeight() {
         return height;
     }
@@ -325,7 +353,11 @@ public class SceneNode {
         return this;
     }
 
-    /** @return {@code true} if {@link #fillColorRgba} is stored in premultiplied alpha form */
+    /**
+     * Returns {@code true} if {@link #fillColorRgba} is stored in premultiplied alpha form.
+     *
+     * @return {@code true} if {@link #fillColorRgba} is stored in premultiplied alpha form
+     */
     public boolean isFillColorPremultiplied() {
         return fillColorPremultiplied;
     }
@@ -340,7 +372,11 @@ public class SceneNode {
         return toPremultiplied(fillColorRgba, fillColorPremultiplied, additionalAlpha);
     }
 
-    /** @return rounded-rectangle corner radius in logical pixels */
+    /**
+     * Returns rounded-rectangle corner radius in logical pixels.
+     *
+     * @return rounded-rectangle corner radius in logical pixels
+     */
     public float getCornerRadius() {
         return cornerRadius;
     }
@@ -356,7 +392,11 @@ public class SceneNode {
         return this;
     }
 
-    /** @return border thickness in logical pixels ({@code 0} disables border) */
+    /**
+     * Returns border thickness in logical pixels ({@code 0} disables border).
+     *
+     * @return border thickness in logical pixels ({@code 0} disables border)
+     */
     public float getBorderThickness() {
         return borderThickness;
     }
@@ -438,7 +478,11 @@ public class SceneNode {
         return toPremultiplied(borderColorRgba, borderColorPremultiplied, additionalAlpha);
     }
 
-    /** @return OpenGL texture ID, or {@code 0} for solid/rounded rectangles */
+    /**
+     * Returns OpenGL texture ID, or {@code 0} for solid/rounded rectangles.
+     *
+     * @return OpenGL texture ID, or {@code 0} for solid/rounded rectangles
+     */
     public int getTextureId() {
         return textureId;
     }
@@ -454,7 +498,11 @@ public class SceneNode {
         return this;
     }
 
-    /** @return non-null normalized texture UV sub-rectangle {@code (u, v, uWidth, vHeight)} */
+    /**
+     * Returns non-null normalized texture UV sub-rectangle {@code (u, v, uWidth, vHeight)}.
+     *
+     * @return non-null normalized texture UV sub-rectangle {@code (u, v, uWidth, vHeight)}
+     */
     public Rect2f getUvRect() {
         return uvRect;
     }
@@ -470,7 +518,11 @@ public class SceneNode {
         return this;
     }
 
-    /** @return arbitrary user/controller metadata attached to this node, or {@code null} */
+    /**
+     * Returns arbitrary user/controller metadata attached to this node, or {@code null}.
+     *
+     * @return arbitrary user/controller metadata attached to this node, or {@code null}
+     */
     public Object getUserData() {
         return userData;
     }
@@ -486,7 +538,11 @@ public class SceneNode {
         return this;
     }
 
-    /** @return parent node if nested inside another {@link SceneNode}, otherwise {@code null} */
+    /**
+     * Returns parent node if nested inside another {@link SceneNode}, otherwise {@code null}.
+     *
+     * @return parent node if nested inside another {@link SceneNode}, otherwise {@code null}
+     */
     public SceneNode getParent() {
         return parent;
     }
@@ -555,7 +611,11 @@ public class SceneNode {
         return Collections.unmodifiableList(children);
     }
 
-    /** @return optional custom render hook callback, or {@code null} */
+    /**
+     * Returns optional custom render hook callback, or {@code null}.
+     *
+     * @return optional custom render hook callback, or {@code null}
+     */
     public BiConsumer<SceneNode, RenderPipeline2D> getCustomRenderer() {
         return customRenderer;
     }
@@ -599,18 +659,18 @@ public class SceneNode {
         float alphaScale = Math.clamp(additionalAlpha, 0.0f, 1.0f);
         if (alreadyPremultiplied) {
             return new float[]{
-                    rgba[0] * alphaScale,
-                    rgba[1] * alphaScale,
-                    rgba[2] * alphaScale,
-                    rgba[3] * alphaScale
+                rgba[0] * alphaScale,
+                rgba[1] * alphaScale,
+                rgba[2] * alphaScale,
+                rgba[3] * alphaScale
             };
         }
         float effectiveAlpha = Math.clamp(rgba[3], 0.0f, 1.0f) * alphaScale;
         return new float[]{
-                rgba[0] * effectiveAlpha,
-                rgba[1] * effectiveAlpha,
-                rgba[2] * effectiveAlpha,
-                effectiveAlpha
+            rgba[0] * effectiveAlpha,
+            rgba[1] * effectiveAlpha,
+            rgba[2] * effectiveAlpha,
+            effectiveAlpha
         };
     }
 }

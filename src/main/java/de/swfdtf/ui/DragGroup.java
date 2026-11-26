@@ -72,12 +72,20 @@ public class DragGroup extends UiNode {
         super.clearChildren();
     }
 
-    /** @return unmodifiable list of {@link DragItem}s managed by this group */
+    /**
+     * Returns unmodifiable list of {@link DragItem}s managed by this group.
+     *
+     * @return unmodifiable list of {@link DragItem}s managed by this group
+     */
     public List<DragItem> getItems() {
         return Collections.unmodifiableList(items);
     }
 
-    /** @return currently dragged {@link DragItem}, or {@code null} */
+    /**
+     * Returns currently dragged {@link DragItem}, or {@code null}.
+     *
+     * @return currently dragged {@link DragItem}, or {@code null}
+     */
     public DragItem getActiveDraggedItem() {
         return activeDraggedItem;
     }
@@ -147,7 +155,9 @@ public class DragGroup extends UiNode {
             }
             if (child instanceof DragItem item) {
                 Rect2f existing = item.getBounds();
-                if (item.isDragging() || item.getSnappedTo() != null || (existing.width() > 0.0f && existing.height() > 0.0f)) {
+                if (item.isDragging()
+                        || item.getSnappedTo() != null
+                        || (existing.width() > 0.0f && existing.height() > 0.0f)) {
                     // Preserve interactive drag/snap positions across frame relayouts
                     continue;
                 }

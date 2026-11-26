@@ -48,6 +48,7 @@ public final class AudioDecoder {
             int sampleRate,
             double durationSeconds
     ) {
+        /** Validates buffer lengths and audio stream parameters. */
         public DecodedAudio {
             Objects.requireNonNull(monoOrInterleavedFloat, "monoOrInterleavedFloat must not be null");
             Objects.requireNonNull(pcm16, "pcm16 must not be null");
@@ -563,10 +564,10 @@ public final class AudioDecoder {
 
     private static String readFourCc(byte[] bytes, int offset) {
         return new String(new char[]{
-                (char) (bytes[offset] & 0xFF),
-                (char) (bytes[offset + 1] & 0xFF),
-                (char) (bytes[offset + 2] & 0xFF),
-                (char) (bytes[offset + 3] & 0xFF)
+            (char) (bytes[offset] & 0xFF),
+            (char) (bytes[offset + 1] & 0xFF),
+            (char) (bytes[offset + 2] & 0xFF),
+            (char) (bytes[offset + 3] & 0xFF)
         });
     }
 }

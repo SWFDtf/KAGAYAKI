@@ -1,0 +1,23 @@
+define lena = Character("Lena", color="#58a6ff")
+
+default inspected = false
+
+image bg_room = "assets/images/bg/bg_room.png"
+image player = "assets/images/sprites/player.png"
+image chest = "assets/images/sprites/chest.png"
+
+label start:
+    scene bg_room
+    show player
+    show chest
+    move player to 200 500
+    move chest to 250 500
+    wasd_init player speed 260 bounds 40 40 1880 1040 diagonal_norm true
+    on_collide player chest call inspect_chest
+    lena "Trete an die Truhe heran."
+    return
+
+label inspect_chest:
+    $ inspected = true
+    lena "Du hast die Truhe untersucht."
+    return

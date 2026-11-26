@@ -155,166 +155,294 @@ public final class PreferencesState {
         }
     }
 
-    /** @return master volume in {@code [0, 1]} */
+    /**
+     * Returns the master volume.
+     *
+     * @return master volume in {@code [0, 1]}
+     */
     public synchronized float getMasterVolume() {
         return masterVolume;
     }
 
-    /** @param masterVolume master volume in {@code [0, 1]} */
+    /**
+     * Sets the master volume.
+     *
+     * @param masterVolume master volume in {@code [0, 1]}
+     */
     public synchronized void setMasterVolume(float masterVolume) {
         this.masterVolume = clampVolume(masterVolume, 1.0f);
     }
 
-    /** @return music volume in {@code [0, 1]} */
+    /**
+     * Returns the music volume.
+     *
+     * @return music volume in {@code [0, 1]}
+     */
     public synchronized float getMusicVolume() {
         return musicVolume;
     }
 
-    /** @param musicVolume music volume in {@code [0, 1]} */
+    /**
+     * Sets the music volume.
+     *
+     * @param musicVolume music volume in {@code [0, 1]}
+     */
     public synchronized void setMusicVolume(float musicVolume) {
         this.musicVolume = clampVolume(musicVolume, 0.8f);
     }
 
-    /** @return sound effect volume in {@code [0, 1]} */
+    /**
+     * Returns the sound effect volume.
+     *
+     * @return sound effect volume in {@code [0, 1]}
+     */
     public synchronized float getSoundVolume() {
         return soundVolume;
     }
 
-    /** @param soundVolume sound effect volume in {@code [0, 1]} */
+    /**
+     * Sets the sound effect volume.
+     *
+     * @param soundVolume sound effect volume in {@code [0, 1]}
+     */
     public synchronized void setSoundVolume(float soundVolume) {
         this.soundVolume = clampVolume(soundVolume, 0.9f);
     }
 
-    /** @return voice volume in {@code [0, 1]} */
+    /**
+     * Returns the voice volume.
+     *
+     * @return voice volume in {@code [0, 1]}
+     */
     public synchronized float getVoiceVolume() {
         return voiceVolume;
     }
 
-    /** @param voiceVolume voice volume in {@code [0, 1]} */
+    /**
+     * Sets the voice volume.
+     *
+     * @param voiceVolume voice volume in {@code [0, 1]}
+     */
     public synchronized void setVoiceVolume(float voiceVolume) {
         this.voiceVolume = clampVolume(voiceVolume, 1.0f);
     }
 
-    /** @return ambient audio volume in {@code [0, 1]} */
+    /**
+     * Returns the ambient audio volume.
+     *
+     * @return ambient audio volume in {@code [0, 1]}
+     */
     public synchronized float getAmbientVolume() {
         return ambientVolume;
     }
 
-    /** @param ambientVolume ambient audio volume in {@code [0, 1]} */
+    /**
+     * Sets the ambient audio volume.
+     *
+     * @param ambientVolume ambient audio volume in {@code [0, 1]}
+     */
     public synchronized void setAmbientVolume(float ambientVolume) {
         this.ambientVolume = clampVolume(ambientVolume, 0.7f);
     }
 
-    /** @return typewriter speed in characters per second ({@code 0} for instant) */
+    /**
+     * Returns the typewriter text speed.
+     *
+     * @return typewriter speed in characters per second ({@code 0} for instant)
+     */
     public synchronized float getTextSpeedCps() {
         return textSpeedCps;
     }
 
-    /** @param textSpeedCps typewriter speed in characters per second */
+    /**
+     * Sets the typewriter text speed.
+     *
+     * @param textSpeedCps typewriter speed in characters per second
+     */
     public synchronized void setTextSpeedCps(float textSpeedCps) {
         this.textSpeedCps = (!Float.isFinite(textSpeedCps) || textSpeedCps < 0.0f) ? 40.0f : textSpeedCps;
     }
 
-    /** @return auto-forward delay in seconds */
+    /**
+     * Returns the auto-forward delay in seconds.
+     *
+     * @return auto-forward delay in seconds
+     */
     public synchronized float getAutoForwardDelaySeconds() {
         return autoForwardDelaySeconds;
     }
 
-    /** @param autoForwardDelaySeconds auto-forward delay in seconds */
+    /**
+     * Sets the auto-forward delay in seconds.
+     *
+     * @param autoForwardDelaySeconds auto-forward delay in seconds
+     */
     public synchronized void setAutoForwardDelaySeconds(float autoForwardDelaySeconds) {
         this.autoForwardDelaySeconds = (!Float.isFinite(autoForwardDelaySeconds) || autoForwardDelaySeconds < 0.0f)
                 ? 2.5f
                 : autoForwardDelaySeconds;
     }
 
-    /** @return whether unread lines may be skipped */
+    /**
+     * Returns whether unread lines may be skipped.
+     *
+     * @return whether unread lines may be skipped
+     */
     public synchronized boolean isSkipUnread() {
         return skipUnread;
     }
 
-    /** @param skipUnread whether unread lines may be skipped */
+    /**
+     * Sets whether unread lines may be skipped.
+     *
+     * @param skipUnread whether unread lines may be skipped
+     */
     public synchronized void setSkipUnread(boolean skipUnread) {
         this.skipUnread = skipUnread;
     }
 
-    /** @return whether skip continues automatically after player menu choices */
+    /**
+     * Returns whether skip continues after menu choices.
+     *
+     * @return whether skip continues automatically after player menu choices
+     */
     public synchronized boolean isSkipAfterChoices() {
         return skipAfterChoices;
     }
 
-    /** @param skipAfterChoices whether skip continues after choices */
+    /**
+     * Sets whether skip continues after menu choices.
+     *
+     * @param skipAfterChoices whether skip continues after choices
+     */
     public synchronized void setSkipAfterChoices(boolean skipAfterChoices) {
         this.skipAfterChoices = skipAfterChoices;
     }
 
-    /** @return whether fullscreen display is enabled */
+    /**
+     * Returns whether fullscreen display is enabled.
+     *
+     * @return whether fullscreen display is enabled
+     */
     public synchronized boolean isFullscreen() {
         return fullscreen;
     }
 
-    /** @param fullscreen fullscreen display flag */
+    /**
+     * Sets whether fullscreen display is enabled.
+     *
+     * @param fullscreen fullscreen display flag
+     */
     public synchronized void setFullscreen(boolean fullscreen) {
         this.fullscreen = fullscreen;
     }
 
-    /** @return render backend mode ({@code "2D"} or {@code "3D"}) */
+    /**
+     * Returns the render backend mode.
+     *
+     * @return render backend mode ({@code "2D"} or {@code "3D"})
+     */
     public synchronized String getRenderMode() {
         return renderMode;
     }
 
-    /** @param renderMode render backend mode ({@code "2D"} or {@code "3D"}) */
+    /**
+     * Sets the render backend mode.
+     *
+     * @param renderMode render backend mode ({@code "2D"} or {@code "3D"})
+     */
     public synchronized void setRenderMode(String renderMode) {
         this.renderMode = (renderMode != null && "3D".equalsIgnoreCase(renderMode.trim())) ? "3D" : "2D";
     }
 
-    /** @return active translation language identifier */
+    /**
+     * Returns the active translation language identifier.
+     *
+     * @return active translation language identifier
+     */
     public synchronized String getLanguage() {
         return language;
     }
 
-    /** @param language translation language identifier */
+    /**
+     * Sets the active translation language identifier.
+     *
+     * @param language translation language identifier
+     */
     public synchronized void setLanguage(String language) {
         this.language = (language == null || language.isBlank()) ? "deutsch" : language.trim();
     }
 
-    /** @return preferred dialogue presentation mode ({@code "ADV"}, {@code "NVL"}, {@code "BUBBLE"}) */
+    /**
+     * Returns the preferred dialogue presentation mode.
+     *
+     * @return preferred dialogue presentation mode ({@code "ADV"}, {@code "NVL"}, {@code "BUBBLE"})
+     */
     public synchronized String getDialogueMode() {
         return dialogueMode;
     }
 
-    /** @param dialogueMode preferred dialogue presentation mode */
+    /**
+     * Sets the preferred dialogue presentation mode.
+     *
+     * @param dialogueMode preferred dialogue presentation mode
+     */
     public synchronized void setDialogueMode(String dialogueMode) {
         this.dialogueMode = (dialogueMode == null || dialogueMode.isBlank())
                 ? "ADV"
                 : dialogueMode.trim().toUpperCase(Locale.ROOT);
     }
 
-    /** @return whether TTS / self-voicing accessibility mode is enabled */
+    /**
+     * Returns whether self-voicing TTS mode is enabled.
+     *
+     * @return whether TTS / self-voicing accessibility mode is enabled
+     */
     public synchronized boolean isSelfVoicing() {
         return selfVoicing;
     }
 
-    /** @param selfVoicing self-voicing accessibility flag */
+    /**
+     * Sets whether self-voicing TTS mode is enabled.
+     *
+     * @param selfVoicing self-voicing accessibility flag
+     */
     public synchronized void setSelfVoicing(boolean selfVoicing) {
         this.selfVoicing = selfVoicing;
     }
 
-    /** @return whether high-contrast & dyslexia-friendly font mode is enabled */
+    /**
+     * Returns whether high-contrast and dyslexia-friendly font mode is enabled.
+     *
+     * @return whether high-contrast &amp; dyslexia-friendly font mode is enabled
+     */
     public synchronized boolean isHighContrastDyslexiaFont() {
         return highContrastDyslexiaFont;
     }
 
-    /** @param highContrastDyslexiaFont dyslexia/high-contrast accessibility flag */
+    /**
+     * Sets whether high-contrast and dyslexia-friendly font mode is enabled.
+     *
+     * @param highContrastDyslexiaFont dyslexia/high-contrast accessibility flag
+     */
     public synchronized void setHighContrastDyslexiaFont(boolean highContrastDyslexiaFont) {
         this.highContrastDyslexiaFont = highContrastDyslexiaFont;
     }
 
-    /** @return UI accessibility text scale multiplier */
+    /**
+     * Returns the UI accessibility text scale multiplier.
+     *
+     * @return UI accessibility text scale multiplier
+     */
     public synchronized float getUiTextScale() {
         return uiTextScale;
     }
 
-    /** @param uiTextScale UI accessibility text scale multiplier ({@code > 0}) */
+    /**
+     * Sets the UI accessibility text scale multiplier.
+     *
+     * @param uiTextScale UI accessibility text scale multiplier ({@code > 0})
+     */
     public synchronized void setUiTextScale(float uiTextScale) {
         this.uiTextScale = (!Float.isFinite(uiTextScale) || uiTextScale <= 0.0f) ? 1.0f : uiTextScale;
     }

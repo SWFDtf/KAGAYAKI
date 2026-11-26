@@ -83,6 +83,8 @@ public class InputOverlayScreen extends Screen {
 
     /**
      * Synchronizes prompt text, default value, allowed characters, and max length from runtime.
+     *
+     * @param force {@code true} to force UI refresh even if prompt is unchanged
      */
     public void syncFromRuntime(boolean force) {
         ScriptRuntime.InputPrompt prompt = session.getRuntime().getActiveInput();
@@ -111,14 +113,29 @@ public class InputOverlayScreen extends Screen {
         lastPrompt = null;
     }
 
+    /**
+     * Returns the promptLabel value.
+     *
+     * @return the resulting value
+     */
     public TextWidget getPromptLabel() {
         return promptLabel;
     }
 
+    /**
+     * Returns the textInput value.
+     *
+     * @return the resulting value
+     */
     public TextInput getTextInput() {
         return textInput;
     }
 
+    /**
+     * Returns the confirmButton value.
+     *
+     * @return the resulting value
+     */
     public TextButton getConfirmButton() {
         return confirmButton;
     }

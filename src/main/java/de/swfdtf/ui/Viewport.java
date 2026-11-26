@@ -44,17 +44,29 @@ public class Viewport extends UiNode {
         return this;
     }
 
-    /** @return current vertical scroll offset in logical pixels */
+    /**
+     * Returns current vertical scroll offset in logical pixels.
+     *
+     * @return current vertical scroll offset in logical pixels
+     */
     public float getScrollY() {
         return scrollY;
     }
 
-    /** @return maximum scrollable vertical offset ({@code max(0, contentHeight - innerHeight)}) */
+    /**
+     * Returns maximum scrollable vertical offset ({@code max(0, contentHeight - innerHeight)}).
+     *
+     * @return maximum scrollable vertical offset ({@code max(0, contentHeight - innerHeight)})
+     */
     public float getMaxScrollY() {
         return maxScrollY;
     }
 
-    /** @return total measured vertical height of child content */
+    /**
+     * Returns total measured vertical height of child content.
+     *
+     * @return total measured vertical height of child content
+     */
     public float getContentHeight() {
         return contentHeight;
     }
@@ -70,7 +82,11 @@ public class Viewport extends UiNode {
         return this;
     }
 
-    /** @return {@code true} if the scrollbar is visible */
+    /**
+     * Returns {@code true} if the scrollbar is visible.
+     *
+     * @return {@code true} if the scrollbar is visible
+     */
     public boolean isScrollbarVisible() {
         return scrollbarVisible;
     }
@@ -88,12 +104,20 @@ public class Viewport extends UiNode {
         return this;
     }
 
-    /** @return scroll step per mouse wheel notch */
+    /**
+     * Returns scroll step per mouse wheel notch.
+     *
+     * @return scroll step per mouse wheel notch
+     */
     public float getScrollStep() {
         return scrollStep;
     }
 
-    /** @return {@code true} while the user is dragging the scrollbar thumb */
+    /**
+     * Returns {@code true} while the user is dragging the scrollbar thumb.
+     *
+     * @return {@code true} while the user is dragging the scrollbar thumb
+     */
     public boolean isDraggingScrollbar() {
         return draggingScrollbar;
     }
@@ -194,7 +218,8 @@ public class Viewport extends UiNode {
         }
         Rect2f inner = getContentBounds();
         Rect2f track = computeScrollbarTrack(inner);
-        if (lx >= track.x() - 4.0f && lx <= getBounds().right() && track.contains(Math.max(track.x(), Math.min(track.right(), lx)), ly)) {
+        float clampedX = Math.max(track.x(), Math.min(track.right(), lx));
+        if (lx >= track.x() - 4.0f && lx <= getBounds().right() && track.contains(clampedX, ly)) {
             draggingScrollbar = true;
             updateScrollFromPointerY(ly, inner, track);
             return true;

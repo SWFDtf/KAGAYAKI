@@ -59,7 +59,11 @@ public class WindowBox extends UiNode {
         return this;
     }
 
-    /** @return current window title text */
+    /**
+     * Returns current window title text.
+     *
+     * @return current window title text
+     */
     public String getTitle() {
         return title;
     }
@@ -75,7 +79,11 @@ public class WindowBox extends UiNode {
         return this;
     }
 
-    /** @return title header bar height in logical pixels */
+    /**
+     * Returns title header bar height in logical pixels.
+     *
+     * @return title header bar height in logical pixels
+     */
     public float getHeaderHeight() {
         return headerHeight;
     }
@@ -94,7 +102,11 @@ public class WindowBox extends UiNode {
         return this;
     }
 
-    /** @return header title font size */
+    /**
+     * Returns header title font size.
+     *
+     * @return header title font size
+     */
     public float getTitleFontSize() {
         return titleFontSize;
     }

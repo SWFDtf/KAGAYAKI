@@ -1,0 +1,14 @@
+define lena = Character("Lena", color="#58a6ff")
+
+default star_count = 1
+default speaker_gender = "female"
+default spieler_name = "Kaito"
+
+image bg_sky = "assets/images/bg/bg_sky.png"
+
+label start:
+    scene bg_sky
+    lena "Willkommen, [spieler_name]! Du hast {b}[star_count]{/b} Sterne."
+    lena "{star_count, plural, one {# Stern gefunden.} other {# Sterne gefunden.}}"
+    lena "{speaker_gender, select, female {Sie ist bereit.} male {Er ist bereit.} other {Bereit.}}"
+    return

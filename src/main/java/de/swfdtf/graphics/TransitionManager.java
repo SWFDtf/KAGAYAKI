@@ -249,6 +249,12 @@ public final class TransitionManager {
     private int activeStepIndex = 0;
     private float activeStepProgress = 0.0f;
 
+    /**
+     * Creates a new idle {@code TransitionManager} instance.
+     */
+    public TransitionManager() {
+    }
+
     // OpenGL resources (lazily initialized via initGl)
     private boolean glInitialized = false;
     private Framebuffer fromFbo;
@@ -375,17 +381,29 @@ public final class TransitionManager {
         this.activeStepProgress = 0.0f;
     }
 
-    /** @return {@code true} if a transition is currently in progress */
+    /**
+     * Returns whether a transition is currently in progress.
+     *
+     * @return {@code true} if a transition is currently in progress
+     */
     public boolean isActive() {
         return active;
     }
 
-    /** @return overall normalized transition progress in {@code [0, 1]} */
+    /**
+     * Returns the overall normalized transition progress in {@code [0, 1]}.
+     *
+     * @return overall normalized transition progress in {@code [0, 1]}
+     */
     public float getProgress() {
         return progress;
     }
 
-    /** @return currently active {@link Transition}, or {@code null} when idle/finished */
+    /**
+     * Returns the currently active {@link Transition}, if any.
+     *
+     * @return currently active {@link Transition}, or {@code null} when idle/finished
+     */
     public Transition getActiveTransition() {
         return active ? activeTransition : null;
     }
@@ -467,13 +485,13 @@ public final class TransitionManager {
 
     private void initQuadGeometry() {
         float[] vertices = {
-                0.0f, 0.0f, 0.0f, 0.0f,
-                1.0f, 0.0f, 1.0f, 0.0f,
-                1.0f, 1.0f, 1.0f, 1.0f,
+            0.0f, 0.0f, 0.0f, 0.0f,
+            1.0f, 0.0f, 1.0f, 0.0f,
+            1.0f, 1.0f, 1.0f, 1.0f,
 
-                0.0f, 0.0f, 0.0f, 0.0f,
-                1.0f, 1.0f, 1.0f, 1.0f,
-                0.0f, 1.0f, 0.0f, 1.0f
+            0.0f, 0.0f, 0.0f, 0.0f,
+            1.0f, 1.0f, 1.0f, 1.0f,
+            0.0f, 1.0f, 0.0f, 1.0f
         };
         quadVao = GL30.glGenVertexArrays();
         quadVbo = GL15.glGenBuffers();
@@ -656,12 +674,20 @@ public final class TransitionManager {
         glInitialized = false;
     }
 
-    /** @return {@code true} if OpenGL resources have been initialized via {@link #initGl(int, int)} */
+    /**
+     * Returns whether OpenGL resources have been initialized via {@link #initGl(int, int)}.
+     *
+     * @return {@code true} if OpenGL resources have been initialized via {@link #initGl(int, int)}
+     */
     public boolean isGlInitialized() {
         return glInitialized;
     }
 
-    /** @return internal captured "from" {@link Framebuffer}, or {@code null} if GL is uninitialized */
+    /**
+     * Returns the internal captured "from" {@link Framebuffer}, if initialized.
+     *
+     * @return internal captured "from" {@link Framebuffer}, or {@code null} if GL is uninitialized
+     */
     public Framebuffer getFromFramebuffer() {
         return fromFbo;
     }

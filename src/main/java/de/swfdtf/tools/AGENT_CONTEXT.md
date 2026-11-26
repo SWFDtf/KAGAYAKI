@@ -50,6 +50,7 @@ Entwickler-Werkzeuge, Dual-Window-Studio-UI und Standalone-Build-Pipeline von KA
 | `ExportPreFlightChecker` | `final class` | Release-Vorabprüfung (`PreFlightReport`) über `ProjectDescriptor`, `VJavaLinter`, `assets/` und `tl/` als Markdown-Checkliste. |
 | `VpakManifestInspector` | `final class` | Prüft alle Einträge eines `.vpak`-Archivs inklusive CRC32-Verifikation, Kompressionsrate und Extension-Statistik (`VpakInspectionReport`). |
 | `StudioWorkspaceState` | `final class` | Persistiert Studio-Workspace-Einstellungen (letztes Projekt, Recent-Projects, Panel-Auswahl) atomar als JSON. |
+| `PerformanceBenchmarkRunner` | `final class` | Reproduzierbare Micro-Benchmark-Suite für Lexer, Parser, Motion-Controller, SceneGraph-Traversal und Rich-Text-Layout inkl. `docs/BENCHMARKS.md`-Export (`BenchmarkMetric`, `BenchmarkSuiteReport`). |
 
 ## Öffentliche API-Signaturen
 

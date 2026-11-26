@@ -4,10 +4,6 @@ import de.swfdtf.core.EngineApplication;
 import de.swfdtf.core.EngineConfig;
 import de.swfdtf.core.EngineMode;
 
-import de.swfdtf.core.EngineApplication;
-import de.swfdtf.core.EngineConfig;
-import de.swfdtf.core.EngineMode;
-
 import java.nio.file.Path;
 import java.util.Optional;
 

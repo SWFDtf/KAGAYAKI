@@ -20,8 +20,11 @@ public final class ClosedCaptionQueue {
      * Accessibility caption category distinguishing spoken dialogue, sound effects, and music cues.
      */
     public enum CaptionCategory {
+        /** Spoken dialogue line. */
         DIALOGUE,
+        /** Sound effect cue. */
         SFX,
+        /** Music cue. */
         MUSIC
     }
 

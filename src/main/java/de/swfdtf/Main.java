@@ -117,7 +117,7 @@ public final class Main {
      * Resolves a default project directory when no explicit {@code --project} argument was supplied.
      *
      * @param workingDir current working directory to probe
-     * @return an {@link Optional} containing {@code workingDir} or {@code demo/project} if it holds a project descriptor
+     * @return an {@link Optional} containing {@code workingDir} or {@code demo/project} if it holds a descriptor
      */
     static Optional<Path> resolveDefaultProjectDir(Path workingDir) {
         if (workingDir == null) {

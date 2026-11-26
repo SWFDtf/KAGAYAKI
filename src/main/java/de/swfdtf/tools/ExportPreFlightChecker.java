@@ -49,6 +49,7 @@ public final class ExportPreFlightChecker {
             CheckStatus status,
             String details
     ) {
+        /** Validates check name and status, normalizing null details to empty string. */
         public CheckItem {
             Objects.requireNonNull(name, "name must not be null");
             Objects.requireNonNull(status, "status must not be null");
@@ -71,6 +72,7 @@ public final class ExportPreFlightChecker {
             List<CheckItem> checks,
             String summaryMarkdown
     ) {
+        /** Normalizes null check list and summary Markdown values. */
         public PreFlightReport {
             checks = checks != null ? List.copyOf(checks) : List.of();
             summaryMarkdown = summaryMarkdown != null ? summaryMarkdown : "";

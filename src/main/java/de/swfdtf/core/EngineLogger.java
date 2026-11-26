@@ -33,9 +33,13 @@ public final class EngineLogger {
      * Severity levels supported by {@link EngineLogger}.
      */
     public enum Level {
+        /** Diagnostic debug message. */
         DEBUG,
+        /** Informational message. */
         INFO,
+        /** Non-fatal warning message. */
         WARN,
+        /** Error message. */
         ERROR
     }
 

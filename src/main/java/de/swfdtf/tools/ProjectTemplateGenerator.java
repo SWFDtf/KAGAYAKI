@@ -82,7 +82,8 @@ public final class ProjectTemplateGenerator {
      * @param targetDir    destination project root directory
      * @param title        project display title (falls back to default if null or blank)
      * @param renderMode   render backend mode ({@code "2D"} or {@code "3D"})
-     * @param templateType scaffolding preset ({@link TemplateType#FULL_DEMO}, {@link TemplateType#STARTER}, or {@link TemplateType#MINIMAL})
+     * @param templateType scaffolding preset ({@link TemplateType#FULL_DEMO}, {@link TemplateType#STARTER},
+     *                     or {@link TemplateType#MINIMAL})
      * @return normalized path to the generated project root directory
      * @throws IOException if writing project files or assets fails
      */
@@ -246,7 +247,8 @@ public final class ProjectTemplateGenerator {
 
                     show lena neutral at center with easein(0.4)
                     voice "assets/audio/voice/lena_01.wav"
-                    lena "Willkommen in der ersten Beispielszene, [spieler_name].{w=0.4} Bereit für den Übergang in Dialog 2?"
+                    lena "Willkommen in der ersten Beispielszene, [spieler_name].{w=0.4} \
+                Bereit für den Übergang in Dialog 2?"
                     kaito "Der Sternenkompass zeigt direkt hinüber zur Bibliothek."
 
                     menu:
@@ -261,7 +263,8 @@ public final class ProjectTemplateGenerator {
                 label dialog_zwei:
                     scene bg_bibliothek with fade(0.5)
                     show lena entschlossen at left with easein(0.3)
-                    lena "Das hier ist der zweite Beispieldialog der Vorlage. Du kannst jetzt speichern, laden oder zurückspulen!"
+                    lena "Das hier ist der zweite Beispieldialog der Vorlage. \
+                Du kannst jetzt speichern, laden oder zurückspulen!"
                     stop music fadeout 1.5
                     return
                 %s""".formatted(arenaImageDefs, arenaMenuChoice, arenaLabels);
@@ -411,7 +414,8 @@ public final class ProjectTemplateGenerator {
                     new "Inspect the surroundings first."
                 %s
                 translate english start_01:
-                    # lena "Willkommen in der ersten Beispielszene, [spieler_name].{w=0.4} Bereit für den Übergang in Dialog 2?"
+                    # lena "Willkommen in der ersten Beispielszene, [spieler_name].{w=0.4} \
+                Bereit für den Übergang in Dialog 2?"
                     lena "Welcome to the first sample scene, [spieler_name].{w=0.4} Ready to proceed to Dialogue 2?"
                 %s""".formatted(arenaTranslations, arenaDialogue);
     }
@@ -681,10 +685,26 @@ public final class ProjectTemplateGenerator {
                     } else {
                         int spineHash = (x / 9 + y / 44) % 4;
                         switch (spineHash) {
-                            case 0 -> { r = 92; g = 44; b = 44; }
-                            case 1 -> { r = 46; g = 74; b = 96; }
-                            case 2 -> { r = 54; g = 82; b = 56; }
-                            default -> { r = 106; g = 84; b = 52; }
+                            case 0 -> {
+                                r = 92;
+                                g = 44;
+                                b = 44;
+                            }
+                            case 1 -> {
+                                r = 46;
+                                g = 74;
+                                b = 96;
+                            }
+                            case 2 -> {
+                                r = 54;
+                                g = 82;
+                                b = 56;
+                            }
+                            default -> {
+                                r = 106;
+                                g = 84;
+                                b = 52;
+                            }
                         }
                     }
                 }
@@ -813,7 +833,8 @@ public final class ProjectTemplateGenerator {
         return rgba;
     }
 
-    private static void fillRect(byte[] rgba, int w, int h, int x0, int y0, int x1, int y1, int r, int g, int b, int a) {
+    private static void fillRect(
+            byte[] rgba, int w, int h, int x0, int y0, int x1, int y1, int r, int g, int b, int a) {
         int minX = Math.max(0, x0);
         int maxX = Math.min(w - 1, x1);
         int minY = Math.max(0, y0);

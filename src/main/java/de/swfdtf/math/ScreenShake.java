@@ -130,32 +130,56 @@ public final class ScreenShake {
         elapsed = 0.0f;
     }
 
-    /** @return horizontal amplitude */
+    /**
+     * Returns the horizontal amplitude.
+     *
+     * @return horizontal amplitude
+     */
     public float getAmplitudeX() {
         return ampX;
     }
 
-    /** @return vertical amplitude */
+    /**
+     * Returns the vertical amplitude.
+     *
+     * @return vertical amplitude
+     */
     public float getAmplitudeY() {
         return ampY;
     }
 
-    /** @return exponential decay factor {@code lambda} */
+    /**
+     * Returns the exponential decay factor {@code lambda}.
+     *
+     * @return exponential decay factor {@code lambda}
+     */
     public float getDecay() {
         return decay;
     }
 
-    /** @return angular frequency {@code omega} */
+    /**
+     * Returns the angular frequency {@code omega}.
+     *
+     * @return angular frequency {@code omega}
+     */
     public float getOmega() {
         return omega;
     }
 
-    /** @return configured duration in seconds */
+    /**
+     * Returns the configured duration in seconds.
+     *
+     * @return configured duration in seconds
+     */
     public float getDurationSeconds() {
         return durationSeconds;
     }
 
-    /** @return current elapsed time in seconds */
+    /**
+     * Returns the current elapsed time in seconds.
+     *
+     * @return current elapsed time in seconds
+     */
     public float getElapsed() {
         return elapsed;
     }

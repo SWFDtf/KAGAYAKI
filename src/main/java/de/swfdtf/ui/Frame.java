@@ -41,7 +41,11 @@ public class Frame extends UiNode {
         return this;
     }
 
-    /** @return attached {@link NineSliceDrawable}, or {@code null} */
+    /**
+     * Returns attached {@link NineSliceDrawable}, or {@code null}.
+     *
+     * @return attached {@link NineSliceDrawable}, or {@code null}
+     */
     public NineSliceDrawable getNineSlice() {
         return nineSlice;
     }
@@ -85,7 +89,8 @@ public class Frame extends UiNode {
     @Override
     protected void drawBackgroundBox(RenderPipeline2D pipeline, float effectiveAlpha) {
         Rect2f b = getBounds();
-        if (!UiRenderSupport.isPipelineReady(pipeline) || b.width() <= 0.0f || b.height() <= 0.0f || effectiveAlpha <= 0.0f) {
+        if (!UiRenderSupport.isPipelineReady(pipeline)
+                || b.width() <= 0.0f || b.height() <= 0.0f || effectiveAlpha <= 0.0f) {
             return;
         }
         if (nineSlice != null) {

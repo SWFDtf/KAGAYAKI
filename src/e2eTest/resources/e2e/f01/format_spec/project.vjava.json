@@ -1,0 +1,13 @@
+{
+  "title": "F01 Format Specifier Fixture",
+  "version": "1.0.0",
+  "author": "KAGAYAKI E2E",
+  "renderMode": "2D",
+  "logicalWidth": 1920,
+  "logicalHeight": 1080,
+  "entryLabel": "start",
+  "defaultLanguage": "deutsch",
+  "dialogueMode": "ADV",
+  "windowTitle": "F01 Format Specifier",
+  "iconPath": ""
+}

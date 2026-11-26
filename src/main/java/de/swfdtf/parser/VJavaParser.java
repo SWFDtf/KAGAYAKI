@@ -92,11 +92,14 @@ public final class VJavaParser {
             "add", "use", "hotspot", "hotbar", "side"
     );
 
+    private static final int MAX_BLOCK_DEPTH = 64;
+
     private final Path filePath;
     private final String sourceFile;
     private final List<Token> tokens;
     private int cursor;
     private int javaBlockSequence;
+    private int blockDepth;
 
     private VJavaParser(Path filePath, String sourceFile, List<Token> tokens) {
         this.filePath = filePath;
@@ -548,13 +551,18 @@ public final class VJavaParser {
     }
 
     private List<AtlStep> parseAtlBlock(Token parentToken) {
-        List<AtlStep> steps = new ArrayList<>();
-        while (!isAtEnd() && peek().type() != TokenType.DEDENT) {
-            Token lineTok = expectLine("ATL block");
-            steps.add(parseAtlStep(lineTok));
+        enterNestedBlock(parentToken, "ATL");
+        try {
+            List<AtlStep> steps = new ArrayList<>();
+            while (!isAtEnd() && peek().type() != TokenType.DEDENT) {
+                Token lineTok = expectLine("ATL block");
+                steps.add(parseAtlStep(lineTok));
+            }
+            consumeRequiredDedent(parentToken);
+            return steps;
+        } finally {
+            blockDepth--;
         }
-        consumeRequiredDedent(parentToken);
-        return steps;
     }
 
     private AtlStep parseAtlStep(Token lineTok) {
@@ -738,6 +746,15 @@ public final class VJavaParser {
     }
 
     private ScreenItem parseScreenItem(Token itemTok) {
+        enterNestedBlock(itemTok, "screen");
+        try {
+            return parseScreenItemInternal(itemTok);
+        } finally {
+            blockDepth--;
+        }
+    }
+
+    private ScreenItem parseScreenItemInternal(Token itemTok) {
         String raw = itemTok.text();
         boolean hasBlock = endsWithColonOutsideQuotes(raw);
         String header = hasBlock ? raw.substring(0, raw.length() - 1).trim() : raw;
@@ -941,79 +958,91 @@ public final class VJavaParser {
     }
 
     private List<Statement> parseStatementBlock(Token parentToken) {
-        List<Statement> statements = new ArrayList<>();
-        while (!isAtEnd() && peek().type() != TokenType.DEDENT) {
-            Token curr = peek();
-            if (curr.type() == TokenType.JAVA_BLOCK) {
+        enterNestedBlock(parentToken, "statement");
+        try {
+            List<Statement> statements = new ArrayList<>();
+            while (!isAtEnd() && peek().type() != TokenType.DEDENT) {
+                Token curr = peek();
+                if (curr.type() == TokenType.JAVA_BLOCK) {
+                    consume();
+                    JavaBlockNode block = toJavaBlockNode(curr);
+                    statements.add(new JavaBlockStatement(block, curr.sourceFile(), curr.lineNumber()));
+                    continue;
+                }
+                if (curr.type() != TokenType.LINE) {
+                    throw error(curr, "Unexpected token inside statement block: " + curr.type());
+                }
                 consume();
-                JavaBlockNode block = toJavaBlockNode(curr);
-                statements.add(new JavaBlockStatement(block, curr.sourceFile(), curr.lineNumber()));
-                continue;
-            }
-            if (curr.type() != TokenType.LINE) {
-                throw error(curr, "Unexpected token inside statement block: " + curr.type());
-            }
-            consume();
-            String text = curr.text();
-            if (text.startsWith("$")) {
-                statements.add(parseSetVar(text, false, curr));
-                continue;
-            }
-            if (text.startsWith("\"")) {
-                statements.add(parseSayStatement(null, text, curr));
-                continue;
-            }
+                String text = curr.text();
+                if (text.startsWith("$")) {
+                    statements.add(parseSetVar(text, false, curr));
+                    continue;
+                }
+                if (text.startsWith("\"")) {
+                    statements.add(parseSayStatement(null, text, curr));
+                    continue;
+                }
 
-            String keyword = firstWord(text);
-            switch (keyword) {
-                case "pass" -> {
-                    // Explicit no-op placeholder for empty indented blocks
-                }
-                case "scene" -> statements.add(parseSceneStatement(curr));
-                case "show" -> statements.add(parseShowStatement(curr));
-                case "hide" -> statements.add(parseHideStatement(curr));
-                case "with" -> statements.add(parseWithStatement(curr));
-                case "play" -> statements.add(parsePlayStatement(curr));
-                case "queue" -> statements.add(parseQueueStatement(curr));
-                case "stop" -> statements.add(parseStopStatement(curr));
-                case "voice" -> statements.add(parseVoiceStatement(curr));
-                case "nvl" -> statements.add(parseNvlStatement(curr));
-                case "window" -> statements.add(parseWindowStatement(curr));
-                case "block_rollback" -> {
-                    String extra = text.substring("block_rollback".length()).trim();
-                    if (!extra.isEmpty()) {
-                        throw error(curr, "Unexpected arguments after 'block_rollback': " + extra);
+                String keyword = firstWord(text);
+                switch (keyword) {
+                    case "pass" -> {
+                        // Explicit no-op placeholder for empty indented blocks
                     }
-                    statements.add(new BlockRollbackStatement(curr.sourceFile(), curr.lineNumber()));
-                }
-                case "pause" -> statements.add(parsePauseStatement(curr));
-                case "jump" -> statements.add(parseJumpStatement(curr));
-                case "call" -> statements.add(parseCallStatement(curr));
-                case "return" -> statements.add(parseReturnStatement(curr));
-                case "input" -> statements.add(parseInputStatement(curr));
-                case "move" -> statements.add(parseMoveStatement(curr, false));
-                case "move_by" -> statements.add(parseMoveStatement(curr, true));
-                case "wasd_init" -> statements.add(parseWasdInitStatement(curr));
-                case "wasd_stop" -> statements.add(parseWasdStopStatement(curr));
-                case "physics_init" -> statements.add(parsePhysicsInitStatement(curr));
-                case "physics_stop" -> statements.add(parsePhysicsStopStatement(curr));
-                case "on_collide" -> statements.add(parseOnCollideStatement(curr));
-                case "if" -> statements.add(parseIfStatement(curr));
-                case "elif", "else" -> throw error(curr, "Orphaned '" + keyword + "' without preceding 'if'");
-                case "menu" -> statements.add(parseMenuStatement(curr));
-                default -> {
-                    // Speaker dialogue: <speakerId> "<text>" [with <transition>]
-                    String remainder = text.substring(keyword.length()).trim();
-                    if (remainder.startsWith("\"")) {
-                        statements.add(parseSayStatement(keyword, remainder, curr));
-                    } else {
-                        throw error(curr, "Unknown statement: '" + text + "'");
+                    case "scene" -> statements.add(parseSceneStatement(curr));
+                    case "show" -> statements.add(parseShowStatement(curr));
+                    case "hide" -> statements.add(parseHideStatement(curr));
+                    case "with" -> statements.add(parseWithStatement(curr));
+                    case "play" -> statements.add(parsePlayStatement(curr));
+                    case "queue" -> statements.add(parseQueueStatement(curr));
+                    case "stop" -> statements.add(parseStopStatement(curr));
+                    case "voice" -> statements.add(parseVoiceStatement(curr));
+                    case "nvl" -> statements.add(parseNvlStatement(curr));
+                    case "window" -> statements.add(parseWindowStatement(curr));
+                    case "block_rollback" -> {
+                        String extra = text.substring("block_rollback".length()).trim();
+                        if (!extra.isEmpty()) {
+                            throw error(curr, "Unexpected arguments after 'block_rollback': " + extra);
+                        }
+                        statements.add(new BlockRollbackStatement(curr.sourceFile(), curr.lineNumber()));
+                    }
+                    case "pause" -> statements.add(parsePauseStatement(curr));
+                    case "jump" -> statements.add(parseJumpStatement(curr));
+                    case "call" -> statements.add(parseCallStatement(curr));
+                    case "return" -> statements.add(parseReturnStatement(curr));
+                    case "input" -> statements.add(parseInputStatement(curr));
+                    case "move" -> statements.add(parseMoveStatement(curr, false));
+                    case "move_by" -> statements.add(parseMoveStatement(curr, true));
+                    case "wasd_init" -> statements.add(parseWasdInitStatement(curr));
+                    case "wasd_stop" -> statements.add(parseWasdStopStatement(curr));
+                    case "physics_init" -> statements.add(parsePhysicsInitStatement(curr));
+                    case "physics_stop" -> statements.add(parsePhysicsStopStatement(curr));
+                    case "on_collide" -> statements.add(parseOnCollideStatement(curr));
+                    case "if" -> statements.add(parseIfStatement(curr));
+                    case "elif", "else" -> throw error(curr, "Orphaned '" + keyword + "' without preceding 'if'");
+                    case "menu" -> statements.add(parseMenuStatement(curr));
+                    default -> {
+                        // Speaker dialogue: <speakerId> "<text>" [with <transition>]
+                        String remainder = text.substring(keyword.length()).trim();
+                        if (remainder.startsWith("\"")) {
+                            statements.add(parseSayStatement(keyword, remainder, curr));
+                        } else {
+                            throw error(curr, "Unknown statement: '" + text + "'");
+                        }
                     }
                 }
             }
+            consumeRequiredDedent(parentToken);
+            return statements;
+        } finally {
+            blockDepth--;
         }
-        consumeRequiredDedent(parentToken);
-        return statements;
+    }
+
+    private void enterNestedBlock(Token token, String blockKind) {
+        blockDepth++;
+        if (blockDepth > MAX_BLOCK_DEPTH) {
+            throw error(token, "Maximum " + blockKind + " nesting depth (" + MAX_BLOCK_DEPTH + ") exceeded");
+        }
     }
 
     private SceneStatement parseSceneStatement(Token token) {
@@ -1082,7 +1111,8 @@ public final class VJavaParser {
             inlineAtl = parseAtlBlock(token);
         }
 
-        return new ShowStatement(tag, attributes, positionExpr, transitionExpr, inlineAtl, token.sourceFile(), token.lineNumber());
+        return new ShowStatement(
+                tag, attributes, positionExpr, transitionExpr, inlineAtl, token.sourceFile(), token.lineNumber());
     }
 
     private HideStatement parseHideStatement(Token token) {
@@ -1151,7 +1181,8 @@ public final class VJavaParser {
             }
         }
 
-        return new PlayStatement(channel, assetPath, loop, fadeInSeconds, volume, token.sourceFile(), token.lineNumber());
+        return new PlayStatement(
+                channel, assetPath, loop, fadeInSeconds, volume, token.sourceFile(), token.lineNumber());
     }
 
     private QueueStatement parseQueueStatement(Token token) {
@@ -1288,7 +1319,8 @@ public final class VJavaParser {
                 default -> throw error(token, "Unknown option in '" + keyword + "' statement: " + parts.get(i));
             }
         }
-        return new MoveStatement(tag, targetX, targetY, relative, durationSeconds, easing, token.sourceFile(), token.lineNumber());
+        return new MoveStatement(
+                tag, targetX, targetY, relative, durationSeconds, easing, token.sourceFile(), token.lineNumber());
     }
 
     private WasdInitStatement parseWasdInitStatement(Token token) {
@@ -1336,7 +1368,8 @@ public final class VJavaParser {
                 default -> throw error(token, "Unknown option in 'wasd_init': " + parts.get(i));
             }
         }
-        return new WasdInitStatement(tag, speed, minX, minY, maxX, maxY, normalizeDiagonal, token.sourceFile(), token.lineNumber());
+        return new WasdInitStatement(
+                tag, speed, minX, minY, maxX, maxY, normalizeDiagonal, token.sourceFile(), token.lineNumber());
     }
 
     private WasdStopStatement parseWasdStopStatement(Token token) {
@@ -1611,7 +1644,8 @@ public final class VJavaParser {
         }
         consumeRequiredDedent(menuToken);
 
-        return new MenuStatement(caption, timeoutSeconds, timeoutJumpLabel, choices, menuToken.sourceFile(), menuToken.lineNumber());
+        return new MenuStatement(
+                caption, timeoutSeconds, timeoutJumpLabel, choices, menuToken.sourceFile(), menuToken.lineNumber());
     }
 
     private MenuChoice parseMenuChoice(String text, String remainder, Token itemTok) {

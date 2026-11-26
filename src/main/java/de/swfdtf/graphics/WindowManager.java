@@ -142,17 +142,29 @@ public final class WindowManager {
         }
     }
 
-    /** @return live game window (Window B), or {@code null} if not initialized */
+    /**
+     * Returns the live game window (Window B).
+     *
+     * @return live game window (Window B), or {@code null} if not initialized
+     */
     public GlfwWindow getGameWindow() {
         return gameWindow;
     }
 
-    /** @return studio authoring window (Window A), or {@code null} in standalone mode */
+    /**
+     * Returns the studio authoring window (Window A).
+     *
+     * @return studio authoring window (Window A), or {@code null} in standalone mode
+     */
     public GlfwWindow getStudioWindow() {
         return studioWindow;
     }
 
-    /** @return {@code true} if a Studio window (Window A) is currently open */
+    /**
+     * Returns whether a Studio window (Window A) is currently open.
+     *
+     * @return {@code true} if a Studio window (Window A) is currently open
+     */
     public boolean hasStudioWindow() {
         return studioWindow != null && !studioWindow.isDestroyed();
     }
@@ -178,7 +190,11 @@ public final class WindowManager {
         return studioWindow != null && studioWindow.shouldClose();
     }
 
-    /** @return {@code true} if GLFW has been initialized by this manager */
+    /**
+     * Returns whether GLFW has been initialized by this manager.
+     *
+     * @return {@code true} if GLFW has been initialized by this manager
+     */
     public boolean isGlfwInitialized() {
         return glfwInitialized;
     }
@@ -232,7 +248,8 @@ public final class WindowManager {
 
         long handle = GLFW.glfwCreateWindow(width, height, title, MemoryUtil.NULL, shareHandle);
         if (handle == MemoryUtil.NULL) {
-            throw new IllegalStateException("Failed to create GLFW window '" + title + "' (" + width + "x" + height + ")");
+            throw new IllegalStateException(
+                    "Failed to create GLFW window '" + title + "' (" + width + "x" + height + ")");
         }
         return new GlfwWindow(handle, title, width, height);
     }

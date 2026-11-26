@@ -40,10 +40,41 @@ public class GalleryScreen extends Screen {
             this.selectButton = selectButton;
         }
 
-        public GalleryManager.GalleryEntry getEntry() { return entry; }
-        public boolean isUnlocked() { return unlocked; }
-        public TextButton getSelectButton() { return selectButton; }
-        public String getDisplayedAssetPath() { return previewNode.getAssetPath(); }
+        /**
+         * Returns the entry value.
+         *
+         * @return the resulting value
+         */
+        public GalleryManager.GalleryEntry getEntry() {
+            return entry;
+        }
+
+        /**
+         * Returns whether unlocked is active.
+         *
+         * @return the resulting value
+         */
+        public boolean isUnlocked() {
+            return unlocked;
+        }
+
+        /**
+         * Returns the selectButton value.
+         *
+         * @return the resulting value
+         */
+        public TextButton getSelectButton() {
+            return selectButton;
+        }
+
+        /**
+         * Returns the displayedAssetPath value.
+         *
+         * @return the resulting value
+         */
+        public String getDisplayedAssetPath() {
+            return previewNode.getAssetPath();
+        }
     }
 
     private final ScriptSession session;
@@ -241,6 +272,8 @@ public class GalleryScreen extends Screen {
 
     /**
      * Selects an unlocked gallery entry and resets variation index to {@code 0}.
+     *
+     * @param entry gallery entry to select
      */
     public void selectEntry(GalleryManager.GalleryEntry entry) {
         if (entry == null || !session.getGalleryManager().isUnlocked(entry.id())) {
@@ -253,6 +286,8 @@ public class GalleryScreen extends Screen {
 
     /**
      * Cycles the active variation index by {@code delta} ({@code -1} or {@code +1}).
+     *
+     * @param delta relative step offset
      */
     public void stepVariation(int delta) {
         if (selectedEntry == null) {
@@ -276,12 +311,22 @@ public class GalleryScreen extends Screen {
         setZoomed(!zoomed);
     }
 
+    /**
+     * Sets the zoomed value.
+     *
+     * @param zoomed the zoomed argument
+     */
     public void setZoomed(boolean zoomed) {
         this.zoomed = zoomed && selectedEntry != null;
         zoomOverlay.setVisible(this.zoomed);
         updateViewer();
     }
 
+    /**
+     * Returns whether zoomed is active.
+     *
+     * @return the resulting value
+     */
     public boolean isZoomed() {
         return zoomed;
     }
@@ -298,7 +343,9 @@ public class GalleryScreen extends Screen {
             return;
         }
         List<String> paths = resolveVariationPaths(selectedEntry);
-        String activePath = paths.isEmpty() ? selectedEntry.thumbnailPath() : paths.get(Math.min(variationIndex, paths.size() - 1));
+        String activePath = paths.isEmpty()
+                ? selectedEntry.thumbnailPath()
+                : paths.get(Math.min(variationIndex, paths.size() - 1));
         viewerImage.setAssetPath(activePath);
         zoomImage.setAssetPath(activePath);
 
@@ -333,18 +380,38 @@ public class GalleryScreen extends Screen {
         }
     }
 
+    /**
+     * Returns the cardViews value.
+     *
+     * @return the resulting value
+     */
     public List<GalleryCardView> getCardViews() {
         return Collections.unmodifiableList(cardViews);
     }
 
+    /**
+     * Returns the selectedEntry value.
+     *
+     * @return the resulting value
+     */
     public GalleryManager.GalleryEntry getSelectedEntry() {
         return selectedEntry;
     }
 
+    /**
+     * Returns the variationIndex value.
+     *
+     * @return the resulting value
+     */
     public int getVariationIndex() {
         return variationIndex;
     }
 
+    /**
+     * Returns the activeVariationPath value.
+     *
+     * @return the resulting value
+     */
     public String getActiveVariationPath() {
         return viewerImage.getAssetPath();
     }

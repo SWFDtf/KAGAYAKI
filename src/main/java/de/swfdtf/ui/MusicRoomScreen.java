@@ -56,6 +56,10 @@ public class MusicRoomScreen extends Screen {
 
     /**
      * Creates a {@code MusicRoomScreen} with an explicit {@link AudioEngine}.
+     *
+     * @param session       active script session
+     * @param screenManager UI screen manager
+     * @param audioEngine   explicit audio engine (nullable)
      */
     public MusicRoomScreen(ScriptSession session, ScreenManager screenManager, AudioEngine audioEngine) {
         super(SCREEN_NAME, SceneLayer.Z_MODAL, true);
@@ -239,31 +243,65 @@ public class MusicRoomScreen extends Screen {
         return explicitAudioEngine != null ? explicitAudioEngine : UiMediaSupport.findAudioEngine(session);
     }
 
+    /**
+     * Sets the audioEngine value.
+     *
+     * @param audioEngine the audioEngine argument
+     */
     public void setAudioEngine(AudioEngine audioEngine) {
         this.explicitAudioEngine = audioEngine;
     }
 
+    /**
+     * Returns the spectrumBands value.
+     *
+     * @return the resulting value
+     */
     public float[] getSpectrumBands() {
         return spectrumBands.clone();
     }
 
+    /**
+     * Returns the currentTrackId value.
+     *
+     * @return the resulting value
+     */
     public String getCurrentTrackId() {
         return currentTrackId;
     }
 
+    /**
+     * Returns the nowPlayingLabel value.
+     *
+     * @return the resulting value
+     */
     public TextWidget getNowPlayingLabel() {
         return nowPlayingLabel;
     }
 
+    /**
+     * Returns the stopButton value.
+     *
+     * @return the resulting value
+     */
     public TextButton getStopButton() {
         return stopButton;
     }
 
+    /**
+     * Returns the trackButtons value.
+     *
+     * @return the resulting value
+     */
     public List<TextButton> getTrackButtons() {
         return Collections.unmodifiableList(trackButtons);
     }
 
-    /** @return unmodifiable list of the 16 spectrum {@link VBar} visualizer widgets */
+    /**
+     * Returns unmodifiable list of the 16 spectrum {@link VBar} visualizer widgets.
+     *
+     * @return unmodifiable list of the 16 spectrum {@link VBar} visualizer widgets
+     */
     public List<VBar> getSpectrumBars() {
         return Collections.unmodifiableList(spectrumBars);
     }

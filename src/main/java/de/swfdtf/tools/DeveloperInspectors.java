@@ -2,10 +2,10 @@ package de.swfdtf.tools;
 
 import de.swfdtf.core.EngineAPI;
 import de.swfdtf.core.EngineLogger;
+import de.swfdtf.graphics.FontManager;
 import de.swfdtf.graphics.RenderPipeline2D;
 import de.swfdtf.graphics.SceneController;
 import de.swfdtf.graphics.SceneLayer;
-import de.swfdtf.graphics.FontManager;
 import de.swfdtf.graphics.TextureManager;
 import de.swfdtf.math.Rect2f;
 import de.swfdtf.parser.JavaBlockCompiler;
@@ -109,7 +109,9 @@ public class DeveloperInspectors extends Screen {
             String idPart = (nodeId != null && !nodeId.isBlank()) ? "#" + nodeId : "(no-id)";
             return String.format(
                     Locale.ROOT,
-                    "[%s] %s %s\nBounds: (%.1f, %.1f, %.1f, %.1f)\nBg: %s | Border: %s (%.1fpx) | Radius: %.1f\nState: visible=%s enabled=%s hovered=%s focused=%s",
+                    "[%s] %s %s\nBounds: (%.1f, %.1f, %.1f, %.1f)\n"
+                            + "Bg: %s | Border: %s (%.1fpx) | Radius: %.1f\n"
+                            + "State: visible=%s enabled=%s hovered=%s focused=%s",
                     screenName,
                     nodeClass,
                     idPart,
@@ -312,7 +314,8 @@ public class DeveloperInspectors extends Screen {
         this.consoleInput = new TextInput("", text -> executeConsoleSnippet(text));
         this.consoleInput.setPlaceholder("e.g. state.set(\"gold\", 999);");
         this.consoleInput.setPreferredSize(580.0f, 38.0f);
-        this.consoleExecuteButton = createButton("Execute", 120.0f, 38.0f, () -> executeConsoleSnippet(consoleInput.getText()));
+        this.consoleExecuteButton = createButton(
+                "Execute", 120.0f, 38.0f, () -> executeConsoleSnippet(consoleInput.getText()));
         this.consoleExecuteButton.setBackgroundColorHex(ThemePalette.ACCENT_IDLE);
         TextButton clearConsoleBtn = createButton("Clear", 90.0f, 38.0f, this::clearConsoleLog);
         inputRow.addChild(consoleInput);
@@ -367,12 +370,16 @@ public class DeveloperInspectors extends Screen {
                 Rect2f b = lastInspectedStyle.bounds();
                 float[] border = ThemePalette.premultipliedRgba(ThemePalette.ACCENT_HOVER, 0.95f);
                 float[] fill = new float[]{0.0f, 0.0f, 0.0f, 0.0f};
-                pipeline.drawRoundedRect(b.x(), b.y(), b.width(), b.height(), lastInspectedStyle.cornerRadius(), fill, 2.0f, border);
+                pipeline.drawRoundedRect(
+                        b.x(), b.y(), b.width(), b.height(),
+                        lastInspectedStyle.cornerRadius(), fill, 2.0f, border);
             }
             if (coordinatePickerActive) {
                 float[] crosshairColor = ThemePalette.premultipliedRgba(ThemePalette.ACCENT_HOVER, 0.7f);
-                float logicalW = screenManager != null ? screenManager.getLogicalWidth() : RenderPipeline2D.DEFAULT_LOGICAL_WIDTH;
-                float logicalH = screenManager != null ? screenManager.getLogicalHeight() : RenderPipeline2D.DEFAULT_LOGICAL_HEIGHT;
+                float logicalW = screenManager != null
+                        ? screenManager.getLogicalWidth() : RenderPipeline2D.DEFAULT_LOGICAL_WIDTH;
+                float logicalH = screenManager != null
+                        ? screenManager.getLogicalHeight() : RenderPipeline2D.DEFAULT_LOGICAL_HEIGHT;
                 pipeline.drawRect(0.0f, cursorY, logicalW, 1.0f, crosshairColor);
                 pipeline.drawRect(cursorX, 0.0f, 1.0f, logicalH, crosshairColor);
             }
@@ -513,7 +520,11 @@ public class DeveloperInspectors extends Screen {
         }
     }
 
-    /** @return {@code true} if Style Inspector is currently active */
+    /**
+     * Returns whether the Style Inspector is active.
+     *
+     * @return {@code true} if Style Inspector is currently active
+     */
     public boolean isStyleInspectorActive() {
         return styleInspectorActive;
     }
@@ -564,7 +575,11 @@ public class DeveloperInspectors extends Screen {
         return null;
     }
 
-    /** @return most recent {@link StyleInspectionResult}, or {@code null} */
+    /**
+     * Returns the most recent style inspection result.
+     *
+     * @return most recent {@link StyleInspectionResult}, or {@code null}
+     */
     public StyleInspectionResult getLastInspectedStyle() {
         return lastInspectedStyle;
     }
@@ -594,7 +609,11 @@ public class DeveloperInspectors extends Screen {
         }
     }
 
-    /** @return {@code true} if Coordinate Picker is currently active */
+    /**
+     * Returns whether the Coordinate Picker is active.
+     *
+     * @return {@code true} if Coordinate Picker is currently active
+     */
     public boolean isCoordinatePickerActive() {
         return coordinatePickerActive;
     }
@@ -606,8 +625,10 @@ public class DeveloperInspectors extends Screen {
      * @param ly logical Y coordinate
      */
     public void updateCursorPosition(float lx, float ly) {
-        float logicalW = screenManager != null ? screenManager.getLogicalWidth() : RenderPipeline2D.DEFAULT_LOGICAL_WIDTH;
-        float logicalH = screenManager != null ? screenManager.getLogicalHeight() : RenderPipeline2D.DEFAULT_LOGICAL_HEIGHT;
+        float logicalW = screenManager != null
+                ? screenManager.getLogicalWidth() : RenderPipeline2D.DEFAULT_LOGICAL_WIDTH;
+        float logicalH = screenManager != null
+                ? screenManager.getLogicalHeight() : RenderPipeline2D.DEFAULT_LOGICAL_HEIGHT;
         this.cursorX = lx;
         this.cursorY = ly;
         this.normalizedX = lx / Math.max(1.0f, logicalW);
@@ -652,7 +673,11 @@ public class DeveloperInspectors extends Screen {
         return pickCoordinate(cursorX, cursorY);
     }
 
-    /** @return immutable list of picked coordinates in chronological order */
+    /**
+     * Returns the recorded coordinate pick history.
+     *
+     * @return immutable list of picked coordinates in chronological order
+     */
     public List<PickedCoordinate> getPickedHistory() {
         return Collections.unmodifiableList(new ArrayList<>(pickedHistory));
     }
@@ -712,7 +737,11 @@ public class DeveloperInspectors extends Screen {
         }
     }
 
-    /** @return {@code true} if the Live Java Console is currently open */
+    /**
+     * Returns whether the Live Java Console is open.
+     *
+     * @return {@code true} if the Live Java Console is currently open
+     */
     public boolean isConsoleActive() {
         return consoleActive;
     }
@@ -794,7 +823,11 @@ public class DeveloperInspectors extends Screen {
         }
     }
 
-    /** @return immutable chronological list of console log lines */
+    /**
+     * Returns the console log history.
+     *
+     * @return immutable chronological list of console log lines
+     */
     public List<String> getConsoleLog() {
         return Collections.unmodifiableList(new ArrayList<>(consoleLog));
     }
@@ -832,7 +865,8 @@ public class DeveloperInspectors extends Screen {
         }
         String cleanLabel = labelName.trim();
         targetSession.getRuntime().jumpToLabel(cleanLabel);
-        appendConsoleLine("[Warp] Jumped to label '" + cleanLabel + "' (status=" + targetSession.getRuntime().getStatus() + ")");
+        appendConsoleLine("[Warp] Jumped to label '" + cleanLabel
+                + "' (status=" + targetSession.getRuntime().getStatus() + ")");
     }
 
     /**
@@ -882,7 +916,8 @@ public class DeveloperInspectors extends Screen {
             if (!sb.isEmpty()) {
                 sb.append('\n');
             }
-            sb.append("#").append(i + 1).append(": ").append(p.xposYposSnippet()).append(" | ").append(p.alignSnippet());
+            sb.append("#").append(i + 1).append(": ")
+                    .append(p.xposYposSnippet()).append(" | ").append(p.alignSnippet());
         }
         coordinateHistoryLabel.setText(sb.toString());
     }
@@ -937,7 +972,11 @@ public class DeveloperInspectors extends Screen {
 
     // ---- Public Configuration & Accessors ----
 
-    /** @return currently bound {@link ScriptSession} */
+    /**
+     * Returns the currently bound script session.
+     *
+     * @return currently bound {@link ScriptSession}
+     */
     public ScriptSession getSession() {
         return session;
     }
@@ -969,62 +1008,110 @@ public class DeveloperInspectors extends Screen {
         this.onLiveReload = onLiveReload;
     }
 
-    /** @return latest tracked logical X cursor position */
+    /**
+     * Returns the latest tracked logical X cursor position.
+     *
+     * @return latest tracked logical X cursor position
+     */
     public float getCursorX() {
         return cursorX;
     }
 
-    /** @return latest tracked logical Y cursor position */
+    /**
+     * Returns the latest tracked logical Y cursor position.
+     *
+     * @return latest tracked logical Y cursor position
+     */
     public float getCursorY() {
         return cursorY;
     }
 
-    /** @return latest tracked normalized X cursor coordinate */
+    /**
+     * Returns the latest tracked normalized X cursor coordinate.
+     *
+     * @return latest tracked normalized X cursor coordinate
+     */
     public float getNormalizedX() {
         return normalizedX;
     }
 
-    /** @return latest tracked normalized Y cursor coordinate */
+    /**
+     * Returns the latest tracked normalized Y cursor coordinate.
+     *
+     * @return latest tracked normalized Y cursor coordinate
+     */
     public float getNormalizedY() {
         return normalizedY;
     }
 
-    /** @return Style Inspector panel {@link WindowBox} */
+    /**
+     * Returns the Style Inspector panel window box.
+     *
+     * @return Style Inspector panel {@link WindowBox}
+     */
     public WindowBox getStyleInspectorBox() {
         return styleInspectorBox;
     }
 
-    /** @return Coordinate Picker panel {@link WindowBox} */
+    /**
+     * Returns the Coordinate Picker panel window box.
+     *
+     * @return Coordinate Picker panel {@link WindowBox}
+     */
     public WindowBox getCoordinatePickerBox() {
         return coordinatePickerBox;
     }
 
-    /** @return Live Java Console &amp; Warp panel {@link WindowBox} */
+    /**
+     * Returns the Live Java Console and Warp panel window box.
+     *
+     * @return Live Java Console &amp; Warp panel {@link WindowBox}
+     */
     public WindowBox getConsoleBox() {
         return consoleBox;
     }
 
-    /** @return Live Java Console snippet {@link TextInput} */
+    /**
+     * Returns the Live Java Console snippet input field.
+     *
+     * @return Live Java Console snippet {@link TextInput}
+     */
     public TextInput getConsoleInput() {
         return consoleInput;
     }
 
-    /** @return Live Java Console execute {@link TextButton} */
+    /**
+     * Returns the Live Java Console execute button.
+     *
+     * @return Live Java Console execute {@link TextButton}
+     */
     public TextButton getConsoleExecuteButton() {
         return consoleExecuteButton;
     }
 
-    /** @return Script Warp target label {@link TextInput} */
+    /**
+     * Returns the Script Warp target label input field.
+     *
+     * @return Script Warp target label {@link TextInput}
+     */
     public TextInput getWarpLabelInput() {
         return warpLabelInput;
     }
 
-    /** @return Script Warp {@link TextButton} */
+    /**
+     * Returns the Script Warp action button.
+     *
+     * @return Script Warp {@link TextButton}
+     */
     public TextButton getWarpButton() {
         return warpButton;
     }
 
-    /** @return Live Reload {@link TextButton} */
+    /**
+     * Returns the Live Reload action button.
+     *
+     * @return Live Reload {@link TextButton}
+     */
     public TextButton getReloadButton() {
         return reloadButton;
     }

@@ -1,0 +1,9 @@
+default route = "west"
+
+label start:
+    match route:
+        case "east":
+            "Osten."
+        case "east":
+            "Doppelter Zweig."
+    return

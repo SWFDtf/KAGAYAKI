@@ -134,13 +134,13 @@ public record EngineConfig(
                     projectExplicitlySet = true;
                 }
                 case "--mode", "--render-mode" ->
-                        builder.renderModeName(requireNextValue(args, i++, arg));
+                    builder.renderModeName(requireNextValue(args, i++, arg));
                 case "--width" ->
-                        builder.logicalWidth(parsePositiveInt(requireNextValue(args, i++, "--width"), "--width"));
+                    builder.logicalWidth(parsePositiveInt(requireNextValue(args, i++, "--width"), "--width"));
                 case "--height" ->
-                        builder.logicalHeight(parsePositiveInt(requireNextValue(args, i++, "--height"), "--height"));
+                    builder.logicalHeight(parsePositiveInt(requireNextValue(args, i++, "--height"), "--height"));
                 case "--fps", "--target-fps" ->
-                        builder.targetFps(parsePositiveInt(requireNextValue(args, i++, arg), arg));
+                    builder.targetFps(parsePositiveInt(requireNextValue(args, i++, arg), arg));
                 default -> {
                     if (arg.startsWith("--project=")) {
                         builder.projectDir(Path.of(arg.substring("--project=".length())));

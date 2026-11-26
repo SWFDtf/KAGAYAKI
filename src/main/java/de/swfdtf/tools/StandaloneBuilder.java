@@ -42,7 +42,7 @@ public final class StandaloneBuilder {
      *
      * @param outputDir           normalized export output directory
      * @param vpakFile            path to generated {@code game.vpak}
-     * @param standaloneJar       path to bundled standalone JAR inside {@code outputDir}, or {@code null} if only a runtime reference was written
+     * @param standaloneJar       path to bundled standalone JAR inside {@code outputDir}, or {@code null} if omitted
      * @param launcherScript      path to generated POSIX launcher {@code run_game.sh}
      * @param packagingDescriptor path to generated {@code standalone-packaging.json}
      * @param packagedEntries     number of entries packed into {@code game.vpak}
@@ -124,7 +124,10 @@ public final class StandaloneBuilder {
     private static Path bundleOrWriteRuntimeReference(Path outputDir, Path optionalStandaloneJar) throws IOException {
         if (optionalStandaloneJar != null && Files.isRegularFile(optionalStandaloneJar)) {
             Path targetJar = outputDir.resolve(STANDALONE_JAR_NAME);
-            Files.copy(optionalStandaloneJar.toAbsolutePath().normalize(), targetJar, StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(
+                    optionalStandaloneJar.toAbsolutePath().normalize(),
+                    targetJar,
+                    StandardCopyOption.REPLACE_EXISTING);
             return targetJar;
         }
 

@@ -123,20 +123,20 @@ class SceneGraphTest {
         assertEquals(0, parent.getTextureId());
 
         float[] expectedStraight = new float[]{
-                0x8b / 255.0f,
-                0x94 / 255.0f,
-                0x9e / 255.0f,
-                0x7f / 255.0f
+            0x8b / 255.0f,
+            0x94 / 255.0f,
+            0x9e / 255.0f,
+            0x7f / 255.0f
         };
         assertArrayEquals(expectedStraight, parent.getFillColorRgba(), EPS);
 
         float[] premul = parent.getPremultipliedFillColor(0.5f);
         float effA = expectedStraight[3] * 0.5f;
         assertArrayEquals(new float[]{
-                expectedStraight[0] * effA,
-                expectedStraight[1] * effA,
-                expectedStraight[2] * effA,
-                effA
+            expectedStraight[0] * effA,
+            expectedStraight[1] * effA,
+            expectedStraight[2] * effA,
+            effA
         }, premul, EPS);
 
         SceneNode child = new SceneNode("label");

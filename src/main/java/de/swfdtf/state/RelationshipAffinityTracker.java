@@ -36,11 +36,17 @@ public class RelationshipAffinityTracker {
      * </ul>
      */
     public enum RelationshipTier {
+        /** Negative affinity ({@code points < 0}). */
         HOSTILE(Integer.MIN_VALUE),
+        /** Initial neutral tier ({@code 0 <= points < 10}). */
         STRANGER(0),
+        /** Casual acquaintance tier ({@code 10 <= points < 25}). */
         ACQUAINTANCE(10),
+        /** Friendly tier ({@code 25 <= points < 50}). */
         FRIEND(25),
+        /** Trusted ally tier ({@code 50 <= points < 80}). */
         TRUSTED(50),
+        /** Highest devotion tier ({@code points >= 80}). */
         DEVOTED(80);
 
         private final int minPoints;

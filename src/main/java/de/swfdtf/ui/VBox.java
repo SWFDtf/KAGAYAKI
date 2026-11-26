@@ -32,7 +32,11 @@ public class VBox extends UiNode {
         return this;
     }
 
-    /** @return vertical spacing between children */
+    /**
+     * Returns vertical spacing between children.
+     *
+     * @return vertical spacing between children
+     */
     public float getSpacing() {
         return spacing;
     }
@@ -48,7 +52,11 @@ public class VBox extends UiNode {
         return this;
     }
 
-    /** @return {@code true} if children stretch to content width */
+    /**
+     * Returns {@code true} if children stretch to content width.
+     *
+     * @return {@code true} if children stretch to content width
+     */
     public boolean isFillWidth() {
         return fillWidth;
     }
@@ -64,7 +72,11 @@ public class VBox extends UiNode {
         return this;
     }
 
-    /** @return {@code true} if children are horizontally centered */
+    /**
+     * Returns {@code true} if children are horizontally centered.
+     *
+     * @return {@code true} if children are horizontally centered
+     */
     public boolean isAlignCenterX() {
         return alignCenterX;
     }

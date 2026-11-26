@@ -12,7 +12,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -30,9 +29,13 @@ public final class VideoPlayer implements AutoCloseable {
      * Playback lifecycle state of a {@link VideoPlayer}.
      */
     public enum State {
+        /** Stopped option. */
         STOPPED,
+        /** Playing option. */
         PLAYING,
+        /** Paused option. */
         PAUSED,
+        /** Ended option. */
         ENDED
     }
 
@@ -40,13 +43,25 @@ public final class VideoPlayer implements AutoCloseable {
      * Pluggable decoded RGBA frame producer for video playback.
      */
     public interface FrameSource extends AutoCloseable {
-        /** @return frame width in pixels ({@code > 0}) */
+        /**
+         * Returns frame width in pixels ({@code > 0}).
+         *
+         * @return frame width in pixels ({@code > 0})
+         */
         int getWidth();
 
-        /** @return frame height in pixels ({@code > 0}) */
+        /**
+         * Returns frame height in pixels ({@code > 0}).
+         *
+         * @return frame height in pixels ({@code > 0})
+         */
         int getHeight();
 
-        /** @return nominal playback frame rate in frames per second ({@code > 0}) */
+        /**
+         * Returns nominal playback frame rate in frames per second ({@code > 0}).
+         *
+         * @return nominal playback frame rate in frames per second ({@code > 0})
+         */
         double getFps();
 
         /**
@@ -142,7 +157,9 @@ public final class VideoPlayer implements AutoCloseable {
                 for (int x = 0; x < width; x++) {
                     int idx = (y * width + x) * 4;
                     boolean onBar = (x == barX);
-                    rgba[idx] = onBar ? (byte) 0x58 : (byte) (((x * 255) / Math.max(1, width - 1) + frameMarker) & 0xFF);
+                    rgba[idx] = onBar
+                            ? (byte) 0x58
+                            : (byte) (((x * 255) / Math.max(1, width - 1) + frameMarker) & 0xFF);
                     rgba[idx + 1] = onBar ? (byte) 0xA6 : (byte) ((gy + current * 13) & 0xFF);
                     rgba[idx + 2] = onBar ? (byte) 0xFF : (byte) ((current * 29) & 0xFF);
                     rgba[idx + 3] = (byte) 0xFF;
@@ -163,12 +180,20 @@ public final class VideoPlayer implements AutoCloseable {
             closed = true;
         }
 
-        /** @return zero-based index of the next frame to be emitted */
+        /**
+         * Returns zero-based index of the next frame to be emitted.
+         *
+         * @return zero-based index of the next frame to be emitted
+         */
         public int getFrameIndex() {
             return frameIndex;
         }
 
-        /** @return total finite frames, or {@code <= 0} if infinite */
+        /**
+         * Returns total finite frames, or {@code <= 0} if infinite.
+         *
+         * @return total finite frames, or {@code <= 0} if infinite
+         */
         public int getTotalFrames() {
             return totalFrames;
         }
@@ -500,12 +525,20 @@ public final class VideoPlayer implements AutoCloseable {
             frameQueue.clear();
         }
 
-        /** @return {@code true} if the FFmpeg process launched successfully */
+        /**
+         * Returns {@code true} if the FFmpeg process launched successfully.
+         *
+         * @return {@code true} if the FFmpeg process launched successfully
+         */
         public boolean isAvailable() {
             return available;
         }
 
-        /** @return diagnostic error message if launch failed, or {@code null} */
+        /**
+         * Returns diagnostic error message if launch failed, or {@code null}.
+         *
+         * @return diagnostic error message if launch failed, or {@code null}
+         */
         public String getErrorMessage() {
             return errorMessage;
         }
@@ -628,7 +661,11 @@ public final class VideoPlayer implements AutoCloseable {
         this.loop = loop;
     }
 
-    /** @return {@code true} if looping is enabled */
+    /**
+     * Returns {@code true} if looping is enabled.
+     *
+     * @return {@code true} if looping is enabled
+     */
     public boolean isLoop() {
         return loop;
     }
@@ -750,63 +787,119 @@ public final class VideoPlayer implements AutoCloseable {
         currentFrameIndex = -1;
     }
 
-    /** @return latest uploaded OpenGL {@link Texture}, or {@code null} when GL is disabled or no frame uploaded */
+    /**
+     * Returns latest uploaded OpenGL {@link Texture}, or {@code null} when GL is disabled or no frame uploaded.
+     *
+     * @return latest uploaded OpenGL {@link Texture}, or {@code null} when GL is disabled or no frame uploaded
+     */
     public Texture getCurrentTexture() {
         return currentTexture;
     }
 
-    /** @return defensive copy of the most recently decoded straight RGBA8 frame, or {@code null} */
+    /**
+     * Returns defensive copy of the most recently decoded straight RGBA8 frame, or {@code null}.
+     *
+     * @return defensive copy of the most recently decoded straight RGBA8 frame, or {@code null}
+     */
     public byte[] getLatestFrameRgba() {
         return latestFrameRgba != null ? latestFrameRgba.clone() : null;
     }
 
-    /** @return active {@link FrameSource}, or {@code null} */
+    /**
+     * Returns active {@link FrameSource}, or {@code null}.
+     *
+     * @return active {@link FrameSource}, or {@code null}
+     */
     public FrameSource getFrameSource() {
         return frameSource;
     }
 
-    /** @return current playback {@link State} */
+    /**
+     * Returns current playback {@link State}.
+     *
+     * @return current playback {@link State}
+     */
     public State getState() {
         return state;
     }
 
+    /**
+     * Returns whether playing is active.
+     *
+     * @return the resulting value
+     */
     public boolean isPlaying() {
         return state == State.PLAYING;
     }
 
+    /**
+     * Returns whether paused is active.
+     *
+     * @return the resulting value
+     */
     public boolean isPaused() {
         return state == State.PAUSED;
     }
 
+    /**
+     * Returns whether stopped is active.
+     *
+     * @return the resulting value
+     */
     public boolean isStopped() {
         return state == State.STOPPED;
     }
 
+    /**
+     * Returns whether ended is active.
+     *
+     * @return the resulting value
+     */
     public boolean isEnded() {
         return state == State.ENDED;
     }
 
-    /** @return zero-based index of the currently displayed frame, or {@code -1} if none */
+    /**
+     * Returns zero-based index of the currently displayed frame, or {@code -1} if none.
+     *
+     * @return zero-based index of the currently displayed frame, or {@code -1} if none
+     */
     public long getCurrentFrameIndex() {
         return currentFrameIndex;
     }
 
-    /** @return current video width in pixels, or {@code 0} if no source is attached */
+    /**
+     * Returns current video width in pixels, or {@code 0} if no source is attached.
+     *
+     * @return current video width in pixels, or {@code 0} if no source is attached
+     */
     public int getWidth() {
         return frameSource != null ? frameSource.getWidth() : 0;
     }
 
-    /** @return current video height in pixels, or {@code 0} if no source is attached */
+    /**
+     * Returns current video height in pixels, or {@code 0} if no source is attached.
+     *
+     * @return current video height in pixels, or {@code 0} if no source is attached
+     */
     public int getHeight() {
         return frameSource != null ? frameSource.getHeight() : 0;
     }
 
-    /** @return nominal video frame rate, or {@code 0.0} if no source is attached */
+    /**
+     * Returns nominal video frame rate, or {@code 0.0} if no source is attached.
+     *
+     * @return nominal video frame rate, or {@code 0.0} if no source is attached
+     */
     public double getFps() {
         return frameSource != null ? frameSource.getFps() : 0.0;
     }
 
-    /** @return {@code true} if OpenGL texture uploading is enabled */
+    /**
+     * Returns {@code true} if OpenGL texture uploading is enabled.
+     *
+     * @return {@code true} if OpenGL texture uploading is enabled
+     */
     public boolean isGlEnabled() {
         return glEnabled;
     }

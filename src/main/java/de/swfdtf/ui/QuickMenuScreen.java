@@ -82,7 +82,8 @@ public class QuickMenuScreen extends Screen {
     @Override
     public void update(double dt) {
         super.update(dt);
-        if (screenManager != null && screenManager.getScreen(AdvDialogueScreen.SCREEN_NAME) instanceof AdvDialogueScreen adv) {
+        if (screenManager != null
+                && screenManager.getScreen(AdvDialogueScreen.SCREEN_NAME) instanceof AdvDialogueScreen adv) {
             skipButton.setSelected(adv.isSkipActive());
             autoButton.setSelected(adv.isAutoActive());
         }
@@ -90,7 +91,8 @@ public class QuickMenuScreen extends Screen {
     }
 
     private void toggleSkip() {
-        if (screenManager != null && screenManager.getScreen(AdvDialogueScreen.SCREEN_NAME) instanceof AdvDialogueScreen adv) {
+        if (screenManager != null
+                && screenManager.getScreen(AdvDialogueScreen.SCREEN_NAME) instanceof AdvDialogueScreen adv) {
             adv.toggleSkip();
             skipButton.setSelected(adv.isSkipActive());
         } else {
@@ -99,7 +101,8 @@ public class QuickMenuScreen extends Screen {
     }
 
     private void toggleAuto() {
-        if (screenManager != null && screenManager.getScreen(AdvDialogueScreen.SCREEN_NAME) instanceof AdvDialogueScreen adv) {
+        if (screenManager != null
+                && screenManager.getScreen(AdvDialogueScreen.SCREEN_NAME) instanceof AdvDialogueScreen adv) {
             adv.toggleAuto();
             autoButton.setSelected(adv.isAutoActive());
         } else {
@@ -139,13 +142,84 @@ public class QuickMenuScreen extends Screen {
         }
     }
 
-    public HBox getBarBox() { return barBox; }
-    public TextButton getBackButton() { return backButton; }
-    public TextButton getHistoryButton() { return historyButton; }
-    public TextButton getSkipButton() { return skipButton; }
-    public TextButton getAutoButton() { return autoButton; }
-    public TextButton getSaveButton() { return saveButton; }
-    public TextButton getQuickSaveButton() { return quickSaveButton; }
-    public TextButton getQuickLoadButton() { return quickLoadButton; }
-    public TextButton getPrefsButton() { return prefsButton; }
+    /**
+     * Returns the barBox value.
+     *
+     * @return the resulting value
+     */
+    public HBox getBarBox() {
+        return barBox;
+    }
+
+    /**
+     * Returns the backButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getBackButton() {
+        return backButton;
+    }
+
+    /**
+     * Returns the historyButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getHistoryButton() {
+        return historyButton;
+    }
+
+    /**
+     * Returns the skipButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getSkipButton() {
+        return skipButton;
+    }
+
+    /**
+     * Returns the autoButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getAutoButton() {
+        return autoButton;
+    }
+
+    /**
+     * Returns the saveButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getSaveButton() {
+        return saveButton;
+    }
+
+    /**
+     * Returns the quickSaveButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getQuickSaveButton() {
+        return quickSaveButton;
+    }
+
+    /**
+     * Returns the quickLoadButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getQuickLoadButton() {
+        return quickLoadButton;
+    }
+
+    /**
+     * Returns the prefsButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getPrefsButton() {
+        return prefsButton;
+    }
 }

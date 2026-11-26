@@ -7,8 +7,8 @@ import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import de.swfdtf.state.SaveSlotData.SaveMetadata;
 import de.swfdtf.state.SaveSlotData.SavedScriptPosition;
-import org.lwjgl.stb.STBImageWrite;
 import org.lwjgl.stb.STBIWriteCallback;
+import org.lwjgl.stb.STBImageWrite;
 import org.lwjgl.system.MemoryUtil;
 
 import java.io.BufferedReader;
@@ -279,9 +279,10 @@ public final class SaveManager {
             SavedScriptPosition scriptPos = root.has("scriptPosition") && !root.get("scriptPosition").isJsonNull()
                     ? GSON.fromJson(root.get("scriptPosition"), SavedScriptPosition.class)
                     : null;
-            List<HistoryLog.HistoryEntry> history = root.has("historyEntries") && root.get("historyEntries").isJsonArray()
-                    ? GSON.fromJson(root.get("historyEntries"), HISTORY_LIST_TYPE)
-                    : List.of();
+            List<HistoryLog.HistoryEntry> history =
+                    root.has("historyEntries") && root.get("historyEntries").isJsonArray()
+                            ? GSON.fromJson(root.get("historyEntries"), HISTORY_LIST_TYPE)
+                            : List.of();
             return new SaveSlotData(metadata, variables, scriptPos, history);
         } catch (RuntimeException e) {
             throw new IOException("Failed to deserialize save slot '" + slotId + "': " + e.getMessage(), e);
@@ -416,12 +417,20 @@ public final class SaveManager {
         return Files.isRegularFile(file);
     }
 
-    /** @return normalized saves directory path */
+    /**
+     * Returns the normalized saves directory path.
+     *
+     * @return normalized saves directory path
+     */
     public Path getSavesDir() {
         return savesDir;
     }
 
-    /** @return configured rotating auto-save slot count */
+    /**
+     * Returns the configured rotating auto-save slot count.
+     *
+     * @return configured rotating auto-save slot count
+     */
     public int getAutoSaveSlotCount() {
         return autoSaveSlotCount;
     }

@@ -23,6 +23,10 @@ public final class GameClock {
      */
     public static final int MAX_STEPS_PER_FRAME = 15;
 
+    /** Creates a new {@code GameClock} initialized to zero elapsed time. */
+    public GameClock() {
+    }
+
     private static final double FPS_WINDOW_SECONDS = 1.0 - 1e-9;
 
     private double accumulator = 0.0;

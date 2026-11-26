@@ -30,6 +30,7 @@ public class VJavaCompileException extends RuntimeException {
             String kind,
             String message
     ) {
+        /** Normalizes null diagnostic fields to empty strings. */
         public CompileDiagnostic {
             blockId = blockId != null ? blockId : "";
             sourceFile = sourceFile != null ? sourceFile : "";
@@ -55,11 +56,41 @@ public class VJavaCompileException extends RuntimeException {
         }
     }
 
+    /**
+     * Originating {@code .vjava} block identifier.
+     *
+     * @serial
+     */
     private final String blockId;
+    /**
+     * Originating {@code .vjava} source file path.
+     *
+     * @serial
+     */
     private final String sourceFile;
+    /**
+     * 1-based line number in the originating {@code .vjava} file.
+     *
+     * @serial
+     */
     private final int lineNumber;
+    /**
+     * Formatted compiler diagnostic messages.
+     *
+     * @serial
+     */
     private final List<String> diagnosticMessages;
+    /**
+     * Structured compiler diagnostic records.
+     *
+     * @serial
+     */
     private final List<CompileDiagnostic> diagnostics;
+    /**
+     * Generated Java source passed to {@code javac}.
+     *
+     * @serial
+     */
     private final String generatedSource;
 
     /**

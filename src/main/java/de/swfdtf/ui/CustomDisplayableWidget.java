@@ -24,7 +24,11 @@ public class CustomDisplayableWidget extends UiNode {
         this.displayable = displayable;
     }
 
-    /** @return wrapped {@link CustomDisplayable}, or {@code null} */
+    /**
+     * Returns wrapped {@link CustomDisplayable}, or {@code null}.
+     *
+     * @return wrapped {@link CustomDisplayable}, or {@code null}
+     */
     public CustomDisplayable getDisplayable() {
         return displayable;
     }

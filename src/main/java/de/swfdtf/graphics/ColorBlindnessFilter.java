@@ -14,24 +14,24 @@ import java.util.Objects;
 public final class ColorBlindnessFilter {
 
     private static final ColorMatrix4f PROTANOPIA_MATRIX = ColorMatrix4f.ofRowMajor(new float[]{
-            0.567f, 0.433f, 0.000f, 0.0f,
-            0.558f, 0.442f, 0.000f, 0.0f,
-            0.000f, 0.242f, 0.758f, 0.0f,
-            0.000f, 0.000f, 0.000f, 1.0f
+        0.567f, 0.433f, 0.000f, 0.0f,
+        0.558f, 0.442f, 0.000f, 0.0f,
+        0.000f, 0.242f, 0.758f, 0.0f,
+        0.000f, 0.000f, 0.000f, 1.0f
     });
 
     private static final ColorMatrix4f DEUTERANOPIA_MATRIX = ColorMatrix4f.ofRowMajor(new float[]{
-            0.625f, 0.375f, 0.000f, 0.0f,
-            0.700f, 0.300f, 0.000f, 0.0f,
-            0.000f, 0.300f, 0.700f, 0.0f,
-            0.000f, 0.000f, 0.000f, 1.0f
+        0.625f, 0.375f, 0.000f, 0.0f,
+        0.700f, 0.300f, 0.000f, 0.0f,
+        0.000f, 0.300f, 0.700f, 0.0f,
+        0.000f, 0.000f, 0.000f, 1.0f
     });
 
     private static final ColorMatrix4f TRITANOPIA_MATRIX = ColorMatrix4f.ofRowMajor(new float[]{
-            0.950f, 0.050f, 0.000f, 0.0f,
-            0.000f, 0.433f, 0.567f, 0.0f,
-            0.000f, 0.475f, 0.525f, 0.0f,
-            0.000f, 0.000f, 0.000f, 1.0f
+        0.950f, 0.050f, 0.000f, 0.0f,
+        0.000f, 0.433f, 0.567f, 0.0f,
+        0.000f, 0.475f, 0.525f, 0.0f,
+        0.000f, 0.000f, 0.000f, 1.0f
     });
 
     private static final ColorMatrix4f HIGH_CONTRAST_MATRIX = ColorMatrix4f.contrast(1.4f)

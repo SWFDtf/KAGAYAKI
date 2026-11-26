@@ -179,11 +179,14 @@ public final class VpakArchiver {
             if (tocLengthLong > Integer.MAX_VALUE) {
                 throw new IOException("VPAK table of contents exceeds maximum buffer size");
             }
+            if (entryCount > 0 && (long) entryCount * 37L > tocLengthLong) {
+                throw new IOException("Corrupt VPAK entryCount exceeds available table of contents bytes");
+            }
             ByteBuffer tocBuf = ByteBuffer.allocate((int) tocLengthLong).order(ByteOrder.BIG_ENDIAN);
             readFully(channel, tocOffset, tocBuf);
             tocBuf.flip();
 
-            Map<String, StoredEntry> entries = new LinkedHashMap<>(entryCount);
+            Map<String, StoredEntry> entries = new LinkedHashMap<>(Math.min(entryCount, 1024));
             for (int i = 0; i < entryCount; i++) {
                 if (tocBuf.remaining() < 4) {
                     throw new IOException("Truncated VPAK table of contents at entry " + i);
@@ -204,9 +207,10 @@ public final class VpakArchiver {
                 long crc32 = tocBuf.getLong();
 
                 if (dataOffset < HEADER_SIZE
+                        || dataOffset > tocOffset
                         || uncompressedSize < 0
                         || compressedSize < 0
-                        || dataOffset + compressedSize > tocOffset) {
+                        || compressedSize > tocOffset - dataOffset) {
                     throw new IOException("Corrupt VPAK offsets/sizes for entry '" + entryPath + "'");
                 }
 
@@ -308,6 +312,9 @@ public final class VpakArchiver {
 
             for (StoredEntry stored : entries.values()) {
                 String relPath = stored.info().path();
+                if (relPath.indexOf('\0') >= 0 || (relPath.length() >= 2 && relPath.charAt(1) == ':')) {
+                    throw new IOException("Blocked unsafe VPAK entry path outside targetDir: " + relPath);
+                }
                 Path outPath = normalizedTarget.resolve(relPath).normalize();
                 if (!outPath.startsWith(normalizedTarget)) {
                     throw new IOException("Blocked unsafe VPAK entry path outside targetDir: " + relPath);
@@ -425,16 +432,22 @@ public final class VpakArchiver {
         Inflater inflater = new Inflater();
         try {
             inflater.setInput(compressed);
-            byte[] output = new byte[expectedSize];
-            int offset = 0;
-            while (!inflater.finished() && offset < expectedSize) {
-                int count = inflater.inflate(output, offset, expectedSize - offset);
-                if (count == 0) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream(Math.min(expectedSize, IO_BUFFER_SIZE));
+            byte[] buffer = new byte[IO_BUFFER_SIZE];
+            int totalWritten = 0;
+            while (!inflater.finished()) {
+                int count = inflater.inflate(buffer);
+                if (count > 0) {
+                    if (totalWritten + count > expectedSize) {
+                        throw new IOException("Decompressed size mismatch for VPAK entry '" + entryPath + "'");
+                    }
+                    out.write(buffer, 0, count);
+                    totalWritten += count;
+                } else {
                     if (inflater.needsInput() || inflater.needsDictionary()) {
                         break;
                     }
                 }
-                offset += count;
             }
             if (!inflater.finished()) {
                 byte[] extra = new byte[1];
@@ -443,13 +456,13 @@ public final class VpakArchiver {
                     throw new IOException("Decompressed size mismatch for VPAK entry '" + entryPath + "'");
                 }
             }
-            if (offset != expectedSize) {
+            if (totalWritten != expectedSize) {
                 throw new IOException(
                         "Truncated decompressed data for VPAK entry '" + entryPath
-                                + "' (expected " + expectedSize + " bytes, got " + offset + ")"
+                                + "' (expected " + expectedSize + " bytes, got " + totalWritten + ")"
                 );
             }
-            return output;
+            return out.toByteArray();
         } catch (DataFormatException ex) {
             throw new IOException("Corrupt compressed data for VPAK entry '" + entryPath + "': " + ex.getMessage(), ex);
         } finally {

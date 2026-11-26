@@ -69,7 +69,11 @@ public class SpriteNode extends SceneNode {
         setAttributes(attributes);
     }
 
-    /** @return VN image tag associated with this sprite, or {@code null} */
+    /**
+     * Returns the VN image tag associated with this sprite.
+     *
+     * @return VN image tag associated with this sprite, or {@code null}
+     */
     public String getImageTag() {
         return imageTag;
     }
@@ -85,7 +89,11 @@ public class SpriteNode extends SceneNode {
         return this;
     }
 
-    /** @return unmodifiable list of VN sprite attribute tokens */
+    /**
+     * Returns an unmodifiable list of VN sprite attribute tokens.
+     *
+     * @return unmodifiable list of VN sprite attribute tokens
+     */
     public List<String> getAttributes() {
         return attributes;
     }
@@ -111,7 +119,11 @@ public class SpriteNode extends SceneNode {
         return this;
     }
 
-    /** @return resolved or declared asset path string, or {@code null} */
+    /**
+     * Returns the resolved or declared asset path string.
+     *
+     * @return resolved or declared asset path string, or {@code null}
+     */
     public String getAssetPath() {
         return assetPath;
     }
@@ -127,7 +139,11 @@ public class SpriteNode extends SceneNode {
         return this;
     }
 
-    /** @return attached {@link Texture}, or {@code null} */
+    /**
+     * Returns the attached {@link Texture}, if any.
+     *
+     * @return attached {@link Texture}, or {@code null}
+     */
     public Texture getTexture() {
         return texture;
     }
@@ -159,7 +175,11 @@ public class SpriteNode extends SceneNode {
         return this;
     }
 
-    /** @return attached {@link NineSliceDrawable}, or {@code null} */
+    /**
+     * Returns the attached {@link NineSliceDrawable}, if any.
+     *
+     * @return attached {@link NineSliceDrawable}, or {@code null}
+     */
     public NineSliceDrawable getNineSlice() {
         return nineSlice;
     }
@@ -191,7 +211,11 @@ public class SpriteNode extends SceneNode {
         return this;
     }
 
-    /** @return attached {@link CustomDisplayable}, or {@code null} */
+    /**
+     * Returns the attached {@link CustomDisplayable}, if any.
+     *
+     * @return attached {@link CustomDisplayable}, or {@code null}
+     */
     public CustomDisplayable getCustomDisplayable() {
         return customDisplayable;
     }
@@ -294,17 +318,17 @@ public class SpriteNode extends SceneNode {
                 return new float[]{0.0f, 0.0f, 0.0f, 0.0f};
             }
             return new float[]{
-                    fill[0] / srcA,
-                    fill[1] / srcA,
-                    fill[2] / srcA,
-                    srcA * alphaScale
+                fill[0] / srcA,
+                fill[1] / srcA,
+                fill[2] / srcA,
+                srcA * alphaScale
             };
         }
         return new float[]{
-                fill[0],
-                fill[1],
-                fill[2],
-                Math.clamp(fill[3], 0.0f, 1.0f) * alphaScale
+            fill[0],
+            fill[1],
+            fill[2],
+            Math.clamp(fill[3], 0.0f, 1.0f) * alphaScale
         };
     }
 }

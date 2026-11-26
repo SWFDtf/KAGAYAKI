@@ -32,10 +32,15 @@ public final class ParticleSystem implements CustomDisplayable {
      * Built-in atmospheric and FX particle presets.
      */
     public enum EmitterKind {
+        /** Snow Blossom option. */
         SNOW_BLOSSOM,
+        /** Rain option. */
         RAIN,
+        /** Cherry Blossom option. */
         CHERRY_BLOSSOM,
+        /** Sparks option. */
         SPARKS,
+        /** Dust option. */
         DUST
     }
 
@@ -43,19 +48,33 @@ public final class ParticleSystem implements CustomDisplayable {
      * Mutable simulation state for a single particle within a {@link ParticleEmitter}.
      */
     public static final class Particle {
+        /** Member value {@code x}. */
         public float x;
+        /** Member value {@code y}. */
         public float y;
+        /** Member value {@code vx}. */
         public float vx;
+        /** Member value {@code vy}. */
         public float vy;
+        /** Member value {@code rotation}. */
         public float rotation;
+        /** Member value {@code angularVelocity}. */
         public float angularVelocity;
+        /** Member value {@code size}. */
         public float size;
+        /** Member value {@code alpha}. */
         public float alpha;
+        /** Member value {@code life}. */
         public float life;
+        /** Member value {@code maxLife}. */
         public float maxLife;
+        /** Member value {@code colorRgba}. */
         public final float[] colorRgba;
+        /** Member value {@code swayPhase}. */
         public float swayPhase;
+        /** Member value {@code swayAmplitude}. */
         public float swayAmplitude;
+        /** Member value {@code swayFrequency}. */
         public float swayFrequency;
 
         /**
@@ -107,46 +126,101 @@ public final class ParticleSystem implements CustomDisplayable {
             }
         }
 
+        /**
+         * Returns the x value.
+         *
+         * @return the resulting value
+         */
         public float getX() {
             return x;
         }
 
+        /**
+         * Returns the y value.
+         *
+         * @return the resulting value
+         */
         public float getY() {
             return y;
         }
 
+        /**
+         * Returns the vx value.
+         *
+         * @return the resulting value
+         */
         public float getVx() {
             return vx;
         }
 
+        /**
+         * Returns the vy value.
+         *
+         * @return the resulting value
+         */
         public float getVy() {
             return vy;
         }
 
+        /**
+         * Returns the rotation value.
+         *
+         * @return the resulting value
+         */
         public float getRotation() {
             return rotation;
         }
 
+        /**
+         * Returns the angularVelocity value.
+         *
+         * @return the resulting value
+         */
         public float getAngularVelocity() {
             return angularVelocity;
         }
 
+        /**
+         * Returns the size value.
+         *
+         * @return the resulting value
+         */
         public float getSize() {
             return size;
         }
 
+        /**
+         * Returns the alpha value.
+         *
+         * @return the resulting value
+         */
         public float getAlpha() {
             return alpha;
         }
 
+        /**
+         * Returns the life value.
+         *
+         * @return the resulting value
+         */
         public float getLife() {
             return life;
         }
 
+        /**
+         * Returns the maxLife value.
+         *
+         * @return the resulting value
+         */
         public float getMaxLife() {
             return maxLife;
         }
 
+        /**
+         * Returns the colorRgba value.
+         *
+         * @return the resulting value
+         */
         public float[] getColorRgba() {
             return colorRgba.clone();
         }
@@ -343,26 +417,58 @@ public final class ParticleSystem implements CustomDisplayable {
             }
         }
 
+        /**
+         * Returns the kind value.
+         *
+         * @return the resulting value
+         */
         public EmitterKind getKind() {
             return kind;
         }
 
+        /**
+         * Returns the particles value.
+         *
+         * @return the resulting value
+         */
         public List<Particle> getParticles() {
             return Collections.unmodifiableList(particles);
         }
 
+        /**
+         * Returns the particleCount value.
+         *
+         * @return the resulting value
+         */
         public int getParticleCount() {
             return particles.size();
         }
 
+        /**
+         * Returns the boundsWidth value.
+         *
+         * @return the resulting value
+         */
         public float getBoundsWidth() {
             return boundsWidth;
         }
 
+        /**
+         * Returns the boundsHeight value.
+         *
+         * @return the resulting value
+         */
         public float getBoundsHeight() {
             return boundsHeight;
         }
 
+        /**
+         * Executes {@code setBounds}.
+         *
+         * @param width the width argument
+         * @param height the height argument
+         * @return the resulting value
+         */
         public ParticleEmitter setBounds(float width, float height) {
             if (width <= 0.0f || height <= 0.0f) {
                 throw new IllegalArgumentException("Emitter bounds must be positive: " + width + "x" + height);
@@ -372,37 +478,81 @@ public final class ParticleSystem implements CustomDisplayable {
             return this;
         }
 
+        /**
+         * Returns the windX value.
+         *
+         * @return the resulting value
+         */
         public float getWindX() {
             return windX;
         }
 
+        /**
+         * Sets the windX value.
+         *
+         * @param windX the windX argument
+         * @return the resulting value
+         */
         public ParticleEmitter setWindX(float windX) {
             this.windX = windX;
             return this;
         }
 
+        /**
+         * Returns the speed value.
+         *
+         * @return the resulting value
+         */
         public float getSpeed() {
             return speed;
         }
 
+        /**
+         * Sets the speed value.
+         *
+         * @param speed the speed argument
+         * @return the resulting value
+         */
         public ParticleEmitter setSpeed(float speed) {
             this.speed = speed;
             return this;
         }
 
+        /**
+         * Returns the texture value.
+         *
+         * @return the resulting value
+         */
         public Texture getTexture() {
             return texture;
         }
 
+        /**
+         * Sets the texture value.
+         *
+         * @param texture the texture argument
+         * @return the resulting value
+         */
         public ParticleEmitter setTexture(Texture texture) {
             this.texture = texture;
             return this;
         }
 
+        /**
+         * Returns whether active is active.
+         *
+         * @return the resulting value
+         */
         public boolean isActive() {
             return active;
         }
 
+        /**
+         * Sets the active value.
+         *
+         * @param active the active argument
+         * @return the resulting value
+         */
         public ParticleEmitter setActive(boolean active) {
             this.active = active;
             return this;
@@ -449,6 +599,12 @@ public final class ParticleSystem implements CustomDisplayable {
 
     /**
      * Creates a {@code SnowBlossom}-style emitter using an explicit {@link Random} source.
+     *
+     * @param count  number of particles ({@code >= 0})
+     * @param speed  nominal downward fall speed in px/s
+     * @param windX  horizontal wind speed in px/s
+     * @param random RNG source (nullable; defaults to a new {@link Random})
+     * @return configured {@link ParticleEmitter}
      */
     public static ParticleEmitter snowBlossom(int count, float speed, float windX, Random random) {
         int safeCount = Math.max(0, count);
@@ -478,7 +634,8 @@ public final class ParticleSystem implements CustomDisplayable {
             p.swayFrequency = 1.2f + rng.nextFloat() * 1.5f;
             list.add(p);
         }
-        return new ParticleEmitter(EmitterKind.SNOW_BLOSSOM, list, DEFAULT_WIDTH, DEFAULT_HEIGHT, baseSpeed, windX, rng);
+        return new ParticleEmitter(
+                EmitterKind.SNOW_BLOSSOM, list, DEFAULT_WIDTH, DEFAULT_HEIGHT, baseSpeed, windX, rng);
     }
 
     /**
@@ -495,6 +652,12 @@ public final class ParticleSystem implements CustomDisplayable {
 
     /**
      * Creates a {@code RAIN} emitter using an explicit {@link Random} source.
+     *
+     * @param count  number of raindrops ({@code >= 0})
+     * @param speed  nominal downward rain speed in px/s
+     * @param windX  horizontal wind velocity in px/s
+     * @param random RNG source (nullable; defaults to a new {@link Random})
+     * @return configured {@link ParticleEmitter}
      */
     public static ParticleEmitter rain(int count, float speed, float windX, Random random) {
         int safeCount = Math.max(0, count);
@@ -536,6 +699,10 @@ public final class ParticleSystem implements CustomDisplayable {
 
     /**
      * Creates a {@code CHERRY_BLOSSOM} emitter using an explicit {@link Random} source.
+     *
+     * @param count  number of sakura petals ({@code >= 0})
+     * @param random RNG source (nullable; defaults to a new {@link Random})
+     * @return configured {@link ParticleEmitter}
      */
     public static ParticleEmitter cherryBlossoms(int count, Random random) {
         int safeCount = Math.max(0, count);
@@ -581,6 +748,10 @@ public final class ParticleSystem implements CustomDisplayable {
 
     /**
      * Creates a {@code SPARKS} emitter using an explicit {@link Random} source.
+     *
+     * @param count  number of sparks ({@code >= 0})
+     * @param random RNG source (nullable; defaults to a new {@link Random})
+     * @return configured {@link ParticleEmitter}
      */
     public static ParticleEmitter sparks(int count, Random random) {
         int safeCount = Math.max(0, count);
@@ -626,6 +797,10 @@ public final class ParticleSystem implements CustomDisplayable {
 
     /**
      * Creates a {@code DUST} emitter using an explicit {@link Random} source.
+     *
+     * @param count  number of dust motes ({@code >= 0})
+     * @param random RNG source (nullable; defaults to a new {@link Random})
+     * @return configured {@link ParticleEmitter}
      */
     public static ParticleEmitter dust(int count, Random random) {
         int safeCount = Math.max(0, count);
@@ -690,12 +865,20 @@ public final class ParticleSystem implements CustomDisplayable {
         emitters.clear();
     }
 
-    /** @return unmodifiable list of registered emitters */
+    /**
+     * Returns unmodifiable list of registered emitters.
+     *
+     * @return unmodifiable list of registered emitters
+     */
     public List<ParticleEmitter> getEmitters() {
         return Collections.unmodifiableList(emitters);
     }
 
-    /** @return total number of particles across all registered emitters */
+    /**
+     * Returns total number of particles across all registered emitters.
+     *
+     * @return total number of particles across all registered emitters
+     */
     public int getTotalParticleCount() {
         int total = 0;
         for (ParticleEmitter emitter : emitters) {

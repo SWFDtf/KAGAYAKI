@@ -5,6 +5,8 @@ import de.swfdtf.core.EngineConfig;
 import de.swfdtf.graphics.SceneController;
 import de.swfdtf.graphics.SceneGraph;
 import de.swfdtf.graphics.SpriteNode;
+import de.swfdtf.parser.VJavaAst.BlockRollbackStatement;
+import de.swfdtf.parser.VJavaAst.CallStatement;
 import de.swfdtf.parser.VJavaAst.IfBranch;
 import de.swfdtf.parser.VJavaAst.IfStatement;
 import de.swfdtf.parser.VJavaAst.InputStatement;
@@ -18,8 +20,6 @@ import de.swfdtf.parser.VJavaAst.ProjectAst;
 import de.swfdtf.parser.VJavaAst.ReturnStatement;
 import de.swfdtf.parser.VJavaAst.SayStatement;
 import de.swfdtf.parser.VJavaAst.SetVarStatement;
-import de.swfdtf.parser.VJavaAst.CallStatement;
-import de.swfdtf.parser.VJavaAst.BlockRollbackStatement;
 import de.swfdtf.state.SimplePersistentAccess;
 import de.swfdtf.state.SimpleStateStore;
 import org.junit.jupiter.api.Test;
@@ -35,7 +35,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -106,7 +105,8 @@ class ScriptRuntimeIntegrationTest {
 
                 show lena neutral at center with easein(0.4)
                 voice "assets/audio/voice/lena_01.ogg"
-                lena "Willkommen in der ersten Beispielszene, [spieler_name].{w=0.4} Bereit für den Übergang in Dialog 2?"
+                lena "Willkommen in der ersten Beispielszene, [spieler_name].{w=0.4} \
+            Bereit für den Übergang in Dialog 2?"
 
                 menu:
                     "Ja, direkt weiter zu Dialog 2!" if mut_punkte >= 20 -> jump dialog_zwei
@@ -120,7 +120,8 @@ class ScriptRuntimeIntegrationTest {
             label dialog_zwei:
                 scene bg_bibliothek with fade(0.5)
                 show lena entschlossen at left with easein(0.3)
-                lena "Das hier ist der zweite Beispieldialog der Vorlage. Du kannst jetzt speichern, laden oder zurückspulen!"
+                lena "Das hier ist der zweite Beispieldialog der Vorlage. \
+            Du kannst jetzt speichern, laden oder zurückspulen!"
                 stop music fadeout 1.5
                 return
             """;
@@ -276,7 +277,12 @@ class ScriptRuntimeIntegrationTest {
                         new IfStatement(
                                 List.of(
                                         new IfBranch("_return == 42", List.of(
-                                                new SayStatement(null, "Returned [ _return ] for [hero]", null, "test.vjava", 5),
+                                                new SayStatement(
+                                                        null,
+                                                        "Returned [ _return ] for [hero]",
+                                                        null,
+                                                        "test.vjava",
+                                                        5),
                                                 new PauseStatement(0.5, "test.vjava", 6)
                                         )),
                                         new IfBranch(null, List.of(
@@ -292,9 +298,20 @@ class ScriptRuntimeIntegrationTest {
                                 1.0,
                                 "timed_out",
                                 List.of(
-                                        new MenuChoice("Disabled choice", "false", true, List.of(), "timed_out", "test.vjava", 10),
-                                        new MenuChoice("Hidden choice", "false", false, List.of(), "timed_out", "test.vjava", 11),
-                                        new MenuChoice("Active choice", null, false, List.of(new JumpStatement("timed_out", false, "test.vjava", 12)), null, "test.vjava", 12)
+                                        new MenuChoice(
+                                                "Disabled choice", "false", true, List.of(),
+                                                "timed_out", "test.vjava", 10),
+                                        new MenuChoice(
+                                                "Hidden choice", "false", false, List.of(),
+                                                "timed_out", "test.vjava", 11),
+                                        new MenuChoice(
+                                                "Active choice",
+                                                null,
+                                                false,
+                                                List.of(new JumpStatement("timed_out", false, "test.vjava", 12)),
+                                                null,
+                                                "test.vjava",
+                                                12)
                                 ),
                                 "test.vjava",
                                 9

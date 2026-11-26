@@ -200,47 +200,83 @@ public final class GlfwWindow {
         glCapabilities = null;
     }
 
-    /** @return native GLFW window handle, or {@code 0L} after {@link #destroy()} */
+    /**
+     * Returns the native GLFW window handle.
+     *
+     * @return native GLFW window handle, or {@code 0L} after {@link #destroy()}
+     */
     public long getHandle() {
         return handle;
     }
 
-    /** @return current window title */
+    /**
+     * Returns the current window title.
+     *
+     * @return current window title
+     */
     public String getTitle() {
         return title;
     }
 
-    /** @return window width in screen coordinates */
+    /**
+     * Returns the window width in screen coordinates.
+     *
+     * @return window width in screen coordinates
+     */
     public int getWindowWidth() {
         return windowWidth;
     }
 
-    /** @return window height in screen coordinates */
+    /**
+     * Returns the window height in screen coordinates.
+     *
+     * @return window height in screen coordinates
+     */
     public int getWindowHeight() {
         return windowHeight;
     }
 
-    /** @return physical drawable framebuffer width in pixels */
+    /**
+     * Returns the physical drawable framebuffer width in pixels.
+     *
+     * @return physical drawable framebuffer width in pixels
+     */
     public int getFramebufferWidth() {
         return framebufferWidth;
     }
 
-    /** @return physical drawable framebuffer height in pixels */
+    /**
+     * Returns the physical drawable framebuffer height in pixels.
+     *
+     * @return physical drawable framebuffer height in pixels
+     */
     public int getFramebufferHeight() {
         return framebufferHeight;
     }
 
-    /** @return cached LWJGL {@link GLCapabilities} for this window's context, or {@code null} */
+    /**
+     * Returns the cached LWJGL {@link GLCapabilities} for this window.
+     *
+     * @return cached LWJGL {@link GLCapabilities} for this window's context, or {@code null}
+     */
     public GLCapabilities getGlCapabilities() {
         return glCapabilities;
     }
 
-    /** @return {@code true} if VSync was enabled via {@link #setVsync(boolean)} */
+    /**
+     * Returns whether VSync is enabled.
+     *
+     * @return {@code true} if VSync was enabled via {@link #setVsync(boolean)}
+     */
     public boolean isVsync() {
         return vsync;
     }
 
-    /** @return {@code true} if this window has already been destroyed */
+    /**
+     * Returns whether this window has already been destroyed.
+     *
+     * @return {@code true} if this window has already been destroyed
+     */
     public boolean isDestroyed() {
         return handle == MemoryUtil.NULL;
     }

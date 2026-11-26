@@ -153,16 +153,29 @@ public class ChoiceMenuScreen extends Screen {
         }
     }
 
-    /** @return unmodifiable list of currently rendered visible choice buttons */
+    /**
+     * Returns an unmodifiable list of currently rendered visible choice buttons.
+     *
+     * @return visible option buttons
+     */
     public List<TextButton> getOptionButtons() {
         return Collections.unmodifiableList(optionButtons);
     }
 
-    /** @return countdown timer progress bar widget */
+    /**
+     * Returns the countdown timer progress bar widget.
+     *
+     * @return timeout bar widget
+     */
     public Bar getTimeoutBar() {
         return timeoutBar;
     }
 
+    /**
+     * Returns the optional menu caption label widget.
+     *
+     * @return caption label
+     */
     public TextWidget getCaptionLabel() {
         return captionLabel;
     }

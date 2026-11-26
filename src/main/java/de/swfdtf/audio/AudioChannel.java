@@ -5,7 +5,6 @@ import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.AL11;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,6 +44,7 @@ public final class AudioChannel {
             boolean playing,
             double playbackSeconds
     ) {
+        /** Normalizes non-finite volume and negative playback cursor values. */
         public ChannelSnapshot {
             if (!Float.isFinite(targetVolume)) {
                 targetVolume = 1.0f;
@@ -522,52 +522,92 @@ public final class AudioChannel {
         uploadAndStartOpenAl(slot, slot.playbackSeconds);
     }
 
-    /** @return normalized lowercase channel name */
+    /**
+     * Returns the normalized lowercase channel name.
+     *
+     * @return normalized lowercase channel name
+     */
     public String getName() {
         return name;
     }
 
-    /** @return {@code true} if the primary slot is currently playing (including fade-out) */
+    /**
+     * Returns whether the primary slot is currently playing.
+     *
+     * @return {@code true} if the primary slot is currently playing (including fade-out)
+     */
     public synchronized boolean isPlaying() {
         return primary != null && primary.playing;
     }
 
-    /** @return {@code true} if the primary slot is configured to loop */
+    /**
+     * Returns whether the primary slot is configured to loop.
+     *
+     * @return {@code true} if the primary slot is configured to loop
+     */
     public synchronized boolean isLooping() {
         return primary != null && primary.loop;
     }
 
-    /** @return {@code true} if a crossfade between an outgoing and primary track is active */
+    /**
+     * Returns whether a crossfade is active.
+     *
+     * @return {@code true} if a crossfade between an outgoing and primary track is active
+     */
     public synchronized boolean isCrossfading() {
         return primary != null && primary.playing && outgoing != null && outgoing.playing;
     }
 
-    /** @return {@code true} if the primary track is currently fading out to stop */
+    /**
+     * Returns whether the primary track is fading out to stop.
+     *
+     * @return {@code true} if the primary track is currently fading out to stop
+     */
     public synchronized boolean isFadingOut() {
         return primary != null && primary.playing && primary.stopWhenFadeEnds;
     }
 
-    /** @return active or last-played asset path, or {@code null} */
+    /**
+     * Returns the active or last-played asset path.
+     *
+     * @return active or last-played asset path, or {@code null}
+     */
     public synchronized String getAssetPath() {
         return primary != null ? primary.assetPath : null;
     }
 
-    /** @return active track's target volume in {@code [0, 1]} */
+    /**
+     * Returns the active track's target volume.
+     *
+     * @return active track's target volume in {@code [0, 1]}
+     */
     public synchronized float getTargetVolume() {
         return primary != null ? primary.targetVolume : 1.0f;
     }
 
-    /** @return primary track's current fade envelope gain in {@code [0, 1]} */
+    /**
+     * Returns the primary track's current fade envelope gain.
+     *
+     * @return primary track's current fade envelope gain in {@code [0, 1]}
+     */
     public synchronized float getFadeGain() {
         return primary != null ? primary.fadeGain : 0.0f;
     }
 
-    /** @return outgoing crossfade track's fade envelope gain in {@code [0, 1]}, or {@code 0} if none */
+    /**
+     * Returns the outgoing crossfade track's fade envelope gain.
+     *
+     * @return outgoing crossfade track's fade envelope gain in {@code [0, 1]}, or {@code 0} if none
+     */
     public synchronized float getOutgoingFadeGain() {
         return (outgoing != null && outgoing.playing) ? outgoing.fadeGain : 0.0f;
     }
 
-    /** @return external channel mix gain (master * preference channel volume) in {@code [0, 1]} */
+    /**
+     * Returns the external channel mix gain.
+     *
+     * @return external channel mix gain (master * preference channel volume) in {@code [0, 1]}
+     */
     public synchronized float getChannelMixGain() {
         return channelMixGain;
     }
@@ -597,7 +637,11 @@ public final class AudioChannel {
         return computeEffectiveGain(primary);
     }
 
-    /** @return {@code true} if OpenAL source management is enabled for this channel */
+    /**
+     * Returns whether OpenAL source management is enabled for this channel.
+     *
+     * @return {@code true} if OpenAL source management is enabled for this channel
+     */
     public boolean isOpenAlEnabled() {
         return openAlEnabled;
     }

@@ -29,8 +29,11 @@ public final class LipSyncAnalyzer {
      * Discrete mouth animation state driven by smoothed voice openness.
      */
     public enum MouthShape {
+        /** Mouth closed (below half-open threshold). */
         CLOSED,
+        /** Mouth partially open. */
         HALF_OPEN,
+        /** Mouth fully open. */
         OPEN
     }
 
@@ -170,78 +173,134 @@ public final class LipSyncAnalyzer {
         this.mouthShape = MouthShape.CLOSED;
     }
 
-    /** @return current discrete {@link MouthShape} */
+    /**
+     * Returns the current discrete mouth shape.
+     *
+     * @return current discrete {@link MouthShape}
+     */
     public MouthShape getMouthShape() {
         return mouthShape;
     }
 
-    /** @return smoothed mouth openness in {@code [0, 1]} */
+    /**
+     * Returns the smoothed mouth openness.
+     *
+     * @return smoothed mouth openness in {@code [0, 1]}
+     */
     public float getOpenness() {
         return openness;
     }
 
-    /** @return attack smoothing time constant in seconds */
+    /**
+     * Returns the attack smoothing time constant.
+     *
+     * @return attack smoothing time constant in seconds
+     */
     public double getAttackSeconds() {
         return attackSeconds;
     }
 
-    /** @param attackSeconds attack smoothing time constant in seconds ({@code >= 0}) */
+    /**
+     * Sets the attack smoothing time constant.
+     *
+     * @param attackSeconds attack smoothing time constant in seconds ({@code >= 0})
+     */
     public void setAttackSeconds(double attackSeconds) {
         validateTimeConstant(attackSeconds, "attackSeconds");
         this.attackSeconds = attackSeconds;
     }
 
-    /** @return release smoothing time constant in seconds */
+    /**
+     * Returns the release smoothing time constant.
+     *
+     * @return release smoothing time constant in seconds
+     */
     public double getReleaseSeconds() {
         return releaseSeconds;
     }
 
-    /** @param releaseSeconds release smoothing time constant in seconds ({@code >= 0}) */
+    /**
+     * Sets the release smoothing time constant.
+     *
+     * @param releaseSeconds release smoothing time constant in seconds ({@code >= 0})
+     */
     public void setReleaseSeconds(double releaseSeconds) {
         validateTimeConstant(releaseSeconds, "releaseSeconds");
         this.releaseSeconds = releaseSeconds;
     }
 
-    /** @return noise floor RMS gate */
+    /**
+     * Returns the noise floor RMS gate.
+     *
+     * @return noise floor RMS gate
+     */
     public float getNoiseFloorRms() {
         return noiseFloorRms;
     }
 
-    /** @param noiseFloorRms noise floor RMS gate ({@code >= 0} and {@code < maxRms}) */
+    /**
+     * Sets the noise floor RMS gate.
+     *
+     * @param noiseFloorRms noise floor RMS gate ({@code >= 0} and {@code < maxRms})
+     */
     public void setNoiseFloorRms(float noiseFloorRms) {
         validateRmsBounds(noiseFloorRms, this.maxRms);
         this.noiseFloorRms = noiseFloorRms;
     }
 
-    /** @return saturation RMS value mapped to {@code 1.0f} openness */
+    /**
+     * Returns the saturation RMS value.
+     *
+     * @return saturation RMS value mapped to {@code 1.0f} openness
+     */
     public float getMaxRms() {
         return maxRms;
     }
 
-    /** @param maxRms saturation RMS value ({@code > noiseFloorRms}) */
+    /**
+     * Sets the saturation RMS value.
+     *
+     * @param maxRms saturation RMS value ({@code > noiseFloorRms})
+     */
     public void setMaxRms(float maxRms) {
         validateRmsBounds(this.noiseFloorRms, maxRms);
         this.maxRms = maxRms;
     }
 
-    /** @return openness threshold for {@link MouthShape#HALF_OPEN} */
+    /**
+     * Returns the openness threshold for {@link MouthShape#HALF_OPEN}.
+     *
+     * @return openness threshold for {@link MouthShape#HALF_OPEN}
+     */
     public float getHalfOpenThreshold() {
         return halfOpenThreshold;
     }
 
-    /** @param halfOpenThreshold threshold in {@code [0, openThreshold]} */
+    /**
+     * Sets the openness threshold for {@link MouthShape#HALF_OPEN}.
+     *
+     * @param halfOpenThreshold threshold in {@code [0, openThreshold]}
+     */
     public void setHalfOpenThreshold(float halfOpenThreshold) {
         validateThresholds(halfOpenThreshold, this.openThreshold);
         this.halfOpenThreshold = halfOpenThreshold;
         this.mouthShape = classifyShape(this.openness);
     }
 
-    /** @return openness threshold for {@link MouthShape#OPEN} */
+    /**
+     * Returns the openness threshold for {@link MouthShape#OPEN}.
+     *
+     * @return openness threshold for {@link MouthShape#OPEN}
+     */
     public float getOpenThreshold() {
         return openThreshold;
     }
 
-    /** @param openThreshold threshold in {@code [halfOpenThreshold, 1]} */
+    /**
+     * Sets the openness threshold for {@link MouthShape#OPEN}.
+     *
+     * @param openThreshold threshold in {@code [halfOpenThreshold, 1]}
+     */
     public void setOpenThreshold(float openThreshold) {
         validateThresholds(this.halfOpenThreshold, openThreshold);
         this.openThreshold = openThreshold;

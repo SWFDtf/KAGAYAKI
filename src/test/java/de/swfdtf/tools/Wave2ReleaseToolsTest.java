@@ -41,7 +41,8 @@ class Wave2ReleaseToolsTest {
     // ---- 1. AutomatedPlaythroughRunner ----
 
     @Test
-    void automatedPlaythroughRunnerCompletesStarterProjectWithFirstAndLastChoice(@TempDir Path tempDir) throws Exception {
+    void automatedPlaythroughRunnerCompletesStarterProjectWithFirstAndLastChoice(@TempDir Path tempDir)
+            throws Exception {
         Path projectDir = tempDir.resolve("starter");
         ProjectTemplateGenerator.generate(projectDir, "Runner Demo", "2D");
 
@@ -120,7 +121,8 @@ class Wave2ReleaseToolsTest {
         assertTrue(cappedReport.terminationReason().get().contains("maxSteps"));
 
         assertThrows(NullPointerException.class,
-                () -> runner.run((VJavaAst.ProjectAst) null, AutomatedPlaythroughRunner.ChoiceStrategy.FIRST_CHOICE, 10));
+                () -> runner.run((VJavaAst.ProjectAst) null,
+                        AutomatedPlaythroughRunner.ChoiceStrategy.FIRST_CHOICE, 10));
         assertThrows(NullPointerException.class,
                 () -> runner.run((Path) null, AutomatedPlaythroughRunner.ChoiceStrategy.FIRST_CHOICE, 10));
         assertThrows(NullPointerException.class, () -> runner.run(ast, null, 10));
@@ -219,7 +221,8 @@ class Wave2ReleaseToolsTest {
         ExportPreFlightChecker.PreFlightReport warnReport = checker.check(cleanProject);
         assertTrue(warnReport.readyForRelease());
         assertTrue(warnReport.checks().stream().anyMatch(
-                c -> c.name().equals("Translations Directory") && c.status() == ExportPreFlightChecker.CheckStatus.WARN));
+                c -> c.name().equals("Translations Directory")
+                        && c.status() == ExportPreFlightChecker.CheckStatus.WARN));
         assertTrue(warnReport.summaryMarkdown().contains("- [!]"));
 
         // Blank title in project.vjava.json triggers FAIL
@@ -230,7 +233,8 @@ class Wave2ReleaseToolsTest {
                   "entryLabel": "start"
                 }
                 """;
-        Files.writeString(cleanProject.resolve(ProjectDescriptor.FILE_NAME), invalidDescriptorJson, StandardCharsets.UTF_8);
+        Files.writeString(
+                cleanProject.resolve(ProjectDescriptor.FILE_NAME), invalidDescriptorJson, StandardCharsets.UTF_8);
         ExportPreFlightChecker.PreFlightReport badMetaReport = checker.check(cleanProject);
         assertFalse(badMetaReport.readyForRelease());
         assertTrue(badMetaReport.checks().stream().anyMatch(

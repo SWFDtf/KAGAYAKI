@@ -27,6 +27,10 @@ public final class KeybindingRemapper {
     private final Map<String, Integer> defaults = new LinkedHashMap<>();
     private final Map<String, Integer> activeBindings = new LinkedHashMap<>();
 
+    /** Creates a new empty {@code KeybindingRemapper}. */
+    public KeybindingRemapper() {
+    }
+
     /**
      * Registers a default keybinding for a logical action and binds it if not yet active.
      *

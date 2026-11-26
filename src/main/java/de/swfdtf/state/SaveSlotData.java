@@ -29,6 +29,7 @@ public record SaveSlotData(
         List<HistoryLog.HistoryEntry> historyEntries
 ) {
 
+    /** Defensively normalizes variable and history collections. */
     public SaveSlotData {
         variables = variables != null
                 ? Collections.unmodifiableMap(new LinkedHashMap<>(variables))
@@ -73,10 +74,16 @@ public record SaveSlotData(
             int thumbnailHeight,
             byte[] thumbnailPng
     ) {
+        /** Defensively copies thumbnail PNG bytes. */
         public SaveMetadata {
             thumbnailPng = thumbnailPng != null ? thumbnailPng.clone() : new byte[0];
         }
 
+        /**
+         * Returns a defensive copy of the encoded PNG thumbnail bytes.
+         *
+         * @return copy of PNG thumbnail bytes
+         */
         @Override
         public byte[] thumbnailPng() {
             return thumbnailPng.clone();
@@ -155,6 +162,7 @@ public record SaveSlotData(
             String activeVoicePath,
             SceneController.StageSnapshot stageSnapshot
     ) {
+        /** Defensively copies call stack and NVL line lists. */
         public SavedScriptPosition {
             callStack = callStack != null ? List.copyOf(callStack) : List.of();
             nvlLines = nvlLines != null ? List.copyOf(nvlLines) : List.of();

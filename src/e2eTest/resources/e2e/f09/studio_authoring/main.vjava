@@ -1,0 +1,32 @@
+define lena = Character("Lena", color="#58a6ff")
+
+default mood = "neutral"
+default score = 10
+
+image bg_main = "assets/images/bg/bg_main.png"
+image hero = "assets/images/char/hero.png"
+
+label start:
+    scene bg_main
+    show hero at center
+    $ score = 20
+    call helper
+    lena "Startszene geladen."
+    jump chapter_two
+
+label helper:
+    $ score = score + 5
+    lena "Hilfslabel ausgeführt."
+    return
+
+label chapter_two:
+    if mood == "happy":
+        lena "Stimmung ist fröhlich."
+    else:
+        lena "Stimmung ist neutral."
+    play sound "assets/audio/ping.wav"
+    return
+
+label unreachable_secret:
+    lena "Dieses Label ist nicht direkt erreichbar."
+    return

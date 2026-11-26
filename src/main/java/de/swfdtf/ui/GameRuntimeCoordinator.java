@@ -15,7 +15,6 @@ import de.swfdtf.graphics.RenderMode;
 import de.swfdtf.graphics.RenderPipeline2D;
 import de.swfdtf.graphics.SceneController;
 import de.swfdtf.graphics.SceneGraph;
-import de.swfdtf.graphics.SceneLayer;
 import de.swfdtf.graphics.TextureManager;
 import de.swfdtf.graphics.TransitionManager;
 import de.swfdtf.parser.ProjectScanner;
@@ -85,9 +84,17 @@ public final class GameRuntimeCoordinator implements GameHost {
     private boolean autoStartMainMenu = true;
     private boolean initialized = false;
 
+    /**
+     * Creates a new {@code GameRuntimeCoordinator} instance.
+     */
     public GameRuntimeCoordinator() {
     }
 
+    /**
+     * Creates a new {@code GameRuntimeCoordinator} instance.
+     *
+     * @param autoStartMainMenu the autoStartMainMenu argument
+     */
     public GameRuntimeCoordinator(boolean autoStartMainMenu) {
         this.autoStartMainMenu = autoStartMainMenu;
     }
@@ -639,66 +646,146 @@ public final class GameRuntimeCoordinator implements GameHost {
         }
     }
 
+    /**
+     * Returns the session value.
+     *
+     * @return the resulting value
+     */
     public ScriptSession getSession() {
         return session;
     }
 
+    /**
+     * Returns the screenManager value.
+     *
+     * @return the resulting value
+     */
     public ScreenManager getScreenManager() {
         return screenManager;
     }
 
+    /**
+     * Returns the audioEngine value.
+     *
+     * @return the resulting value
+     */
     public AudioEngine getAudioEngine() {
         return audioEngine;
     }
 
+    /**
+     * Returns the fontManager value.
+     *
+     * @return the resulting value
+     */
     public FontManager getFontManager() {
         return fontManager;
     }
 
+    /**
+     * Returns the textureManager value.
+     *
+     * @return the resulting value
+     */
     public TextureManager getTextureManager() {
         return textureManager;
     }
 
+    /**
+     * Returns the animationEngine value.
+     *
+     * @return the resulting value
+     */
     public AnimationEngine getAnimationEngine() {
         return animationEngine;
     }
 
+    /**
+     * Returns the transitionManager value.
+     *
+     * @return the resulting value
+     */
     public TransitionManager getTransitionManager() {
         return transitionManager;
     }
 
+    /**
+     * Returns the lipSyncAnalyzer value.
+     *
+     * @return the resulting value
+     */
     public LipSyncAnalyzer getLipSyncAnalyzer() {
         return lipSyncAnalyzer;
     }
 
+    /**
+     * Returns the ttsService value.
+     *
+     * @return the resulting value
+     */
     public TextToSpeechService getTtsService() {
         return ttsService;
     }
 
+    /**
+     * Returns the mainMenuScreen value.
+     *
+     * @return the resulting value
+     */
     public MainMenuScreen getMainMenuScreen() {
         return mainMenuScreen;
     }
 
+    /**
+     * Returns the advScreen value.
+     *
+     * @return the resulting value
+     */
     public AdvDialogueScreen getAdvScreen() {
         return advScreen;
     }
 
+    /**
+     * Returns the nvlScreen value.
+     *
+     * @return the resulting value
+     */
     public NvlDialogueScreen getNvlScreen() {
         return nvlScreen;
     }
 
+    /**
+     * Returns the bubbleScreen value.
+     *
+     * @return the resulting value
+     */
     public BubbleDialogueScreen getBubbleScreen() {
         return bubbleScreen;
     }
 
+    /**
+     * Returns the choiceMenuScreen value.
+     *
+     * @return the resulting value
+     */
     public ChoiceMenuScreen getChoiceMenuScreen() {
         return choiceMenuScreen;
     }
 
+    /**
+     * Returns the preferencesScreen value.
+     *
+     * @return the resulting value
+     */
     public PreferencesScreen getPreferencesScreen() {
         return preferencesScreen;
     }
 
+    /**
+     * Returns the toastOverlay value.
+     *
+     * @return the resulting value
+     */
     public NotificationToastOverlay getToastOverlay() {
         return toastOverlay;
     }

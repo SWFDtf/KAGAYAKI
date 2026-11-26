@@ -10,9 +10,10 @@ import java.util.function.Function;
 
 /**
  * Parser for KAGAYAKI Visual Novel rich text strings supporting {@code [variable]} interpolation,
- * escaped {@code [[} / {@code {{} sequences, inline formatting/metric tags, flow-control cues,
- * Furigana ({@code {rb}/{rt}}), inline images ({@code {image=...}}), hyperlinks ({@code {a=...}}),
- * and real-time text shader tags ({@code {wave}}, {@code {jitter}}/{@code {shake}}, {@code {gradient=...}}).
+ * escaped {@code [[} / <code>&#123;&#123;</code> sequences, inline formatting/metric tags, flow-control cues,
+ * Furigana (<code>&#123;rb&#125;/&#123;rt&#125;</code>), inline images (<code>&#123;image=...&#125;</code>),
+ * hyperlinks (<code>&#123;a=...&#125;</code>), and real-time text shader tags (<code>&#123;wave&#125;</code>,
+ * <code>&#123;jitter&#125;</code>/<code>&#123;shake&#125;</code>, <code>&#123;gradient=...&#125;</code>).
  */
 public final class TextTagParser {
 
@@ -55,7 +56,8 @@ public final class TextTagParser {
      * @param sizeDelta        relative pixel size offset applied after {@code fontSize}/base size
      * @param fontPath         optional font asset path override, or {@code null} for default font
      * @param kerning          extra per-character horizontal spacing in pixels
-     * @param cps              local typewriter speed in chars/sec ({@code < 0} uses controller default, {@code 0} = instant)
+     * @param cps              local typewriter speed in chars/sec ({@code < 0} uses controller default,
+     *                         {@code 0} = instant)
      * @param wave             whether sine-wave vertical animation is active
      * @param jitter           whether jitter/shake animation is active
      * @param gradientStartHex optional left/start gradient hex color, or {@code null}
@@ -119,10 +121,13 @@ public final class TextTagParser {
      *
      * @param index   0-based character index in {@code plainText} where the cue triggers
      * @param kind    cue type
-     * @param seconds timed wait duration in seconds (for {@link CueKind#WAIT_TIMED} or timed {@link CueKind#PARAGRAPH}),
-     *                or {@code 0.0} for untimed/click cues
+     * @param seconds timed wait duration in seconds (for {@link CueKind#WAIT_TIMED} or
+     *                timed {@link CueKind#PARAGRAPH}), or {@code 0.0} for untimed/click cues
      */
     public record TextCue(int index, CueKind kind, double seconds) {
+        /**
+         * Validates cue kind, non-negative index, and finite duration.
+         */
         public TextCue {
             Objects.requireNonNull(kind, "kind must not be null");
             if (index < 0) {
@@ -143,6 +148,9 @@ public final class TextTagParser {
      * @param rubyText   phonetic/ruby reading displayed above the base text
      */
     public record RubyPair(int startIndex, int endIndex, String baseText, String rubyText) {
+        /**
+         * Validates non-null base and ruby text.
+         */
         public RubyPair {
             Objects.requireNonNull(baseText, "baseText must not be null");
             Objects.requireNonNull(rubyText, "rubyText must not be null");
@@ -158,6 +166,9 @@ public final class TextTagParser {
      * @param height    optional explicit display height in pixels ({@code <= 0} auto-scales to line height)
      */
     public record InlineImageSpan(int charIndex, String imagePath, float width, float height) {
+        /**
+         * Validates non-null image asset path.
+         */
         public InlineImageSpan {
             Objects.requireNonNull(imagePath, "imagePath must not be null");
         }
@@ -177,6 +188,9 @@ public final class TextTagParser {
             String rubyReading,
             String inlineImagePath
     ) {
+        /**
+         * Validates non-null text and active style.
+         */
         public TextSpan {
             Objects.requireNonNull(text, "text must not be null");
             Objects.requireNonNull(style, "style must not be null");
@@ -196,7 +210,8 @@ public final class TextTagParser {
     /**
      * Immutable result of parsing a VN rich text string.
      *
-     * @param plainText          rendered character stream (with {@code \n} for {@code {p}} and {@code \uFFFC} for inline images)
+     * @param plainText          rendered character stream (with {@code \n} for {@code {p}} and {@code \uFFFC} for
+     *                           inline images)
      * @param spans              ordered immutable list of {@link TextSpan} runs
      * @param cues               ordered immutable list of {@link TextCue} flow-control events
      * @param fastPrefixEndIndex exclusive end character index for {@code {fast}} instant reveal ({@code 0} if absent)
@@ -209,6 +224,9 @@ public final class TextTagParser {
             int fastPrefixEndIndex,
             boolean hasNoWait
     ) {
+        /**
+         * Enforces non-null text and creates immutable copies of span and cue lists.
+         */
         public ParsedRichText {
             Objects.requireNonNull(plainText, "plainText must not be null");
             spans = List.copyOf(Objects.requireNonNull(spans, "spans must not be null"));
@@ -297,7 +315,8 @@ public final class TextTagParser {
 
     /**
      * Expands {@code [variable]} placeholders in {@code raw} using {@code lookup}, while unescaping
-     * {@code [[} to literal {@code [}. Escaped {@code {{} sequences are preserved intact for tag parsing.
+     * {@code [[} to literal {@code [}. Escaped <code>&#123;&#123;</code> sequences are preserved
+     * intact for tag parsing.
      *
      * <p>If {@code lookup} is {@code null} or returns {@code null} for a key, the placeholder
      * {@code [key]} is preserved verbatim.</p>
@@ -353,8 +372,8 @@ public final class TextTagParser {
     }
 
     /**
-     * Parses a VN rich text string without variable interpolation (escaped {@code [[} and {@code {{}
-     * are still unescaped).
+     * Parses a VN rich text string without variable interpolation (escaped {@code [[} and
+     * <code>&#123;&#123;</code> are still unescaped).
      *
      * @param raw raw VN string (if {@code null}, returns an empty {@link ParsedRichText})
      * @return parsed rich text representation

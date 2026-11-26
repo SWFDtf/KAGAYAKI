@@ -132,7 +132,7 @@ public final class ScriptSession {
                 ? project.descriptor().getDefaultLanguage()
                 : "deutsch";
         this.localizationManager = new LocalizationManager(defaultLang);
-        this.localizationManager.indexProject(project);
+        VJavaLocalizationBridge.indexProject(this.localizationManager, project);
         if (preferencesState.getLanguage() != null && !preferencesState.getLanguage().isBlank()) {
             this.localizationManager.setLanguage(preferencesState.getLanguage());
         }
@@ -450,54 +450,119 @@ public final class ScriptSession {
         return root.resolve("saves");
     }
 
+    /**
+     * Returns the script execution runtime.
+     *
+     * @return script runtime
+     */
     public ScriptRuntime getRuntime() {
         return runtime;
     }
 
+    /**
+     * Returns the revertable state store.
+     *
+     * @return revertable state store
+     */
     public RevertableStateStore getStateStore() {
         return stateStore;
     }
 
+    /**
+     * Returns the persistent state storage.
+     *
+     * @return persistent state storage
+     */
     public PersistentState getPersistentState() {
         return persistentState;
     }
 
+    /**
+     * Returns the user preferences state.
+     *
+     * @return user preferences state
+     */
     public PreferencesState getPreferencesState() {
         return preferencesState;
     }
 
+    /**
+     * Returns the session state.
+     *
+     * @return session state
+     */
     public SessionState getSessionState() {
         return sessionState;
     }
 
+    /**
+     * Returns the dialogue history log.
+     *
+     * @return dialogue history log
+     */
     public HistoryLog getHistoryLog() {
         return historyLog;
     }
 
+    /**
+     * Returns the save slot manager.
+     *
+     * @return save slot manager
+     */
     public SaveManager getSaveManager() {
         return saveManager;
     }
 
+    /**
+     * Returns the localization manager.
+     *
+     * @return localization manager
+     */
     public LocalizationManager getLocalizationManager() {
         return localizationManager;
     }
 
+    /**
+     * Returns the achievement manager.
+     *
+     * @return achievement manager
+     */
     public AchievementManager getAchievementManager() {
         return achievementManager;
     }
 
+    /**
+     * Returns the gallery manager.
+     *
+     * @return gallery manager
+     */
     public GalleryManager getGalleryManager() {
         return galleryManager;
     }
 
+    /**
+     * Returns the endings manager.
+     *
+     * @return endings manager
+     */
     public EndingsManager getEndingsManager() {
         return endingsManager;
     }
 
+    /**
+     * Returns the stage scene controller.
+     *
+     * @return stage scene controller
+     */
     public SceneController getSceneController() {
         return sceneController;
     }
 
+    /**
+     * Returns the engine API facade.
+     *
+     * @return engine API facade
+     */
     public EngineAPI getEngineApi() {
         return engineApi;
     }

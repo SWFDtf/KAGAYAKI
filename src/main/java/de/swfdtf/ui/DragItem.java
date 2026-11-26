@@ -36,7 +36,11 @@ public class DragItem extends UiNode {
         setBorderThickness(1.0f);
     }
 
-    /** @return optional domain payload */
+    /**
+     * Returns optional domain payload.
+     *
+     * @return optional domain payload
+     */
     public Object getPayload() {
         return payload;
     }
@@ -63,7 +67,11 @@ public class DragItem extends UiNode {
         return this;
     }
 
-    /** @return {@code true} if this item accepts dropped items */
+    /**
+     * Returns {@code true} if this item accepts dropped items.
+     *
+     * @return {@code true} if this item accepts dropped items
+     */
     public boolean isDropTarget() {
         return dropTarget;
     }
@@ -79,7 +87,11 @@ public class DragItem extends UiNode {
         return this;
     }
 
-    /** @return {@code true} if draggable */
+    /**
+     * Returns {@code true} if draggable.
+     *
+     * @return {@code true} if draggable
+     */
     public boolean isDraggable() {
         return draggable;
     }
@@ -95,7 +107,11 @@ public class DragItem extends UiNode {
         return this;
     }
 
-    /** @return {@code true} if snapping is enabled */
+    /**
+     * Returns {@code true} if snapping is enabled.
+     *
+     * @return {@code true} if snapping is enabled
+     */
     public boolean isSnappable() {
         return snappable;
     }
@@ -111,12 +127,20 @@ public class DragItem extends UiNode {
         return this;
     }
 
-    /** @return configured drop callback */
+    /**
+     * Returns configured drop callback.
+     *
+     * @return configured drop callback
+     */
     public BiConsumer<DragItem, DragItem> getOnDrop() {
         return onDrop;
     }
 
-    /** @return the {@link DragItem} drop target this item is currently snapped onto, or {@code null} */
+    /**
+     * Returns the {@link DragItem} drop target this item is currently snapped onto, or {@code null}.
+     *
+     * @return the {@link DragItem} drop target this item is currently snapped onto, or {@code null}
+     */
     public DragItem getSnappedTo() {
         return snappedTo;
     }
@@ -125,7 +149,11 @@ public class DragItem extends UiNode {
         this.snappedTo = snappedTo;
     }
 
-    /** @return {@code true} while currently being dragged */
+    /**
+     * Returns {@code true} while currently being dragged.
+     *
+     * @return {@code true} while currently being dragged
+     */
     public boolean isDragging() {
         return dragging;
     }
@@ -152,9 +180,10 @@ public class DragItem extends UiNode {
         String fillHex = getBackgroundColorHex() != null
                 ? getBackgroundColorHex()
                 : (dropTarget ? ThemePalette.PANEL_SURFACE : ThemePalette.ELEVATED);
+        String fallbackBorder = isHovered() ? ThemePalette.ACCENT_HOVER : ThemePalette.BORDER;
         String borderHex = getBorderColorHex() != null
                 ? getBorderColorHex()
-                : (dragging ? ThemePalette.ACTIVE_SELECTED : (isHovered() ? ThemePalette.ACCENT_HOVER : ThemePalette.BORDER));
+                : (dragging ? ThemePalette.ACTIVE_SELECTED : fallbackBorder);
         UiRenderSupport.drawRoundedRect(
                 pipeline, b.x(), b.y(), b.width(), b.height(),
                 getCornerRadius(), fillHex, getBorderThickness(), borderHex, effectiveAlpha

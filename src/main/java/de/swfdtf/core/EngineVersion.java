@@ -37,7 +37,8 @@ public final class EngineVersion {
      * @return formatted project + engine header
      */
     public static String formatProjectHeader(String projectTitle, String projectVersion) {
-        String safeTitle = (projectTitle == null || projectTitle.isBlank()) ? "Unbenanntes Projekt" : projectTitle.trim();
+        String safeTitle = (projectTitle == null || projectTitle.isBlank())
+                ? "Unbenanntes Projekt" : projectTitle.trim();
         String safeProjVer = (projectVersion == null || projectVersion.isBlank()) ? VERSION : projectVersion.trim();
         return safeTitle + " v" + safeProjVer + " — " + formatBanner();
     }

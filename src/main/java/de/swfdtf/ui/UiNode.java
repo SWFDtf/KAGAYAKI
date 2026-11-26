@@ -38,7 +38,14 @@ public abstract class UiNode {
     private float cornerRadius = 0.0f;
 
     private UiNode parent;
+    /** Ordered child UI nodes. */
     protected final List<UiNode> children = new ArrayList<>();
+
+    /**
+     * Creates a base UI node.
+     */
+    protected UiNode() {
+    }
 
     /**
      * Computes preferred dimensions given available container space.
@@ -109,6 +116,11 @@ public abstract class UiNode {
 
     /**
      * Renders node-specific content after the optional background box.
+     *
+     * @param pipeline       2D render pipeline
+     * @param fontManager    font manager
+     * @param textureManager texture manager
+     * @param elapsedSeconds total elapsed clock seconds
      */
     protected void renderSelf(
             RenderPipeline2D pipeline,
@@ -120,6 +132,9 @@ public abstract class UiNode {
 
     /**
      * Draws this node's optional rounded/bordered background rectangle if configured.
+     *
+     * @param pipeline       2D render pipeline
+     * @param effectiveAlpha effective node opacity
      */
     protected void drawBackgroundBox(RenderPipeline2D pipeline, float effectiveAlpha) {
         if (pipeline == null || !pipeline.isInitialized() || bounds.width() <= 0.0f || bounds.height() <= 0.0f) {
@@ -142,6 +157,8 @@ public abstract class UiNode {
     /**
      * Dispatches a mouse move event in logical canvas coordinates and updates {@code hovered}.
      *
+     * @param lx logical X coordinate
+     * @param ly logical Y coordinate
      * @return deepest hovered interactive node, if any
      */
     public UiNode dispatchMouseMove(float lx, float ly) {
@@ -169,6 +186,9 @@ public abstract class UiNode {
     /**
      * Dispatches a mouse button press event in top-down z-order (last child first).
      *
+     * @param lx     logical X coordinate
+     * @param ly     logical Y coordinate
+     * @param button GLFW mouse button code
      * @return {@code true} if consumed by this node or a descendant
      */
     public boolean dispatchMouseDown(float lx, float ly, int button) {
@@ -190,6 +210,9 @@ public abstract class UiNode {
     /**
      * Dispatches a mouse button release event.
      *
+     * @param lx     logical X coordinate
+     * @param ly     logical Y coordinate
+     * @param button GLFW mouse button code
      * @return {@code true} if handled
      */
     public boolean dispatchMouseUp(float lx, float ly, int button) {
@@ -215,6 +238,9 @@ public abstract class UiNode {
     /**
      * Dispatches mouse wheel scrolling inside bounds.
      *
+     * @param lx      logical X coordinate
+     * @param ly      logical Y coordinate
+     * @param scrollY scroll wheel delta
      * @return {@code true} if consumed
      */
     public boolean dispatchMouseScroll(float lx, float ly, double scrollY) {
@@ -232,6 +258,8 @@ public abstract class UiNode {
     /**
      * Dispatches a key press to this node or its children.
      *
+     * @param key  GLFW key code
+     * @param mods active GLFW modifier flags
      * @return {@code true} if consumed
      */
     public boolean dispatchKeyPressed(int key, int mods) {
@@ -249,6 +277,7 @@ public abstract class UiNode {
     /**
      * Dispatches a typed Unicode character to this node or its children.
      *
+     * @param ch typed Unicode character
      * @return {@code true} if consumed
      */
     public boolean dispatchCharTyped(char ch) {
@@ -263,33 +292,87 @@ public abstract class UiNode {
         return onCharTyped(ch);
     }
 
+    /**
+     * Returns whether interactive is active.
+     *
+     * @return the resulting value
+     */
     protected boolean isInteractive() {
         return focusable;
     }
 
+    /**
+     * Handles the {@code onMouseMoved} callback.
+     *
+     * @param lx the lx argument
+     * @param ly the ly argument
+     * @param inside the inside argument
+     */
     protected void onMouseMoved(float lx, float ly, boolean inside) {
     }
 
+    /**
+     * Handles the {@code onMouseDown} callback.
+     *
+     * @param lx the lx argument
+     * @param ly the ly argument
+     * @param button the button argument
+     * @return the resulting value
+     */
     protected boolean onMouseDown(float lx, float ly, int button) {
         return false;
     }
 
+    /**
+     * Handles the {@code onMouseUp} callback.
+     *
+     * @param lx the lx argument
+     * @param ly the ly argument
+     * @param button the button argument
+     * @return the resulting value
+     */
     protected boolean onMouseUp(float lx, float ly, int button) {
         return false;
     }
 
+    /**
+     * Handles the {@code onMouseScroll} callback.
+     *
+     * @param lx the lx argument
+     * @param ly the ly argument
+     * @param scrollY the scrollY argument
+     * @return the resulting value
+     */
     protected boolean onMouseScroll(float lx, float ly, double scrollY) {
         return false;
     }
 
+    /**
+     * Handles the {@code onKeyPressed} callback.
+     *
+     * @param key the key argument
+     * @param mods the mods argument
+     * @return the resulting value
+     */
     protected boolean onKeyPressed(int key, int mods) {
         return false;
     }
 
+    /**
+     * Handles the {@code onCharTyped} callback.
+     *
+     * @param ch the ch argument
+     * @return the resulting value
+     */
     protected boolean onCharTyped(char ch) {
         return false;
     }
 
+    /**
+     * Sets the hoveredDeep value.
+     *
+     * @param hovered the hovered argument
+     */
     public void setHoveredDeep(boolean hovered) {
         this.hovered = hovered;
         for (UiNode child : children) {
@@ -297,6 +380,12 @@ public abstract class UiNode {
         }
     }
 
+    /**
+     * Executes {@code addChild}.
+     *
+     * @param child the child argument
+     * @return the resulting value
+     */
     public UiNode addChild(UiNode child) {
         if (child != null) {
             child.parent = this;
@@ -305,6 +394,12 @@ public abstract class UiNode {
         return this;
     }
 
+    /**
+     * Executes {@code removeChild}.
+     *
+     * @param child the child argument
+     * @return the resulting value
+     */
     public boolean removeChild(UiNode child) {
         if (children.remove(child)) {
             child.parent = null;
@@ -313,6 +408,9 @@ public abstract class UiNode {
         return false;
     }
 
+    /**
+     * Executes {@code clearChildren}.
+     */
     public void clearChildren() {
         for (UiNode child : children) {
             child.parent = null;
@@ -320,14 +418,29 @@ public abstract class UiNode {
         children.clear();
     }
 
+    /**
+     * Returns the children value.
+     *
+     * @return the resulting value
+     */
     public List<UiNode> getChildren() {
         return Collections.unmodifiableList(children);
     }
 
+    /**
+     * Returns the parent value.
+     *
+     * @return the resulting value
+     */
     public UiNode getParent() {
         return parent;
     }
 
+    /**
+     * Returns the contentBounds value.
+     *
+     * @return the resulting value
+     */
     public Rect2f getContentBounds() {
         float x = bounds.x() + paddingLeft;
         float y = bounds.y() + paddingTop;
@@ -336,6 +449,12 @@ public abstract class UiNode {
         return new Rect2f(x, y, w, h);
     }
 
+    /**
+     * Sets the padding value.
+     *
+     * @param all the all argument
+     * @return the resulting value
+     */
     public UiNode setPadding(float all) {
         this.paddingLeft = all;
         this.paddingTop = all;
@@ -344,6 +463,13 @@ public abstract class UiNode {
         return this;
     }
 
+    /**
+     * Executes {@code setPadding}.
+     *
+     * @param horizontal the horizontal argument
+     * @param vertical the vertical argument
+     * @return the resulting value
+     */
     public UiNode setPadding(float horizontal, float vertical) {
         this.paddingLeft = horizontal;
         this.paddingRight = horizontal;
@@ -352,6 +478,15 @@ public abstract class UiNode {
         return this;
     }
 
+    /**
+     * Executes {@code setPadding}.
+     *
+     * @param left the left argument
+     * @param top the top argument
+     * @param right the right argument
+     * @param bottom the bottom argument
+     * @return the resulting value
+     */
     public UiNode setPadding(float left, float top, float right, float bottom) {
         this.paddingLeft = left;
         this.paddingTop = top;
@@ -360,37 +495,330 @@ public abstract class UiNode {
         return this;
     }
 
-    public String getId() { return id; }
-    public UiNode setId(String id) { this.id = id != null ? id : ""; return this; }
-    public Rect2f getBounds() { return bounds; }
-    public UiNode setBounds(Rect2f bounds) { this.bounds = bounds != null ? bounds : new Rect2f(0, 0, 0, 0); return this; }
-    public float getPreferredWidth() { return preferredWidth; }
-    public UiNode setPreferredWidth(float w) { this.preferredWidth = w; return this; }
-    public float getPreferredHeight() { return preferredHeight; }
-    public UiNode setPreferredHeight(float h) { this.preferredHeight = h; return this; }
-    public UiNode setPreferredSize(float w, float h) { this.preferredWidth = w; this.preferredHeight = h; return this; }
-    public float getPaddingLeft() { return paddingLeft; }
-    public float getPaddingTop() { return paddingTop; }
-    public float getPaddingRight() { return paddingRight; }
-    public float getPaddingBottom() { return paddingBottom; }
-    public boolean isVisible() { return visible; }
-    public UiNode setVisible(boolean visible) { this.visible = visible; return this; }
-    public boolean isEnabled() { return enabled; }
-    public UiNode setEnabled(boolean enabled) { this.enabled = enabled; return this; }
-    public boolean isFocusable() { return focusable; }
-    public UiNode setFocusable(boolean focusable) { this.focusable = focusable; return this; }
-    public boolean isHovered() { return hovered; }
-    public boolean isFocused() { return focused; }
-    public UiNode setFocused(boolean focused) { this.focused = focused; return this; }
-    public boolean isPressed() { return pressed; }
-    public float getAlpha() { return alpha; }
-    public UiNode setAlpha(float alpha) { this.alpha = Math.max(0.0f, Math.min(1.0f, alpha)); return this; }
-    public String getBackgroundColorHex() { return backgroundColorHex; }
-    public UiNode setBackgroundColorHex(String hex) { this.backgroundColorHex = hex; return this; }
-    public String getBorderColorHex() { return borderColorHex; }
-    public UiNode setBorderColorHex(String hex) { this.borderColorHex = hex; return this; }
-    public float getBorderThickness() { return borderThickness; }
-    public UiNode setBorderThickness(float t) { this.borderThickness = Math.max(0.0f, t); return this; }
-    public float getCornerRadius() { return cornerRadius; }
-    public UiNode setCornerRadius(float r) { this.cornerRadius = Math.max(0.0f, r); return this; }
+    /**
+     * Returns the id value.
+     *
+     * @return the resulting value
+     */
+    public String getId() {
+        return id;
+    }
+
+    /**
+     * Sets the id value.
+     *
+     * @param id the id argument
+     * @return the resulting value
+     */
+    public UiNode setId(String id) {
+        this.id = id != null ? id : "";
+        return this;
+    }
+
+    /**
+     * Returns the bounds value.
+     *
+     * @return the resulting value
+     */
+    public Rect2f getBounds() {
+        return bounds;
+    }
+
+    /**
+     * Sets the bounds value.
+     *
+     * @param bounds the bounds argument
+     * @return the resulting value
+     */
+    public UiNode setBounds(Rect2f bounds) {
+        this.bounds = bounds != null ? bounds : new Rect2f(0, 0, 0, 0);
+        return this;
+    }
+
+    /**
+     * Returns the preferredWidth value.
+     *
+     * @return the resulting value
+     */
+    public float getPreferredWidth() {
+        return preferredWidth;
+    }
+
+    /**
+     * Sets the preferredWidth value.
+     *
+     * @param w the w argument
+     * @return the resulting value
+     */
+    public UiNode setPreferredWidth(float w) {
+        this.preferredWidth = w;
+        return this;
+    }
+
+    /**
+     * Returns the preferredHeight value.
+     *
+     * @return the resulting value
+     */
+    public float getPreferredHeight() {
+        return preferredHeight;
+    }
+
+    /**
+     * Sets the preferredHeight value.
+     *
+     * @param h the h argument
+     * @return the resulting value
+     */
+    public UiNode setPreferredHeight(float h) {
+        this.preferredHeight = h;
+        return this;
+    }
+
+    /**
+     * Executes {@code setPreferredSize}.
+     *
+     * @param w the w argument
+     * @param h the h argument
+     * @return the resulting value
+     */
+    public UiNode setPreferredSize(float w, float h) {
+        this.preferredWidth = w;
+        this.preferredHeight = h;
+        return this;
+    }
+
+    /**
+     * Returns the paddingLeft value.
+     *
+     * @return the resulting value
+     */
+    public float getPaddingLeft() {
+        return paddingLeft;
+    }
+
+    /**
+     * Returns the paddingTop value.
+     *
+     * @return the resulting value
+     */
+    public float getPaddingTop() {
+        return paddingTop;
+    }
+
+    /**
+     * Returns the paddingRight value.
+     *
+     * @return the resulting value
+     */
+    public float getPaddingRight() {
+        return paddingRight;
+    }
+
+    /**
+     * Returns the paddingBottom value.
+     *
+     * @return the resulting value
+     */
+    public float getPaddingBottom() {
+        return paddingBottom;
+    }
+
+    /**
+     * Returns whether visible is active.
+     *
+     * @return the resulting value
+     */
+    public boolean isVisible() {
+        return visible;
+    }
+
+    /**
+     * Sets the visible value.
+     *
+     * @param visible the visible argument
+     * @return the resulting value
+     */
+    public UiNode setVisible(boolean visible) {
+        this.visible = visible;
+        return this;
+    }
+
+    /**
+     * Returns whether enabled is active.
+     *
+     * @return the resulting value
+     */
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    /**
+     * Sets the enabled value.
+     *
+     * @param enabled the enabled argument
+     * @return the resulting value
+     */
+    public UiNode setEnabled(boolean enabled) {
+        this.enabled = enabled;
+        return this;
+    }
+
+    /**
+     * Returns whether focusable is active.
+     *
+     * @return the resulting value
+     */
+    public boolean isFocusable() {
+        return focusable;
+    }
+
+    /**
+     * Sets the focusable value.
+     *
+     * @param focusable the focusable argument
+     * @return the resulting value
+     */
+    public UiNode setFocusable(boolean focusable) {
+        this.focusable = focusable;
+        return this;
+    }
+
+    /**
+     * Returns whether hovered is active.
+     *
+     * @return the resulting value
+     */
+    public boolean isHovered() {
+        return hovered;
+    }
+
+    /**
+     * Returns whether focused is active.
+     *
+     * @return the resulting value
+     */
+    public boolean isFocused() {
+        return focused;
+    }
+
+    /**
+     * Sets the focused value.
+     *
+     * @param focused the focused argument
+     * @return the resulting value
+     */
+    public UiNode setFocused(boolean focused) {
+        this.focused = focused;
+        return this;
+    }
+
+    /**
+     * Returns whether pressed is active.
+     *
+     * @return the resulting value
+     */
+    public boolean isPressed() {
+        return pressed;
+    }
+
+    /**
+     * Returns the alpha value.
+     *
+     * @return the resulting value
+     */
+    public float getAlpha() {
+        return alpha;
+    }
+
+    /**
+     * Sets the alpha value.
+     *
+     * @param alpha the alpha argument
+     * @return the resulting value
+     */
+    public UiNode setAlpha(float alpha) {
+        this.alpha = Math.max(0.0f, Math.min(1.0f, alpha));
+        return this;
+    }
+
+    /**
+     * Returns the backgroundColorHex value.
+     *
+     * @return the resulting value
+     */
+    public String getBackgroundColorHex() {
+        return backgroundColorHex;
+    }
+
+    /**
+     * Sets the backgroundColorHex value.
+     *
+     * @param hex the hex argument
+     * @return the resulting value
+     */
+    public UiNode setBackgroundColorHex(String hex) {
+        this.backgroundColorHex = hex;
+        return this;
+    }
+
+    /**
+     * Returns the borderColorHex value.
+     *
+     * @return the resulting value
+     */
+    public String getBorderColorHex() {
+        return borderColorHex;
+    }
+
+    /**
+     * Sets the borderColorHex value.
+     *
+     * @param hex the hex argument
+     * @return the resulting value
+     */
+    public UiNode setBorderColorHex(String hex) {
+        this.borderColorHex = hex;
+        return this;
+    }
+
+    /**
+     * Returns the borderThickness value.
+     *
+     * @return the resulting value
+     */
+    public float getBorderThickness() {
+        return borderThickness;
+    }
+
+    /**
+     * Sets the borderThickness value.
+     *
+     * @param t the t argument
+     * @return the resulting value
+     */
+    public UiNode setBorderThickness(float t) {
+        this.borderThickness = Math.max(0.0f, t);
+        return this;
+    }
+
+    /**
+     * Returns the cornerRadius value.
+     *
+     * @return the resulting value
+     */
+    public float getCornerRadius() {
+        return cornerRadius;
+    }
+
+    /**
+     * Sets the cornerRadius value.
+     *
+     * @param r the r argument
+     * @return the resulting value
+     */
+    public UiNode setCornerRadius(float r) {
+        this.cornerRadius = Math.max(0.0f, r);
+        return this;
+    }
 }

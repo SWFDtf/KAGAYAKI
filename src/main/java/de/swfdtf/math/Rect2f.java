@@ -64,7 +64,8 @@ public record Rect2f(float x, float y, float width, float height) {
     }
 
     /**
-     * Tests whether this rectangle strictly overlaps with {@code other} (shared edges alone do not count as intersection).
+     * Tests whether this rectangle strictly overlaps with {@code other}
+     * (shared edges alone do not count as intersection).
      * Returns {@code false} if either rectangle has non-positive width or height.
      *
      * @param other other rectangle (non-null)

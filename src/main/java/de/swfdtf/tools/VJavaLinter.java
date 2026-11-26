@@ -8,7 +8,6 @@ import de.swfdtf.parser.VJavaAst;
 import de.swfdtf.parser.VJavaCompileException;
 import de.swfdtf.parser.VJavaParseException;
 
-import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -69,6 +68,7 @@ public final class VJavaLinter {
             String sourceFile,
             int lineNumber
     ) {
+        /** Validates severity and normalizes null strings. */
         public LintIssue {
             Objects.requireNonNull(severity, "severity must not be null");
             code = code != null ? code : "LINT_ISSUE";
@@ -89,6 +89,7 @@ public final class VJavaLinter {
             int errorCount,
             int warningCount
     ) {
+        /** Normalizes null issue lists to an empty immutable list. */
         public LintReport {
             issues = issues != null ? List.copyOf(issues) : List.of();
         }
@@ -426,7 +427,8 @@ public final class VJavaLinter {
                         issues.add(new LintIssue(
                                 Severity.WARNING,
                                 "UNDEFINED_SPEAKER",
-                                "Undefined speaker ID '" + speakerId + "' (missing 'define " + speakerId + " = Character(...)').",
+                                "Undefined speaker ID '" + speakerId
+                                        + "' (missing 'define " + speakerId + " = Character(...)').",
                                 say.sourceFile(),
                                 say.lineNumber()
                         ));
@@ -459,7 +461,8 @@ public final class VJavaLinter {
                     verifyAssetExists(project, knownAssets, path, queue.sourceFile(), queue.lineNumber(), issues);
                 }
             } else if (stmt instanceof VJavaAst.VoiceStatement voice) {
-                verifyAssetExists(project, knownAssets, voice.assetPath(), voice.sourceFile(), voice.lineNumber(), issues);
+                verifyAssetExists(
+                        project, knownAssets, voice.assetPath(), voice.sourceFile(), voice.lineNumber(), issues);
             } else if (stmt instanceof VJavaAst.OnCollideStatement collide) {
                 String target = collide.targetLabel() != null ? collide.targetLabel().trim() : "";
                 if (target.isEmpty() || !project.labels().containsKey(target)) {

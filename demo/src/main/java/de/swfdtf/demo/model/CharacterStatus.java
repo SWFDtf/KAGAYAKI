@@ -7,11 +7,17 @@ package de.swfdtf.demo.model;
  * definierte {@code FigurZustand}-Enum auf Java-Anwendungsebene wider.</p>
  */
 public enum CharacterStatus {
+    /** Wach und wohlauf. */
     LEBENDIG("Lebendig", "Wach und wohlauf"),
+    /** Im siebten Zwergenbettchen eingeschlafen. */
     SCHLAFEND("Schlafend", "Im siebten Zwergenbettchen eingeschlafen"),
+    /** Durch den Schnürriemen ohne Atem. */
     OHNMAECHTIG("Ohnmächtig", "Durch den Schnürriemen ohne Atem"),
+    /** Durch Giftkamm oder Giftapfel wie tot. */
     VERGIFTET("Vergiftet", "Durch Giftkamm oder Giftapfel wie tot"),
+    /** Apfelstück aus dem Hals gelöst, wieder erwacht. */
     ERLOEST("Erlöst", "Apfelstück aus dem Hals gelöst, wieder erwacht"),
+    /** In rotglühenden eisernen Pantoffeln gerichtet. */
     BESTRAFT("Bestraft", "In rotglühenden eisernen Pantoffeln gerichtet");
 
     private final String label;

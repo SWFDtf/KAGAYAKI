@@ -1,0 +1,22 @@
+image bg_arena = "assets/images/bg/bg_arena.png"
+image hero = "assets/images/sprites/hero.png"
+image coin = "assets/images/sprites/coin.png"
+
+label start:
+    scene bg_arena
+    show hero:
+        xpos 300.0
+        ypos 800.0
+    show coin:
+        xpos 1600.0
+        ypos 800.0
+    wasd_init hero speed 300 bounds 50 50 1850 950 diagonal_norm true
+    physics_init hero gravity 980 jump_force 420 ground_y 800
+    on_collide hero coin jump goal_reached
+    "Erster Schritt."
+    "Zweiter Schritt."
+    return
+
+label goal_reached:
+    "Münze gesammelt."
+    return

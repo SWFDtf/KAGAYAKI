@@ -3,7 +3,6 @@ package de.swfdtf.parser;
 import de.swfdtf.core.EngineAPI;
 import de.swfdtf.core.EngineConfig;
 import de.swfdtf.state.HistoryLog;
-import de.swfdtf.state.SaveManager;
 import de.swfdtf.state.SaveSlotData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -92,7 +91,9 @@ class ScriptRollbackAndSaveIntegrationTest {
 
         session.start();
         assertEquals(ScriptRuntime.Status.WAITING_DIALOGUE, session.getRuntime().getStatus());
-        assertEquals("Willkommen in der ersten Beispielszene, Kaito.", session.getRuntime().getActiveDialogue().interpolatedText());
+        assertEquals(
+                "Willkommen in der ersten Beispielszene, Kaito.",
+                session.getRuntime().getActiveDialogue().interpolatedText());
         assertEquals(35, session.getStateStore().getInt("mut_punkte", 0));
 
         // Step 1 -> Menu
@@ -121,13 +122,15 @@ class ScriptRollbackAndSaveIntegrationTest {
         assertTrue(entries.size() >= 2);
         HistoryLog.HistoryEntry firstLine = entries.get(0);
         assertTrue(session.jumpToHistoryEntry(firstLine));
-        assertEquals("Willkommen in der ersten Beispielszene, Kaito.", session.getRuntime().getActiveDialogue().interpolatedText());
+        assertEquals(
+                "Willkommen in der ersten Beispielszene, Kaito.",
+                session.getRuntime().getActiveDialogue().interpolatedText());
         assertEquals(35, session.getStateStore().getInt("mut_punkte", 0));
 
         // Save slot with 2x2 RGBA thumbnail while holding custom SpezialGegenstand object
         byte[] thumbRgba = new byte[]{
-                (byte) 255, 0, 0, (byte) 255, 0, (byte) 255, 0, (byte) 255,
-                0, 0, (byte) 255, (byte) 255, (byte) 255, (byte) 255, 0, (byte) 255
+            (byte) 255, 0, 0, (byte) 255, 0, (byte) 255, 0, (byte) 255,
+            0, 0, (byte) 255, (byte) 255, (byte) 255, (byte) 255, 0, (byte) 255
         };
         session.saveToSlot("slot_1", "Akademie Start", 2, 2, thumbRgba);
         SaveSlotData.SaveMetadata meta = session.getSaveManager().readSlotMetadata("slot_1").orElseThrow();
@@ -150,7 +153,9 @@ class ScriptRollbackAndSaveIntegrationTest {
         reloaded.loadFromSlot("slot_1");
 
         assertEquals(ScriptRuntime.Status.WAITING_DIALOGUE, reloaded.getRuntime().getStatus());
-        assertEquals("Willkommen in der ersten Beispielszene, Kaito.", reloaded.getRuntime().getActiveDialogue().interpolatedText());
+        assertEquals(
+                "Willkommen in der ersten Beispielszene, Kaito.",
+                reloaded.getRuntime().getActiveDialogue().interpolatedText());
         assertEquals(35, reloaded.getStateStore().getInt("mut_punkte", 0));
         Object item = reloaded.getStateStore().get("aktives_item");
         assertNotNull(item);

@@ -42,9 +42,12 @@ class Wave1StateFeaturesTest {
         @SuppressWarnings("unchecked")
         Supplier<SaveSlotData> provider = mock(Supplier.class);
 
-        SaveSlotData snap1 = sampleSlot("auto_1", "Chap 1", "ch1", "Opening", 10.0, Instant.parse("2026-01-01T10:00:00Z"), Map.of("day", 1));
-        SaveSlotData snap2 = sampleSlot("auto_2", "Chap 2", "ch2", "Crossing", 20.0, Instant.parse("2026-01-01T10:05:00Z"), Map.of("day", 2));
-        SaveSlotData snap3 = sampleSlot("auto_3", "Chap 3", "ch3", "Finale", 30.0, Instant.parse("2026-01-01T10:10:00Z"), Map.of("day", 3));
+        SaveSlotData snap1 = sampleSlot(
+                "auto_1", "Chap 1", "ch1", "Opening", 10.0, Instant.parse("2026-01-01T10:00:00Z"), Map.of("day", 1));
+        SaveSlotData snap2 = sampleSlot(
+                "auto_2", "Chap 2", "ch2", "Crossing", 20.0, Instant.parse("2026-01-01T10:05:00Z"), Map.of("day", 2));
+        SaveSlotData snap3 = sampleSlot(
+                "auto_3", "Chap 3", "ch3", "Finale", 30.0, Instant.parse("2026-01-01T10:10:00Z"), Map.of("day", 3));
         when(provider.get()).thenReturn(snap1, snap2, snap3);
 
         AutoSaveScheduler scheduler = new AutoSaveScheduler(saveManager, provider, 2, 10.0, 3);
@@ -111,7 +114,8 @@ class Wave1StateFeaturesTest {
     }
 
     @Test
-    void saveSlotQueryServiceSupportsTagsSearchSortingAndSafeCorruptionSkipping(@TempDir Path tempDir) throws Exception {
+    void saveSlotQueryServiceSupportsTagsSearchSortingAndSafeCorruptionSkipping(@TempDir Path tempDir)
+            throws Exception {
         SaveManager saveManager = new SaveManager(tempDir);
         SaveSlotQueryService queryService = new SaveSlotQueryService(saveManager);
 

@@ -113,6 +113,8 @@ public class NvlDialogueScreen extends Screen {
 
     /**
      * Synchronizes accumulated paragraphs with {@link ScriptRuntime#getNvlLines()}.
+     *
+     * @param force {@code true} to rebuild paragraph widgets unconditionally
      */
     public void syncFromRuntime(boolean force) {
         ScriptRuntime runtime = session.getRuntime();
@@ -190,30 +192,57 @@ public class NvlDialogueScreen extends Screen {
         return latest.getTypewriter() != null ? latest.getTypewriter() : latestFallbackTypewriter;
     }
 
-    /** @return immutable snapshot of currently displayed NVL paragraph strings */
+    /**
+     * Returns immutable snapshot of currently displayed NVL paragraph strings.
+     *
+     * @return immutable snapshot of currently displayed NVL paragraph strings
+     */
     public List<String> getEntries() {
         return lastDisplayedLines;
     }
 
-    /** @return number of accumulated NVL paragraphs currently shown */
+    /**
+     * Returns number of accumulated NVL paragraphs currently shown.
+     *
+     * @return number of accumulated NVL paragraphs currently shown
+     */
     public int getEntryCount() {
         return paragraphWidgets.size();
     }
 
-    /** @return {@code true} if the latest NVL paragraph has finished typing */
+    /**
+     * Returns {@code true} if the latest NVL paragraph has finished typing.
+     *
+     * @return {@code true} if the latest NVL paragraph has finished typing
+     */
     public boolean isLatestTypewriterFinished() {
         StyledTextLayout.TypewriterController tw = resolveLatestTypewriter();
         return tw == null || tw.isFinished();
     }
 
+    /**
+     * Returns the viewport value.
+     *
+     * @return the resulting value
+     */
     public Viewport getViewport() {
         return viewport;
     }
 
+    /**
+     * Returns the paragraphContainer value.
+     *
+     * @return the resulting value
+     */
     public VBox getParagraphContainer() {
         return paragraphBox;
     }
 
+    /**
+     * Returns the paragraphWidgets value.
+     *
+     * @return the resulting value
+     */
     public List<TextWidget> getParagraphWidgets() {
         return Collections.unmodifiableList(paragraphWidgets);
     }

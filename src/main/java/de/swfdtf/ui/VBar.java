@@ -46,7 +46,11 @@ public class VBar extends UiNode {
         return this;
     }
 
-    /** @return current bar value */
+    /**
+     * Returns current bar value.
+     *
+     * @return current bar value
+     */
     public float getValue() {
         return value;
     }
@@ -65,12 +69,20 @@ public class VBar extends UiNode {
         return this;
     }
 
-    /** @return maximum range value */
+    /**
+     * Returns maximum range value.
+     *
+     * @return maximum range value
+     */
     public float getMax() {
         return max;
     }
 
-    /** @return normalized fill fraction in {@code [0, 1]} */
+    /**
+     * Returns normalized fill fraction in {@code [0, 1]}.
+     *
+     * @return normalized fill fraction in {@code [0, 1]}
+     */
     public float getNormalizedValue() {
         return max > 0.0f ? Math.clamp(value / max, 0.0f, 1.0f) : 0.0f;
     }
@@ -88,7 +100,11 @@ public class VBar extends UiNode {
         return this;
     }
 
-    /** @return fill color hex string */
+    /**
+     * Returns fill color hex string.
+     *
+     * @return fill color hex string
+     */
     public String getFillColorHex() {
         return fillColorHex;
     }
@@ -106,7 +122,11 @@ public class VBar extends UiNode {
         return this;
     }
 
-    /** @return track color hex string */
+    /**
+     * Returns track color hex string.
+     *
+     * @return track color hex string
+     */
     public String getTrackColorHex() {
         return trackColorHex;
     }

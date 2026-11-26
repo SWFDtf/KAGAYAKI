@@ -7,7 +7,6 @@ import de.swfdtf.core.EngineConfig;
 import de.swfdtf.core.InputManager;
 import de.swfdtf.math.Rect2f;
 import de.swfdtf.parser.ProjectScanner;
-import de.swfdtf.parser.ScriptRuntime;
 import de.swfdtf.parser.ScriptSession;
 import de.swfdtf.parser.VJavaAst;
 import org.junit.jupiter.api.Test;
@@ -18,7 +17,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DialogueModesTest {
 
@@ -224,7 +226,8 @@ class DialogueModesTest {
         float tailStartY = afterBoxDrag.tailY();
         assertTrue(bubble.getRoot().dispatchMouseDown(tailStartX, tailStartY, GLFW.GLFW_MOUSE_BUTTON_LEFT));
         bubble.getRoot().dispatchMouseMove(tailStartX - 80.0f, tailStartY + 35.0f);
-        assertTrue(bubble.getRoot().dispatchMouseUp(tailStartX - 80.0f, tailStartY + 35.0f, GLFW.GLFW_MOUSE_BUTTON_LEFT));
+        assertTrue(bubble.getRoot().dispatchMouseUp(
+                tailStartX - 80.0f, tailStartY + 35.0f, GLFW.GLFW_MOUSE_BUTTON_LEFT));
 
         BubbleDialogueScreen.BubbleLayoutConfig afterTailDrag = bubble.getActiveBubble().layout();
         assertEquals(tailStartX - 80.0f, afterTailDrag.tailX(), 1.0f);
@@ -233,7 +236,8 @@ class DialogueModesTest {
         // Exit editor mode -> presets persist to bubble_layouts.json and reload in new BubbleDialogueScreen
         bubble.toggleEditorMode();
         assertFalse(bubble.isEditorActive());
-        assertTrue(Files.exists(session.getSaveManager().getSavesDir().resolve(BubbleDialogueScreen.PRESETS_FILE_NAME)));
+        assertTrue(Files.exists(
+                session.getSaveManager().getSavesDir().resolve(BubbleDialogueScreen.PRESETS_FILE_NAME)));
 
         BubbleDialogueScreen reloaded = new BubbleDialogueScreen(session);
         BubbleDialogueScreen.BubbleLayoutConfig loadedCfg = reloaded.getLayoutPreset(bubble.getActiveBubble().lineId());

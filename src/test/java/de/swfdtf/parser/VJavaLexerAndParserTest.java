@@ -118,7 +118,8 @@ class VJavaLexerAndParserTest {
 
                 show lena neutral at center with easein(0.4)
                 voice "assets/audio/voice/lena_01.ogg"
-                lena "Willkommen in der ersten Beispielszene, [spieler_name].{w=0.4} Bereit für den Übergang in Dialog 2?"
+                lena "Willkommen in der ersten Beispielszene, [spieler_name].{w=0.4} \
+            Bereit für den Übergang in Dialog 2?"
 
                 menu:
                     "Ja, direkt weiter zu Dialog 2!" if mut_punkte >= 20 -> jump dialog_zwei
@@ -132,7 +133,8 @@ class VJavaLexerAndParserTest {
             label dialog_zwei:
                 scene bg_bibliothek with fade(0.5)
                 show lena entschlossen at left with easein(0.3)
-                lena "Das hier ist der zweite Beispieldialog der Vorlage. Du kannst jetzt speichern, laden oder zurückspulen!"
+                lena "Das hier ist der zweite Beispieldialog der Vorlage. \
+            Du kannst jetzt speichern, laden oder zurückspulen!"
                 stop music fadeout 1.5
                 return
             """;
@@ -171,8 +173,12 @@ class VJavaLexerAndParserTest {
         GroupLayerEntry outfit = (GroupLayerEntry) layered.entries().get(1);
         assertEquals("outfit", outfit.groupName());
         assertEquals(2, outfit.attributes().size());
-        assertEquals(new AttributeEntry("uniform", true, "assets/images/char/lena_uniform.png", null), outfit.attributes().get(0));
-        assertEquals(new AttributeEntry("casual", false, "assets/images/char/lena_casual.png", null), outfit.attributes().get(1));
+        assertEquals(
+                new AttributeEntry("uniform", true, "assets/images/char/lena_uniform.png", null),
+                outfit.attributes().get(0));
+        assertEquals(
+                new AttributeEntry("casual", false, "assets/images/char/lena_casual.png", null),
+                outfit.attributes().get(1));
 
         GroupLayerEntry face = (GroupLayerEntry) layered.entries().get(2);
         assertEquals("face", face.groupName());
@@ -213,7 +219,9 @@ class VJavaLexerAndParserTest {
 
         SayStatement say1 = (SayStatement) start.statements().get(5);
         assertEquals("lena", say1.speakerId());
-        assertEquals("Willkommen in der ersten Beispielszene, [spieler_name].{w=0.4} Bereit für den Übergang in Dialog 2?", say1.text());
+        assertEquals(
+                "Willkommen in der ersten Beispielszene, [spieler_name].{w=0.4} Bereit für den Übergang in Dialog 2?",
+                say1.text());
         assertNull(say1.transitionExpr());
 
         MenuStatement menu = (MenuStatement) start.statements().get(6);
@@ -257,7 +265,9 @@ class VJavaLexerAndParserTest {
         String script = """
                 default mut_punkte = 10
                 $ global_flag = true
-                define custom_char = Character("Mira", color="#ff00aa", outline_color="#111111", image="mira", voice_tag="mira_v", textbox="assets/ui/box.png", voice_bleep="assets/audio/bleep.ogg", mood_style="calm")
+                define custom_char = Character("Mira", color="#ff00aa", outline_color="#111111", image="mira", \
+                voice_tag="mira_v", textbox="assets/ui/box.png", \
+                voice_bleep="assets/audio/bleep.ogg", mood_style="calm")
                 image bg akademie nacht = "assets/images/bg/akademie_nacht.png"
 
                 label flow_test:
@@ -459,7 +469,9 @@ class VJavaLexerAndParserTest {
         assertEquals(8, tr.steps().size());
         assertEquals("set", tr.steps().get(0).kind());
         assertEquals("0.5", tr.steps().get(0).properties().get("xpos"));
-        assertEquals("TintMatrix(\"#58a6ff\") * BrightnessMatrix(0.1)", tr.steps().get(2).properties().get("matrixcolor"));
+        assertEquals(
+                "TintMatrix(\"#58a6ff\") * BrightnessMatrix(0.1)",
+                tr.steps().get(2).properties().get("matrixcolor"));
         AtlStep linearStep = tr.steps().get(3);
         assertEquals("interpolate", linearStep.kind());
         assertEquals("linear", linearStep.easeName());
@@ -578,7 +590,9 @@ class VJavaLexerAndParserTest {
         LayeredImageDef layered = ast.layeredImages().get(0);
         assertEquals(new AlwaysLayerEntry("assets/images/base.png"), layered.entries().get(0));
         GroupLayerEntry group = (GroupLayerEntry) layered.entries().get(1);
-        assertEquals(new AttributeEntry("happy", false, "assets/images/happy.png", "points > 5"), group.attributes().get(0));
+        assertEquals(
+                new AttributeEntry("happy", false, "assets/images/happy.png", "points > 5"),
+                group.attributes().get(0));
 
         ShowStatement show = (ShowStatement) ast.labels().get(0).statements().get(0);
         assertEquals("sprite_a", show.tag());

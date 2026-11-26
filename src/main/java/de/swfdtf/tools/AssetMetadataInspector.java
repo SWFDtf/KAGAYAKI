@@ -32,7 +32,7 @@ public final class AssetMetadataInspector {
 
     private static final String ASSETS_DIR_NAME = "assets";
     private static final byte[] PNG_SIGNATURE = {
-            (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
+        (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A
     };
     private static final int PNG_HEADER_BYTES = 24;
 

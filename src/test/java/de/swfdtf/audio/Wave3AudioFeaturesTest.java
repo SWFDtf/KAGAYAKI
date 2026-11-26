@@ -84,7 +84,8 @@ class Wave3AudioFeaturesTest {
         assertThrows(IllegalArgumentException.class, () -> new AudioDuckingController(1.1f, 0.1, 0.1));
         assertThrows(IllegalArgumentException.class, () -> new AudioDuckingController(Float.NaN, 0.1, 0.1));
         assertThrows(IllegalArgumentException.class, () -> new AudioDuckingController(0.5f, -0.01, 0.1));
-        assertThrows(IllegalArgumentException.class, () -> new AudioDuckingController(0.5f, 0.1, Double.POSITIVE_INFINITY));
+        assertThrows(IllegalArgumentException.class,
+                () -> new AudioDuckingController(0.5f, 0.1, Double.POSITIVE_INFINITY));
         assertThrows(IllegalArgumentException.class, () -> instant.update(-0.1));
         assertThrows(IllegalArgumentException.class, () -> instant.update(Double.NaN));
         assertThrows(IllegalArgumentException.class, () -> instant.applyToGain(-0.01f));
@@ -238,12 +239,18 @@ class Wave3AudioFeaturesTest {
         assertThrows(IllegalArgumentException.class, () -> queue.setMaxVisibleEntries(0));
 
         assertThrows(NullPointerException.class, () -> queue.push(null, "Lena", "Text", 1.0));
-        assertThrows(NullPointerException.class, () -> queue.push(ClosedCaptionQueue.CaptionCategory.DIALOGUE, null, "Text", 1.0));
-        assertThrows(NullPointerException.class, () -> queue.push(ClosedCaptionQueue.CaptionCategory.DIALOGUE, "Lena", null, 1.0));
-        assertThrows(IllegalArgumentException.class, () -> queue.push(ClosedCaptionQueue.CaptionCategory.DIALOGUE, "Lena", "   ", 1.0));
-        assertThrows(IllegalArgumentException.class, () -> queue.push(ClosedCaptionQueue.CaptionCategory.DIALOGUE, "Lena", "Hi", 0.0));
-        assertThrows(IllegalArgumentException.class, () -> queue.push(ClosedCaptionQueue.CaptionCategory.DIALOGUE, "Lena", "Hi", -1.0));
-        assertThrows(IllegalArgumentException.class, () -> queue.push(ClosedCaptionQueue.CaptionCategory.DIALOGUE, "Lena", "Hi", Double.NaN));
+        assertThrows(NullPointerException.class,
+                () -> queue.push(ClosedCaptionQueue.CaptionCategory.DIALOGUE, null, "Text", 1.0));
+        assertThrows(NullPointerException.class,
+                () -> queue.push(ClosedCaptionQueue.CaptionCategory.DIALOGUE, "Lena", null, 1.0));
+        assertThrows(IllegalArgumentException.class,
+                () -> queue.push(ClosedCaptionQueue.CaptionCategory.DIALOGUE, "Lena", "   ", 1.0));
+        assertThrows(IllegalArgumentException.class,
+                () -> queue.push(ClosedCaptionQueue.CaptionCategory.DIALOGUE, "Lena", "Hi", 0.0));
+        assertThrows(IllegalArgumentException.class,
+                () -> queue.push(ClosedCaptionQueue.CaptionCategory.DIALOGUE, "Lena", "Hi", -1.0));
+        assertThrows(IllegalArgumentException.class,
+                () -> queue.push(ClosedCaptionQueue.CaptionCategory.DIALOGUE, "Lena", "Hi", Double.NaN));
         assertThrows(IllegalArgumentException.class, () -> queue.update(-0.1));
         assertThrows(NullPointerException.class, () -> queue.filterByCategory(null));
     }

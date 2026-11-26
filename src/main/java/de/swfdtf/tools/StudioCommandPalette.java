@@ -40,6 +40,7 @@ public final class StudioCommandPalette {
             String shortcut,
             Runnable action
     ) {
+        /** Validates command ID, title, and action, trimming display fields. */
         public PaletteCommand {
             Objects.requireNonNull(id, "id must not be null");
             Objects.requireNonNull(title, "title must not be null");

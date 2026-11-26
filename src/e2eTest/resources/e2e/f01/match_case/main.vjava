@@ -1,0 +1,12 @@
+define lena = Character("Lena", color="#58a6ff")
+default mood = "happy"
+
+label start:
+    match mood:
+        case "happy":
+            lena "Stimmung: fröhlich."
+        case "sad":
+            lena "Stimmung: traurig."
+        default:
+            lena "Stimmung: neutral."
+    return

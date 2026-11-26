@@ -130,7 +130,8 @@ class Wave1ToolsFeaturesTest {
         logger.info("Boot", "Engine started");
         logger.warn("Assets", "Low texture cache");
 
-        EngineAPI api = new EngineAPI(config, null, logger, new de.swfdtf.core.GameClock(), new de.swfdtf.core.InputManager());
+        EngineAPI api = new EngineAPI(
+                config, null, logger, new de.swfdtf.core.GameClock(), new de.swfdtf.core.InputManager());
         VJavaLinter.LintReport lintReport = new VJavaLinter.LintReport(
                 List.of(new VJavaLinter.LintIssue(
                         VJavaLinter.Severity.WARNING,
@@ -173,7 +174,8 @@ class Wave1ToolsFeaturesTest {
     }
 
     @Test
-    void diagnosticBundleExporterIntegratesWithMockitoEngineApiAndHandlesNullOptionals(@TempDir Path tempDir) throws Exception {
+    void diagnosticBundleExporterIntegratesWithMockitoEngineApiAndHandlesNullOptionals(@TempDir Path tempDir)
+            throws Exception {
         EngineAPI mockApi = mock(EngineAPI.class);
         EngineLogger mockLogger = mock(EngineLogger.class);
 
@@ -182,7 +184,8 @@ class Wave1ToolsFeaturesTest {
         when(mockApi.getConfig()).thenReturn(null);
         when(mockApi.getLogger()).thenReturn(mockLogger);
         when(mockLogger.getRecentEntries(25)).thenReturn(List.of(
-                new EngineLogger.LogEntry(Instant.parse("2026-03-01T12:00:00Z"), EngineLogger.Level.ERROR, "Test", "Boom")
+                new EngineLogger.LogEntry(
+                        Instant.parse("2026-03-01T12:00:00Z"), EngineLogger.Level.ERROR, "Test", "Boom")
         ));
 
         DiagnosticBundleExporter exporter = new DiagnosticBundleExporter(25);

@@ -32,7 +32,11 @@ public class Imagemap extends UiNode {
         this.hoverPath = hoverPath;
     }
 
-    /** @return ground image asset path */
+    /**
+     * Returns ground image asset path.
+     *
+     * @return ground image asset path
+     */
     public String getGroundPath() {
         return groundPath;
     }
@@ -48,7 +52,11 @@ public class Imagemap extends UiNode {
         return this;
     }
 
-    /** @return hover image asset path, or {@code null} */
+    /**
+     * Returns hover image asset path, or {@code null}.
+     *
+     * @return hover image asset path, or {@code null}
+     */
     public String getHoverPath() {
         return hoverPath;
     }
@@ -118,12 +126,20 @@ public class Imagemap extends UiNode {
         super.clearChildren();
     }
 
-    /** @return unmodifiable list of registered {@link Hotspot}s */
+    /**
+     * Returns unmodifiable list of registered {@link Hotspot}s.
+     *
+     * @return unmodifiable list of registered {@link Hotspot}s
+     */
     public List<Hotspot> getHotspots() {
         return Collections.unmodifiableList(hotspots);
     }
 
-    /** @return unmodifiable list of registered {@link Hotbar}s */
+    /**
+     * Returns unmodifiable list of registered {@link Hotbar}s.
+     *
+     * @return unmodifiable list of registered {@link Hotbar}s
+     */
     public List<Hotbar> getHotbars() {
         return Collections.unmodifiableList(hotbars);
     }

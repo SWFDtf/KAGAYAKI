@@ -518,32 +518,56 @@ public final class ObjectMotionController {
         };
     }
 
-    /** @return {@code true} if at least one WASD movement binding is currently active */
+    /**
+     * Returns whether any WASD movement binding is active.
+     *
+     * @return {@code true} if at least one WASD movement binding is currently active
+     */
     public boolean hasActiveWasd() {
         return !wasdBindings.isEmpty();
     }
 
-    /** @return {@code true} if at least one 2D physics body is currently active */
+    /**
+     * Returns whether any 2D physics body is active.
+     *
+     * @return {@code true} if at least one 2D physics body is currently active
+     */
     public boolean hasActivePhysics() {
         return !physicsBodies.isEmpty();
     }
 
-    /** @return immutable set of sprite tags currently bound to WASD control */
+    /**
+     * Returns an immutable set of sprite tags bound to WASD control.
+     *
+     * @return immutable set of sprite tags currently bound to WASD control
+     */
     public Set<String> getActiveWasdTags() {
         return Collections.unmodifiableSet(new LinkedHashSet<>(wasdBindings.keySet()));
     }
 
-    /** @return immutable set of sprite tags currently driven by 2D physics */
+    /**
+     * Returns an immutable set of sprite tags driven by 2D physics.
+     *
+     * @return immutable set of sprite tags currently driven by 2D physics
+     */
     public Set<String> getActivePhysicsTags() {
         return Collections.unmodifiableSet(new LinkedHashSet<>(physicsBodies.keySet()));
     }
 
-    /** @return number of currently running movement tweens */
+    /**
+     * Returns the number of active movement tweens.
+     *
+     * @return number of currently running movement tweens
+     */
     public int getActiveTweenCount() {
         return activeTweens.size();
     }
 
-    /** @return number of registered collision triggers */
+    /**
+     * Returns the number of registered collision triggers.
+     *
+     * @return number of registered collision triggers
+     */
     public int getCollisionTriggerCount() {
         return collisionTriggers.size();
     }

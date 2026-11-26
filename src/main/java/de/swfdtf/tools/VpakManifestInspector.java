@@ -41,6 +41,7 @@ public final class VpakManifestInspector {
             List<String> corruptedEntries,
             boolean integrityVerified
     ) {
+        /** Validates archive path, byte counters, and compression ratio. */
         public VpakInspectionReport {
             Objects.requireNonNull(vpakPath, "vpakPath must not be null");
             if (entryCount < 0) {

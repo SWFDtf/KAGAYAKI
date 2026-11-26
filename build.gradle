@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'checkstyle'
 }
 
 group = 'de.swfdtf'
@@ -55,6 +56,24 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+sourceSets {
+    e2eTest {
+        java {
+            srcDirs = ['src/e2eTest/java']
+        }
+        resources {
+            srcDirs = ['src/e2eTest/resources']
+        }
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+configurations {
+    e2eTestImplementation.extendsFrom testImplementation
+    e2eTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
 application {
     mainClass = 'de.swfdtf.Main'
     if (isMac) {
@@ -66,8 +85,39 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+checkstyle {
+    toolVersion = '10.24.0'
+    configDirectory = file('gradle/checkstyle')
+    configFile = file('gradle/checkstyle/checkstyle.xml')
+    ignoreFailures = false
+    maxErrors = 0
+    maxWarnings = 0
+    sourceSets = [sourceSets.main, sourceSets.test]
+}
+
+tasks.withType(Javadoc).configureEach {
+    options.encoding = 'UTF-8'
+    options.charSet = 'UTF-8'
+    options.docEncoding = 'UTF-8'
+    options.addBooleanOption('Xdoclint:all', true)
+    options.addBooleanOption('Werror', true)
+}
+
 test {
     useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat = 'full'
+    }
+}
+
+tasks.register('e2eTest', Test) {
+    group = 'verification'
+    description = 'Runs isolated opaque-box end-to-end tests from src/e2eTest/java.'
+    testClassesDirs = sourceSets.e2eTest.output.classesDirs
+    classpath = sourceSets.e2eTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter tasks.named('test')
     testLogging {
         events 'passed', 'skipped', 'failed'
         exceptionFormat = 'full'

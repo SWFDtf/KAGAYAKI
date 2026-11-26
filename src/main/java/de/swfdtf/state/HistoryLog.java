@@ -40,6 +40,7 @@ public final class HistoryLog {
             String voicePath,
             Instant timestamp
     ) {
+        /** Initializes missing timestamp to current instant. */
         public HistoryEntry {
             timestamp = timestamp != null ? timestamp : Instant.now();
         }
@@ -215,17 +216,29 @@ public final class HistoryLog {
         }
     }
 
-    /** @return current number of retained history entries */
+    /**
+     * Returns the current number of retained history entries.
+     *
+     * @return current number of retained history entries
+     */
     public synchronized int size() {
         return entries.size();
     }
 
-    /** @return {@code true} if the log contains no entries */
+    /**
+     * Returns whether the log contains no entries.
+     *
+     * @return {@code true} if the log contains no entries
+     */
     public synchronized boolean isEmpty() {
         return entries.isEmpty();
     }
 
-    /** @return configured maximum entry capacity */
+    /**
+     * Returns the configured maximum entry capacity.
+     *
+     * @return configured maximum entry capacity
+     */
     public int getMaxEntries() {
         return maxEntries;
     }

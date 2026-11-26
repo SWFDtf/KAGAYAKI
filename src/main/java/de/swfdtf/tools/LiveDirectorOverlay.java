@@ -16,7 +16,6 @@ import de.swfdtf.ui.TextButton;
 import de.swfdtf.ui.TextInput;
 import de.swfdtf.ui.TextWidget;
 import de.swfdtf.ui.ThemePalette;
-import de.swfdtf.ui.UiNode;
 import de.swfdtf.ui.VBox;
 import de.swfdtf.ui.Viewport;
 import de.swfdtf.ui.WindowBox;
@@ -30,7 +29,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -467,7 +465,8 @@ public class LiveDirectorOverlay extends Screen {
             yposSlider.setValue(resolvedY);
             zoomSlider.setValue(t.getZoom());
             alphaSlider.setValue(t.getAlpha());
-            updateSliderLabels(xposSlider.getValue(), yposSlider.getValue(), zoomSlider.getValue(), alphaSlider.getValue());
+            updateSliderLabels(
+                    xposSlider.getValue(), yposSlider.getValue(), zoomSlider.getValue(), alphaSlider.getValue());
         } finally {
             updatingControls = false;
         }
@@ -687,7 +686,8 @@ public class LiveDirectorOverlay extends Screen {
                     + String.format(Locale.ROOT, "zoom %.2f alpha %.2f", t.getZoom(), t.getAlpha());
         }
 
-        if (defaultScaleAlpha && Math.abs(t.getXpos()) < 1e-4f && Math.abs(t.getYpos()) < 1e-4f && positionName != null) {
+        if (defaultScaleAlpha && Math.abs(t.getXpos()) < 1e-4f
+                && Math.abs(t.getYpos()) < 1e-4f && positionName != null) {
             return positionName;
         }
 
@@ -782,7 +782,8 @@ public class LiveDirectorOverlay extends Screen {
                 inSingle = true;
             } else if (c == '#' || (c == '/' && i + 1 < len && text.charAt(i + 1) == '/')) {
                 int suffixStart = i;
-                while (suffixStart > 0 && (text.charAt(suffixStart - 1) == ' ' || text.charAt(suffixStart - 1) == '\t')) {
+                while (suffixStart > 0
+                        && (text.charAt(suffixStart - 1) == ' ' || text.charAt(suffixStart - 1) == '\t')) {
                     suffixStart--;
                 }
                 return new CommentSplit(text.substring(0, suffixStart), text.substring(suffixStart));
@@ -974,7 +975,8 @@ public class LiveDirectorOverlay extends Screen {
                 while (lookahead < lines.size() && lines.get(lookahead).isBlank()) {
                     lookahead++;
                 }
-                if (lookahead < lines.size() && extractLeadingWhitespace(lines.get(lookahead)).length() > headerIndentCols) {
+                if (lookahead < lines.size()
+                        && extractLeadingWhitespace(lines.get(lookahead)).length() > headerIndentCols) {
                     i = lookahead;
                     continue;
                 }
@@ -1000,7 +1002,11 @@ public class LiveDirectorOverlay extends Screen {
             tempFile = Files.createTempFile(parent, normalizedTarget.getFileName().toString() + ".", ".tmp");
             Files.writeString(tempFile, content, StandardCharsets.UTF_8);
             try {
-                Files.move(tempFile, normalizedTarget, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(
+                        tempFile,
+                        normalizedTarget,
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
             } catch (AtomicMoveNotSupportedException ex) {
                 Files.move(tempFile, normalizedTarget, StandardCopyOption.REPLACE_EXISTING);
             }
@@ -1024,7 +1030,8 @@ public class LiveDirectorOverlay extends Screen {
         return label;
     }
 
-    private static Slider createSlider(float value, float min, float max, float step, java.util.function.Consumer<Float> onChanged) {
+    private static Slider createSlider(
+            float value, float min, float max, float step, java.util.function.Consumer<Float> onChanged) {
         Slider slider = new Slider(value, min, max, onChanged);
         slider.setStep(step);
         slider.setPreferredSize(430.0f, 26.0f);
@@ -1039,7 +1046,11 @@ public class LiveDirectorOverlay extends Screen {
 
     // ---- Public Accessors ----
 
-    /** @return bound {@link ScriptSession} */
+    /**
+     * Returns the bound script session.
+     *
+     * @return bound {@link ScriptSession}
+     */
     public ScriptSession getSession() {
         return session;
     }
@@ -1056,57 +1067,101 @@ public class LiveDirectorOverlay extends Screen {
         }
     }
 
-    /** @return currently selected stage sprite tag, or {@code null} */
+    /**
+     * Returns the currently selected stage sprite tag.
+     *
+     * @return currently selected stage sprite tag, or {@code null}
+     */
     public String getSelectedSpriteTag() {
         return selectedSpriteTag;
     }
 
-    /** @return root {@link WindowBox} inspector panel */
+    /**
+     * Returns the root inspector panel window box.
+     *
+     * @return root {@link WindowBox} inspector panel
+     */
     public WindowBox getPanelBox() {
         return panelBox;
     }
 
-    /** @return {@code xpos} slider control */
+    /**
+     * Returns the {@code xpos} slider control.
+     *
+     * @return {@code xpos} slider control
+     */
     public Slider getXposSlider() {
         return xposSlider;
     }
 
-    /** @return {@code ypos} slider control */
+    /**
+     * Returns the {@code ypos} slider control.
+     *
+     * @return {@code ypos} slider control
+     */
     public Slider getYposSlider() {
         return yposSlider;
     }
 
-    /** @return {@code zoom} slider control */
+    /**
+     * Returns the {@code zoom} slider control.
+     *
+     * @return {@code zoom} slider control
+     */
     public Slider getZoomSlider() {
         return zoomSlider;
     }
 
-    /** @return {@code alpha} slider control */
+    /**
+     * Returns the {@code alpha} slider control.
+     *
+     * @return {@code alpha} slider control
+     */
     public Slider getAlphaSlider() {
         return alphaSlider;
     }
 
-    /** @return attributes text input field */
+    /**
+     * Returns the attributes text input field.
+     *
+     * @return attributes text input field
+     */
     public TextInput getAttributesInput() {
         return attributesInput;
     }
 
-    /** @return {@code Apply & Write to .vjava} button */
+    /**
+     * Returns the Apply &amp; Write button.
+     *
+     * @return {@code Apply & Write to .vjava} button
+     */
     public TextButton getApplyButton() {
         return applyButton;
     }
 
-    /** @return stage refresh button */
+    /**
+     * Returns the stage refresh button.
+     *
+     * @return stage refresh button
+     */
     public TextButton getRefreshButton() {
         return refreshButton;
     }
 
-    /** @return status feedback text widget */
+    /**
+     * Returns the status feedback text widget.
+     *
+     * @return status feedback text widget
+     */
     public TextWidget getStatusLabel() {
         return statusLabel;
     }
 
-    /** @return immutable view of active sprite selection buttons */
+    /**
+     * Returns an immutable view of active sprite selection buttons.
+     *
+     * @return immutable view of active sprite selection buttons
+     */
     public List<TextButton> getSpriteButtons() {
         return Collections.unmodifiableList(spriteButtons);
     }

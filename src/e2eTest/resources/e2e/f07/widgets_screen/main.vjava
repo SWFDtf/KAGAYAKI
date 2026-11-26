@@ -1,0 +1,100 @@
+define lena = Character("Lena", color="#58a6ff", image="lena")
+
+default opt_flag = false
+default toggle_flag = false
+default player_name = ""
+default selected_res = "1280x720"
+
+image bg_room = "assets/images/bg/bg_room.png"
+image lena = "assets/images/char/lena.png"
+
+screen widget_showcase():
+    zorder 120
+    gridbox:
+        id "demo_gridbox"
+        cols 3
+        spacing 12
+        xpos 40
+        ypos 40
+        xsize 900
+        ysize 400
+        text "Item 01"
+        text "Item 02"
+        text "Item 03"
+        text "Item 04"
+        text "Item 05"
+        text "Item 06"
+        text "Item 07"
+        text "Item 08"
+        text "Item 09"
+        text "Item 10"
+        text "Item 11"
+        text "Item 12"
+    selectbox:
+        id "res_select"
+        options "1280x720,1920x1080"
+        default "1280x720"
+        value VariableValue("selected_res")
+        xpos 1000
+        ypos 40
+        xsize 280
+        ysize 44
+    checkbox:
+        id "opt_checkbox"
+        text "Auto-Save"
+        value VariableValue("opt_flag")
+        xpos 1000
+        ypos 120
+        xsize 280
+        ysize 40
+    toggleswitch:
+        id "opt_toggle"
+        text "Dark Contrast"
+        value VariableValue("toggle_flag")
+        xpos 1000
+        ypos 180
+        xsize 280
+        ysize 40
+    tabpanel:
+        id "settings_tabs"
+        xpos 1000
+        ypos 250
+        xsize 600
+        ysize 300
+        tab "Grafik":
+            text "Grafik-Einstellungen"
+        tab "Audio":
+            text "Audio-Einstellungen"
+    viewport:
+        id "scroll_vp"
+        xpos 40
+        ypos 500
+        xsize 420
+        ysize 180
+        vbox:
+            spacing 8
+            text "Zeile 1" size 30
+            text "Zeile 2" size 30
+            text "Zeile 3" size 30
+            text "Zeile 4" size 30
+            text "Zeile 5" size 30
+            text "Zeile 6" size 30
+            text "Zeile 7" size 30
+            text "Zeile 8" size 30
+    input:
+        id "name_input"
+        value VariableInputValue("player_name")
+        allow "abcxyz"
+        length 8
+        xpos 40
+        ypos 720
+        xsize 320
+        ysize 44
+    textbutton "Hilfe" id "tooltip_btn" tooltip "Kontexthilfe im Eckbereich" xpos 1820 ypos 1020 xsize 90 ysize 40 action "Return()"
+
+label start:
+    scene bg_room
+    show lena at center
+    lena "Betrachte den {a=codex:spiegel}Zauberspiegel{/a} neben mir."
+    "Der Erzaehler spricht ohne Portraet."
+    return

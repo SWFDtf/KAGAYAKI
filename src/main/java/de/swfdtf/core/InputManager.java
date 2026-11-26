@@ -98,6 +98,10 @@ public final class InputManager {
     private GLFWScrollCallback scrollCallback;
     private GLFWWindowFocusCallback windowFocusCallback;
 
+    /** Creates a new {@code InputManager} with default logical viewport bounds. */
+    public InputManager() {
+    }
+
     /**
      * Attaches GLFW keyboard, character, mouse, scroll, and focus callbacks to the given window.
      * Any previously attached callbacks managed by this instance are detached first.
@@ -559,7 +563,8 @@ public final class InputManager {
     }
 
     /**
-     * Returns the cursor Y coordinate mapped into logical canvas coordinates ({@code 0..logicalHeight} inside viewport).
+     * Returns the cursor Y coordinate mapped into logical canvas coordinates
+     * ({@code 0..logicalHeight} inside viewport).
      *
      * @return logical mouse Y
      */

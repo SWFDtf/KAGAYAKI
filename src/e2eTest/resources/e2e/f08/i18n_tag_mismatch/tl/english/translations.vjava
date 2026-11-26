@@ -1,0 +1,3 @@
+translate english line_01:
+    # lena "Hallo {b}[spieler_name]{/b},{w=0.4} willkommen im Turm!"
+    lena "Hello traveler, welcome to the tower!"

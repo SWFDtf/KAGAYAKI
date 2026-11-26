@@ -19,6 +19,10 @@ public class SimplePersistentAccess implements PersistentAccess {
     private final Set<String> unlockedEndings = new LinkedHashSet<>();
     private final Set<String> unlockedAchievements = new LinkedHashSet<>();
 
+    /** Creates a new empty in-memory {@code SimplePersistentAccess} store. */
+    public SimplePersistentAccess() {
+    }
+
     @Override
     public synchronized void set(String key, Object value) {
         Objects.requireNonNull(key, "key must not be null");

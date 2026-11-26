@@ -7,7 +7,7 @@ Vollständige `.vjava`-Skript-Pipeline von KAGAYAKI (Meilenstein M3 + M4): einr�
 - `de.swfdtf.core` (`ProjectDescriptor` in `VJavaAst`, `ProjectScanner`, `ScriptSession`; `EngineAPI`, `EngineConfig` in `VJavaExecutable`, `JavaBlockCompiler`, `ScriptRuntime`, `ScriptSession`)
 - `de.swfdtf.graphics` (`SceneController`, `SceneGraph`, `SpriteNode`, `TextTagParser` in `VJavaExecutable`, `JavaBlockCompiler`, `ScriptRuntime`, `ScriptSession`; `TextureManager` in `ScriptSession`)
 - `de.swfdtf.math` (`Transform2D`, `ScreenShake` in `JavaBlockCompiler`, `ScriptRuntime`)
-- `de.swfdtf.state` (`StateStore`, `PersistentAccess`, `SimpleStateStore`, `SimplePersistentAccess` in `VJavaExecutable`, `JavaBlockCompiler`, `ConditionEvaluator`, `ScriptRuntime`; `LocalizationManager`, `SaveSlotData` in `ScriptRuntime`, `ScriptSession`; `RevertableStateStore`, `PersistentState`, `PreferencesState`, `SessionState`, `HistoryLog`, `SaveManager`, `AchievementManager`, `GalleryManager`, `EndingsManager` in `ScriptSession`)
+- `de.swfdtf.state` (`StateStore`, `PersistentAccess`, `SimpleStateStore`, `SimplePersistentAccess` in `VJavaExecutable`, `JavaBlockCompiler`, `ConditionEvaluator`, `ScriptRuntime`; `LocalizationManager`, `SaveSlotData` in `ScriptRuntime`, `ScriptSession`; `LocalizationManager`, `TranslationEntry` in `VJavaLocalizationBridge`; `RevertableStateStore`, `PersistentState`, `PreferencesState`, `SessionState`, `HistoryLog`, `SaveManager`, `AchievementManager`, `GalleryManager`, `EndingsManager` in `ScriptSession`)
 - JDK-Module: `javax.tools.*` (`JavaCompiler`, `ForwardingJavaFileManager`, `DiagnosticCollector`) in `JavaBlockCompiler` und `VJavaCompileException`.
 
 ## Enthaltene Typen
@@ -15,7 +15,7 @@ Vollständige `.vjava`-Skript-Pipeline von KAGAYAKI (Meilenstein M3 + M4): einr�
 | Typ | Art | Beschreibung |
 | :--- | :--- | :--- |
 | `VJavaAst` | `final class` | Unveränderliches AST-Modell für `.vjava`-Skripte (`Statement`-Hierarchie, Deklarationen, `ScriptFileAst`, `ProjectAst`). |
-| `VJavaAst.Statement` | `sealed interface` | Gemeinsamer Vertrag aller ausführbaren Statements innerhalb von Labels, `if`-Zweigen und `menu`-Optionen (21 Record-Varianten). |
+| `VJavaAst.Statement` | `sealed interface` | Gemeinsamer Vertrag aller ausführbaren Statements innerhalb von Labels, `if`-Zweigen und `menu`-Optionen (27 Record-Varianten). |
 | `VJavaAst.JavaBlockNode` | `record` | Eingebetteter nativer Java-Block (`@->{ ... }<<`) mit eindeutiger `id`, optionaler `description`, `code`, `sourceFile` und `lineNumber`. |
 | `VJavaAst.CharacterDef` | `record` | Charakterdefinition aus `define <id> = Character(...)` mit Farbe, Outline, Bild-/Voice-Tag, Textbox-Skin und Properties. |
 | `VJavaAst.ImageDef` | `record` | Eigenständige Bildalias-Deklaration (`image <tag> [attrs...] = "<path>"`). |
@@ -51,6 +51,7 @@ Vollständige `.vjava`-Skript-Pipeline von KAGAYAKI (Meilenstein M3 + M4): einr�
 | `VariableWatchpointManager` | `final class` | Überwacht `StateStore`-Variablen auf Änderungen oder Bedingungserfüllung (`watchKey`, `watchWhen`, `checkAll`) inklusive Historie. |
 | `MacroRegistry` | `final class` | Text-Makro-Registry (`{{macro}}`) mit Zyklus-/Tiefenprüfung (`IllegalStateException`) und `Optional`-Lookup. |
 | `TypeSafeStateView` | `final class` | Typsichere Lese-Fassade über `StateStore` mit `Optional<String|Integer|Long|Double|Boolean|BigDecimal|T>`-Methoden. |
+| `VJavaLocalizationBridge` | `final class` | Brücke zwischen `VJavaAst.ProjectAst` und dem AST-freien `LocalizationManager` (`indexProject`, `toTranslationBlocks`, `extractTranslationTemplate`). |
 | `HotReloadWatcher` | `final class` | Nicht-blockierender Polling-Dateiwächter für `**/*.vjava` und `project.vjava.json` (`ReloadDelta` mit `added`/`modified`/`deleted`). |
 
 ## Öffentliche API-Signaturen
@@ -360,3 +361,12 @@ public final class ScriptSession {
   - `PhysicsStopStatement(String tag, String sourceFile, int lineNumber)` (`physics_stop`)
   - `OnCollideStatement(String tagA, String tagB, String targetLabel, String sourceFile, int lineNumber)` (`on_collide <tagA> <tagB> jump <label>`)
 - `ScriptRuntime` verdrahtet alle 6 Statements + `setCollisionJumpListener(targetLabel -> jumpToLabel(targetLabel))` auf `SceneController.getMotionController()`.
+
+### `VJavaLocalizationBridge`
+```java
+public final class VJavaLocalizationBridge {
+    public static void indexProject(LocalizationManager manager, VJavaAst.ProjectAst project)
+    public static List<LocalizationManager.TranslationBlock> toTranslationBlocks(VJavaAst.ProjectAst project)
+    public static String extractTranslationTemplate(VJavaAst.ProjectAst project, String targetLanguage)
+}
+```

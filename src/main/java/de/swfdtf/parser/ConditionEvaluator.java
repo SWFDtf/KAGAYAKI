@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -29,6 +28,69 @@ import java.util.Set;
  * (e.g., {@code "Kaito".equals(spieler_name)}, {@code state.get(...)}, {@code persistent.get(...)}).</p>
  */
 public final class ConditionEvaluator {
+
+    private static final Set<String> BLOCKED_MEMBERS = Set.of(
+            "class",
+            "classLoader",
+            "module",
+            "protectionDomain",
+            "declaredFields",
+            "declaredMethods",
+            "declaredConstructors",
+            "runtime",
+            "securityManager"
+    );
+
+    private static final Set<String> BLOCKED_METHODS = Set.of(
+            "getClass",
+            "forName",
+            "getClassLoader",
+            "getContextClassLoader",
+            "setContextClassLoader",
+            "getModule",
+            "getProtectionDomain",
+            "getDeclaredMethod",
+            "getMethod",
+            "getDeclaredMethods",
+            "getMethods",
+            "getDeclaredField",
+            "getField",
+            "getDeclaredFields",
+            "getFields",
+            "getDeclaredConstructor",
+            "getConstructor",
+            "getConstructors",
+            "getDeclaredConstructors",
+            "newInstance",
+            "defineClass",
+            "loadClass",
+            "exit",
+            "halt",
+            "exec",
+            "load",
+            "loadLibrary",
+            "getRuntime",
+            "setSecurityManager",
+            "getSecurityManager",
+            "start",
+            "wait",
+            "notify",
+            "notifyAll",
+            "clone",
+            "finalize"
+    );
+
+    private static final List<String> BLOCKED_CLASS_PREFIXES = List.of(
+            "java.lang.reflect.",
+            "java.lang.invoke.",
+            "java.lang.instrument.",
+            "java.lang.management.",
+            "java.lang.module.",
+            "javax.script.",
+            "sun.misc.",
+            "jdk.internal.",
+            "java.nio.file."
+    );
 
     /**
      * Public constructor allowing instance-based or static invocation.
@@ -161,7 +223,8 @@ public final class ConditionEvaluator {
                     i++;
                 }
                 if (!closed) {
-                    throw new IllegalArgumentException("Unterminated string literal at position " + start + " in: " + expr);
+                    throw new IllegalArgumentException(
+                            "Unterminated string literal at position " + start + " in: " + expr);
                 }
                 tokens.add(new Token(TokenKind.STRING, expr.substring(start, i), sb.toString(), start));
                 continue;
@@ -546,7 +609,8 @@ public final class ConditionEvaluator {
         }
 
         private IllegalArgumentException syntaxError(String message, Token token) {
-            return new IllegalArgumentException(message + " at position " + token.position() + " in expression: " + source);
+            return new IllegalArgumentException(
+                    message + " at position " + token.position() + " in expression: " + source);
         }
     }
 
@@ -841,12 +905,66 @@ public final class ConditionEvaluator {
 
     // ---- Reflection: Member & Method Resolution ----
 
+    private static void assertTargetAllowed(Object target, Class<?> clazz, String action) {
+        if (target instanceof Class<?> cls && cls != Math.class) {
+            throw new SecurityException(
+                    "Sandbox blocked reflection access to Class '" + cls.getName() + "' during " + action);
+        }
+        if (isRestrictedClass(clazz)) {
+            throw new SecurityException(
+                    "Sandbox blocked restricted type '" + clazz.getName() + "' during " + action);
+        }
+    }
+
+    private static boolean isRestrictedClass(Class<?> clazz) {
+        if (clazz == null) {
+            return false;
+        }
+        if (clazz == Class.class
+                || ClassLoader.class.isAssignableFrom(clazz)
+                || Module.class.isAssignableFrom(clazz)
+                || Runtime.class.isAssignableFrom(clazz)
+                || System.class.isAssignableFrom(clazz)
+                || ProcessBuilder.class.isAssignableFrom(clazz)
+                || Process.class.isAssignableFrom(clazz)
+                || Thread.class.isAssignableFrom(clazz)
+                || ThreadGroup.class.isAssignableFrom(clazz)
+                || java.lang.reflect.Member.class.isAssignableFrom(clazz)
+                || java.io.File.class.isAssignableFrom(clazz)) {
+            return true;
+        }
+        String name = clazz.getName();
+        for (String prefix : BLOCKED_CLASS_PREFIXES) {
+            if (name.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Object assertReturnValueAllowed(Object value, String context) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Class<?> || isRestrictedClass(value.getClass())) {
+            throw new SecurityException(
+                    "Sandbox blocked restricted return value of type '"
+                            + value.getClass().getName() + "' from " + context);
+        }
+        return value;
+    }
+
     private static Object resolveMember(Object target, String member) {
         if (target == null) {
             throw new IllegalStateException("Cannot access member '" + member + "' on null");
         }
         boolean staticOnly = target instanceof Class<?>;
         Class<?> clazz = staticOnly ? (Class<?>) target : target.getClass();
+        if (BLOCKED_MEMBERS.contains(member)) {
+            throw new SecurityException(
+                    "Sandbox blocked restricted member access '" + member + "' on " + clazz.getName());
+        }
+        assertTargetAllowed(target, clazz, "member access '" + member + "'");
         Object receiver = staticOnly ? null : target;
 
         if (!staticOnly && clazz.isArray() && "length".equals(member)) {
@@ -857,7 +975,7 @@ public final class ConditionEvaluator {
         try {
             Field f = clazz.getField(member);
             if (!staticOnly || Modifier.isStatic(f.getModifiers())) {
-                return f.get(receiver);
+                return assertReturnValueAllowed(f.get(receiver), member);
             }
         } catch (NoSuchFieldException | IllegalAccessException ignored) {
             // Fall through to declared fields / getter methods
@@ -870,7 +988,7 @@ public final class ConditionEvaluator {
                 Field f = walk.getDeclaredField(member);
                 if (!staticOnly || Modifier.isStatic(f.getModifiers())) {
                     if (f.trySetAccessible()) {
-                        return f.get(receiver);
+                        return assertReturnValueAllowed(f.get(receiver), member);
                     }
                 }
             } catch (NoSuchFieldException | IllegalAccessException ignored) {
@@ -883,20 +1001,25 @@ public final class ConditionEvaluator {
         String cap = Character.toUpperCase(member.charAt(0)) + member.substring(1);
         List<String> methodCandidates = List.of(member, "get" + cap, "is" + cap);
         for (String candidateName : methodCandidates) {
+            if (BLOCKED_METHODS.contains(candidateName)) {
+                throw new SecurityException(
+                        "Sandbox blocked reflection accessor '" + candidateName + "' on " + clazz.getName());
+            }
             Method found = findZeroArgAccessibleMethod(clazz, candidateName, staticOnly);
             if (found != null) {
                 try {
-                    return found.invoke(receiver);
+                    return assertReturnValueAllowed(found.invoke(receiver), candidateName);
                 } catch (IllegalAccessException | InvocationTargetException e) {
                     Throwable cause = e instanceof InvocationTargetException ite ? ite.getCause() : e;
-                    throw new IllegalStateException("Failed invoking accessor '" + candidateName + "' on " + clazz.getSimpleName(), cause);
+                    throw new IllegalStateException(
+                            "Failed invoking accessor '" + candidateName + "' on " + clazz.getSimpleName(), cause);
                 }
             }
         }
 
         // 4. Map key lookup
         if (target instanceof Map<?, ?> map) {
-            return map.get(member);
+            return assertReturnValueAllowed(map.get(member), "map['" + member + "']");
         }
 
         throw new IllegalArgumentException("Unknown member '" + member + "' on type " + clazz.getName());
@@ -922,6 +1045,11 @@ public final class ConditionEvaluator {
         }
         boolean staticOnly = target instanceof Class<?>;
         Class<?> clazz = staticOnly ? (Class<?>) target : target.getClass();
+        if (BLOCKED_METHODS.contains(methodName)) {
+            throw new SecurityException(
+                    "Sandbox blocked reflection/restricted method '" + methodName + "' on " + clazz.getName());
+        }
+        assertTargetAllowed(target, clazz, "method call '" + methodName + "'");
         Object receiver = staticOnly ? null : target;
 
         List<Method> candidates = new ArrayList<>();
@@ -956,11 +1084,12 @@ public final class ConditionEvaluator {
             if (!bestMethod.canAccess(receiver)) {
                 bestMethod.trySetAccessible();
             }
-            return bestMethod.invoke(receiver, bestArgs);
+            return assertReturnValueAllowed(bestMethod.invoke(receiver, bestArgs), methodName);
         } catch (IllegalAccessException | InvocationTargetException e) {
             Throwable cause = e instanceof InvocationTargetException ite ? ite.getCause() : e;
             throw new IllegalStateException(
-                    "Error invoking method '" + methodName + "' on " + clazz.getSimpleName() + ": " + cause.getMessage(),
+                    "Error invoking method '" + methodName + "' on " + clazz.getSimpleName()
+                            + ": " + cause.getMessage(),
                     cause
             );
         }
@@ -975,7 +1104,8 @@ public final class ConditionEvaluator {
             if (current == null) {
                 continue;
             }
-            if (Modifier.isPublic(current.getModifiers()) || current.getModule().equals(ConditionEvaluator.class.getModule())) {
+            if (Modifier.isPublic(current.getModifiers())
+                    || current.getModule().equals(ConditionEvaluator.class.getModule())) {
                 ordered.add(current);
             }
             if (current.getSuperclass() != null) {
@@ -1081,24 +1211,52 @@ public final class ConditionEvaluator {
     }
 
     private static Class<?> boxPrimitive(Class<?> primitive) {
-        if (primitive == int.class) return Integer.class;
-        if (primitive == long.class) return Long.class;
-        if (primitive == double.class) return Double.class;
-        if (primitive == float.class) return Float.class;
-        if (primitive == boolean.class) return Boolean.class;
-        if (primitive == char.class) return Character.class;
-        if (primitive == byte.class) return Byte.class;
-        if (primitive == short.class) return Short.class;
+        if (primitive == int.class) {
+            return Integer.class;
+        }
+        if (primitive == long.class) {
+            return Long.class;
+        }
+        if (primitive == double.class) {
+            return Double.class;
+        }
+        if (primitive == float.class) {
+            return Float.class;
+        }
+        if (primitive == boolean.class) {
+            return Boolean.class;
+        }
+        if (primitive == char.class) {
+            return Character.class;
+        }
+        if (primitive == byte.class) {
+            return Byte.class;
+        }
+        if (primitive == short.class) {
+            return Short.class;
+        }
         return primitive;
     }
 
     private static Object convertNumber(Number n, Class<?> boxedTarget) {
-        if (boxedTarget == Integer.class) return n.intValue();
-        if (boxedTarget == Long.class) return n.longValue();
-        if (boxedTarget == Double.class) return n.doubleValue();
-        if (boxedTarget == Float.class) return n.floatValue();
-        if (boxedTarget == Short.class) return n.shortValue();
-        if (boxedTarget == Byte.class) return n.byteValue();
+        if (boxedTarget == Integer.class) {
+            return n.intValue();
+        }
+        if (boxedTarget == Long.class) {
+            return n.longValue();
+        }
+        if (boxedTarget == Double.class) {
+            return n.doubleValue();
+        }
+        if (boxedTarget == Float.class) {
+            return n.floatValue();
+        }
+        if (boxedTarget == Short.class) {
+            return n.shortValue();
+        }
+        if (boxedTarget == Byte.class) {
+            return n.byteValue();
+        }
         return null;
     }
 }

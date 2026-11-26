@@ -40,22 +40,38 @@ public class Grid extends UiNode {
         return this;
     }
 
-    /** @return configured column count */
+    /**
+     * Returns configured column count.
+     *
+     * @return configured column count
+     */
     public int getColumns() {
         return columns;
     }
 
-    /** @return configured row count ({@code 0} for automatic) */
+    /**
+     * Returns configured row count ({@code 0} for automatic).
+     *
+     * @return configured row count ({@code 0} for automatic)
+     */
     public int getRows() {
         return rows;
     }
 
-    /** @return horizontal cell spacing in pixels */
+    /**
+     * Returns horizontal cell spacing in pixels.
+     *
+     * @return horizontal cell spacing in pixels
+     */
     public float getHorizontalSpacing() {
         return horizontalSpacing;
     }
 
-    /** @return vertical cell spacing in pixels */
+    /**
+     * Returns vertical cell spacing in pixels.
+     *
+     * @return vertical cell spacing in pixels
+     */
     public float getVerticalSpacing() {
         return verticalSpacing;
     }
@@ -86,7 +102,9 @@ public class Grid extends UiNode {
                 : cols * maxCellW + Math.max(0, cols - 1) * horizontalSpacing + getPaddingLeft() + getPaddingRight();
         float h = getPreferredHeight() > 0.0f
                 ? getPreferredHeight()
-                : effectiveRows * maxCellH + Math.max(0, effectiveRows - 1) * verticalSpacing + getPaddingTop() + getPaddingBottom();
+                : effectiveRows * maxCellH
+                        + Math.max(0, effectiveRows - 1) * verticalSpacing
+                        + getPaddingTop() + getPaddingBottom();
         return new Vec2f(w, h);
     }
 
@@ -99,7 +117,8 @@ public class Grid extends UiNode {
         int effectiveRows = rows > 0 ? rows : Math.max(1, (visible.size() + cols - 1) / cols);
 
         float cellW = Math.max(0.0f, (inner.width() - Math.max(0, cols - 1) * horizontalSpacing) / cols);
-        float cellH = Math.max(0.0f, (inner.height() - Math.max(0, effectiveRows - 1) * verticalSpacing) / effectiveRows);
+        float cellH = Math.max(
+                0.0f, (inner.height() - Math.max(0, effectiveRows - 1) * verticalSpacing) / effectiveRows);
 
         for (int i = 0; i < visible.size(); i++) {
             int col = i % cols;

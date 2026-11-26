@@ -4,7 +4,7 @@
 Wurzelpaket mit den Anwendungs-Einstiegspunkten von KAGAYAKI: `Main` für den standardmäßigen Studio-Dual-Window-Start (mit optionalem `--standalone`-Override und `--create-template <dir>` zur Starterprojekt-Generierung) und `StandaloneMain` als dedizierter Einstiegspunkt für exportierte Standalone-Builds (`packageStandalone`).
 
 ## Abhängigkeiten zu anderen `de.swfdtf.*`-Paketen
-- `de.swfdtf.core` (`EngineApplication`, `EngineConfig`, `EngineMode`)
+- `de.swfdtf.core` (`EngineApplication`, `EngineConfig`, `EngineMode`, `ProjectDescriptor`)
 - `de.swfdtf.tools` (`ProjectTemplateGenerator` in `Main` für `--create-template`)
 
 ## Enthaltene Typen

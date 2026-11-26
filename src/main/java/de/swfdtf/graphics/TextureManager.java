@@ -378,12 +378,20 @@ public final class TextureManager {
         return (tex != null && !tex.isDisposed()) ? tex : null;
     }
 
-    /** @return number of non-fallback textures currently stored in the cache */
+    /**
+     * Returns the number of non-fallback textures currently stored in the cache.
+     *
+     * @return number of non-fallback textures currently stored in the cache
+     */
     public int getCacheSize() {
         return cache.size();
     }
 
-    /** @return configured base asset directory for relative path resolution, or {@code null} */
+    /**
+     * Returns the configured base asset directory for relative path resolution.
+     *
+     * @return configured base asset directory for relative path resolution, or {@code null}
+     */
     public Path getAssetRoot() {
         return assetRoot;
     }
@@ -397,7 +405,11 @@ public final class TextureManager {
         this.assetRoot = assetRoot != null ? assetRoot.toAbsolutePath().normalize() : null;
     }
 
-    /** @return logger used for missing/corrupt texture warnings */
+    /**
+     * Returns the logger used for missing or corrupt texture warnings.
+     *
+     * @return logger used for missing/corrupt texture warnings
+     */
     public EngineLogger getLogger() {
         return logger;
     }

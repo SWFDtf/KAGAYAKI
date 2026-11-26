@@ -33,9 +33,13 @@ public final class StyledTextLayout {
      * Decoration categories generated or applied by {@link StyledTextLayout}.
      */
     public enum DecorationKind {
+        /** Underline option. */
         UNDERLINE,
+        /** Strikethrough option. */
         STRIKETHROUGH,
+        /** Drop Shadow option. */
         DROP_SHADOW,
+        /** Outline option. */
         OUTLINE
     }
 
@@ -83,10 +87,18 @@ public final class StyledTextLayout {
             boolean jitter,
             boolean hasGradient
     ) {
+        /**
+         * Validates and clones the glyph tint array.
+         */
         public GlyphQuad {
             colorRgba = colorRgba.clone();
         }
 
+        /**
+         * Returns a defensive copy of the straight RGBA color array.
+         *
+         * @return cloned RGBA array
+         */
         @Override
         public float[] colorRgba() {
             return colorRgba.clone();
@@ -117,11 +129,19 @@ public final class StyledTextLayout {
             int startCharIndex,
             int endCharIndex
     ) {
+        /**
+         * Validates decoration kind and clones the color array.
+         */
         public LineDecoration {
             Objects.requireNonNull(kind, "kind must not be null");
             colorRgba = colorRgba.clone();
         }
 
+        /**
+         * Returns a defensive copy of the decoration RGBA color array.
+         *
+         * @return cloned RGBA array
+         */
         @Override
         public float[] colorRgba() {
             return colorRgba.clone();
@@ -158,6 +178,9 @@ public final class StyledTextLayout {
             int endCharIndex,
             List<GlyphQuad> rubyQuads
     ) {
+        /**
+         * Stores an immutable copy of the ruby glyph quads.
+         */
         public RubyLayout {
             rubyQuads = List.copyOf(rubyQuads);
         }
@@ -195,6 +218,9 @@ public final class StyledTextLayout {
      * @param lineIndex    0-based wrapped line index
      */
     public record HyperlinkHitbox(Rect2f bounds, String actionTarget, int lineIndex) {
+        /**
+         * Validates non-null hyperlink hitbox bounds and action target.
+         */
         public HyperlinkHitbox {
             Objects.requireNonNull(bounds, "bounds must not be null");
             Objects.requireNonNull(actionTarget, "actionTarget must not be null");
@@ -478,52 +504,92 @@ public final class StyledTextLayout {
             return defaultCps;
         }
 
-        /** @return {@code true} if paused at a {@code {w}}, {@code {w=t}}, {@code {p}}, or {@code {p=t}} cue */
+        /**
+         * Returns {@code true} if paused at a {@code {w}}, {@code {w=t}}, {@code {p}}, or {@code {p=t}} cue.
+         *
+         * @return {@code true} if paused at a {@code {w}}, {@code {w=t}}, {@code {p}}, or {@code {p=t}} cue
+         */
         public boolean isWaiting() {
             return waiting;
         }
 
-        /** @return {@code true} if currently paused on a timed wait cue */
+        /**
+         * Returns {@code true} if currently paused on a timed wait cue.
+         *
+         * @return {@code true} if currently paused on a timed wait cue
+         */
         public boolean isTimedWait() {
             return waiting && waitingTimed;
         }
 
-        /** @return remaining seconds on the active timed wait, or {@code 0.0} */
+        /**
+         * Returns remaining seconds on the active timed wait, or {@code 0.0}.
+         *
+         * @return remaining seconds on the active timed wait, or {@code 0.0}
+         */
         public double getWaitRemainingSeconds() {
             return waitingTimed ? Math.max(0.0, waitRemainingSeconds) : 0.0;
         }
 
-        /** @return currently active wait cue, or {@code null} */
+        /**
+         * Returns currently active wait cue, or {@code null}.
+         *
+         * @return currently active wait cue, or {@code null}
+         */
         public TextTagParser.TextCue getActiveWaitCue() {
             return activeWaitCue;
         }
 
-        /** @return {@code true} if all characters are visible and no pending wait cues remain */
+        /**
+         * Returns {@code true} if all characters are visible and no pending wait cues remain.
+         *
+         * @return {@code true} if all characters are visible and no pending wait cues remain
+         */
         public boolean isFinished() {
             return !waiting && visibleCharCount >= totalCharCount && nextCueIndex >= richText.cues().size();
         }
 
-        /** @return number of characters currently revealed in {@link TextTagParser.ParsedRichText#plainText()} */
+        /**
+         * Returns number of characters currently revealed in {@link TextTagParser.ParsedRichText#plainText()}.
+         *
+         * @return number of characters currently revealed in {@link TextTagParser.ParsedRichText#plainText()}
+         */
         public int getVisibleCharCount() {
             return visibleCharCount;
         }
 
-        /** @return total character count in {@link TextTagParser.ParsedRichText#plainText()} */
+        /**
+         * Returns total character count in {@link TextTagParser.ParsedRichText#plainText()}.
+         *
+         * @return total character count in {@link TextTagParser.ParsedRichText#plainText()}
+         */
         public int getTotalCharCount() {
             return totalCharCount;
         }
 
-        /** @return {@code true} if the parsed rich text contained {@code {nw}} */
+        /**
+         * Returns {@code true} if the parsed rich text contained {@code {nw}}.
+         *
+         * @return {@code true} if the parsed rich text contained {@code {nw}}
+         */
         public boolean hasNoWait() {
             return richText.hasNoWait();
         }
 
-        /** @return {@code true} if finished and {@code {nw}} requests immediate auto-advance */
+        /**
+         * Returns {@code true} if finished and {@code {nw}} requests immediate auto-advance.
+         *
+         * @return {@code true} if finished and {@code {nw}} requests immediate auto-advance
+         */
         public boolean shouldAutoAdvance() {
             return isFinished() && richText.hasNoWait();
         }
 
-        /** @return configured default CPS speed */
+        /**
+         * Returns configured default CPS speed.
+         *
+         * @return configured default CPS speed
+         */
         public float getDefaultCps() {
             return defaultCps;
         }
@@ -997,82 +1063,146 @@ public final class StyledTextLayout {
         return hitTestHyperlink(canvasX - originX, canvasY - originY);
     }
 
-    /** @return source {@link TextTagParser.ParsedRichText} */
+    /**
+     * Returns source {@link TextTagParser.ParsedRichText}.
+     *
+     * @return source {@link TextTagParser.ParsedRichText}
+     */
     public TextTagParser.ParsedRichText getRichText() {
         return richText;
     }
 
-    /** @return configured maximum wrapping width ({@link Float#POSITIVE_INFINITY} if unwrapped) */
+    /**
+     * Returns configured maximum wrapping width ({@link Float#POSITIVE_INFINITY} if unwrapped).
+     *
+     * @return configured maximum wrapping width ({@link Float#POSITIVE_INFINITY} if unwrapped)
+     */
     public float getMaxWidth() {
         return maxWidth;
     }
 
-    /** @return configured unscaled base font size */
+    /**
+     * Returns configured unscaled base font size.
+     *
+     * @return configured unscaled base font size
+     */
     public float getBaseFontSize() {
         return baseFontSize;
     }
 
-    /** @return configured line spacing multiplier */
+    /**
+     * Returns configured line spacing multiplier.
+     *
+     * @return configured line spacing multiplier
+     */
     public float getLineSpacing() {
         return lineSpacing;
     }
 
-    /** @return immutable list of all positioned glyph quads */
+    /**
+     * Returns immutable list of all positioned glyph quads.
+     *
+     * @return immutable list of all positioned glyph quads
+     */
     public List<GlyphQuad> getGlyphQuads() {
         return glyphQuads;
     }
 
-    /** @return immutable list of all underline/strikethrough line decorations */
+    /**
+     * Returns immutable list of all underline/strikethrough line decorations.
+     *
+     * @return immutable list of all underline/strikethrough line decorations
+     */
     public List<LineDecoration> getDecorations() {
         return decorations;
     }
 
-    /** @return immutable list of all Furigana {@link RubyLayout}s */
+    /**
+     * Returns immutable list of all Furigana {@link RubyLayout}s.
+     *
+     * @return immutable list of all Furigana {@link RubyLayout}s
+     */
     public List<RubyLayout> getRubyLayouts() {
         return rubyLayouts;
     }
 
-    /** @return immutable list of all positioned {@link InlineImageLayout}s */
+    /**
+     * Returns immutable list of all positioned {@link InlineImageLayout}s.
+     *
+     * @return immutable list of all positioned {@link InlineImageLayout}s
+     */
     public List<InlineImageLayout> getInlineImages() {
         return inlineImages;
     }
 
-    /** @return immutable list of clickable {@link HyperlinkHitbox} bounds */
+    /**
+     * Returns immutable list of clickable {@link HyperlinkHitbox} bounds.
+     *
+     * @return immutable list of clickable {@link HyperlinkHitbox} bounds
+     */
     public List<HyperlinkHitbox> getHyperlinkHitboxes() {
         return hyperlinkHitboxes;
     }
 
-    /** @return immutable list of wrapped {@link TextLine} metrics */
+    /**
+     * Returns immutable list of wrapped {@link TextLine} metrics.
+     *
+     * @return immutable list of wrapped {@link TextLine} metrics
+     */
     public List<TextLine> getLines() {
         return lines;
     }
 
-    /** @return number of wrapped lines */
+    /**
+     * Returns number of wrapped lines.
+     *
+     * @return number of wrapped lines
+     */
     public int getLineCount() {
         return lines.size();
     }
 
-    /** @return widest wrapped line width in pixels */
+    /**
+     * Returns widest wrapped line width in pixels.
+     *
+     * @return widest wrapped line width in pixels
+     */
     public float getTotalWidth() {
         return totalWidth;
     }
 
-    /** @return total vertical layout height in pixels */
+    /**
+     * Returns total vertical layout height in pixels.
+     *
+     * @return total vertical layout height in pixels
+     */
     public float getTotalHeight() {
         return totalHeight;
     }
 
-    /** @return configured drop shadow horizontal offset */
+    /**
+     * Returns configured drop shadow horizontal offset.
+     *
+     * @return configured drop shadow horizontal offset
+     */
     public float getShadowOffsetX() {
         return shadowOffsetX;
     }
 
-    /** @return configured drop shadow vertical offset */
+    /**
+     * Returns configured drop shadow vertical offset.
+     *
+     * @return configured drop shadow vertical offset
+     */
     public float getShadowOffsetY() {
         return shadowOffsetY;
     }
 
-    /** @return configured outline radius in pixels */
+    /**
+     * Returns configured outline radius in pixels.
+     *
+     * @return configured outline radius in pixels
+     */
     public float getOutlineThickness() {
         return outlineThickness;
     }
@@ -1671,7 +1801,8 @@ public final class StyledTextLayout {
                     lineStartChar = 0;
                     lineEndChar = 0;
                 }
-                lines.add(new TextLine(lineIdx, cursorY, lineBaselineY, cursorX, lineTotalHeight, lineStartChar, lineEndChar));
+                lines.add(new TextLine(
+                        lineIdx, cursorY, lineBaselineY, cursorX, lineTotalHeight, lineStartChar, lineEndChar));
                 totalWidth = Math.max(totalWidth, cursorX);
                 cursorY += lineTotalHeight;
             }

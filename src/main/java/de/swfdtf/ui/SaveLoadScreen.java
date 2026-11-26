@@ -31,14 +31,19 @@ public class SaveLoadScreen extends Screen {
 
     /** Active interaction mode. */
     public enum Mode {
+        /** Save option. */
         SAVE,
+        /** Load option. */
         LOAD
     }
 
     /** Slot filter category tab. */
     public enum FilterTab {
+        /** Manual option. */
         MANUAL,
+        /** Quick option. */
         QUICK,
+        /** Auto option. */
         AUTO
     }
 
@@ -78,17 +83,104 @@ public class SaveLoadScreen extends Screen {
             this.occupied = occupied;
         }
 
-        public String getSlotId() { return slotId; }
-        public Frame getCardNode() { return cardNode; }
-        public TextWidget getTitleLabel() { return titleLabel; }
-        public TextWidget getMetaLabel() { return metaLabel; }
-        public TextWidget getPreviewTextLabel() { return previewTextLabel; }
-        public TextButton getActionButton() { return actionButton; }
-        public TextButton getDeleteButton() { return deleteButton; }
-        public boolean isOccupied() { return occupied; }
-        public boolean hasThumbnail() { return previewNode.hasImageSource(); }
-        public int getThumbnailWidth() { return previewNode.getDecodedWidth(); }
-        public int getThumbnailHeight() { return previewNode.getDecodedHeight(); }
+        /**
+         * Returns the slotId value.
+         *
+         * @return the resulting value
+         */
+        public String getSlotId() {
+            return slotId;
+        }
+
+        /**
+         * Returns the cardNode value.
+         *
+         * @return the resulting value
+         */
+        public Frame getCardNode() {
+            return cardNode;
+        }
+
+        /**
+         * Returns the titleLabel value.
+         *
+         * @return the resulting value
+         */
+        public TextWidget getTitleLabel() {
+            return titleLabel;
+        }
+
+        /**
+         * Returns the metaLabel value.
+         *
+         * @return the resulting value
+         */
+        public TextWidget getMetaLabel() {
+            return metaLabel;
+        }
+
+        /**
+         * Returns the previewTextLabel value.
+         *
+         * @return the resulting value
+         */
+        public TextWidget getPreviewTextLabel() {
+            return previewTextLabel;
+        }
+
+        /**
+         * Returns the actionButton value.
+         *
+         * @return the resulting value
+         */
+        public TextButton getActionButton() {
+            return actionButton;
+        }
+
+        /**
+         * Returns the deleteButton value.
+         *
+         * @return the resulting value
+         */
+        public TextButton getDeleteButton() {
+            return deleteButton;
+        }
+
+        /**
+         * Returns whether occupied is active.
+         *
+         * @return the resulting value
+         */
+        public boolean isOccupied() {
+            return occupied;
+        }
+
+        /**
+         * Executes {@code hasThumbnail}.
+         *
+         * @return the resulting value
+         */
+        public boolean hasThumbnail() {
+            return previewNode.hasImageSource();
+        }
+
+        /**
+         * Returns the thumbnailWidth value.
+         *
+         * @return the resulting value
+         */
+        public int getThumbnailWidth() {
+            return previewNode.getDecodedWidth();
+        }
+
+        /**
+         * Returns the thumbnailHeight value.
+         *
+         * @return the resulting value
+         */
+        public int getThumbnailHeight() {
+            return previewNode.getDecodedHeight();
+        }
     }
 
     private final ScriptSession session;
@@ -200,30 +292,49 @@ public class SaveLoadScreen extends Screen {
         refreshSlots();
     }
 
+    /**
+     * Returns the mode value.
+     *
+     * @return the resulting value
+     */
     public Mode getMode() {
         return mode;
     }
 
     /**
      * Selects the active slot filter tab ({@code MANUAL}, {@code QUICK}, or {@code AUTO}).
+     *
+     * @param tab target slot category tab
      */
     public void setFilterTab(FilterTab tab) {
         this.filterTab = Objects.requireNonNull(tab, "tab must not be null");
         refreshSlots();
     }
 
+    /**
+     * Returns the active slot filter tab.
+     *
+     * @return active {@link FilterTab}
+     */
     public FilterTab getFilterTab() {
         return filterTab;
     }
 
     /**
      * Navigates to a 0-based page index in {@code [0, TOTAL_PAGES - 1]}.
+     *
+     * @param pageIndex target 0-based page index
      */
     public void setPage(int pageIndex) {
         this.currentPage = Math.max(0, Math.min(TOTAL_PAGES - 1, pageIndex));
         refreshSlots();
     }
 
+    /**
+     * Returns the 0-based current save page index.
+     *
+     * @return current page index
+     */
     public int getCurrentPage() {
         return currentPage;
     }
@@ -257,7 +368,8 @@ public class SaveLoadScreen extends Screen {
                     addSlotCard(slotId, meta);
                 }
             } else if (filterTab == FilterTab.QUICK) {
-                Optional<SaveSlotData.SaveMetadata> quickMeta = saveManager.readSlotMetadata(SaveManager.QUICK_SAVE_SLOT);
+                Optional<SaveSlotData.SaveMetadata> quickMeta = saveManager
+                        .readSlotMetadata(SaveManager.QUICK_SAVE_SLOT);
                 addSlotCard(SaveManager.QUICK_SAVE_SLOT, quickMeta.orElse(null));
             } else {
                 for (int i = 1; i <= saveManager.getAutoSaveSlotCount(); i++) {
@@ -298,7 +410,8 @@ public class SaveLoadScreen extends Screen {
         TextWidget titleLbl = UiMediaSupport.createTitleText(title, 22.0f);
 
         String metaStr = occupied
-                ? UiMediaSupport.formatTimestamp(meta.savedAt()) + " | " + UiMediaSupport.formatPlaytime(meta.playtimeSeconds())
+                ? UiMediaSupport.formatTimestamp(meta.savedAt()) + " | "
+                        + UiMediaSupport.formatPlaytime(meta.playtimeSeconds())
                 : "No save data";
         TextWidget metaLbl = UiMediaSupport.createMutedText(metaStr, 16.0f);
 
@@ -344,6 +457,8 @@ public class SaveLoadScreen extends Screen {
 
     /**
      * Executes save or load for the given {@code slotId} according to the active {@link Mode}.
+     *
+     * @param slotId save slot identifier
      */
     public void handleSlotAction(String slotId) {
         try {
@@ -365,6 +480,8 @@ public class SaveLoadScreen extends Screen {
 
     /**
      * Deletes {@code slotId} from disk and refreshes the grid.
+     *
+     * @param slotId save slot identifier
      */
     public void handleSlotDelete(String slotId) {
         try {
@@ -385,14 +502,29 @@ public class SaveLoadScreen extends Screen {
         }
     }
 
+    /**
+     * Returns the visibleCards value.
+     *
+     * @return the resulting value
+     */
     public List<SlotCardView> getVisibleCards() {
         return Collections.unmodifiableList(visibleCards);
     }
 
+    /**
+     * Returns the customNameInput value.
+     *
+     * @return the resulting value
+     */
     public TextInput getCustomNameInput() {
         return customNameInput;
     }
 
+    /**
+     * Returns the pageButtons value.
+     *
+     * @return the resulting value
+     */
     public List<TextButton> getPageButtons() {
         return Collections.unmodifiableList(pageButtons);
     }

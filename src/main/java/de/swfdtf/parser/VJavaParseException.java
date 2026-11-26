@@ -8,7 +8,18 @@ public class VJavaParseException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 
+    /**
+     * Source file path where parsing failed.
+     *
+     * @serial
+     */
     private final String sourceFile;
+
+    /**
+     * 1-based line number where parsing failed.
+     *
+     * @serial
+     */
     private final int lineNumber;
 
     /**

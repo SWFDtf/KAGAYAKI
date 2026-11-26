@@ -13,7 +13,6 @@ import de.swfdtf.state.PersistentAccess;
 import de.swfdtf.state.StateStore;
 import org.lwjgl.glfw.GLFW;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -433,7 +432,8 @@ public final class ScreenAstBuilder {
         return input;
     }
 
-    private static Hotspot buildHotspot(String primaryArg, Map<String, String> props, Consumer<String> actionDispatcher) {
+    private static Hotspot buildHotspot(
+            String primaryArg, Map<String, String> props, Consumer<String> actionDispatcher) {
         Rect2f rect = parseRect(primaryArg);
         Hotspot hs = new Hotspot(rect, toActionRunnable(props.get("action"), actionDispatcher));
         if (props.containsKey("hovered_color")) {

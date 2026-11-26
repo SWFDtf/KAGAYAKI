@@ -1,0 +1,8 @@
+define aria = Character("Aria", color="#58a6ff")
+
+label start:
+    play sound "assets/audio/thunder.wav"
+    voice "assets/audio/monologue.wav"
+    aria "Ein langer Monolog beginnt hier."
+    aria "Der Monolog geht weiter."
+    return

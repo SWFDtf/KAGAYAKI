@@ -69,7 +69,8 @@ final class UiRenderSupport {
             String fillHex,
             float effectiveAlpha
     ) {
-        if (!isPipelineReady(pipeline) || width <= 0.0f || height <= 0.0f || effectiveAlpha <= 0.0f || fillHex == null) {
+        if (!isPipelineReady(pipeline)
+                || width <= 0.0f || height <= 0.0f || effectiveAlpha <= 0.0f || fillHex == null) {
             return;
         }
         pipeline.drawRect(x, y, width, height, straightRgba(fillHex, effectiveAlpha));

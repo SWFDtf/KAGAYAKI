@@ -1,0 +1,12 @@
+define narrator = Character(None)
+default gold = 1234.5
+default text_var = "nicht_numerisch"
+
+label start:
+    $ null_var = null
+    narrator "Valid: [gold:.2f]"
+    narrator "Missing: [missing:.2f]"
+    narrator "Null: [null_var:.2f]"
+    narrator "Text: [text_var:.2f]"
+    narrator "BadSpec: [gold:invalid_spec]"
+    return

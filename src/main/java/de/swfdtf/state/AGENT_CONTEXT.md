@@ -5,12 +5,11 @@ Vollständige 4-Schichten-State-, Rollback-, Save/Load-, Verlaufs-, Meta-Progres
 - **Tier 1 (Transient Runtime Session)**: `SessionState` (Sitzungsstart, Spielzeit, aktiver Save-Slot, Auto-Save-Zeitstempel, transiente Flags).
 - **Tier 2 (Deterministic Rollback & Save Slots)**: `StateStore`, `Revertable<S>`, `RevertableMap<K, V>`, `RevertableList<E>`, `RevertableStateStore` (Checkpoints, Rollback/Roll-Forward, Branch-Trimming, `block_rollback`-Barrieren, `HistoryLog`-Jump-Back), `HistoryLog`, `SaveValueCodec` (typerhaltender Gson-Codec inkl. `__vjavaClass`-Rekonstruktion), `SaveSlotData` und `SaveManager` (atomare `.ksav`-GZIP-JSON-Dateien mit LWJGL-STB-PNG-Thumbnails, Quick-Save & rotierendem Auto-Save).
 - **Tier 3 (Cross-Save Persistent Data)**: `PersistentAccess`, `SimplePersistentAccess`, `PersistentState` (atomare GZIP-JSON-Persistenz in `saves/persistent.dat`), `AchievementManager`, `GalleryManager` und `EndingsManager`.
-- **Tier 4 (User Preferences & Live Localization)**: `PreferencesState` (`saves/preferences.json`) und `LocalizationManager` (`.vjava`-`translate`-Indizierung, Live-Sprachwechsel, `tl/<lang>/`-Asset-Auflösung und `.vjava`-Template-Generator).
+- **Tier 4 (User Preferences & Live Localization)**: `PreferencesState` (`saves/preferences.json`), `TranslationEntry` und `LocalizationManager` (AST-freie `TranslationBlock`/`TranslationEntry`-Indizierung, Live-Sprachwechsel und `tl/<lang>/`-Asset-Auflösung).
 
 ## Abhängigkeiten zu anderen `de.swfdtf.*`-Paketen
 - `de.swfdtf.math` (`Transform2D` in `RevertableMap`, `SaveValueCodec`; `ColorMatrix4f`, `Rect2f` in `SaveValueCodec`)
 - `de.swfdtf.graphics` (`SceneController` in `SaveSlotData`)
-- `de.swfdtf.parser` (`VJavaAst` in `LocalizationManager`)
 - Externe Bibliotheken: `com.google.gson.*` (`PersistentState`, `PreferencesState`, `SaveManager`, `SaveValueCodec`), `org.lwjgl.stb.STBImageWrite` / `STBIWriteCallback` / `org.lwjgl.system.MemoryUtil` (`SaveManager`).
 
 ## Enthaltene Typen
@@ -40,7 +39,9 @@ Vollständige 4-Schichten-State-, Rollback-, Save/Load-, Verlaufs-, Meta-Progres
 | `AchievementManager` | `class` | Verwaltet Achievement-Definitionen (`AchievementDef`), persistenten Unlock-Status über `PersistentAccess`, Toast-Warteschlange (`AchievementToast`) und Unlock-Listener. |
 | `GalleryManager` | `class` | Verwaltet CG-Galerie-Einträge (`GalleryEntry` mit Variationen/Kategorien) und deren persistenten Unlock-Status. |
 | `EndingsManager` | `class` | Verwaltet verzweigte Story-Endings (`EndingDef` mit `parentEndingId`-Baumstruktur) inklusive Completion-Prozentwert. |
-| `LocalizationManager` | `class` | Verwaltet Live-Sprachwechsel mit Listenern, Indizierung von `VJavaAst.TranslateBlock`s, `translateDialogue`/`translateUi`, `tl/<lang>/`-Asset-Auflösung und `.vjava`-Template-Generierung (`extractTranslationTemplate`). |
+| `TranslationEntry` | `record` | AST-freier, unveränderlicher Übersetzungseintrag (`id`, `sourceText`, `translatedText`, `context`, `lineNumber`) mit Validierung `lineNumber >= 0`. |
+| `LocalizationManager` | `class` | Verwaltet Live-Sprachwechsel mit Listenern, AST-freie Indizierung über `TranslationBlock`/`TranslationEntry`, `translateDialogue`/`translateUi` und `tl/<lang>/`-Asset-Auflösung. |
+| `LocalizationManager.TranslationBlock` | `record` | AST-freier Übersetzungsblock (`language`, `id`, unveränderliche `List<TranslationEntry>`) für die blockweise Projektindizierung. |
 | `AutoSaveScheduler` | `final class` | Konfigurierbarer Zeit-/Schritt-Scheduler für rotierende Auto-Saves (`auto_1`..`auto_<maxSlots>`) über `SaveManager`. |
 | `SaveSlotQueryService` | `final class` | Tagging, Volltextsuche, Filterung nach Tag/Label und Sortierung (Zeitstempel/Spielzeit) über `SaveSlotData` mit `Optional`- und unveränderlichen Listen-Ergebnissen. |
 | `SaveMigrationStep` | `interface` | Versionsschritt (`fromVersion()`, `toVersion()`, `migrate(SaveSlotData)`) für abwärtskompatible Spielstand-Migrationen. |
@@ -330,9 +331,13 @@ public class EndingsManager {
 }
 ```
 
-### `LocalizationManager`
+### `TranslationEntry` & `LocalizationManager`
 ```java
+public record TranslationEntry(String id, String sourceText, String translatedText, String context, int lineNumber) {}
+
 public class LocalizationManager {
+    public record TranslationBlock(String language, String id, List<TranslationEntry> entries) {}
+
     public LocalizationManager()
     public LocalizationManager(String defaultLanguage)
     public void setLanguage(String language)
@@ -340,12 +345,13 @@ public class LocalizationManager {
     public synchronized String getDefaultLanguage()
     public synchronized void addLanguageChangeListener(Consumer<String> listener)
     public synchronized void removeLanguageChangeListener(Consumer<String> listener)
-    public synchronized void indexProject(VJavaAst.ProjectAst project)
+    public synchronized void indexTranslationBlocks(String projectDefaultLanguage, Collection<TranslationBlock> blocks)
+    public synchronized void indexTranslations(String projectDefaultLanguage, Map<String, List<TranslationEntry>> entriesByLanguage)
     public synchronized void registerTranslation(String language, String keyOrOriginal, String translatedText)
+    public synchronized void registerTranslation(String language, TranslationEntry entry)
     public synchronized String translateDialogue(String lineId, String originalText)
     public synchronized String translateUi(String key, String fallbackText)
     public synchronized String resolveLocalizedAsset(Path projectRoot, String assetPath)
     public synchronized Set<String> getAvailableLanguages()
-    public static String extractTranslationTemplate(VJavaAst.ProjectAst project, String targetLanguage)
 }
 ```

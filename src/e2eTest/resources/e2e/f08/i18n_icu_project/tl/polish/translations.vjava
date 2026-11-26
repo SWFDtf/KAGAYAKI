@@ -1,0 +1,11 @@
+translate polish line_01:
+    # lena "Willkommen, [spieler_name]! Du hast {b}[star_count]{/b} Sterne."
+    lena "Witaj, [spieler_name]! Masz {b}[star_count]{/b} gwiazd."
+
+translate polish line_02:
+    # lena "{star_count, plural, one {# Stern gefunden.} other {# Sterne gefunden.}}"
+    lena "{star_count, plural, one {# gwiazda znaleziona.} few {# gwiazdy znalezione.} many {# gwiazd znalezionych.} other {# gwiazdy znalezione.}}"
+
+translate polish line_03:
+    # lena "{speaker_gender, select, female {Sie ist bereit.} male {Er ist bereit.} other {Bereit.}}"
+    lena "{speaker_gender, select, female {Ona jest gotowa.} male {On jest gotowy.} other {Gotowe.}}"

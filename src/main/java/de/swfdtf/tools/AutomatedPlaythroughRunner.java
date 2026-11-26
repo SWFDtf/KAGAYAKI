@@ -56,6 +56,7 @@ public final class AutomatedPlaythroughRunner {
             double labelCoveragePercent,
             Optional<String> terminationReason
     ) {
+        /** Validates playthrough metrics and normalizes label set. */
         public PlaythroughReport {
             if (stepsExecuted < 0) {
                 throw new IllegalArgumentException("stepsExecuted must be >= 0, got " + stepsExecuted);

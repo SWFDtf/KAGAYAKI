@@ -38,6 +38,7 @@ public class RevertableStateStore implements StateStore {
             String summary,
             boolean rollbackBarrierBefore
     ) {
+        /** Creates a defensive immutable copy of the variable snapshot map. */
         public Checkpoint {
             variablesSnapshot = variablesSnapshot != null
                     ? Collections.unmodifiableMap(new LinkedHashMap<>(variablesSnapshot))

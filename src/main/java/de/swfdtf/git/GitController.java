@@ -297,7 +297,8 @@ public final class GitController {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             process.destroyForcibly();
-            return new CommandResult(-1, safeJoin(stdoutFuture), "Interrupted while waiting for git: " + e.getMessage(), false);
+            return new CommandResult(
+                    -1, safeJoin(stdoutFuture), "Interrupted while waiting for git: " + e.getMessage(), false);
         }
     }
 

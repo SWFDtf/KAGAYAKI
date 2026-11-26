@@ -97,6 +97,7 @@ public final class DiagnosticBundleExporter {
             int warningCount,
             List<LintIssueSummary> issues
     ) {
+        /** Normalizes null issue lists to an empty immutable list. */
         public LintSummary {
             issues = issues != null ? List.copyOf(issues) : List.of();
         }
@@ -122,6 +123,7 @@ public final class DiagnosticBundleExporter {
             LintSummary lintReport,
             Map<String, Object> metrics
     ) {
+        /** Validates required fields and defensively copies log and metric collections. */
         public DiagnosticReport {
             Objects.requireNonNull(exportedAt, "exportedAt must not be null");
             Objects.requireNonNull(engineVersion, "engineVersion must not be null");

@@ -25,8 +25,11 @@ public final class AudioDsp {
      * Filter topology supported by {@link BiquadFilter}.
      */
     public enum FilterType {
+        /** Attenuates frequencies above the cutoff frequency. */
         LOWPASS,
+        /** Attenuates frequencies below the cutoff frequency. */
         HIGHPASS,
+        /** Passes frequencies within a band around the center frequency. */
         BANDPASS
     }
 
@@ -220,22 +223,39 @@ public final class AudioDsp {
             return new BiquadFilter(type, sampleRate, cutoffHz, q, b0, b1, b2, a1, a2);
         }
 
-        /** @return filter type ({@link FilterType#LOWPASS}, {@link FilterType#HIGHPASS}, or {@link FilterType#BANDPASS}) */
+        /**
+         * Returns the filter type.
+         *
+         * @return filter type ({@link FilterType#LOWPASS}, {@link FilterType#HIGHPASS},
+         *         or {@link FilterType#BANDPASS})
+         */
         public FilterType getType() {
             return type;
         }
 
-        /** @return configured sample rate in Hz */
+        /**
+         * Returns the configured sample rate.
+         *
+         * @return configured sample rate in Hz
+         */
         public float getSampleRate() {
             return sampleRate;
         }
 
-        /** @return configured cutoff/center frequency in Hz */
+        /**
+         * Returns the configured cutoff or center frequency.
+         *
+         * @return configured cutoff/center frequency in Hz
+         */
         public float getCutoffHz() {
             return cutoffHz;
         }
 
-        /** @return configured quality factor {@code Q} */
+        /**
+         * Returns the configured quality factor.
+         *
+         * @return configured quality factor {@code Q}
+         */
         public float getQ() {
             return q;
         }

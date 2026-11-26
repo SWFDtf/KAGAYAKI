@@ -245,12 +245,20 @@ public final class PersistentState implements PersistentAccess {
         return Set.copyOf(unlockedAchievements);
     }
 
-    /** @return immutable view of all read dialogue line identifiers */
+    /**
+     * Returns an immutable view of all read dialogue line identifiers.
+     *
+     * @return immutable view of all read dialogue line identifiers
+     */
     public synchronized Set<String> getReadLines() {
         return Set.copyOf(readLines);
     }
 
-    /** @return immutable copy of all custom persistent key-value pairs */
+    /**
+     * Returns an immutable copy of all custom persistent key-value pairs.
+     *
+     * @return immutable copy of all custom persistent key-value pairs
+     */
     public synchronized Map<String, Object> getDataSnapshot() {
         return Collections.unmodifiableMap(new LinkedHashMap<>(data));
     }

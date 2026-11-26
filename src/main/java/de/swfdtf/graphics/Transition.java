@@ -24,25 +24,45 @@ public final class Transition {
      * Supported transition effect categories.
      */
     public enum Kind {
+        /** None option. */
         NONE,
+        /** Dissolve option. */
         DISSOLVE,
+        /** Fade option. */
         FADE,
+        /** Pixellate option. */
         PIXELLATE,
+        /** Move option. */
         MOVE,
+        /** Ease option. */
         EASE,
+        /** Wipe Left option. */
         WIPE_LEFT,
+        /** Wipe Right option. */
         WIPE_RIGHT,
+        /** Wipe Up option. */
         WIPE_UP,
+        /** Wipe Down option. */
         WIPE_DOWN,
+        /** Slide Left option. */
         SLIDE_LEFT,
+        /** Slide Right option. */
         SLIDE_RIGHT,
+        /** Push Left option. */
         PUSH_LEFT,
+        /** Push Right option. */
         PUSH_RIGHT,
+        /** Iris In option. */
         IRIS_IN,
+        /** Iris Out option. */
         IRIS_OUT,
+        /** Blinds option. */
         BLINDS,
+        /** Squares option. */
         SQUARES,
+        /** Image Dissolve option. */
         IMAGE_DISSOLVE,
+        /** Multiple option. */
         MULTIPLE
     }
 
@@ -110,18 +130,42 @@ public final class Transition {
 
     // ---- Factory Methods ----
 
+    /**
+     * Executes {@code none}.
+     *
+     * @return the resulting value
+     */
     public static Transition none() {
         return NONE_INSTANCE;
     }
 
+    /**
+     * Executes {@code dissolve}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition dissolve(float durationSeconds) {
         return simple(Kind.DISSOLVE, durationSeconds);
     }
 
+    /**
+     * Executes {@code fade}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition fade(float durationSeconds) {
         return fade(durationSeconds, DEFAULT_FADE_COLOR_HEX);
     }
 
+    /**
+     * Executes {@code fade}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @param fadeColorHex the fadeColorHex argument
+     * @return the resulting value
+     */
     public static Transition fade(float durationSeconds, String fadeColorHex) {
         String hex = normalizeColorHex(fadeColorHex);
         return new Transition(
@@ -137,10 +181,22 @@ public final class Transition {
         );
     }
 
+    /**
+     * Executes {@code pixellate}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition pixellate(float durationSeconds) {
         return simple(Kind.PIXELLATE, durationSeconds);
     }
 
+    /**
+     * Executes {@code move}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition move(float durationSeconds) {
         return new Transition(
                 Kind.MOVE,
@@ -155,10 +211,23 @@ public final class Transition {
         );
     }
 
+    /**
+     * Executes {@code ease}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition ease(float durationSeconds) {
         return ease(durationSeconds, Easing.EaseType.EASE);
     }
 
+    /**
+     * Executes {@code ease}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @param easeType the easeType argument
+     * @return the resulting value
+     */
     public static Transition ease(float durationSeconds, Easing.EaseType easeType) {
         return new Transition(
                 Kind.EASE,
@@ -173,46 +242,113 @@ public final class Transition {
         );
     }
 
+    /**
+     * Executes {@code wipeLeft}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition wipeLeft(float durationSeconds) {
         return simple(Kind.WIPE_LEFT, durationSeconds);
     }
 
+    /**
+     * Executes {@code wipeRight}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition wipeRight(float durationSeconds) {
         return simple(Kind.WIPE_RIGHT, durationSeconds);
     }
 
+    /**
+     * Executes {@code wipeUp}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition wipeUp(float durationSeconds) {
         return simple(Kind.WIPE_UP, durationSeconds);
     }
 
+    /**
+     * Executes {@code wipeDown}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition wipeDown(float durationSeconds) {
         return simple(Kind.WIPE_DOWN, durationSeconds);
     }
 
+    /**
+     * Executes {@code slideLeft}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition slideLeft(float durationSeconds) {
         return simple(Kind.SLIDE_LEFT, durationSeconds);
     }
 
+    /**
+     * Executes {@code slideRight}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition slideRight(float durationSeconds) {
         return simple(Kind.SLIDE_RIGHT, durationSeconds);
     }
 
+    /**
+     * Executes {@code pushLeft}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition pushLeft(float durationSeconds) {
         return simple(Kind.PUSH_LEFT, durationSeconds);
     }
 
+    /**
+     * Executes {@code pushRight}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition pushRight(float durationSeconds) {
         return simple(Kind.PUSH_RIGHT, durationSeconds);
     }
 
+    /**
+     * Executes {@code irisIn}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition irisIn(float durationSeconds) {
         return simple(Kind.IRIS_IN, durationSeconds);
     }
 
+    /**
+     * Executes {@code irisOut}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @return the resulting value
+     */
     public static Transition irisOut(float durationSeconds) {
         return simple(Kind.IRIS_OUT, durationSeconds);
     }
 
+    /**
+     * Executes {@code blinds}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @param sliceCount the sliceCount argument
+     * @return the resulting value
+     */
     public static Transition blinds(float durationSeconds, int sliceCount) {
         return new Transition(
                 Kind.BLINDS,
@@ -227,6 +363,13 @@ public final class Transition {
         );
     }
 
+    /**
+     * Executes {@code squares}.
+     *
+     * @param durationSeconds the durationSeconds argument
+     * @param sliceCount the sliceCount argument
+     * @return the resulting value
+     */
     public static Transition squares(float durationSeconds, int sliceCount) {
         return new Transition(
                 Kind.SQUARES,
@@ -241,6 +384,15 @@ public final class Transition {
         );
     }
 
+    /**
+     * Executes {@code imageDissolve}.
+     *
+     * @param maskImagePath the maskImagePath argument
+     * @param durationSeconds the durationSeconds argument
+     * @param rampLength the rampLength argument
+     * @param reverseMask the reverseMask argument
+     * @return the resulting value
+     */
     public static Transition imageDissolve(
             String maskImagePath,
             float durationSeconds,
@@ -263,11 +415,23 @@ public final class Transition {
         );
     }
 
+    /**
+     * Executes {@code multiple}.
+     *
+     * @param subTransitions the subTransitions argument
+     * @return the resulting value
+     */
     public static Transition multiple(Transition... subTransitions) {
         Objects.requireNonNull(subTransitions, "subTransitions must not be null");
         return multiple(List.of(subTransitions));
     }
 
+    /**
+     * Executes {@code multiple}.
+     *
+     * @param subTransitions the subTransitions argument
+     * @return the resulting value
+     */
     public static Transition multiple(List<Transition> subTransitions) {
         Objects.requireNonNull(subTransitions, "subTransitions must not be null");
         List<Transition> cleaned = new ArrayList<>(subTransitions.size());
@@ -356,9 +520,10 @@ public final class Transition {
             case "move" -> move(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr));
             case "ease" -> ease(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr), Easing.EaseType.EASE);
             case "easein" -> ease(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr), Easing.EaseType.EASE_IN);
-            case "easeout" -> ease(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr), Easing.EaseType.EASE_OUT);
+            case "easeout" ->
+                ease(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr), Easing.EaseType.EASE_OUT);
             case "easeinout" ->
-                    ease(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr), Easing.EaseType.EASE_IN_OUT);
+                ease(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr), Easing.EaseType.EASE_IN_OUT);
             case "wipeleft" -> wipeLeft(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr));
             case "wiperight" -> wipeRight(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr));
             case "wipeup" -> wipeUp(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr));
@@ -645,52 +810,92 @@ public final class Transition {
 
     // ---- Getters ----
 
-    /** @return transition effect kind */
+    /**
+     * Returns transition effect kind.
+     *
+     * @return transition effect kind
+     */
     public Kind getKind() {
         return kind;
     }
 
-    /** @return total transition duration in seconds */
+    /**
+     * Returns total transition duration in seconds.
+     *
+     * @return total transition duration in seconds
+     */
     public float getDurationSeconds() {
         return durationSeconds;
     }
 
-    /** @return fade midpoint hex color (default {@code "#000000"}) */
+    /**
+     * Returns fade midpoint hex color (default {@code "#000000"}).
+     *
+     * @return fade midpoint hex color (default {@code "#000000"})
+     */
     public String getFadeColorHex() {
         return fadeColorHex;
     }
 
-    /** @return parsed 4-element straight RGBA array for {@link #getFadeColorHex()} */
+    /**
+     * Returns parsed 4-element straight RGBA array for {@link #getFadeColorHex()}.
+     *
+     * @return parsed 4-element straight RGBA array for {@link #getFadeColorHex()}
+     */
     public float[] getFadeColorRgba() {
         return SceneNode.parseHexRgba(fadeColorHex);
     }
 
-    /** @return grayscale mask image path for {@link Kind#IMAGE_DISSOLVE}, or {@code null} */
+    /**
+     * Returns grayscale mask image path for {@link Kind#IMAGE_DISSOLVE}, or {@code null}.
+     *
+     * @return grayscale mask image path for {@link Kind#IMAGE_DISSOLVE}, or {@code null}
+     */
     public String getMaskImagePath() {
         return maskImagePath;
     }
 
-    /** @return edge ramp softness in 8-bit levels for {@link Kind#IMAGE_DISSOLVE} (default {@code 8.0f}) */
+    /**
+     * Returns edge ramp softness in 8-bit levels for {@link Kind#IMAGE_DISSOLVE} (default {@code 8.0f}).
+     *
+     * @return edge ramp softness in 8-bit levels for {@link Kind#IMAGE_DISSOLVE} (default {@code 8.0f})
+     */
     public float getRampLength() {
         return rampLength;
     }
 
-    /** @return {@code true} if the {@link Kind#IMAGE_DISSOLVE} grayscale mask threshold is inverted */
+    /**
+     * Returns {@code true} if the {@link Kind#IMAGE_DISSOLVE} grayscale mask threshold is inverted.
+     *
+     * @return {@code true} if the {@link Kind#IMAGE_DISSOLVE} grayscale mask threshold is inverted
+     */
     public boolean isReverseMask() {
         return reverseMask;
     }
 
-    /** @return slice/cell count used by {@link Kind#BLINDS} and {@link Kind#SQUARES} */
+    /**
+     * Returns slice/cell count used by {@link Kind#BLINDS} and {@link Kind#SQUARES}.
+     *
+     * @return slice/cell count used by {@link Kind#BLINDS} and {@link Kind#SQUARES}
+     */
     public int getSliceCount() {
         return sliceCount;
     }
 
-    /** @return unmodifiable list of child transitions for {@link Kind#MULTIPLE} */
+    /**
+     * Returns unmodifiable list of child transitions for {@link Kind#MULTIPLE}.
+     *
+     * @return unmodifiable list of child transitions for {@link Kind#MULTIPLE}
+     */
     public List<Transition> getSubTransitions() {
         return subTransitions;
     }
 
-    /** @return easing curve associated with {@link Kind#EASE} / {@link Kind#MOVE} transitions */
+    /**
+     * Returns easing curve associated with {@link Kind#EASE} / {@link Kind#MOVE} transitions.
+     *
+     * @return easing curve associated with {@link Kind#EASE} / {@link Kind#MOVE} transitions
+     */
     public Easing.EaseType getEaseType() {
         return easeType;
     }

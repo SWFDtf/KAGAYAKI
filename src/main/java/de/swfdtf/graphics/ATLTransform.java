@@ -194,7 +194,8 @@ public final class ATLTransform {
     }
 
     /**
-     * Returns total accumulated playback time in seconds since the last {@link #start(Transform2D)} or {@link #reset()}.
+     * Returns total accumulated playback time in seconds since the last {@link #start(Transform2D)}
+     * or {@link #reset()}.
      *
      * @return elapsed playback time in seconds
      */
@@ -318,9 +319,9 @@ public final class ATLTransform {
                 case "alpha" -> updates.add(PropertyUpdate.ofFloat(PropertyKind.ALPHA, parseFloatVal(val, key)));
                 case "blur" -> updates.add(PropertyUpdate.ofFloat(PropertyKind.BLUR, parseFloatVal(val, key)));
                 case "parallax_x", "parallaxx" ->
-                        updates.add(PropertyUpdate.ofFloat(PropertyKind.PARALLAX_X, parseFloatVal(val, key)));
+                    updates.add(PropertyUpdate.ofFloat(PropertyKind.PARALLAX_X, parseFloatVal(val, key)));
                 case "parallax_y", "parallaxy" ->
-                        updates.add(PropertyUpdate.ofFloat(PropertyKind.PARALLAX_Y, parseFloatVal(val, key)));
+                    updates.add(PropertyUpdate.ofFloat(PropertyKind.PARALLAX_Y, parseFloatVal(val, key)));
                 case "crop" -> updates.add(PropertyUpdate.ofCrop(parseCropRect(val)));
                 case "matrixcolor" -> updates.add(PropertyUpdate.ofColorMatrix(parseColorMatrix(val)));
                 default -> {
@@ -1361,100 +1362,205 @@ public final class ATLTransform {
             return this;
         }
 
+        /**
+         * Sets the X position property on the active ATL step.
+         *
+         * @param xpos X position in pixels
+         * @return {@code this}
+         */
         public Builder xpos(float xpos) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.XPOS, xpos));
             return this;
         }
 
+        /**
+         * Sets the Y position property on the active ATL step.
+         *
+         * @param ypos Y position in pixels
+         * @return {@code this}
+         */
         public Builder ypos(float ypos) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.YPOS, ypos));
             return this;
         }
 
+        /**
+         * Sets the horizontal anchor property on the active ATL step.
+         *
+         * @param xanchor horizontal anchor in {@code [0, 1]}
+         * @return {@code this}
+         */
         public Builder xanchor(float xanchor) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.XANCHOR, xanchor));
             return this;
         }
 
+        /**
+         * Sets the vertical anchor property on the active ATL step.
+         *
+         * @param yanchor vertical anchor in {@code [0, 1]}
+         * @return {@code this}
+         */
         public Builder yanchor(float yanchor) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.YANCHOR, yanchor));
             return this;
         }
 
+        /**
+         * Sets the horizontal alignment property on the active ATL step.
+         *
+         * @param xalign horizontal alignment in {@code [0, 1]}
+         * @return {@code this}
+         */
         public Builder xalign(float xalign) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.XALIGN, xalign));
             return this;
         }
 
+        /**
+         * Sets the vertical alignment property on the active ATL step.
+         *
+         * @param yalign vertical alignment in {@code [0, 1]}
+         * @return {@code this}
+         */
         public Builder yalign(float yalign) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.YALIGN, yalign));
             return this;
         }
 
+        /**
+         * Sets the uniform zoom factor on the active ATL step.
+         *
+         * @param zoom zoom multiplier
+         * @return {@code this}
+         */
         public Builder zoom(float zoom) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.ZOOM, zoom));
             return this;
         }
 
+        /**
+         * Sets the horizontal zoom factor on the active ATL step.
+         *
+         * @param xzoom horizontal zoom multiplier
+         * @return {@code this}
+         */
         public Builder xzoom(float xzoom) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.XZOOM, xzoom));
             return this;
         }
 
+        /**
+         * Sets the vertical zoom factor on the active ATL step.
+         *
+         * @param yzoom vertical zoom multiplier
+         * @return {@code this}
+         */
         public Builder yzoom(float yzoom) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.YZOOM, yzoom));
             return this;
         }
 
+        /**
+         * Sets the rotation angle in degrees on the active ATL step.
+         *
+         * @param rotateDegrees clockwise rotation in degrees
+         * @return {@code this}
+         */
         public Builder rotate(float rotateDegrees) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.ROTATE, rotateDegrees));
             return this;
         }
 
+        /**
+         * Sets the opacity alpha multiplier on the active ATL step.
+         *
+         * @param alpha opacity in {@code [0, 1]}
+         * @return {@code this}
+         */
         public Builder alpha(float alpha) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.ALPHA, alpha));
             return this;
         }
 
+        /**
+         * Sets the blur radius on the active ATL step.
+         *
+         * @param blur blur radius in pixels
+         * @return {@code this}
+         */
         public Builder blur(float blur) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.BLUR, blur));
             return this;
         }
 
+        /**
+         * Sets the horizontal parallax factor on the active ATL step.
+         *
+         * @param parallaxX horizontal parallax factor
+         * @return {@code this}
+         */
         public Builder parallaxX(float parallaxX) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.PARALLAX_X, parallaxX));
             return this;
         }
 
+        /**
+         * Sets the vertical parallax factor on the active ATL step.
+         *
+         * @param parallaxY vertical parallax factor
+         * @return {@code this}
+         */
         public Builder parallaxY(float parallaxY) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofFloat(PropertyKind.PARALLAX_Y, parallaxY));
             return this;
         }
 
+        /**
+         * Sets the crop rectangle on the active ATL step.
+         *
+         * @param crop crop rectangle (nullable)
+         * @return {@code this}
+         */
         public Builder crop(Rect2f crop) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofCrop(crop));
             return this;
         }
 
+        /**
+         * Sets the crop rectangle from coordinates on the active ATL step.
+         *
+         * @param x      crop X coordinate
+         * @param y      crop Y coordinate
+         * @param width  crop width
+         * @param height crop height
+         * @return {@code this}
+         */
         public Builder crop(float x, float y, float width, float height) {
             return crop(new Rect2f(x, y, width, height));
         }
 
+        /**
+         * Sets the {@link ColorMatrix4f} on the active ATL step.
+         *
+         * @param colorMatrix color matrix (non-null)
+         * @return {@code this}
+         */
         public Builder colorMatrix(ColorMatrix4f colorMatrix) {
             Objects.requireNonNull(colorMatrix, "colorMatrix must not be null");
             ensurePropertyTarget();
@@ -1462,12 +1568,25 @@ public final class ATLTransform {
             return this;
         }
 
+        /**
+         * Parses and sets a {@code matrixcolor} expression on the active ATL step.
+         *
+         * @param expr color matrix expression
+         * @return {@code this}
+         */
         public Builder matrixcolor(String expr) {
             ensurePropertyTarget();
             activeProperties.add(PropertyUpdate.ofColorMatrix(parseColorMatrix(expr)));
             return this;
         }
 
+        /**
+         * Parses and applies a raw ATL property key-value pair on the active ATL step.
+         *
+         * @param key   ATL property name
+         * @param value ATL property value string
+         * @return {@code this}
+         */
         public Builder property(String key, String value) {
             ensurePropertyTarget();
             Map<String, String> single = new LinkedHashMap<>();

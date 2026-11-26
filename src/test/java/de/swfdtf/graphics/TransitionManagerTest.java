@@ -93,7 +93,8 @@ class TransitionManagerTest {
         assertEquals("#ffffff", multi.getSubTransitions().get(0).getFadeColorHex());
         assertEquals(Transition.Kind.DISSOLVE, multi.getSubTransitions().get(1).getKind());
 
-        Transition renpyMulti = Transition.parse("MultipleTransition([False, Fade(0.25, 0.0, 0.25), True, Dissolve(0.5)])");
+        Transition renpyMulti = Transition.parse(
+                "MultipleTransition([False, Fade(0.25, 0.0, 0.25), True, Dissolve(0.5)])");
         assertEquals(Transition.Kind.MULTIPLE, renpyMulti.getKind());
         assertEquals(1.0f, renpyMulti.getDurationSeconds(), EPS);
         assertEquals(2, renpyMulti.getSubTransitions().size());

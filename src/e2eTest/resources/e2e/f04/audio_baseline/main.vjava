@@ -1,0 +1,8 @@
+label start:
+    play music "assets/audio/bgm.wav" loop fadein 0.2 volume 0.9
+    queue music ["assets/audio/next.wav"]
+    voice "assets/audio/voice.wav"
+    "Audio spielt."
+    stop music fadeout 0.2
+    "Audio gestoppt."
+    return

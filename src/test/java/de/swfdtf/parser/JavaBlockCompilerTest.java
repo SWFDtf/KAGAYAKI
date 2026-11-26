@@ -135,7 +135,10 @@ class JavaBlockCompilerTest {
                 null,
                 null,
                 null,
-                List.of(new MenuChoice("Ok", null, false, List.of(new JavaBlockStatement(inMenu, "a.vjava", 22)), null, "a.vjava", 21)),
+                List.of(new MenuChoice(
+                        "Ok", null, false,
+                        List.of(new JavaBlockStatement(inMenu, "a.vjava", 22)),
+                        null, "a.vjava", 21)),
                 "a.vjava",
                 20
         );

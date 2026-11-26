@@ -22,7 +22,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BuiltInScreensTest {
 
@@ -49,7 +53,8 @@ class BuiltInScreensTest {
 
             label input_scene:
                 $ player_name = "Hero"
-                input player_name "What is your name?" default="Kaito" allow="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" length=12
+                input player_name "What is your name?" default="Kaito" \
+            allow="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" length=12
                 lena "Hello [player_name]!"
                 return
 
@@ -106,8 +111,8 @@ class BuiltInScreensTest {
         assertEquals("slot_1", saveLoad.getVisibleCards().get(0).getSlotId());
 
         byte[] rgba = new byte[]{
-                (byte) 255, 0, 0, (byte) 255, 0, (byte) 255, 0, (byte) 255,
-                0, 0, (byte) 255, (byte) 255, (byte) 255, (byte) 255, 0, (byte) 255
+            (byte) 255, 0, 0, (byte) 255, 0, (byte) 255, 0, (byte) 255,
+            0, 0, (byte) 255, (byte) 255, (byte) 255, (byte) 255, 0, (byte) 255
         };
         session.saveToSlot("slot_1", "Chapter One", 2, 2, rgba);
         saveLoad.refreshSlots();
@@ -308,7 +313,8 @@ class BuiltInScreensTest {
         assertFalse(controls.getVisibleBindings().isEmpty());
         controls.setCategory(ControlsScreen.Category.KEYBOARD);
         assertTrue(controls.getVisibleBindings().stream().anyMatch(b -> b.input().contains("Shift + B")));
-        assertTrue(controls.getVisibleBindings().stream().allMatch(b -> b.category() == ControlsScreen.Category.KEYBOARD));
+        assertTrue(controls.getVisibleBindings().stream()
+                .allMatch(b -> b.category() == ControlsScreen.Category.KEYBOARD));
 
         session.start("start");
         session.advance(); // line 2

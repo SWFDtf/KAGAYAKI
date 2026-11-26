@@ -1,0 +1,14 @@
+image bg_sky = "assets/images/bg/bg_sky.png"
+image cloud = "assets/images/sprites/cloud.png"
+
+transform cloud_drift:
+    xpos 0.0 ypos 120.0 alpha 1.0
+    linear 1.0 xpos 400.0
+    pause 0.2
+    repeat
+
+label start:
+    scene bg_sky
+    show cloud at cloud_drift
+    "Beobachtung der animierten Wolke."
+    return

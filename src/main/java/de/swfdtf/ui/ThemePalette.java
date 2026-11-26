@@ -16,7 +16,7 @@ public final class ThemePalette {
     /** Semi-transparent frosted glass modal backdrop ({@code #161822d9}). */
     public static final String PANEL_GLASS = "#161822d9";
 
-    /** Elevated interactive surface such as buttons & dialogue box ({@code #1f2232}). */
+    /** Elevated interactive surface such as buttons &amp; dialogue box ({@code #1f2232}). */
     public static final String ELEVATED = "#1f2232";
 
     /** 1px structural border lines ({@code #2e334a}). */

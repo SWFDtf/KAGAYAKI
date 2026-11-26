@@ -239,12 +239,20 @@ public final class ShaderProgram {
         return location;
     }
 
-    /** @return native OpenGL program handle, or {@code 0} if not compiled or disposed */
+    /**
+     * Returns the native OpenGL program handle.
+     *
+     * @return native OpenGL program handle, or {@code 0} if not compiled or disposed
+     */
     public int getProgramId() {
         return programId;
     }
 
-    /** @return {@code true} if a compiled and linked OpenGL program is currently held */
+    /**
+     * Returns whether a compiled and linked OpenGL program is held.
+     *
+     * @return {@code true} if a compiled and linked OpenGL program is currently held
+     */
     public boolean isCompiled() {
         return programId != 0;
     }

@@ -74,12 +74,25 @@ public class BubbleDialogueScreen extends Screen {
             float tailX,
             float tailY
     ) {
-        /** @return {@code true} if {@code (lx, ly)} falls inside the bubble rectangle */
+        /**
+         * Checks whether {@code (lx, ly)} falls inside the bubble rectangle.
+         *
+         * @param lx logical X coordinate
+         * @param ly logical Y coordinate
+         * @return {@code true} if {@code (lx, ly)} falls inside the bubble rectangle
+         */
         public boolean containsBox(float lx, float ly) {
             return lx >= boxX && lx <= boxX + boxW && ly >= boxY && ly <= boxY + boxH;
         }
 
-        /** @return {@code true} if {@code (lx, ly)} is within grab radius of the tail tip */
+        /**
+         * Checks whether {@code (lx, ly)} is within grab radius of the tail tip.
+         *
+         * @param lx     logical X coordinate
+         * @param ly     logical Y coordinate
+         * @param radius hit grab radius
+         * @return {@code true} if {@code (lx, ly)} is within grab radius of the tail tip
+         */
         public boolean isNearTailTip(float lx, float ly, float radius) {
             float dx = lx - tailX;
             float dy = ly - tailY;
@@ -186,7 +199,11 @@ public class BubbleDialogueScreen extends Screen {
         }
     }
 
-    /** @return {@code true} if the {@code Shift+B} bubble editor is currently active */
+    /**
+     * Returns whether the {@code Shift+B} bubble editor is currently active.
+     *
+     * @return {@code true} if active
+     */
     public boolean isEditorActive() {
         return editorMode;
     }
@@ -203,7 +220,11 @@ public class BubbleDialogueScreen extends Screen {
         }
     }
 
-    /** @return {@code true} if retain mode is active */
+    /**
+     * Returns whether retain mode is active.
+     *
+     * @return {@code true} if retain mode is active
+     */
     public boolean isRetainPreviousBubbles() {
         return retainPreviousBubbles;
     }
@@ -248,22 +269,38 @@ public class BubbleDialogueScreen extends Screen {
         return key != null ? layoutPresets.get(key) : null;
     }
 
-    /** @return unmodifiable view of all layout presets */
+    /**
+     * Returns an unmodifiable view of all layout presets.
+     *
+     * @return layout presets map
+     */
     public Map<String, BubbleLayoutConfig> getLayoutPresets() {
         return Collections.unmodifiableMap(new LinkedHashMap<>(layoutPresets));
     }
 
-    /** @return currently active speech bubble, or {@code null} */
+    /**
+     * Returns the currently active speech bubble, or {@code null}.
+     *
+     * @return active speech bubble
+     */
     public BubbleEntry getActiveBubble() {
         return activeBubble;
     }
 
-    /** @return unmodifiable list of retained prior speech bubbles (excluding current) */
+    /**
+     * Returns an unmodifiable list of retained prior speech bubbles (excluding current).
+     *
+     * @return retained bubbles
+     */
     public List<BubbleEntry> getRetainedBubbles() {
         return Collections.unmodifiableList(retainedBubbles);
     }
 
-    /** @return total visible bubbles (retained + active) */
+    /**
+     * Returns total visible bubbles (retained + active).
+     *
+     * @return visible bubble count
+     */
     public int getVisibleBubbleCount() {
         return retainedBubbles.size() + (activeBubble != null ? 1 : 0);
     }
@@ -285,6 +322,8 @@ public class BubbleDialogueScreen extends Screen {
 
     /**
      * Synchronizes active and retained bubbles from {@link ScriptRuntime#getActiveDialogue()}.
+     *
+     * @param force {@code true} to rebuild even when prompt is unchanged
      */
     public void syncFromRuntime(boolean force) {
         ScriptRuntime runtime = session.getRuntime();
@@ -331,6 +370,9 @@ public class BubbleDialogueScreen extends Screen {
 
     /**
      * Computes the default or preset-overridden {@link BubbleLayoutConfig} for {@code prompt}.
+     *
+     * @param prompt dialogue prompt
+     * @return resolved bubble layout configuration
      */
     public BubbleLayoutConfig resolveLayoutForPrompt(ScriptRuntime.DialoguePrompt prompt) {
         if (prompt.lineId() != null && layoutPresets.containsKey(prompt.lineId())) {
@@ -516,7 +558,8 @@ public class BubbleDialogueScreen extends Screen {
                 drawBubble(pipeline, fontManager, textureManager, retained, 0.78f, false, null, elapsedSeconds);
             }
             if (activeBubble != null) {
-                drawBubble(pipeline, fontManager, textureManager, activeBubble, 1.0f, editorMode, activeTypewriter, elapsedSeconds);
+                drawBubble(pipeline, fontManager, textureManager, activeBubble,
+                        1.0f, editorMode, activeTypewriter, elapsedSeconds);
             }
             if (editorMode) {
                 drawEditorBanner(pipeline, fontManager, elapsedSeconds);
@@ -539,11 +582,15 @@ public class BubbleDialogueScreen extends Screen {
             float[] border = ThemePalette.premultipliedRgba(borderHex, alpha);
 
             drawTail(pipeline, cfg, fill, border);
-            pipeline.drawRoundedRect(cfg.boxX(), cfg.boxY(), cfg.boxW(), cfg.boxH(), 16.0f, fill, highlightEditor ? 2.5f : 1.5f, border);
+            pipeline.drawRoundedRect(
+                    cfg.boxX(), cfg.boxY(), cfg.boxW(), cfg.boxH(),
+                    16.0f, fill, highlightEditor ? 2.5f : 1.5f, border);
 
             if (entry.speakerName() != null && !entry.speakerName().isBlank()) {
                 float[] badgeFill = ThemePalette.premultipliedRgba(ThemePalette.ELEVATED, alpha);
-                pipeline.drawRoundedRect(cfg.boxX() + 18.0f, cfg.boxY() - 22.0f, 220.0f, 36.0f, 8.0f, badgeFill, 1.0f, border);
+                pipeline.drawRoundedRect(
+                        cfg.boxX() + 18.0f, cfg.boxY() - 22.0f,
+                        220.0f, 36.0f, 8.0f, badgeFill, 1.0f, border);
                 if (fontManager != null) {
                     String colorHex = (entry.speakerColorHex() != null && !entry.speakerColorHex().isBlank())
                             ? entry.speakerColorHex()
@@ -557,7 +604,8 @@ public class BubbleDialogueScreen extends Screen {
                             colorHex,
                             true
                     );
-                    badgeLayout.render(pipeline, textureManager, cfg.boxX() + 28.0f, cfg.boxY() - 16.0f, elapsedSeconds);
+                    badgeLayout.render(
+                            pipeline, textureManager, cfg.boxX() + 28.0f, cfg.boxY() - 16.0f, elapsedSeconds);
                 }
             }
 

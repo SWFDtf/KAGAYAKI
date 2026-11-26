@@ -310,7 +310,8 @@ class Wave2AnalysisToolsTest {
         Files.createDirectories(frenchFile.getParent());
         Files.writeString(frenchFile, """
                 translate francais start_01:
-                    # lena "Willkommen in der ersten Beispielszene, [spieler_name].{w=0.4} Bereit für den Übergang in Dialog 2?"
+                    # lena "Willkommen in der ersten Beispielszene, [spieler_name].{w=0.4} \
+                Bereit für den Übergang in Dialog 2?"
                     lena "Bienvenue dans la première scène, [spieler_name].{w=0.4} Prêt pour le dialogue 2 ?"
 
                 translate francais start_02:

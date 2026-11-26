@@ -97,37 +97,65 @@ public final class VJavaLexer {
             this.precedingComments = precedingComments != null ? List.copyOf(precedingComments) : List.of();
         }
 
-        /** Returns the token category. */
+        /**
+         * Returns the token category.
+         *
+         * @return token category
+         */
         public TokenType type() {
             return type;
         }
 
-        /** Returns the source file identifier. */
+        /**
+         * Returns the source file identifier.
+         *
+         * @return source file identifier
+         */
         public String sourceFile() {
             return sourceFile;
         }
 
-        /** Returns the 1-based line number where this token starts. */
+        /**
+         * Returns the 1-based line number where this token starts.
+         *
+         * @return 1-based line number
+         */
         public int lineNumber() {
             return lineNumber;
         }
 
-        /** Returns the leading indentation column count. */
+        /**
+         * Returns the leading indentation column count.
+         *
+         * @return leading indentation column count
+         */
         public int indentColumns() {
             return indentColumns;
         }
 
-        /** Returns the trimmed line text (excluding indentation and trailing comments). */
+        /**
+         * Returns the trimmed line text (excluding indentation and trailing comments).
+         *
+         * @return trimmed line text
+         */
         public String text() {
             return text;
         }
 
-        /** Returns the optional Java block description from {@code :: ... @->{}. */
+        /**
+         * Returns the optional Java block description from <code>:: ... @-&gt;&#123;</code>.
+         *
+         * @return optional Java block description
+         */
         public String description() {
             return description;
         }
 
-        /** Returns the verbatim inner Java source for {@link TokenType#JAVA_BLOCK} tokens. */
+        /**
+         * Returns the verbatim inner Java source for {@link TokenType#JAVA_BLOCK} tokens.
+         *
+         * @return verbatim inner Java source
+         */
         public String code() {
             return code;
         }
@@ -724,7 +752,8 @@ public final class VJavaLexer {
 
         // If '}<<' is preceded on its line only by horizontal whitespace, trim that whitespace and its newline
         int lastLineStart = e;
-        while (lastLineStart > s && (source.charAt(lastLineStart - 1) == ' ' || source.charAt(lastLineStart - 1) == '\t')) {
+        while (lastLineStart > s
+                && (source.charAt(lastLineStart - 1) == ' ' || source.charAt(lastLineStart - 1) == '\t')) {
             lastLineStart--;
         }
         if (lastLineStart > s && source.charAt(lastLineStart - 1) == '\n') {

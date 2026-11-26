@@ -35,7 +35,8 @@ public final class AudioDuckingController {
      * Creates an {@code AudioDuckingController} with custom ducked gain and transition durations.
      *
      * @param duckedGain     target gain multiplier in {@code [0, 1]} while voice is active
-     * @param attackSeconds  duration in seconds to transition from {@code 1.0f} down to {@code duckedGain} ({@code >= 0})
+     * @param attackSeconds  duration in seconds to transition from {@code 1.0f} down to {@code duckedGain}
+     *                       ({@code >= 0})
      * @param releaseSeconds duration in seconds to transition from {@code duckedGain} up to {@code 1.0f} ({@code >= 0})
      * @throws IllegalArgumentException if any parameter is non-finite or out of valid range
      */

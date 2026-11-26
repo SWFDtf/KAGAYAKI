@@ -22,7 +22,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.RecordComponent;
-import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
@@ -763,7 +762,9 @@ public final class SaveValueCodec {
 
     private static List<Field> collectSerializableFields(Class<?> clazz) {
         List<Class<?>> hierarchy = new ArrayList<>();
-        for (Class<?> cur = clazz; cur != null && cur != Object.class && cur != Record.class; cur = cur.getSuperclass()) {
+        for (Class<?> cur = clazz;
+                cur != null && cur != Object.class && cur != Record.class;
+                cur = cur.getSuperclass()) {
             hierarchy.add(cur);
         }
         Collections.reverse(hierarchy);
@@ -845,7 +846,8 @@ public final class SaveValueCodec {
         if (value instanceof Number && isNumericType(targetType)) {
             return true;
         }
-        if (value instanceof Collection<?> && (List.class.isAssignableFrom(targetType) || Set.class.isAssignableFrom(targetType))) {
+        if (value instanceof Collection<?>
+                && (List.class.isAssignableFrom(targetType) || Set.class.isAssignableFrom(targetType))) {
             return true;
         }
         if (value instanceof Map<?, ?> && Map.class.isAssignableFrom(targetType)) {
@@ -918,14 +920,30 @@ public final class SaveValueCodec {
         if (!type.isPrimitive()) {
             return type;
         }
-        if (type == int.class) return Integer.class;
-        if (type == long.class) return Long.class;
-        if (type == double.class) return Double.class;
-        if (type == float.class) return Float.class;
-        if (type == boolean.class) return Boolean.class;
-        if (type == byte.class) return Byte.class;
-        if (type == short.class) return Short.class;
-        if (type == char.class) return Character.class;
+        if (type == int.class) {
+            return Integer.class;
+        }
+        if (type == long.class) {
+            return Long.class;
+        }
+        if (type == double.class) {
+            return Double.class;
+        }
+        if (type == float.class) {
+            return Float.class;
+        }
+        if (type == boolean.class) {
+            return Boolean.class;
+        }
+        if (type == byte.class) {
+            return Byte.class;
+        }
+        if (type == short.class) {
+            return Short.class;
+        }
+        if (type == char.class) {
+            return Character.class;
+        }
         return type;
     }
 
@@ -936,14 +954,30 @@ public final class SaveValueCodec {
     }
 
     private static Object defaultValueFor(Class<?> type) {
-        if (type == boolean.class) return false;
-        if (type == byte.class) return (byte) 0;
-        if (type == short.class) return (short) 0;
-        if (type == char.class) return '\0';
-        if (type == int.class) return 0;
-        if (type == long.class) return 0L;
-        if (type == float.class) return 0.0f;
-        if (type == double.class) return 0.0;
+        if (type == boolean.class) {
+            return false;
+        }
+        if (type == byte.class) {
+            return (byte) 0;
+        }
+        if (type == short.class) {
+            return (short) 0;
+        }
+        if (type == char.class) {
+            return '\0';
+        }
+        if (type == int.class) {
+            return 0;
+        }
+        if (type == long.class) {
+            return 0L;
+        }
+        if (type == float.class) {
+            return 0.0f;
+        }
+        if (type == double.class) {
+            return 0.0;
+        }
         return null;
     }
 
@@ -993,10 +1027,18 @@ public final class SaveValueCodec {
         if (obj == null) {
             return t;
         }
-        if (obj.has("xpos")) t.setXpos(obj.get("xpos").getAsFloat());
-        if (obj.has("ypos")) t.setYpos(obj.get("ypos").getAsFloat());
-        if (obj.has("xanchor")) t.setXanchor(obj.get("xanchor").getAsFloat());
-        if (obj.has("yanchor")) t.setYanchor(obj.get("yanchor").getAsFloat());
+        if (obj.has("xpos")) {
+            t.setXpos(obj.get("xpos").getAsFloat());
+        }
+        if (obj.has("ypos")) {
+            t.setYpos(obj.get("ypos").getAsFloat());
+        }
+        if (obj.has("xanchor")) {
+            t.setXanchor(obj.get("xanchor").getAsFloat());
+        }
+        if (obj.has("yanchor")) {
+            t.setYanchor(obj.get("yanchor").getAsFloat());
+        }
         if (obj.has("xalign") && !obj.get("xalign").isJsonNull()) {
             t.setXalign(obj.get("xalign").getAsFloat());
         } else {
@@ -1007,12 +1049,24 @@ public final class SaveValueCodec {
         } else {
             t.setYalign(Float.NaN);
         }
-        if (obj.has("zoom")) t.setZoom(obj.get("zoom").getAsFloat());
-        if (obj.has("xzoom")) t.setXzoom(obj.get("xzoom").getAsFloat());
-        if (obj.has("yzoom")) t.setYzoom(obj.get("yzoom").getAsFloat());
-        if (obj.has("rotate")) t.setRotate(obj.get("rotate").getAsFloat());
-        if (obj.has("alpha")) t.setAlpha(obj.get("alpha").getAsFloat());
-        if (obj.has("blur")) t.setBlur(obj.get("blur").getAsFloat());
+        if (obj.has("zoom")) {
+            t.setZoom(obj.get("zoom").getAsFloat());
+        }
+        if (obj.has("xzoom")) {
+            t.setXzoom(obj.get("xzoom").getAsFloat());
+        }
+        if (obj.has("yzoom")) {
+            t.setYzoom(obj.get("yzoom").getAsFloat());
+        }
+        if (obj.has("rotate")) {
+            t.setRotate(obj.get("rotate").getAsFloat());
+        }
+        if (obj.has("alpha")) {
+            t.setAlpha(obj.get("alpha").getAsFloat());
+        }
+        if (obj.has("blur")) {
+            t.setBlur(obj.get("blur").getAsFloat());
+        }
         if (obj.has("colorMatrix") && obj.get("colorMatrix").isJsonArray()) {
             t.setColorMatrix(ColorMatrix4f.ofColumnMajor(decodeFloatArray(obj.getAsJsonArray("colorMatrix"))));
         }
@@ -1025,8 +1079,12 @@ public final class SaveValueCodec {
                     c.get("height").getAsFloat()
             ));
         }
-        if (obj.has("parallaxX")) t.setParallaxX(obj.get("parallaxX").getAsFloat());
-        if (obj.has("parallaxY")) t.setParallaxY(obj.get("parallaxY").getAsFloat());
+        if (obj.has("parallaxX")) {
+            t.setParallaxX(obj.get("parallaxX").getAsFloat());
+        }
+        if (obj.has("parallaxY")) {
+            t.setParallaxY(obj.get("parallaxY").getAsFloat());
+        }
         return t;
     }
 
@@ -1234,7 +1292,10 @@ public final class SaveValueCodec {
                             in.nextNull();
                             t.setCrop(null);
                         } else {
-                            float x = 0, y = 0, w = 0, h = 0;
+                            float x = 0;
+                            float y = 0;
+                            float w = 0;
+                            float h = 0;
                             in.beginObject();
                             while (in.hasNext()) {
                                 switch (in.nextName()) {

@@ -113,7 +113,8 @@ class AudioDspTest {
 
         assertTrue(midBands[midPeak] > 0.7f, "Mid tone peak magnitude should be prominent, got " + midBands[midPeak]);
         assertTrue(midBands[0] < 0.08f, "Distant low band should be near zero for 1 kHz tone, got " + midBands[0]);
-        assertTrue(midBands[bandCount - 1] < 0.05f, "Distant high band should be near zero for 1 kHz tone, got " + midBands[bandCount - 1]);
+        assertTrue(midBands[bandCount - 1] < 0.05f,
+                "Distant high band should be near zero for 1 kHz tone, got " + midBands[bandCount - 1]);
     }
 
     private static float[] generateSine(double freqHz, double durationSeconds, float sampleRate, float amplitude) {

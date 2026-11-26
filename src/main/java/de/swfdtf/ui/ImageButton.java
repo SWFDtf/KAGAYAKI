@@ -44,7 +44,11 @@ public class ImageButton extends UiNode {
         return this;
     }
 
-    /** @return disabled image path, or {@code null} */
+    /**
+     * Returns disabled image path, or {@code null}.
+     *
+     * @return disabled image path, or {@code null}
+     */
     public String getDisabledPath() {
         return disabledPath;
     }
@@ -60,7 +64,11 @@ public class ImageButton extends UiNode {
         return this;
     }
 
-    /** @return idle image path */
+    /**
+     * Returns idle image path.
+     *
+     * @return idle image path
+     */
     public String getIdlePath() {
         return idlePath;
     }
@@ -76,7 +84,11 @@ public class ImageButton extends UiNode {
         return this;
     }
 
-    /** @return hover image path */
+    /**
+     * Returns hover image path.
+     *
+     * @return hover image path
+     */
     public String getHoverPath() {
         return hoverPath;
     }
@@ -92,7 +104,11 @@ public class ImageButton extends UiNode {
         return this;
     }
 
-    /** @return selected image path */
+    /**
+     * Returns selected image path.
+     *
+     * @return selected image path
+     */
     public String getSelectedPath() {
         return selectedPath;
     }
@@ -108,7 +124,11 @@ public class ImageButton extends UiNode {
         return this;
     }
 
-    /** @return {@code true} if selected */
+    /**
+     * Returns {@code true} if selected.
+     *
+     * @return {@code true} if selected
+     */
     public boolean isSelected() {
         return selected;
     }
@@ -124,7 +144,11 @@ public class ImageButton extends UiNode {
         return this;
     }
 
-    /** @return click callback */
+    /**
+     * Returns click callback.
+     *
+     * @return click callback
+     */
     public Runnable getOnClick() {
         return onClick;
     }
@@ -159,8 +183,12 @@ public class ImageButton extends UiNode {
 
     @Override
     public Vec2f measure(float availableWidth, float availableHeight) {
-        float w = getPreferredWidth() > 0.0f ? getPreferredWidth() : Math.min(200.0f, availableWidth > 0 ? availableWidth : 200.0f);
-        float h = getPreferredHeight() > 0.0f ? getPreferredHeight() : Math.min(64.0f, availableHeight > 0 ? availableHeight : 64.0f);
+        float w = getPreferredWidth() > 0.0f
+                ? getPreferredWidth()
+                : Math.min(200.0f, availableWidth > 0 ? availableWidth : 200.0f);
+        float h = getPreferredHeight() > 0.0f
+                ? getPreferredHeight()
+                : Math.min(64.0f, availableHeight > 0 ? availableHeight : 64.0f);
         return new Vec2f(w, h);
     }
 

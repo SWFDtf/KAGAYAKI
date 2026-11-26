@@ -1,0 +1,28 @@
+define lena = Character("Lena", color="#58a6ff", image="lena")
+
+default interacted = false
+
+image bg_room = "assets/images/bg/bg_room.png"
+image lena = "assets/images/char/lena.png"
+image player = "assets/images/sprites/player.png"
+image chest = "assets/images/sprites/chest.png"
+
+label start:
+    scene bg_room
+    show lena at center
+    lena "Erste Dialogzeile vor dem Remap."
+    lena "Zweite Dialogzeile nach dem Advance."
+    menu "Pfad":
+        "Zur Arena" -> jump wasd_scene
+    return
+
+label wasd_scene:
+    scene bg_room
+    show player
+    show chest
+    move player to 200 500
+    move chest to 420 500
+    wasd_init player speed 280 bounds 40 40 1880 1040 diagonal_norm true
+    play sound "assets/audio/sfx_door.wav"
+    lena "Bewege dich im Raum."
+    return

@@ -1,0 +1,5 @@
+label start:
+    $ bad_sum = true + "assets/images/bg/bg_test.png"
+    $ bad_num = false + 42
+    "Typfehler-Test"
+    return

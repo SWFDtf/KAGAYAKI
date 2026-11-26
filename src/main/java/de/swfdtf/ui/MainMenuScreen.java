@@ -156,7 +156,8 @@ public class MainMenuScreen extends Screen {
                 }
             }
             for (int page = 0; page < 5; page++) {
-                List<SaveSlotData.SaveMetadata> pageSlots = saveManager.listPageSlots(page, SaveLoadScreen.SLOTS_PER_PAGE);
+                List<SaveSlotData.SaveMetadata> pageSlots = saveManager.listPageSlots(
+                        page, SaveLoadScreen.SLOTS_PER_PAGE);
                 for (SaveSlotData.SaveMetadata meta : pageSlots) {
                     if (meta != null && isNewer(meta.savedAt(), bestTime)) {
                         bestSlot = meta.slotId();
@@ -215,17 +216,120 @@ public class MainMenuScreen extends Screen {
         }
     }
 
-    public String getNewestSaveSlotId() { return newestSaveSlotId; }
-    public TextWidget getTitleBanner() { return titleBanner; }
-    public TextButton getStartButton() { return startButton; }
-    public TextButton getContinueButton() { return continueButton; }
-    public TextButton getLoadButton() { return loadButton; }
-    public TextButton getGalleryButton() { return galleryButton; }
-    public TextButton getMusicRoomButton() { return musicRoomButton; }
-    public TextButton getEndingsButton() { return endingsButton; }
-    public TextButton getAchievementsButton() { return achievementsButton; }
-    public TextButton getPreferencesButton() { return preferencesButton; }
-    public TextButton getControlsButton() { return controlsButton; }
-    public TextButton getAboutButton() { return aboutButton; }
-    public TextButton getQuitButton() { return quitButton; }
+    /**
+     * Returns the slot identifier of the newest detected save, if any.
+     *
+     * @return slot id or {@code null}
+     */
+    public String getNewestSaveSlotId() {
+        return newestSaveSlotId;
+    }
+
+    /**
+     * Returns the titleBanner value.
+     *
+     * @return the resulting value
+     */
+    public TextWidget getTitleBanner() {
+        return titleBanner;
+    }
+
+    /**
+     * Returns the startButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getStartButton() {
+        return startButton;
+    }
+
+    /**
+     * Returns the continueButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getContinueButton() {
+        return continueButton;
+    }
+
+    /**
+     * Returns the loadButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getLoadButton() {
+        return loadButton;
+    }
+
+    /**
+     * Returns the galleryButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getGalleryButton() {
+        return galleryButton;
+    }
+
+    /**
+     * Returns the musicRoomButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getMusicRoomButton() {
+        return musicRoomButton;
+    }
+
+    /**
+     * Returns the endingsButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getEndingsButton() {
+        return endingsButton;
+    }
+
+    /**
+     * Returns the achievementsButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getAchievementsButton() {
+        return achievementsButton;
+    }
+
+    /**
+     * Returns the preferencesButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getPreferencesButton() {
+        return preferencesButton;
+    }
+
+    /**
+     * Returns the controlsButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getControlsButton() {
+        return controlsButton;
+    }
+
+    /**
+     * Returns the aboutButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getAboutButton() {
+        return aboutButton;
+    }
+
+    /**
+     * Returns the quitButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getQuitButton() {
+        return quitButton;
+    }
 }

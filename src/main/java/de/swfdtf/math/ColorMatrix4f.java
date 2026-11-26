@@ -26,10 +26,10 @@ public final class ColorMatrix4f {
     private static final float INV_SQRT_3 = (float) (1.0 / Math.sqrt(3.0));
 
     private static final ColorMatrix4f IDENTITY = new ColorMatrix4f(new float[]{
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 0.0f, 1.0f
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
     });
 
     private final float[] m;
@@ -91,10 +91,10 @@ public final class ColorMatrix4f {
      */
     public static ColorMatrix4f brightness(float b) {
         return new ColorMatrix4f(new float[]{
-                1.0f, 0.0f, 0.0f, 0.0f,
-                0.0f, 1.0f, 0.0f, 0.0f,
-                0.0f, 0.0f, 1.0f, 0.0f,
-                b,    b,    b,    1.0f
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            b,    b,    b,    1.0f
         });
     }
 
@@ -108,10 +108,10 @@ public final class ColorMatrix4f {
     public static ColorMatrix4f contrast(float c) {
         float offset = (1.0f - c) * 0.5f;
         return new ColorMatrix4f(new float[]{
-                c,      0.0f,   0.0f,   0.0f,
-                0.0f,   c,      0.0f,   0.0f,
-                0.0f,   0.0f,   c,      0.0f,
-                offset, offset, offset, 1.0f
+            c,      0.0f,   0.0f,   0.0f,
+            0.0f,   c,      0.0f,   0.0f,
+            0.0f,   0.0f,   c,      0.0f,
+            offset, offset, offset, 1.0f
         });
     }
 
@@ -128,10 +128,10 @@ public final class ColorMatrix4f {
         float sg = inv * LUMA_G;
         float sb = inv * LUMA_B;
         return new ColorMatrix4f(new float[]{
-                sr + s, sr,     sr,     0.0f,
-                sg,     sg + s, sg,     0.0f,
-                sb,     sb,     sb + s, 0.0f,
-                0.0f,   0.0f,   0.0f,   1.0f
+            sr + s, sr,     sr,     0.0f,
+            sg,     sg + s, sg,     0.0f,
+            sb,     sb,     sb + s, 0.0f,
+            0.0f,   0.0f,   0.0f,   1.0f
         });
     }
 
@@ -154,10 +154,10 @@ public final class ColorMatrix4f {
         float r02 = t + u;
 
         return new ColorMatrix4f(new float[]{
-                diag, r02,  r01,  0.0f,
-                r01,  diag, r02,  0.0f,
-                r02,  r01,  diag, 0.0f,
-                0.0f, 0.0f, 0.0f, 1.0f
+            diag, r02,  r01,  0.0f,
+            r01,  diag, r02,  0.0f,
+            r02,  r01,  diag, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f
         });
     }
 
@@ -171,10 +171,10 @@ public final class ColorMatrix4f {
      */
     public static ColorMatrix4f tint(float r, float g, float b) {
         return new ColorMatrix4f(new float[]{
-                r,    0.0f, 0.0f, 0.0f,
-                0.0f, g,    0.0f, 0.0f,
-                0.0f, 0.0f, b,    0.0f,
-                0.0f, 0.0f, 0.0f, 1.0f
+            r,    0.0f, 0.0f, 0.0f,
+            0.0f, g,    0.0f, 0.0f,
+            0.0f, 0.0f, b,    0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f
         });
     }
 
@@ -186,10 +186,10 @@ public final class ColorMatrix4f {
      */
     public static ColorMatrix4f opacity(float a) {
         return new ColorMatrix4f(new float[]{
-                a,    0.0f, 0.0f, 0.0f,
-                0.0f, a,    0.0f, 0.0f,
-                0.0f, 0.0f, a,    0.0f,
-                0.0f, 0.0f, 0.0f, a
+            a,    0.0f, 0.0f, 0.0f,
+            0.0f, a,    0.0f, 0.0f,
+            0.0f, 0.0f, a,    0.0f,
+            0.0f, 0.0f, 0.0f, a
         });
     }
 
@@ -200,10 +200,10 @@ public final class ColorMatrix4f {
      */
     public static ColorMatrix4f invert() {
         return new ColorMatrix4f(new float[]{
-                -1.0f,  0.0f,  0.0f, 0.0f,
-                 0.0f, -1.0f,  0.0f, 0.0f,
-                 0.0f,  0.0f, -1.0f, 0.0f,
-                 1.0f,  1.0f,  1.0f, 1.0f
+            -1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, -1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, -1.0f, 0.0f,
+            1.0f, 1.0f, 1.0f, 1.0f
         });
     }
 

@@ -1,0 +1,8 @@
+image bg_a = "assets/images/bg/bg_a.png"
+image bg_b = "assets/images/bg/bg_b.png"
+
+label start:
+    scene bg_a
+    scene bg_b with imagedissolve("assets/masks/wipe.png", 0.6, ramplen=8, reverse=true)
+    "Übergang aktiv."
+    return

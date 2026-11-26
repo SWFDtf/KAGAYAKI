@@ -1,0 +1,43 @@
+define aria = Character("Aria", color="#58a6ff")
+
+default base_score = 10
+default bonus_flag = true
+
+:: Kode für VN: Benutzerklasse für deterministische Auswertung @->{
+    public static class HeroStats {
+        public final String name;
+        public final int score;
+
+        public HeroStats(String name, int score) {
+            this.name = name;
+            this.score = score;
+        }
+    }
+}<<
+
+image bg_test = "assets/images/bg/bg_test.png"
+
+label start:
+    scene bg_test
+    $ score = base_score + 5
+    $ ok = bonus_flag && !false
+    $ greeting = "Hallo " + "Welt"
+    :: Kode für VN: HeroStats instanziieren @->{
+        state.set("hero", new HeroStats("Aria", state.getInt("score", 0) * 2));
+    }<<
+    if ok && hero.score == 30:
+        aria "[greeting] [hero.name] hat [hero.score] Punkte."
+    else:
+        aria "Unerwarteter Zustand."
+    menu "Pfad wählen":
+        "Zum guten Ende" if hero.score >= 30 -> jump ending_good
+        "Zum anderen Ende" -> jump ending_alt
+    return
+
+label ending_good:
+    aria "Gutes Ende erreicht."
+    return
+
+label ending_alt:
+    aria "Alternatives Ende erreicht."
+    return

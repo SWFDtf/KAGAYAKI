@@ -75,12 +75,20 @@ public final class SceneLayer {
         this.parallaxFactor = parallaxFactor;
     }
 
-    /** @return layer name */
+    /**
+     * Returns the layer name.
+     *
+     * @return layer name
+     */
     public String getName() {
         return name;
     }
 
-    /** @return layer Z-order */
+    /**
+     * Returns the layer Z-order.
+     *
+     * @return layer Z-order
+     */
     public int getZOrder() {
         return zOrder;
     }
@@ -96,7 +104,11 @@ public final class SceneLayer {
         return this;
     }
 
-    /** @return {@code true} if this layer is rendered */
+    /**
+     * Returns whether this layer is rendered.
+     *
+     * @return {@code true} if this layer is rendered
+     */
     public boolean isVisible() {
         return visible;
     }
@@ -112,7 +124,11 @@ public final class SceneLayer {
         return this;
     }
 
-    /** @return layer-wide normalized mouse parallax factor */
+    /**
+     * Returns the layer-wide normalized mouse parallax factor.
+     *
+     * @return layer-wide normalized mouse parallax factor
+     */
     public float getParallaxFactor() {
         return parallaxFactor;
     }
@@ -218,12 +234,20 @@ public final class SceneLayer {
         nodes.clear();
     }
 
-    /** @return number of top-level nodes in this layer */
+    /**
+     * Returns the number of top-level nodes in this layer.
+     *
+     * @return number of top-level nodes in this layer
+     */
     public int size() {
         return nodes.size();
     }
 
-    /** @return {@code true} if this layer contains no nodes */
+    /**
+     * Returns whether this layer contains no nodes.
+     *
+     * @return {@code true} if this layer contains no nodes
+     */
     public boolean isEmpty() {
         return nodes.isEmpty();
     }

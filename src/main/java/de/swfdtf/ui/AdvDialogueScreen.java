@@ -166,7 +166,8 @@ public class AdvDialogueScreen extends Screen {
         this.rootContainer.addChildAt(this.speakerBox, PANEL_X + 24.0f, PANEL_Y - 42.0f, 340.0f, 50.0f);
         this.rootContainer.addChildAt(this.dialogueText, PANEL_X + 36.0f, PANEL_Y + 26.0f, PANEL_W - 72.0f, 152.0f);
         this.rootContainer.addChildAt(this.statusBadge, PANEL_X + PANEL_W - 240.0f, PANEL_Y + 12.0f, 210.0f, 28.0f);
-        this.rootContainer.addChildAt(this.quickMenuRow, PANEL_X + PANEL_W - 770.0f, PANEL_Y + PANEL_H - 50.0f, 740.0f, 36.0f);
+        this.rootContainer.addChildAt(
+                this.quickMenuRow, PANEL_X + PANEL_W - 770.0f, PANEL_Y + PANEL_H - 50.0f, 740.0f, 36.0f);
 
         setRoot(this.rootContainer);
         registerDefaultBindings();
@@ -347,54 +348,103 @@ public class AdvDialogueScreen extends Screen {
         updateStatusIndicators();
     }
 
-    /** @return {@code true} if skip mode is currently active */
+    /**
+     * Returns whether skip mode is currently active.
+     *
+     * @return {@code true} if skip mode is currently active
+     */
     public boolean isSkipActive() {
         return skipActive;
     }
 
-    /** @return {@code true} if auto-advance mode is currently active */
+    /**
+     * Returns whether auto-advance mode is currently active.
+     *
+     * @return {@code true} if auto-advance mode is currently active
+     */
     public boolean isAutoActive() {
         return autoActive;
     }
 
-    /** @return number of voice bleeps triggered so far */
+    /**
+     * Returns the number of voice bleeps triggered so far.
+     *
+     * @return number of voice bleeps triggered so far
+     */
     public int getBleepCount() {
         return bleepCount;
     }
 
-    /** @return current typewriter visible character count */
+    /**
+     * Returns the current typewriter visible character count.
+     *
+     * @return current typewriter visible character count
+     */
     public int getVisibleCharCount() {
         StyledTextLayout.TypewriterController tw = resolveActiveTypewriter();
         return tw != null ? tw.getVisibleCharCount() : dialogueText.getText().length();
     }
 
-    /** @return {@code true} when the active line's typewriter reveal has finished */
+    /**
+     * Returns whether the active line's typewriter reveal has finished.
+     *
+     * @return {@code true} when the active line's typewriter reveal has finished
+     */
     public boolean isTypewriterFinished() {
         StyledTextLayout.TypewriterController tw = resolveActiveTypewriter();
         return tw == null || tw.isFinished();
     }
 
-    /** @return canonical logical bounds of the bottom ADV panel */
+    /**
+     * Returns the canonical logical bounds of the bottom ADV panel.
+     *
+     * @return canonical logical bounds of the bottom ADV panel
+     */
     public Rect2f getDialogueBoxBounds() {
         return new Rect2f(PANEL_X, PANEL_Y, PANEL_W, PANEL_H);
     }
 
+    /**
+     * Returns the speakerNameWidget value.
+     *
+     * @return the resulting value
+     */
     public TextWidget getSpeakerNameWidget() {
         return speakerText;
     }
 
+    /**
+     * Returns the dialogueTextWidget value.
+     *
+     * @return the resulting value
+     */
     public TextWidget getDialogueTextWidget() {
         return dialogueText;
     }
 
+    /**
+     * Returns the quickMenuRow value.
+     *
+     * @return the resulting value
+     */
     public HBox getQuickMenuRow() {
         return quickMenuRow;
     }
 
+    /**
+     * Sets the audioEngine value.
+     *
+     * @param audioEngine the audioEngine argument
+     */
     public void setAudioEngine(AudioEngine audioEngine) {
         this.explicitAudioEngine = audioEngine;
     }
 
+    /**
+     * Sets the ttsService value.
+     *
+     * @param ttsService the ttsService argument
+     */
     public void setTtsService(TextToSpeechService ttsService) {
         this.explicitTtsService = ttsService;
     }

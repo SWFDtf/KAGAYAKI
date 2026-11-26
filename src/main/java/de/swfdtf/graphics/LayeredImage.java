@@ -14,7 +14,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -286,7 +285,8 @@ public class LayeredImage implements CustomDisplayable {
     }
 
     /**
-     * Creates a {@link LayeredImage} from a parsed {@link VJavaAst.LayeredImageDef} and optional {@link TextureManager}.
+     * Creates a {@link LayeredImage} from a parsed {@link VJavaAst.LayeredImageDef} and optional
+     * {@link TextureManager}.
      *
      * @param def            layered image AST definition
      * @param textureManager optional texture manager for GPU texture loading (nullable in headless tests)
@@ -699,28 +699,49 @@ public class LayeredImage implements CustomDisplayable {
         }
     }
 
-    /** @return composite layered image name */
+    /**
+     * Returns the composite layered image name.
+     *
+     * @return composite layered image name
+     */
     public String getName() {
         return name;
     }
 
-    /** @return ordered list of currently resolved active layer asset paths */
+    /**
+     * Returns the ordered list of currently resolved active layer asset paths.
+     *
+     * @return ordered list of currently resolved active layer asset paths
+     */
     public List<String> getResolvedLayerAssets() {
         return resolvedLayerAssets;
     }
 
-    /** @return unmodifiable list of requested attributes */
+    /**
+     * Returns an unmodifiable list of requested attributes.
+     *
+     * @return unmodifiable list of requested attributes
+     */
     public List<String> getSelectedAttributes() {
         return selectedAttributes;
     }
 
-    /** @return active attribute name inside {@code groupName}, or {@code null} */
+    /**
+     * Returns the active attribute name inside {@code groupName}.
+     *
+     * @param groupName attribute group name
+     * @return active attribute name inside {@code groupName}, or {@code null}
+     */
     public String getActiveAttribute(String groupName) {
         GroupCrossfadeState st = groupStates.get(groupName);
         return st != null ? st.currentAttribute : null;
     }
 
-    /** @return map of group name to currently active attribute name */
+    /**
+     * Returns a map of group name to currently active attribute name.
+     *
+     * @return map of group name to currently active attribute name
+     */
     public Map<String, String> getActiveGroupAttributes() {
         Map<String, String> map = new LinkedHashMap<>();
         for (Map.Entry<String, GroupCrossfadeState> e : groupStates.entrySet()) {
@@ -731,25 +752,44 @@ public class LayeredImage implements CustomDisplayable {
         return Collections.unmodifiableMap(map);
     }
 
-    /** @return outgoing layer alpha in {@code [0, 1]} for {@code groupName} during crossfade, else {@code 0} */
+    /**
+     * Returns the outgoing layer alpha for {@code groupName} during a crossfade.
+     *
+     * @param groupName attribute group name
+     * @return outgoing layer alpha in {@code [0, 1]} for {@code groupName} during crossfade, else {@code 0}
+     */
     public float getGroupPreviousAlpha(String groupName) {
         GroupCrossfadeState st = groupStates.get(groupName);
         return st != null ? st.previousAlpha() : 0.0f;
     }
 
-    /** @return incoming layer alpha in {@code [0, 1]} for {@code groupName} during crossfade, else {@code 1} */
+    /**
+     * Returns the incoming layer alpha for {@code groupName} during a crossfade.
+     *
+     * @param groupName attribute group name
+     * @return incoming layer alpha in {@code [0, 1]} for {@code groupName} during crossfade, else {@code 1}
+     */
     public float getGroupCurrentAlpha(String groupName) {
         GroupCrossfadeState st = groupStates.get(groupName);
         return st != null ? st.currentAlpha() : 0.0f;
     }
 
-    /** @return crossfade progress in {@code [0, 1]} for {@code groupName} */
+    /**
+     * Returns the crossfade progress for {@code groupName}.
+     *
+     * @param groupName attribute group name
+     * @return crossfade progress in {@code [0, 1]} for {@code groupName}
+     */
     public float getGroupFadeProgress(String groupName) {
         GroupCrossfadeState st = groupStates.get(groupName);
         return st != null ? st.progress : 1.0f;
     }
 
-    /** @return {@code true} if any group is currently crossfading */
+    /**
+     * Returns whether any group is currently crossfading.
+     *
+     * @return {@code true} if any group is currently crossfading
+     */
     public boolean isCrossfading() {
         for (GroupCrossfadeState st : groupStates.values()) {
             if (st.isCrossfading()) {
@@ -759,7 +799,11 @@ public class LayeredImage implements CustomDisplayable {
         return false;
     }
 
-    /** @return crossfade duration in seconds */
+    /**
+     * Returns the crossfade duration in seconds.
+     *
+     * @return crossfade duration in seconds
+     */
     public float getCrossfadeDurationSeconds() {
         return crossfadeDurationSeconds;
     }
@@ -775,7 +819,11 @@ public class LayeredImage implements CustomDisplayable {
                 : DEFAULT_CROSSFADE_DURATION_SECONDS;
     }
 
-    /** @return group name targeted by lip-sync mouth shape changes */
+    /**
+     * Returns the group name targeted by lip-sync mouth shape changes.
+     *
+     * @return group name targeted by lip-sync mouth shape changes
+     */
     public String getMouthGroupName() {
         return mouthGroupName;
     }
@@ -791,12 +839,20 @@ public class LayeredImage implements CustomDisplayable {
                 : mouthGroupName.trim();
     }
 
-    /** @return currently bound {@link LipSyncAnalyzer}, or {@code null} */
+    /**
+     * Returns the currently bound lip-sync analyzer.
+     *
+     * @return currently bound {@link LipSyncAnalyzer}, or {@code null}
+     */
     public LipSyncAnalyzer getBoundLipSync() {
         return boundLipSync;
     }
 
-    /** @return optional {@link TextureManager} */
+    /**
+     * Returns the optional texture manager.
+     *
+     * @return optional {@link TextureManager}
+     */
     public TextureManager getTextureManager() {
         return textureManager;
     }

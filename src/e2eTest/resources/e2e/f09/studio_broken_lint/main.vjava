@@ -1,0 +1,7 @@
+image bg_main = "assets/images/bg/bg_main.png"
+
+label start:
+    scene bg_main
+    mystery_npc "Diese Figur wurde noch nicht definiert."
+    jump missing_chapter
+    return

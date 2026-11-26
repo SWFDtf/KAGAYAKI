@@ -8,7 +8,6 @@ import de.swfdtf.graphics.RenderPipeline3DStub;
 import de.swfdtf.graphics.SceneGraph;
 import de.swfdtf.graphics.WindowManager;
 import de.swfdtf.math.Rect2f;
-import org.lwjgl.glfw.GLFW;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -266,7 +265,8 @@ public final class EngineApplication implements AutoCloseable {
             if (studioBridgeInitialized && studioBridge != null) {
                 studioBridge.render(studioWindow.getFramebufferWidth(), studioWindow.getFramebufferHeight());
             } else {
-                org.lwjgl.opengl.GL11.glViewport(0, 0, studioWindow.getFramebufferWidth(), studioWindow.getFramebufferHeight());
+                org.lwjgl.opengl.GL11.glViewport(
+                        0, 0, studioWindow.getFramebufferWidth(), studioWindow.getFramebufferHeight());
                 org.lwjgl.opengl.GL11.glClearColor(0x16 / 255.0f, 0x18 / 255.0f, 0x22 / 255.0f, 1.0f);
                 org.lwjgl.opengl.GL11.glClear(org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT);
             }
@@ -350,32 +350,56 @@ public final class EngineApplication implements AutoCloseable {
         updatables.remove(updatable);
     }
 
-    /** @return core engine API facade */
+    /**
+     * Returns the core engine API facade.
+     *
+     * @return core engine API facade
+     */
     public EngineAPI getApi() {
         return api;
     }
 
-    /** @return root scene graph */
+    /**
+     * Returns the root scene graph.
+     *
+     * @return root scene graph
+     */
     public SceneGraph getSceneGraph() {
         return sceneGraph;
     }
 
-    /** @return GLFW window manager */
+    /**
+     * Returns the GLFW window manager.
+     *
+     * @return GLFW window manager
+     */
     public WindowManager getWindowManager() {
         return windowManager;
     }
 
-    /** @return currently active render pipeline */
+    /**
+     * Returns the currently active render pipeline.
+     *
+     * @return currently active render pipeline
+     */
     public IRenderPipeline getActivePipeline() {
         return activePipeline;
     }
 
-    /** @return {@code true} if {@link #initialize()} has completed */
+    /**
+     * Returns whether {@link #initialize()} has completed.
+     *
+     * @return {@code true} if {@link #initialize()} has completed
+     */
     public boolean isInitialized() {
         return initialized;
     }
 
-    /** @return active {@link GameHost}, or {@code null} if no project host was loaded */
+    /**
+     * Returns the active {@link GameHost}.
+     *
+     * @return active {@link GameHost}, or {@code null} if no project host was loaded
+     */
     public GameHost getGameHost() {
         return gameHost;
     }
@@ -498,7 +522,8 @@ public final class EngineApplication implements AutoCloseable {
                     studioBridge = bridge;
                 }
             } catch (ClassNotFoundException ignored) {
-                api.getLogger().info("Studio", "StudioWindowController not yet present; Studio window runs base canvas.");
+                api.getLogger().info(
+                        "Studio", "StudioWindowController not yet present; Studio window runs base canvas.");
                 return;
             } catch (ReflectiveOperationException ex) {
                 api.getLogger().warn("Studio", "Failed to instantiate StudioWindowController: " + ex.getMessage());

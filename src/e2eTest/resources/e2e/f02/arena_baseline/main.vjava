@@ -1,0 +1,33 @@
+image bg_arena = "assets/images/bg/bg_arena.png"
+image hero = "assets/images/sprites/hero.png"
+image coin = "assets/images/sprites/coin.png"
+
+transform foot_pivot:
+    xpos 400.0
+    ypos 800.0
+    xanchor 0.5
+    yanchor 1.0
+    zoom 2.0
+
+label start:
+    scene bg_arena
+    show hero at foot_pivot
+    show coin:
+        xpos 1750.0
+        ypos 800.0
+        xanchor 0.5
+        yanchor 1.0
+    move hero to 450 800 duration 0.5 ease linear
+    "Phase eins."
+    move_by hero 50 0 duration 0.5 ease ease_out
+    wasd_init hero speed 200 bounds 100 100 1800 950 diagonal_norm true
+    physics_init hero gravity 980 jump_force 480 ground_y 800
+    on_collide hero coin jump goal_hit
+    "Arena bereit."
+    return
+
+label goal_hit:
+    wasd_stop hero
+    physics_stop hero
+    "Ziel erreicht."
+    return

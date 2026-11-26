@@ -18,9 +18,13 @@ public class ControlsScreen extends Screen {
 
     /** Binding category filter. */
     public enum Category {
+        /** Show all binding categories. */
         ALL,
+        /** Keyboard bindings only. */
         KEYBOARD,
+        /** Mouse bindings only. */
         MOUSE,
+        /** Gamepad bindings only. */
         GAMEPAD
     }
 
@@ -98,9 +102,11 @@ public class ControlsScreen extends Screen {
         topBar.setAlignCenterY(true);
         topBar.addChild(UiMediaSupport.createTitleText("Controls", 34.0f));
         this.allTab = UiMediaSupport.createActionButton("All", 110.0f, 38.0f, () -> setCategory(Category.ALL));
-        this.keyboardTab = UiMediaSupport.createActionButton("Keyboard", 140.0f, 38.0f, () -> setCategory(Category.KEYBOARD));
+        this.keyboardTab = UiMediaSupport.createActionButton(
+                "Keyboard", 140.0f, 38.0f, () -> setCategory(Category.KEYBOARD));
         this.mouseTab = UiMediaSupport.createActionButton("Mouse", 120.0f, 38.0f, () -> setCategory(Category.MOUSE));
-        this.gamepadTab = UiMediaSupport.createActionButton("Gamepad", 140.0f, 38.0f, () -> setCategory(Category.GAMEPAD));
+        this.gamepadTab = UiMediaSupport.createActionButton(
+                "Gamepad", 140.0f, 38.0f, () -> setCategory(Category.GAMEPAD));
         TextButton closeBtn = UiMediaSupport.createActionButton("Back", 120.0f, 38.0f, this::closeScreen);
 
         topBar.addChild(allTab);
@@ -134,12 +140,19 @@ public class ControlsScreen extends Screen {
 
     /**
      * Filters the bindings table to {@code category}.
+     *
+     * @param category target device category filter
      */
     public void setCategory(Category category) {
         this.activeCategory = category != null ? category : Category.ALL;
         rebuildTable();
     }
 
+    /**
+     * Returns the active category filter.
+     *
+     * @return active category
+     */
     public Category getActiveCategory() {
         return activeCategory;
     }
@@ -191,6 +204,11 @@ public class ControlsScreen extends Screen {
         }
     }
 
+    /**
+     * Returns the immutable list of currently visible bindings.
+     *
+     * @return visible binding entries
+     */
     public List<BindingEntry> getVisibleBindings() {
         return Collections.unmodifiableList(visibleBindings);
     }

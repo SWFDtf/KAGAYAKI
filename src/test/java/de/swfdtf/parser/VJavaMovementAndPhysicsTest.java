@@ -3,7 +3,6 @@ package de.swfdtf.parser;
 import de.swfdtf.core.ProjectDescriptor;
 import de.swfdtf.graphics.ObjectMotionController;
 import de.swfdtf.graphics.SceneController;
-import de.swfdtf.graphics.SceneGraph;
 import de.swfdtf.graphics.SpriteNode;
 import de.swfdtf.graphics.TextureManager;
 import de.swfdtf.tools.VJavaLinter;

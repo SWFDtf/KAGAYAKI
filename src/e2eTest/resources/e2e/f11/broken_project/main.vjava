@@ -1,0 +1,2 @@
+label start:
+    jump missing_target_label

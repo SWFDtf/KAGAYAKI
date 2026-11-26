@@ -125,7 +125,7 @@ public final class ProjectSearchService {
      * @param projectRoot root directory of the project (must not be {@code null})
      * @param pattern     compiled regular expression pattern (must not be {@code null} or empty)
      * @return unmodifiable list of {@link SearchMatch} sorted by file, line number, and column
-     * @throws IllegalArgumentException if {@code pattern} has an empty expression or {@code projectRoot} is not a directory
+     * @throws IllegalArgumentException if {@code pattern} has an empty expression or {@code projectRoot} is invalid
      * @throws UncheckedIOException     if filesystem traversal fails
      */
     public List<SearchMatch> searchRegex(Path projectRoot, Pattern pattern) {

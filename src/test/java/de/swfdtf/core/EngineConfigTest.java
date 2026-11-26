@@ -29,15 +29,15 @@ class EngineConfigTest {
     @Test
     void parsesStudioAndStandaloneCliArguments() {
         EngineConfig studio = EngineConfig.fromArgs(new String[]{
-                "--studio",
-                "--project", "projects/demo",
-                "--mode", "3d",
-                "--width", "1280",
-                "--height", "720",
-                "--no-vsync",
-                "--fps", "144",
-                "--smoke-test",
-                "--headless"
+            "--studio",
+            "--project", "projects/demo",
+            "--mode", "3d",
+            "--width", "1280",
+            "--height", "720",
+            "--no-vsync",
+            "--fps", "144",
+            "--smoke-test",
+            "--headless"
         });
 
         assertEquals(EngineMode.STUDIO_DUAL_WINDOW, studio.engineMode());
@@ -53,7 +53,7 @@ class EngineConfigTest {
         assertTrue(studio.headless());
 
         EngineConfig gradleStandalone = EngineConfig.fromArgs(new String[]{
-                "--standalone", "samples/my_vn"
+            "--standalone", "samples/my_vn"
         });
         assertEquals(EngineMode.STANDALONE_GAME, gradleStandalone.engineMode());
         assertEquals(Path.of("samples/my_vn"), gradleStandalone.projectDir());

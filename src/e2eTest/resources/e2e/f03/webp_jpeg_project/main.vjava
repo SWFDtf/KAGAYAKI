@@ -1,0 +1,8 @@
+image bg_photo = "assets/images/bg/photo.jpg"
+image badge = "assets/images/sprites/badge.webp"
+
+label start:
+    scene bg_photo
+    show badge at center
+    "Moderne Bildformate geladen."
+    return

@@ -84,7 +84,8 @@ class Wave1CoreFeaturesTest {
             List<String> received = new ArrayList<>();
 
             EventSubscription baseSub = bus.subscribe(BaseUiEvent.class, e -> received.add("base:" + e.source()), 5);
-            try (EventSubscription exactSub = bus.subscribe(ButtonPressedEvent.class, e -> received.add("exact:" + e.source()), 10)) {
+            try (EventSubscription exactSub = bus.subscribe(
+                    ButtonPressedEvent.class, e -> received.add("exact:" + e.source()), 10)) {
                 assertTrue(exactSub.isActive());
                 assertTrue(baseSub.isActive());
                 bus.publish(new ButtonPressedEvent("start"));

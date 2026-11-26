@@ -112,6 +112,7 @@ public final class ScriptRuntime {
             double remainingSeconds,
             List<ChoiceOption> options
     ) {
+        /** Normalizes null option list to an empty immutable list. */
         public MenuPrompt {
             options = options != null ? List.copyOf(options) : List.of();
         }
@@ -140,12 +141,38 @@ public final class ScriptRuntime {
      * statements execute.
      */
     public interface AudioBridge {
+        /**
+         * Starts playback on an audio channel.
+         *
+         * @param ch     channel name
+         * @param path   audio asset path
+         * @param loop   whether playback loops
+         * @param fadeIn fade-in duration in seconds
+         * @param vol    target volume multiplier
+         */
         void play(String ch, String path, boolean loop, double fadeIn, double vol);
 
+        /**
+         * Appends audio asset paths to a channel queue.
+         *
+         * @param ch    channel name
+         * @param paths ordered asset paths
+         */
         void queue(String ch, List<String> paths);
 
+        /**
+         * Stops playback on an audio channel.
+         *
+         * @param ch      channel name
+         * @param fadeOut fade-out duration in seconds
+         */
         void stop(String ch, double fadeOut);
 
+        /**
+         * Triggers voice playback for the next dialogue line.
+         *
+         * @param path voice audio asset path
+         */
         void voice(String path);
     }
 
@@ -169,6 +196,7 @@ public final class ScriptRuntime {
             double fadeSeconds,
             double volume
     ) {
+        /** Normalizes null queued path lists to an empty immutable list. */
         public AudioEvent {
             queuedPaths = queuedPaths != null ? List.copyOf(queuedPaths) : List.of();
         }
@@ -190,6 +218,7 @@ public final class ScriptRuntime {
             List<VJavaAst.Statement> childStatements,
             boolean isCallBoundary
     ) {
+        /** Normalizes null statement lists to empty immutable lists. */
         public StackFrame {
             statements = statements != null ? List.copyOf(statements) : List.of();
             childStatements = childStatements != null ? List.copyOf(childStatements) : List.of();
@@ -234,6 +263,7 @@ public final class ScriptRuntime {
             String activeVoicePath,
             SceneController.StageSnapshot stageSnapshot
     ) {
+        /** Normalizes null call stack and NVL line lists to empty immutable lists. */
         public ExecutionSnapshot {
             callStack = callStack != null ? List.copyOf(callStack) : List.of();
             nvlLines = nvlLines != null ? List.copyOf(nvlLines) : List.of();
@@ -428,7 +458,8 @@ public final class ScriptRuntime {
         }
         ChoiceOption chosen = options.get(optionIndex);
         if (!chosen.visible() || !chosen.enabled()) {
-            throw new IllegalStateException("Menu option " + optionIndex + " ('" + chosen.text() + "') is disabled or hidden");
+            throw new IllegalStateException(
+                    "Menu option " + optionIndex + " ('" + chosen.text() + "') is disabled or hidden");
         }
 
         VJavaAst.MenuChoice astChoice = chosen.astChoice();
@@ -445,7 +476,8 @@ public final class ScriptRuntime {
             if (hasInlineJump) {
                 List<VJavaAst.Statement> combined = new ArrayList<>(choiceBody.size() + 1);
                 combined.addAll(choiceBody);
-                combined.add(new VJavaAst.JumpStatement(inlineJump, false, astChoice.sourceFile(), astChoice.lineNumber()));
+                combined.add(new VJavaAst.JumpStatement(
+                        inlineJump, false, astChoice.sourceFile(), astChoice.lineNumber()));
                 effectiveBody = List.copyOf(combined);
             }
             pushNestedBlock(effectiveBody);
@@ -682,10 +714,12 @@ public final class ScriptRuntime {
         this.statementIndex = pos.statementIndex();
         this.callStack.clear();
         for (SaveSlotData.SavedStackFrame sf : pos.callStack()) {
-            List<VJavaAst.Statement> frameStmts = (sf.labelName() != null && projectAst.labels().containsKey(sf.labelName()))
-                    ? projectAst.labels().get(sf.labelName()).statements()
-                    : List.of();
-            this.callStack.add(new StackFrame(sf.labelName(), sf.statementIndex(), frameStmts, List.of(), sf.isCallBoundary()));
+            List<VJavaAst.Statement> frameStmts =
+                    (sf.labelName() != null && projectAst.labels().containsKey(sf.labelName()))
+                            ? projectAst.labels().get(sf.labelName()).statements()
+                            : List.of();
+            this.callStack.add(new StackFrame(
+                    sf.labelName(), sf.statementIndex(), frameStmts, List.of(), sf.isCallBoundary()));
         }
 
         if (this.currentLabel != null && projectAst.labels().containsKey(this.currentLabel)) {
@@ -720,7 +754,9 @@ public final class ScriptRuntime {
                     ? currentStatements.get(statementIndex)
                     : null;
             if (currentStmt instanceof VJavaAst.SayStatement say) {
-                String speakerId = (say.speakerId() != null && !say.speakerId().isBlank()) ? say.speakerId().trim() : pos.activeSpeakerId();
+                String speakerId = (say.speakerId() != null && !say.speakerId().isBlank())
+                        ? say.speakerId().trim()
+                        : pos.activeSpeakerId();
                 VJavaAst.CharacterDef charDef = speakerId != null ? projectAst.characters().get(speakerId) : null;
                 String speakerName = charDef != null ? interpolateText(charDef.displayName()) : pos.activeSpeakerName();
                 String speakerColor = charDef != null ? charDef.colorHex() : null;
@@ -1342,11 +1378,7 @@ public final class ScriptRuntime {
     }
 
     private String buildLineId(VJavaAst.SayStatement say) {
-        String loc = (say.sourceFile() != null && !say.sourceFile().isBlank() && say.lineNumber() > 0)
-                ? say.sourceFile() + ":" + say.lineNumber()
-                : (currentLabel + ":" + statementIndex);
-        int hash = Objects.hash(say.speakerId(), say.text());
-        return loc + ":" + Integer.toHexString(hash);
+        return VJavaLocalizationBridge.buildDialogueLineId(currentLabel, statementIndex, say);
     }
 
     private void applyTransitionEffects(String transitionExpr) {
@@ -1430,52 +1462,92 @@ public final class ScriptRuntime {
 
     // ---- Getters & Hooks ----
 
-    /** @return current interpreter status */
+    /**
+     * Returns the current interpreter status.
+     *
+     * @return current interpreter status
+     */
     public Status getStatus() {
         return status;
     }
 
-    /** @return active dialogue prompt during {@link Status#WAITING_DIALOGUE}, or {@code null} */
+    /**
+     * Returns the active dialogue prompt.
+     *
+     * @return active dialogue prompt during {@link Status#WAITING_DIALOGUE}, or {@code null}
+     */
     public DialoguePrompt getActiveDialogue() {
         return activeDialogue;
     }
 
-    /** @return active menu prompt during {@link Status#WAITING_MENU}, or {@code null} */
+    /**
+     * Returns the active menu prompt.
+     *
+     * @return active menu prompt during {@link Status#WAITING_MENU}, or {@code null}
+     */
     public MenuPrompt getActiveMenu() {
         return activeMenu;
     }
 
-    /** @return active input prompt during {@link Status#WAITING_INPUT}, or {@code null} */
+    /**
+     * Returns the active input prompt.
+     *
+     * @return active input prompt during {@link Status#WAITING_INPUT}, or {@code null}
+     */
     public InputPrompt getActiveInput() {
         return activeInput;
     }
 
-    /** @return bound mutable state store */
+    /**
+     * Returns the bound mutable state store.
+     *
+     * @return bound mutable state store
+     */
     public StateStore getStateStore() {
         return stateStore;
     }
 
-    /** @return bound cross-save persistent access */
+    /**
+     * Returns the bound cross-save persistent access.
+     *
+     * @return bound cross-save persistent access
+     */
     public PersistentAccess getPersistentAccess() {
         return persistentAccess;
     }
 
-    /** @return bound visual stage controller */
+    /**
+     * Returns the bound visual stage controller.
+     *
+     * @return bound visual stage controller
+     */
     public SceneController getSceneController() {
         return sceneController;
     }
 
-    /** @return bound engine API facade */
+    /**
+     * Returns the bound engine API facade.
+     *
+     * @return bound engine API facade
+     */
     public EngineAPI getEngineApi() {
         return engineApi;
     }
 
-    /** @return project AST executed by this runtime */
+    /**
+     * Returns the project AST executed by this runtime.
+     *
+     * @return project AST executed by this runtime
+     */
     public VJavaAst.ProjectAst getProjectAst() {
         return projectAst;
     }
 
-    /** @return immutable view of recorded audio events emitted during execution */
+    /**
+     * Returns an immutable view of recorded audio events.
+     *
+     * @return immutable view of recorded audio events emitted during execution
+     */
     public List<AudioEvent> getAudioEvents() {
         return Collections.unmodifiableList(new ArrayList<>(audioEvents));
     }
@@ -1498,7 +1570,11 @@ public final class ScriptRuntime {
         this.localizationManager = localizationManager;
     }
 
-    /** @return attached {@link LocalizationManager} or service-registered fallback, if any */
+    /**
+     * Returns the attached or service-registered {@link LocalizationManager}.
+     *
+     * @return attached {@link LocalizationManager} or service-registered fallback, if any
+     */
     public LocalizationManager getLocalizationManager() {
         return localizationManager != null ? localizationManager : engineApi.getService(LocalizationManager.class);
     }
@@ -1532,42 +1608,74 @@ public final class ScriptRuntime {
         this.checkpointListener = checkpointListener;
     }
 
-    /** @return compiled block registry, or {@code null} if {@link #compile()} has not run yet */
+    /**
+     * Returns the compiled block registry.
+     *
+     * @return compiled block registry, or {@code null} if {@link #compile()} has not run yet
+     */
     public JavaBlockCompiler.CompiledProjectBlocks getCompiledBlocks() {
         return compiledBlocks;
     }
 
-    /** @return current active label name, or {@code null} prior to {@link #start()} */
+    /**
+     * Returns the current active label name.
+     *
+     * @return current active label name, or {@code null} prior to {@link #start()}
+     */
     public String getCurrentLabel() {
         return currentLabel;
     }
 
-    /** @return current statement index within active block */
+    /**
+     * Returns the current statement index within the active block.
+     *
+     * @return current statement index within active block
+     */
     public int getStatementIndex() {
         return statementIndex;
     }
 
-    /** @return {@code true} if NVL cumulative mode is active */
+    /**
+     * Returns whether NVL cumulative mode is active.
+     *
+     * @return {@code true} if NVL cumulative mode is active
+     */
     public boolean isNvlMode() {
         return nvlMode;
     }
 
-    /** @return immutable list of accumulated NVL lines */
+    /**
+     * Returns an immutable list of accumulated NVL lines.
+     *
+     * @return immutable list of accumulated NVL lines
+     */
     public List<String> getNvlLines() {
         return List.copyOf(nvlLines);
     }
 
-    /** @return currently queued/active voice path, or {@code null} */
+    /**
+     * Returns the currently queued or active voice path.
+     *
+     * @return currently queued/active voice path, or {@code null}
+     */
     public String getActiveVoicePath() {
         return activeVoicePath;
     }
 
-    /** @return remaining timed pause duration in seconds ({@code -1.0} if click-waiting) */
+    /**
+     * Returns the remaining timed pause duration in seconds.
+     *
+     * @return remaining timed pause duration in seconds ({@code -1.0} if click-waiting)
+     */
     public double getPauseRemainingSeconds() {
         return pauseRemainingSeconds;
     }
 
-    /** @return current dialogue window action ({@code "auto"}, {@code "show"}, {@code "hide"}) */
+    /**
+     * Returns the current dialogue window action.
+     *
+     * @return current dialogue window action ({@code "auto"}, {@code "show"}, {@code "hide"})
+     */
     public String getWindowAction() {
         return windowAction;
     }

@@ -24,6 +24,12 @@ public class EndingsTreeScreen extends Screen {
 
     /**
      * Flattened tree node representation for rendering and verification.
+     *
+     * @param ending      backing ending definition
+     * @param depth       hierarchy depth in the tree
+     * @param unlocked    whether the ending is unlocked
+     * @param titleLabel  title text widget
+     * @param statusLabel status badge text widget
      */
     public record TreeNodeView(
             EndingsManager.EndingDef ending,
@@ -195,14 +201,29 @@ public class EndingsTreeScreen extends Screen {
         }
     }
 
+    /**
+     * Returns the nodeViews value.
+     *
+     * @return the resulting value
+     */
     public List<TreeNodeView> getNodeViews() {
         return Collections.unmodifiableList(nodeViews);
     }
 
+    /**
+     * Returns the completionBar value.
+     *
+     * @return the resulting value
+     */
     public Bar getCompletionBar() {
         return completionBar;
     }
 
+    /**
+     * Returns the completionLabel value.
+     *
+     * @return the resulting value
+     */
     public TextWidget getCompletionLabel() {
         return completionLabel;
     }

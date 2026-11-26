@@ -21,5 +21,9 @@ public interface VJavaExecutable {
      * @param scene      stage and sprite controller exposed as {@code scene}
      * @throws Exception if the script snippet throws any checked or unchecked exception
      */
-    void execute(StateStore state, PersistentAccess persistent, EngineAPI engine, SceneController scene) throws Exception;
+    void execute(
+            StateStore state,
+            PersistentAccess persistent,
+            EngineAPI engine,
+            SceneController scene) throws Exception;
 }

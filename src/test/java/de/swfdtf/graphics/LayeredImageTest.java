@@ -118,8 +118,10 @@ class LayeredImageTest {
         assertEquals(0.5f, layered.getGroupCurrentAlpha("face"), 1e-4f);
 
         List<LayeredImage.LayerRenderInfo> midLayers = layered.getActiveRenderLayers();
-        assertTrue(midLayers.stream().anyMatch(l -> l.assetPath().equals("assets/char/lena_neutral.png") && Math.abs(l.alpha() - 0.5f) < 1e-3f));
-        assertTrue(midLayers.stream().anyMatch(l -> l.assetPath().equals("assets/char/lena_happy.png") && Math.abs(l.alpha() - 0.5f) < 1e-3f));
+        assertTrue(midLayers.stream().anyMatch(
+                l -> l.assetPath().equals("assets/char/lena_neutral.png") && Math.abs(l.alpha() - 0.5f) < 1e-3f));
+        assertTrue(midLayers.stream().anyMatch(
+                l -> l.assetPath().equals("assets/char/lena_happy.png") && Math.abs(l.alpha() - 0.5f) < 1e-3f));
 
         // Finish at +0.10s (total 0.20s)
         layered.update(0.10);

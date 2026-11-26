@@ -191,32 +191,56 @@ public final class RenderPipeline3DStub implements IRenderPipeline {
         return new Matrix4f(viewMatrix);
     }
 
-    /** @return computed camera Z distance for the configured logical width and FOV */
+    /**
+     * Returns the computed camera Z distance.
+     *
+     * @return computed camera Z distance for the configured logical width and FOV
+     */
     public float getCameraDistanceZ() {
         return cameraDistanceZ;
     }
 
-    /** @return perspective field of view in degrees */
+    /**
+     * Returns the perspective field of view in degrees.
+     *
+     * @return perspective field of view in degrees
+     */
     public float getFovDegrees() {
         return fovDegrees;
     }
 
-    /** @return configured logical stage width */
+    /**
+     * Returns the configured logical stage width.
+     *
+     * @return configured logical stage width
+     */
     public int getLogicalWidth() {
         return logicalWidth;
     }
 
-    /** @return configured logical stage height */
+    /**
+     * Returns the configured logical stage height.
+     *
+     * @return configured logical stage height
+     */
     public int getLogicalHeight() {
         return logicalHeight;
     }
 
-    /** @return {@code true} after {@link #init(int, int)} until {@link #dispose()} */
+    /**
+     * Returns whether this 3D stub pipeline is initialized.
+     *
+     * @return {@code true} after {@link #init(int, int)} until {@link #dispose()}
+     */
     public boolean isInitialized() {
         return initialized;
     }
 
-    /** @return {@code true} once the controlled stub warning has been logged */
+    /**
+     * Returns whether the controlled stub warning has been logged.
+     *
+     * @return {@code true} once the controlled stub warning has been logged
+     */
     public boolean isWarningLogged() {
         return initWarningLogged || renderWarningLogged;
     }

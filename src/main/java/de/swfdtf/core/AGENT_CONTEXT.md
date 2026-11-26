@@ -6,7 +6,7 @@ Zentrales Laufzeit-Fundament von KAGAYAKI: Ausführungsmodi (`STUDIO_DUAL_WINDOW
 ## Abhängigkeiten zu anderen `de.swfdtf.*`-Paketen
 - `de.swfdtf.graphics` (`GlfwWindow`, `IRenderPipeline`, `RenderMode`, `RenderPipeline2D`, `RenderPipeline3DStub`, `SceneGraph`, `WindowManager`) in `EngineApplication`
 - `de.swfdtf.math` (`Rect2f`) in `EngineApplication`
-- Externe Bibliotheken: `org.lwjgl.glfw.*`, `org.lwjgl.opengl.GL11`, `org.lwjgl.system.*` (`InputManager`, `EngineApplication`); `com.google.gson.*` (`ProjectDescriptor`).
+- Externe Bibliotheken: `org.lwjgl.glfw.*`, `org.lwjgl.opengl.GL11`, `org.lwjgl.system.*` (`InputManager`, `EngineApplication`); `com.google.gson.*` (`ProjectDescriptor`, `KeybindingRemapper`).
 
 ## Enthaltene Typen
 
@@ -19,6 +19,7 @@ Zentrales Laufzeit-Fundament von KAGAYAKI: Ausführungsmodi (`STUDIO_DUAL_WINDOW
 | `EngineLogger.Level` | `enum` | Schweregrade für Log-Einträge (`DEBUG`, `INFO`, `WARN`, `ERROR`). |
 | `EngineLogger.LogEntry` | `record` | Unveränderlicher strukturierter Log-Eintrag mit Zeitstempel, Level, Kategorie, Nachricht und Einzeilen-Formatierung. |
 | `ProjectDescriptor` | `final class` | Gson-serialisierbares Projekt-Metadatenmodell für `project.vjava.json` inklusive Laden, Speichern und Standardwert-Normalisierung. |
+| `EngineVersion` | `final class` | Zentrale Versionskonstanten (`ENGINE_NAME`, `VERSION`, `VJAVA_SPEC_VERSION`) und Banner-/Header-Formatierer. |
 | `GameClock` | `final class` | Deterministische 60-Hz-Fixed-Timestep-Uhr (`FIXED_TIMESTEP = 1.0 / 60.0`) mit Frame-Delta-Clamping, Zeit-Skalierung, Pause und FPS-Messung. |
 | `InputManager` | `final class` | Zentraler GLFW-Eingabemanager für Tastatur, Modifier, Unicode-Texteingabe, Letterbox-gemappte logische Mauskoordinaten, Scroll-Deltas und Gamepads (inkl. Headless-Test-Hooks). |
 | `EngineAPI` | `final class` | Öffentliche Engine-Fassade für `@->{ ... }<<`-Java-Blöcke (`engine`), UI-Screens und Studio-Werkzeuge inklusive Properties und typisiertem Service-Locator. |

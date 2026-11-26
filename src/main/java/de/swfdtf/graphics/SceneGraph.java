@@ -156,7 +156,11 @@ public final class SceneGraph {
         }
     }
 
-    /** @return currently active {@link ScreenShake}, or {@code null} if none */
+    /**
+     * Returns the currently active {@link ScreenShake}, if any.
+     *
+     * @return currently active {@link ScreenShake}, or {@code null} if none
+     */
     public ScreenShake getScreenShake() {
         return screenShake;
     }
@@ -196,17 +200,29 @@ public final class SceneGraph {
         this.normalizedMouseY = Float.isFinite(ny) ? Math.clamp(ny, -1.0f, 1.0f) : 0.0f;
     }
 
-    /** @return clamped normalized mouse X offset in {@code [-1, 1]} */
+    /**
+     * Returns the clamped normalized mouse X offset in {@code [-1, 1]}.
+     *
+     * @return clamped normalized mouse X offset in {@code [-1, 1]}
+     */
     public float getNormalizedMouseX() {
         return normalizedMouseX;
     }
 
-    /** @return clamped normalized mouse Y offset in {@code [-1, 1]} */
+    /**
+     * Returns the clamped normalized mouse Y offset in {@code [-1, 1]}.
+     *
+     * @return clamped normalized mouse Y offset in {@code [-1, 1]}
+     */
     public float getNormalizedMouseY() {
         return normalizedMouseY;
     }
 
-    /** @return normalized mouse offset vector {@code (nx, ny)} */
+    /**
+     * Returns the normalized mouse offset vector {@code (nx, ny)}.
+     *
+     * @return normalized mouse offset vector {@code (nx, ny)}
+     */
     public Vec2f getNormalizedMouse() {
         return new Vec2f(normalizedMouseX, normalizedMouseY);
     }

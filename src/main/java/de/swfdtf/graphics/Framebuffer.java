@@ -196,27 +196,47 @@ public final class Framebuffer {
         }
     }
 
-    /** @return OpenGL texture ID attached to color attachment 0, or {@code 0} if uninitialized */
+    /**
+     * Returns the OpenGL color texture ID.
+     *
+     * @return OpenGL texture ID attached to color attachment 0, or {@code 0} if uninitialized
+     */
     public int getTextureId() {
         return textureId;
     }
 
-    /** @return native OpenGL framebuffer object ID, or {@code 0} if uninitialized */
+    /**
+     * Returns the native OpenGL framebuffer object ID.
+     *
+     * @return native OpenGL framebuffer object ID, or {@code 0} if uninitialized
+     */
     public int getFboId() {
         return fboId;
     }
 
-    /** @return framebuffer width in pixels */
+    /**
+     * Returns the framebuffer width in pixels.
+     *
+     * @return framebuffer width in pixels
+     */
     public int getWidth() {
         return width;
     }
 
-    /** @return framebuffer height in pixels */
+    /**
+     * Returns the framebuffer height in pixels.
+     *
+     * @return framebuffer height in pixels
+     */
     public int getHeight() {
         return height;
     }
 
-    /** @return {@code true} if the FBO and texture attachment are currently allocated */
+    /**
+     * Returns whether the FBO and texture attachment are initialized.
+     *
+     * @return {@code true} if the FBO and texture attachment are currently allocated
+     */
     public boolean isInitialized() {
         return fboId != 0 && textureId != 0;
     }

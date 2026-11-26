@@ -36,7 +36,11 @@ public class Hotbar extends UiNode {
         setPreferredSize(area.width(), area.height());
     }
 
-    /** @return configured hotbar area */
+    /**
+     * Returns configured hotbar area.
+     *
+     * @return configured hotbar area
+     */
     public Rect2f getArea() {
         return area;
     }
@@ -53,7 +57,11 @@ public class Hotbar extends UiNode {
         return this;
     }
 
-    /** @return maximum range value */
+    /**
+     * Returns maximum range value.
+     *
+     * @return maximum range value
+     */
     public float getMaxValue() {
         return maxValue;
     }
@@ -69,7 +77,11 @@ public class Hotbar extends UiNode {
         return this;
     }
 
-    /** @return current supplied value clamped to {@code [0, maxValue]} */
+    /**
+     * Returns current supplied value clamped to {@code [0, maxValue]}.
+     *
+     * @return current supplied value clamped to {@code [0, maxValue]}
+     */
     public float getCurrentValue() {
         if (valueSupplier == null) {
             return 0.0f;
@@ -81,7 +93,11 @@ public class Hotbar extends UiNode {
         return Math.clamp(val, 0.0f, maxValue);
     }
 
-    /** @return normalized fill fraction in {@code [0, 1]} */
+    /**
+     * Returns normalized fill fraction in {@code [0, 1]}.
+     *
+     * @return normalized fill fraction in {@code [0, 1]}
+     */
     public float getNormalizedRatio() {
         return Math.clamp(getCurrentValue() / maxValue, 0.0f, 1.0f);
     }
@@ -99,7 +115,11 @@ public class Hotbar extends UiNode {
         return this;
     }
 
-    /** @return fill color hex string */
+    /**
+     * Returns fill color hex string.
+     *
+     * @return fill color hex string
+     */
     public String getFillColorHex() {
         return fillColorHex;
     }
@@ -117,7 +137,11 @@ public class Hotbar extends UiNode {
         return this;
     }
 
-    /** @return track color hex string */
+    /**
+     * Returns track color hex string.
+     *
+     * @return track color hex string
+     */
     public String getTrackColorHex() {
         return trackColorHex;
     }

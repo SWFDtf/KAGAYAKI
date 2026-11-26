@@ -223,37 +223,65 @@ public final class Texture {
         disposed = true;
     }
 
-    /** @return native OpenGL texture ID, or {@code 0} after {@link #dispose()} */
+    /**
+     * Returns the native OpenGL texture ID.
+     *
+     * @return native OpenGL texture ID, or {@code 0} after {@link #dispose()}
+     */
     public int getTextureId() {
         return textureId;
     }
 
-    /** @return texture width in pixels */
+    /**
+     * Returns the texture width in pixels.
+     *
+     * @return texture width in pixels
+     */
     public int getWidth() {
         return width;
     }
 
-    /** @return texture height in pixels */
+    /**
+     * Returns the texture height in pixels.
+     *
+     * @return texture height in pixels
+     */
     public int getHeight() {
         return height;
     }
 
-    /** @return diagnostic texture name or asset key */
+    /**
+     * Returns the diagnostic texture name or asset key.
+     *
+     * @return diagnostic texture name or asset key
+     */
     public String getName() {
         return name;
     }
 
-    /** @return {@code true} if the texture stores premultiplied RGBA texels */
+    /**
+     * Returns whether the texture stores premultiplied RGBA texels.
+     *
+     * @return {@code true} if the texture stores premultiplied RGBA texels
+     */
     public boolean isPremultiplied() {
         return premultiplied;
     }
 
-    /** @return {@code true} if this texture is a generated missing-asset fallback */
+    /**
+     * Returns whether this texture is a generated missing-asset fallback.
+     *
+     * @return {@code true} if this texture is a generated missing-asset fallback
+     */
     public boolean isFallback() {
         return fallback;
     }
 
-    /** @return {@code true} if {@link #dispose()} has been called */
+    /**
+     * Returns whether {@link #dispose()} has been called.
+     *
+     * @return {@code true} if {@link #dispose()} has been called
+     */
     public boolean isDisposed() {
         return disposed;
     }

@@ -19,11 +19,17 @@ public final class GamepadNavigationRouter {
      * Discrete UI navigation events emitted by {@link GamepadNavigationRouter}.
      */
     public enum NavigationDirection {
+        /** Navigate upward. */
         UP,
+        /** Navigate downward. */
         DOWN,
+        /** Navigate left. */
         LEFT,
+        /** Navigate right. */
         RIGHT,
+        /** Confirm selection. */
         CONFIRM,
+        /** Cancel or go back. */
         CANCEL
     }
 
@@ -43,10 +49,10 @@ public final class GamepadNavigationRouter {
     public static final double DEFAULT_REPEAT_INTERVAL_SECONDS = 0.12;
 
     private static final NavigationDirection[] DIRECTIONAL_INPUTS = {
-            NavigationDirection.UP,
-            NavigationDirection.DOWN,
-            NavigationDirection.LEFT,
-            NavigationDirection.RIGHT
+        NavigationDirection.UP,
+        NavigationDirection.DOWN,
+        NavigationDirection.LEFT,
+        NavigationDirection.RIGHT
     };
 
     private float deadzone;

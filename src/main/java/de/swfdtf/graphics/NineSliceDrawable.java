@@ -367,42 +367,74 @@ public final class NineSliceDrawable {
         }
     }
 
-    /** @return backing {@link Texture}, or {@code null} if constructed from a raw OpenGL texture ID */
+    /**
+     * Returns the backing {@link Texture}.
+     *
+     * @return backing {@link Texture}, or {@code null} if constructed from a raw OpenGL texture ID
+     */
     public Texture getTexture() {
         return texture;
     }
 
-    /** @return active OpenGL texture ID */
+    /**
+     * Returns the active OpenGL texture ID.
+     *
+     * @return active OpenGL texture ID
+     */
     public int getTextureId() {
         return texture != null ? texture.getTextureId() : textureId;
     }
 
-    /** @return source texture width in texels */
+    /**
+     * Returns the source texture width in texels.
+     *
+     * @return source texture width in texels
+     */
     public float getTexWidth() {
         return texWidth;
     }
 
-    /** @return source texture height in texels */
+    /**
+     * Returns the source texture height in texels.
+     *
+     * @return source texture height in texels
+     */
     public float getTexHeight() {
         return texHeight;
     }
 
-    /** @return left border inset in texels */
+    /**
+     * Returns the left border inset in texels.
+     *
+     * @return left border inset in texels
+     */
     public float getLeft() {
         return left;
     }
 
-    /** @return top border inset in texels */
+    /**
+     * Returns the top border inset in texels.
+     *
+     * @return top border inset in texels
+     */
     public float getTop() {
         return top;
     }
 
-    /** @return right border inset in texels */
+    /**
+     * Returns the right border inset in texels.
+     *
+     * @return right border inset in texels
+     */
     public float getRight() {
         return right;
     }
 
-    /** @return bottom border inset in texels */
+    /**
+     * Returns the bottom border inset in texels.
+     *
+     * @return bottom border inset in texels
+     */
     public float getBottom() {
         return bottom;
     }

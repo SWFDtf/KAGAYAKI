@@ -1,9 +1,5 @@
 package de.swfdtf.state;
 
-import de.swfdtf.parser.ProjectScanner;
-import de.swfdtf.parser.ScriptRuntime;
-import de.swfdtf.parser.VJavaAst;
-import de.swfdtf.parser.VJavaParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -12,61 +8,66 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class LocalizationManagerTest {
 
     @Test
-    void switchesLanguagesLiveWithoutRestartAndResolvesDialogueAndUi(@TempDir Path tempProject) throws IOException {
-        Files.writeString(tempProject.resolve("project.vjava.json"), """
-                {
-                  "title": "Test VN",
-                  "defaultLanguage": "deutsch"
-                }
-                """, StandardCharsets.UTF_8);
+    void translationEntryAndBlockValidateInputsAndEnforceImmutability() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new TranslationEntry("line_1", "Hallo", "Hello", "lena", -1));
 
-        Files.writeString(tempProject.resolve("main.vjava"), """
-                define lena = Character("Lena")
+        TranslationEntry entry = new TranslationEntry("line_1", "Hallo", "Hello", "lena", 0);
+        assertEquals("line_1", entry.id());
+        assertEquals(0, entry.lineNumber());
 
-                label start:
-                    lena "Guten Morgen!"
-                    "Ein ruhiger Tag."
-                    return
-                """, StandardCharsets.UTF_8);
+        assertThrows(NullPointerException.class,
+                () -> new LocalizationManager.TranslationBlock(null, "line_1", List.of(entry)));
 
-        Files.writeString(tempProject.resolve("tl_en.vjava"), """
-                translate english line_intro_01:
-                    # lena "Guten Morgen!"
-                    lena "Good morning!"
+        List<TranslationEntry> mutable = new ArrayList<>();
+        mutable.add(entry);
+        LocalizationManager.TranslationBlock block =
+                new LocalizationManager.TranslationBlock("english", "line_1", mutable);
+        mutable.clear();
+        assertEquals(1, block.entries().size());
+        assertThrows(UnsupportedOperationException.class, () -> block.entries().add(entry));
 
-                translate english line_narrator_02:
-                    "A quiet day."
+        LocalizationManager.TranslationBlock emptyBlock =
+                new LocalizationManager.TranslationBlock("english", null, null);
+        assertEquals(List.of(), emptyBlock.entries());
+    }
 
-                translate english strings:
-                    old "Neues Spiel"
-                    new "New Game"
-                    old "Einstellungen"
-                    new "Settings"
-                """, StandardCharsets.UTF_8);
+    @Test
+    void switchesLanguagesLiveWithoutRestartAndResolvesDialogueAndUi() {
+        List<LocalizationManager.TranslationBlock> blocks = List.of(
+                new LocalizationManager.TranslationBlock("english", "line_intro_01", List.of(
+                        new TranslationEntry("line_intro_01", "Guten Morgen!", "Good morning!", "lena", 3)
+                )),
+                new LocalizationManager.TranslationBlock("english", "line_narrator_02", List.of(
+                        new TranslationEntry("line_narrator_02", "Ein ruhiger Tag.", "A quiet day.", null, 6)
+                )),
+                new LocalizationManager.TranslationBlock("english", "strings", List.of(
+                        new TranslationEntry("strings", "Neues Spiel", "New Game", null, 10),
+                        new TranslationEntry("strings", "Einstellungen", "Settings", null, 12),
+                        new TranslationEntry("strings", "Beenden", "", null, 14)
+                )),
+                new LocalizationManager.TranslationBlock("japanese", "strings", List.of(
+                        new TranslationEntry("strings", "Neues Spiel", "ニューゲーム", null, 2)
+                ))
+        );
 
-        Files.writeString(tempProject.resolve("tl_jp.vjava"), """
-                translate japanese strings:
-                    old "Neues Spiel"
-                    new "ニューゲーム"
-                """, StandardCharsets.UTF_8);
-
-        VJavaAst.ProjectAst project = ProjectScanner.scan(tempProject);
         LocalizationManager loc = new LocalizationManager();
-        loc.indexProject(project);
+        loc.indexTranslationBlocks("deutsch", blocks);
 
         assertEquals("deutsch", loc.getCurrentLanguage());
+        assertEquals("deutsch", loc.getDefaultLanguage());
         assertEquals(Set.of("deutsch", "english", "japanese"), loc.getAvailableLanguages());
 
         // Fast fallback for default language
@@ -82,12 +83,13 @@ class LocalizationManagerTest {
         assertEquals("english", loc.getCurrentLanguage());
         assertEquals(List.of("english"), languageEvents);
 
-        // Lookup by originalText and by TranslateBlock id
+        // Lookup by originalText and by TranslationBlock id ("strings" must NOT enter projectById)
         assertEquals("Good morning!", loc.translateDialogue("unknown_id", "Guten Morgen!"));
         assertEquals("A quiet day.", loc.translateDialogue("line_narrator_02", "Ein ruhiger Tag."));
         assertEquals("New Game", loc.translateUi("Neues Spiel", "Neues Spiel"));
         assertEquals("Settings", loc.translateUi("ui.settings", "Einstellungen"));
-        // Untranslated fallback
+        assertEquals("FALLBACK", loc.translateUi("strings", "FALLBACK"));
+        // Untranslated empty entry falls back cleanly
         assertEquals("Beenden", loc.translateUi("ui.quit", "Beenden"));
 
         // Manual override takes precedence
@@ -106,6 +108,109 @@ class LocalizationManagerTest {
         loc.setLanguage("deutsch");
         assertEquals(2, languageEvents.size());
         assertEquals("Guten Morgen!", loc.translateDialogue("line_intro_01", "Guten Morgen!"));
+    }
+
+    @Test
+    void indexTranslationsPreservesMultiEntryBlockSemanticsAndExplicitLanguageSelection() {
+        LocalizationManager loc = new LocalizationManager("deutsch");
+        loc.setLanguage("french");
+
+        Map<String, List<TranslationEntry>> byLang = new LinkedHashMap<>();
+        byLang.put("english", List.of(
+                new TranslationEntry("shared_id", "Erste Zeile", "First line", "lena", 10),
+                new TranslationEntry("shared_id", "Zweite Zeile", "Second line", "lena", 11),
+                new TranslationEntry("single_id", "Einzelzeile", "Single line", "lena", 15),
+                new TranslationEntry("strings", "Start", "Play", null, 20)
+        ));
+        byLang.put("french", List.of());
+
+        loc.indexTranslations("spanish", byLang);
+
+        // Explicit language remains active even when projectDefaultLanguage changes
+        assertEquals("spanish", loc.getDefaultLanguage());
+        assertEquals("french", loc.getCurrentLanguage());
+        assertEquals(Set.of("spanish", "english", "french"), loc.getAvailableLanguages());
+
+        loc.setLanguage("english");
+        // Multi-entry block uses putIfAbsent for blockId -> keeps first entry for shared_id
+        assertEquals("First line", loc.translateDialogue("shared_id", "UNRELATED"));
+        assertEquals("Second line", loc.translateDialogue("other_id", "Zweite Zeile"));
+        // Single-entry block resolves by id and sourceText
+        assertEquals("Single line", loc.translateDialogue("single_id", "Einzelzeile"));
+        // "strings" entries resolve by sourceText, never by id "strings"
+        assertEquals("Play", loc.translateUi("Start", "Start"));
+        assertEquals("UNCHANGED", loc.translateUi("strings", "UNCHANGED"));
+    }
+
+    @Test
+    void registerTranslationWithEntryRegistersAndRemovesOverridesCorrectly() {
+        LocalizationManager loc = new LocalizationManager("deutsch");
+        loc.setLanguage("english");
+
+        loc.registerTranslation("english",
+                new TranslationEntry("dlg_42", "Alter Text", "New Text", "lena", 42));
+        assertEquals("New Text", loc.translateDialogue("dlg_42", "UNRELATED"));
+        assertEquals("New Text", loc.translateDialogue("other", "Alter Text"));
+
+        // "strings" id must not pollute ID lookup, only sourceText
+        loc.registerTranslation("english",
+                new TranslationEntry("strings", "Optionen", "Options", null, 50));
+        assertEquals("Options", loc.translateUi("Optionen", "Optionen"));
+        assertEquals("FALLBACK", loc.translateUi("strings", "FALLBACK"));
+
+        // Null translatedText removes both ID and sourceText overrides
+        loc.registerTranslation("english",
+                new TranslationEntry("dlg_42", "Alter Text", null, "lena", 42));
+        assertEquals("UNRELATED", loc.translateDialogue("dlg_42", "UNRELATED"));
+        assertEquals("Alter Text", loc.translateDialogue("other", "Alter Text"));
+    }
+
+    @Test
+    void avoidsCaseDuplicatesAndPhantomLanguagesAndTrimsDialogueLineIds() {
+        LocalizationManager loc = new LocalizationManager("EN");
+        loc.indexTranslationBlocks("en", List.of(
+                new LocalizationManager.TranslationBlock("en", "strings", List.of(
+                        new TranslationEntry("strings", "Hallo", "Hello", null, 1)
+                ))
+        ));
+        assertEquals(1, loc.getAvailableLanguages().size());
+        assertEquals(Set.of("EN"), loc.getAvailableLanguages());
+
+        // Removing or passing empty stub on unseen languages must not pollute available languages
+        loc.registerTranslation("fr", new TranslationEntry("id1", "Bonjour", null, null, 1));
+        loc.registerTranslation("es", "id2", null);
+        loc.registerTranslation("it", new TranslationEntry("id3", "Ciao", "", null, 1));
+        assertEquals(Set.of("EN"), loc.getAvailableLanguages());
+
+        // Registering a real override adds the language; removing the last override prunes it
+        loc.registerTranslation("fr", new TranslationEntry("  dlg_fr  ", "Hallo", "Bonjour", "lena", 5));
+        assertEquals(Set.of("EN", "fr"), loc.getAvailableLanguages());
+
+        loc.setLanguage("fr");
+        assertEquals("Bonjour", loc.translateDialogue("  dlg_fr  ", "UNRELATED"));
+
+        loc.registerTranslation("fr", new TranslationEntry("dlg_fr", "Hallo", null, "lena", 5));
+        assertEquals(Set.of("EN"), loc.getAvailableLanguages());
+        assertEquals("Hallo", loc.translateDialogue("dlg_fr", "Hallo"));
+
+        // Empty translatedText on an existing manual override removes it and falls back cleanly
+        loc.setLanguage("en");
+        loc.registerTranslation("en", new TranslationEntry("dlg_en", "Welt", "World", null, 7));
+        assertEquals("World", loc.translateDialogue("dlg_en", "Welt"));
+        loc.registerTranslation("en", new TranslationEntry("dlg_en", "Welt", "", null, 7));
+        assertEquals("Welt", loc.translateDialogue("dlg_en", "Welt"));
+
+        // Indexed language survives pruning of a removed manual override
+        loc.indexTranslationBlocks("deutsch", List.of(
+                new LocalizationManager.TranslationBlock("japanese", "dlg_jp", List.of(
+                        new TranslationEntry("dlg_jp", "Hallo", "こんにちは", null, 3)
+                ))
+        ));
+        loc.registerTranslation("japanese", "extra_key", "追加");
+        loc.registerTranslation("japanese", "extra_key", "");
+        assertEquals(Set.of("deutsch", "japanese"), loc.getAvailableLanguages());
+        loc.setLanguage("japanese");
+        assertEquals("こんにちは", loc.translateDialogue("  dlg_jp  ", "UNRELATED"));
     }
 
     @Test
@@ -132,106 +237,12 @@ class LocalizationManagerTest {
         assertEquals("assets/images/title.png", loc.resolveLocalizedAsset(projectRoot, "assets/images/title.png"));
 
         loc.setLanguage("en");
-        assertEquals("tl/en/assets/images/title.png", loc.resolveLocalizedAsset(projectRoot, "assets/images/title.png"));
+        assertEquals("tl/en/assets/images/title.png",
+                loc.resolveLocalizedAsset(projectRoot, "assets/images/title.png"));
         assertEquals("tl/en/images/logo.png", loc.resolveLocalizedAsset(projectRoot, "assets/images/logo.png"));
         assertEquals("assets/images/bg.png", loc.resolveLocalizedAsset(projectRoot, "assets/images/bg.png"));
 
         loc.setLanguage("fr");
         assertEquals("assets/images/title.png", loc.resolveLocalizedAsset(projectRoot, "assets/images/title.png"));
-    }
-
-    @Test
-    void extractsValidTranslationTemplateThatReparsesCleanlyAndIntegratesWithRuntime(@TempDir Path projectRoot) throws IOException {
-        Files.writeString(projectRoot.resolve("script.vjava"), """
-                define lena = Character("Lena", color="#58a6ff")
-                default mut = 10
-
-                screen title_menu():
-                    frame:
-                        vbox:
-                            text "KAGAYAKI Demo" size 36
-                            textbutton "Spiel starten" action Return() tooltip "Abenteuer beginnen"
-                            label "Version 1.0"
-
-                label start:
-                    lena "Willkommen in \\"Kagayaki\\"!"
-                    if mut >= 5:
-                        "Eine sternenklare Nacht."
-                    menu "Wohin gehen?":
-                        "In die Bibliothek" -> jump library
-                        "Auf das Dach":
-                            lena "Hier oben weht ein frischer Wind."
-                    return
-
-                label library:
-                    return
-                """, StandardCharsets.UTF_8);
-
-        VJavaAst.ProjectAst project = ProjectScanner.scan(projectRoot);
-        String template = LocalizationManager.extractTranslationTemplate(project, "english");
-
-        assertNotNull(template);
-        assertFalse(template.isBlank());
-        assertTrue(template.contains("translate english "));
-        assertTrue(template.contains("translate english strings:"));
-
-        // Re-parse generated .vjava template cleanly using VJavaParser
-        VJavaAst.ScriptFileAst parsedTemplate = VJavaParser.parse(Path.of("tl/english/generated.vjava"), template);
-
-        // 3 dialogue blocks (lena line 1, narrator in if, lena inside menu choice) + 1 strings block
-        assertEquals(4, parsedTemplate.translations().size());
-
-        VJavaAst.TranslateBlock dlg1 = parsedTemplate.translations().get(0);
-        assertEquals("english", dlg1.language());
-        assertEquals(1, dlg1.entries().size());
-        assertEquals("lena", dlg1.entries().get(0).speaker());
-        assertEquals("Willkommen in \"Kagayaki\"!", dlg1.entries().get(0).originalText());
-
-        VJavaAst.TranslateBlock dlg2 = parsedTemplate.translations().get(1);
-        assertEquals(1, dlg2.entries().size());
-        assertEquals("Eine sternenklare Nacht.", dlg2.entries().get(0).originalText());
-
-        VJavaAst.TranslateBlock dlg3 = parsedTemplate.translations().get(2);
-        assertEquals("lena", dlg3.entries().get(0).speaker());
-        assertEquals("Hier oben weht ein frischer Wind.", dlg3.entries().get(0).originalText());
-
-        VJavaAst.TranslateBlock stringsBlock = parsedTemplate.translations().get(3);
-        assertEquals("strings", stringsBlock.id());
-        List<String> extractedOriginals = stringsBlock.entries().stream()
-                .map(VJavaAst.TranslateEntry::originalText)
-                .toList();
-        assertTrue(extractedOriginals.contains("Wohin gehen?"));
-        assertTrue(extractedOriginals.contains("In die Bibliothek"));
-        assertTrue(extractedOriginals.contains("Auf das Dach"));
-        assertTrue(extractedOriginals.contains("KAGAYAKI Demo"));
-        assertTrue(extractedOriginals.contains("Spiel starten"));
-        assertTrue(extractedOriginals.contains("Abenteuer beginnen"));
-        assertTrue(extractedOriginals.contains("Version 1.0"));
-
-        // Verify filled-in generated template matches ScriptRuntime DialoguePrompt.lineId() end-to-end
-        String filledTemplate = template
-                .replace(
-                        "# lena \"Willkommen in \\\"Kagayaki\\\"!\"\n    lena \"\"",
-                        "# lena \"Willkommen in \\\"Kagayaki\\\"!\"\n    lena \"Welcome to \\\"Kagayaki\\\"!\""
-                )
-                .replace("old \"Spiel starten\"\n    new \"\"", "old \"Spiel starten\"\n    new \"Start Game\"");
-
-        Files.createDirectories(projectRoot.resolve("tl/english"));
-        Files.writeString(projectRoot.resolve("tl/english/script_tl.vjava"), filledTemplate, StandardCharsets.UTF_8);
-
-        VJavaAst.ProjectAst localizedProject = ProjectScanner.scan(projectRoot);
-        LocalizationManager loc = new LocalizationManager();
-        loc.indexProject(localizedProject);
-        loc.setLanguage("english");
-
-        ScriptRuntime runtime = new ScriptRuntime(localizedProject);
-        runtime.start();
-        ScriptRuntime.DialoguePrompt prompt = runtime.getActiveDialogue();
-        assertNotNull(prompt);
-        assertEquals("Welcome to \"Kagayaki\"!", loc.translateDialogue(prompt.lineId(), prompt.rawText()));
-        assertEquals("Welcome to \"Kagayaki\"!", loc.translateDialogue(prompt.lineId(), "UNRELATED_FALLBACK"));
-        assertEquals("Start Game", loc.translateUi("btn.start", "Spiel starten"));
-        // Untranslated template entry gracefully falls back to original text
-        assertEquals("Version 1.0", loc.translateUi("lbl.version", "Version 1.0"));
     }
 }

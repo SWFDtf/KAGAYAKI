@@ -56,17 +56,29 @@ public class Slider extends UiNode {
         return this;
     }
 
-    /** @return current slider value */
+    /**
+     * Returns current slider value.
+     *
+     * @return current slider value
+     */
     public float getValue() {
         return value;
     }
 
-    /** @return minimum bound */
+    /**
+     * Returns minimum bound.
+     *
+     * @return minimum bound
+     */
     public float getMin() {
         return min;
     }
 
-    /** @return maximum bound */
+    /**
+     * Returns maximum bound.
+     *
+     * @return maximum bound
+     */
     public float getMax() {
         return max;
     }
@@ -83,12 +95,20 @@ public class Slider extends UiNode {
         return this;
     }
 
-    /** @return configured step size ({@code 0} when continuous) */
+    /**
+     * Returns configured step size ({@code 0} when continuous).
+     *
+     * @return configured step size ({@code 0} when continuous)
+     */
     public float getStep() {
         return step;
     }
 
-    /** @return {@code true} while actively dragged by the pointer */
+    /**
+     * Returns {@code true} while actively dragged by the pointer.
+     *
+     * @return {@code true} while actively dragged by the pointer
+     */
     public boolean isDragging() {
         return dragging;
     }
@@ -104,7 +124,11 @@ public class Slider extends UiNode {
         return this;
     }
 
-    /** @return normalized slider position in {@code [0, 1]} */
+    /**
+     * Returns normalized slider position in {@code [0, 1]}.
+     *
+     * @return normalized slider position in {@code [0, 1]}
+     */
     public float getNormalizedValue() {
         float span = max - min;
         if (span <= 0.0f) {

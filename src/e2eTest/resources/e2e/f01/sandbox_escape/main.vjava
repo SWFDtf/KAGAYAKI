@@ -1,0 +1,4 @@
+label start:
+    $ exploit = "".getClass()
+    "Darf niemals erreicht werden: [exploit]"
+    return

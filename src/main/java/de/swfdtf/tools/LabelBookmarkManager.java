@@ -194,7 +194,11 @@ public final class LabelBookmarkManager {
         try {
             Files.writeString(tempFile, json, StandardCharsets.UTF_8);
             try {
-                Files.move(tempFile, normalizedTarget, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                Files.move(
+                        tempFile,
+                        normalizedTarget,
+                        StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException ignored) {
                 Files.move(tempFile, normalizedTarget, StandardCopyOption.REPLACE_EXISTING);
             }
@@ -240,7 +244,8 @@ public final class LabelBookmarkManager {
             }
             return manager;
         } catch (JsonParseException | IllegalArgumentException | NullPointerException e) {
-            throw new IOException("Failed to parse bookmark store JSON from " + normalizedSource + ": " + e.getMessage(), e);
+            throw new IOException(
+                    "Failed to parse bookmark store JSON from " + normalizedSource + ": " + e.getMessage(), e);
         }
     }
 

@@ -71,7 +71,11 @@ public class TextInput extends UiNode {
         return this;
     }
 
-    /** @return current input text */
+    /**
+     * Returns current input text.
+     *
+     * @return current input text
+     */
     public String getText() {
         return text;
     }
@@ -87,7 +91,11 @@ public class TextInput extends UiNode {
         return this;
     }
 
-    /** @return placeholder text */
+    /**
+     * Returns placeholder text.
+     *
+     * @return placeholder text
+     */
     public String getPlaceholder() {
         return placeholder;
     }
@@ -104,7 +112,11 @@ public class TextInput extends UiNode {
         return this;
     }
 
-    /** @return allowed-character whitelist, or {@code null} */
+    /**
+     * Returns allowed-character whitelist, or {@code null}.
+     *
+     * @return allowed-character whitelist, or {@code null}
+     */
     public String getAllowChars() {
         return allowChars;
     }
@@ -123,7 +135,11 @@ public class TextInput extends UiNode {
         return this;
     }
 
-    /** @return maximum allowed length ({@code 0} when unlimited) */
+    /**
+     * Returns maximum allowed length ({@code 0} when unlimited).
+     *
+     * @return maximum allowed length ({@code 0} when unlimited)
+     */
     public int getMaxLength() {
         return maxLength;
     }
@@ -163,7 +179,11 @@ public class TextInput extends UiNode {
         return this;
     }
 
-    /** @return font size in logical pixels */
+    /**
+     * Returns font size in logical pixels.
+     *
+     * @return font size in logical pixels
+     */
     public float getFontSize() {
         return fontSize;
     }

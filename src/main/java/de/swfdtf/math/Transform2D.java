@@ -55,7 +55,11 @@ public final class Transform2D {
         this.parallaxY = src.parallaxY;
     }
 
-    /** @return X position in logical pixels (used when {@code xalign} is {@code NaN}) */
+    /**
+     * Returns the X position in logical pixels.
+     *
+     * @return X position in logical pixels (used when {@code xalign} is {@code NaN})
+     */
     public float getXpos() {
         return xpos;
     }
@@ -71,7 +75,11 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return Y position in logical pixels (used when {@code yalign} is {@code NaN}) */
+    /**
+     * Returns the Y position in logical pixels.
+     *
+     * @return Y position in logical pixels (used when {@code yalign} is {@code NaN})
+     */
     public float getYpos() {
         return ypos;
     }
@@ -87,7 +95,11 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return normalized horizontal anchor ({@code 0}=left, {@code 0.5}=center, {@code 1}=right) */
+    /**
+     * Returns the normalized horizontal anchor.
+     *
+     * @return normalized horizontal anchor ({@code 0}=left, {@code 0.5}=center, {@code 1}=right)
+     */
     public float getXanchor() {
         return xanchor;
     }
@@ -103,7 +115,11 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return normalized vertical anchor ({@code 0}=top, {@code 0.5}=center, {@code 1}=bottom) */
+    /**
+     * Returns the normalized vertical anchor.
+     *
+     * @return normalized vertical anchor ({@code 0}=top, {@code 0.5}=center, {@code 1}=bottom)
+     */
     public float getYanchor() {
         return yanchor;
     }
@@ -119,7 +135,11 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return horizontal alignment in {@code [0, 1]} or {@link Float#NaN} if unset */
+    /**
+     * Returns the horizontal alignment.
+     *
+     * @return horizontal alignment in {@code [0, 1]} or {@link Float#NaN} if unset
+     */
     public float getXalign() {
         return xalign;
     }
@@ -136,12 +156,20 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return {@code true} if {@code xalign} is set (not {@code NaN}) */
+    /**
+     * Returns whether horizontal alignment is set.
+     *
+     * @return {@code true} if {@code xalign} is set (not {@code NaN})
+     */
     public boolean hasXalign() {
         return !Float.isNaN(xalign);
     }
 
-    /** @return vertical alignment in {@code [0, 1]} or {@link Float#NaN} if unset */
+    /**
+     * Returns the vertical alignment.
+     *
+     * @return vertical alignment in {@code [0, 1]} or {@link Float#NaN} if unset
+     */
     public float getYalign() {
         return yalign;
     }
@@ -158,12 +186,20 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return {@code true} if {@code yalign} is set (not {@code NaN}) */
+    /**
+     * Returns whether vertical alignment is set.
+     *
+     * @return {@code true} if {@code yalign} is set (not {@code NaN})
+     */
     public boolean hasYalign() {
         return !Float.isNaN(yalign);
     }
 
-    /** @return uniform zoom factor */
+    /**
+     * Returns the uniform zoom factor.
+     *
+     * @return uniform zoom factor
+     */
     public float getZoom() {
         return zoom;
     }
@@ -179,7 +215,11 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return horizontal zoom multiplier (negative values mirror horizontally) */
+    /**
+     * Returns the horizontal zoom multiplier.
+     *
+     * @return horizontal zoom multiplier (negative values mirror horizontally)
+     */
     public float getXzoom() {
         return xzoom;
     }
@@ -195,7 +235,11 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return vertical zoom multiplier (negative values mirror vertically) */
+    /**
+     * Returns the vertical zoom multiplier.
+     *
+     * @return vertical zoom multiplier (negative values mirror vertically)
+     */
     public float getYzoom() {
         return yzoom;
     }
@@ -211,7 +255,11 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return rotation angle in degrees */
+    /**
+     * Returns the rotation angle in degrees.
+     *
+     * @return rotation angle in degrees
+     */
     public float getRotate() {
         return rotate;
     }
@@ -227,7 +275,11 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return opacity alpha multiplier */
+    /**
+     * Returns the opacity alpha multiplier.
+     *
+     * @return opacity alpha multiplier
+     */
     public float getAlpha() {
         return alpha;
     }
@@ -243,7 +295,11 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return blur radius in pixels */
+    /**
+     * Returns the blur radius in pixels.
+     *
+     * @return blur radius in pixels
+     */
     public float getBlur() {
         return blur;
     }
@@ -259,7 +315,11 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return non-null 4x4 color transformation matrix */
+    /**
+     * Returns the 4x4 color transformation matrix.
+     *
+     * @return non-null 4x4 color transformation matrix
+     */
     public ColorMatrix4f getColorMatrix() {
         return colorMatrix;
     }
@@ -275,7 +335,11 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return optional crop rectangle in source pixel coordinates, or {@code null} if uncropped */
+    /**
+     * Returns the optional crop rectangle.
+     *
+     * @return optional crop rectangle in source pixel coordinates, or {@code null} if uncropped
+     */
     public Rect2f getCrop() {
         return crop;
     }
@@ -291,7 +355,11 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return horizontal mouse-parallax factor */
+    /**
+     * Returns the horizontal mouse-parallax factor.
+     *
+     * @return horizontal mouse-parallax factor
+     */
     public float getParallaxX() {
         return parallaxX;
     }
@@ -307,7 +375,11 @@ public final class Transform2D {
         return this;
     }
 
-    /** @return vertical mouse-parallax factor */
+    /**
+     * Returns the vertical mouse-parallax factor.
+     *
+     * @return vertical mouse-parallax factor
+     */
     public float getParallaxY() {
         return parallaxY;
     }

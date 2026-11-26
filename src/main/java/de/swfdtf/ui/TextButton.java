@@ -57,7 +57,11 @@ public class TextButton extends UiNode {
         return this;
     }
 
-    /** @return button label text */
+    /**
+     * Returns button label text.
+     *
+     * @return button label text
+     */
     public String getText() {
         return text;
     }
@@ -73,7 +77,11 @@ public class TextButton extends UiNode {
         return this;
     }
 
-    /** @return configured click callback */
+    /**
+     * Returns configured click callback.
+     *
+     * @return configured click callback
+     */
     public Runnable getOnClick() {
         return onClick;
     }
@@ -89,7 +97,11 @@ public class TextButton extends UiNode {
         return this;
     }
 
-    /** @return {@code true} if selected */
+    /**
+     * Returns {@code true} if selected.
+     *
+     * @return {@code true} if selected
+     */
     public boolean isSelected() {
         return selected;
     }
@@ -108,7 +120,11 @@ public class TextButton extends UiNode {
         return this;
     }
 
-    /** @return label font size */
+    /**
+     * Returns label font size.
+     *
+     * @return label font size
+     */
     public float getFontSize() {
         return fontSize;
     }

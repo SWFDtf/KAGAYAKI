@@ -7,7 +7,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -151,7 +150,11 @@ public final class FontManager implements AutoCloseable {
         return this;
     }
 
-    /** @return configured asset root directory, or {@code null} */
+    /**
+     * Returns the configured asset root directory.
+     *
+     * @return configured asset root directory, or {@code null}
+     */
     public Path getAssetRoot() {
         return assetRoot;
     }
@@ -169,7 +172,11 @@ public final class FontManager implements AutoCloseable {
         return this;
     }
 
-    /** @return configured default font path, or {@code null} */
+    /**
+     * Returns the configured default font path.
+     *
+     * @return configured default font path, or {@code null}
+     */
     public String getDefaultFontPath() {
         return defaultFontPath;
     }
@@ -187,7 +194,11 @@ public final class FontManager implements AutoCloseable {
         return this;
     }
 
-    /** @return configured dyslexia-friendly font path, or {@code null} */
+    /**
+     * Returns the configured dyslexia-friendly font path.
+     *
+     * @return configured dyslexia-friendly font path, or {@code null}
+     */
     public String getDyslexiaFontPath() {
         return dyslexiaFontPath;
     }
@@ -204,7 +215,11 @@ public final class FontManager implements AutoCloseable {
         return this;
     }
 
-    /** @return {@code true} if OS system font fallback is enabled */
+    /**
+     * Returns whether OS system font fallback is enabled.
+     *
+     * @return {@code true} if OS system font fallback is enabled
+     */
     public boolean isSystemFontFallbackEnabled() {
         return systemFontFallbackEnabled;
     }
@@ -221,7 +236,11 @@ public final class FontManager implements AutoCloseable {
         return this;
     }
 
-    /** @return {@code true} if dyslexia-friendly typography mode is active */
+    /**
+     * Returns whether dyslexia-friendly typography mode is active.
+     *
+     * @return {@code true} if dyslexia-friendly typography mode is active
+     */
     public boolean isDyslexiaFriendlyMode() {
         return dyslexiaFriendlyMode;
     }
@@ -241,7 +260,11 @@ public final class FontManager implements AutoCloseable {
         return this;
     }
 
-    /** @return active global text scale multiplier (default {@code 1.0f}) */
+    /**
+     * Returns the active global text scale multiplier.
+     *
+     * @return active global text scale multiplier (default {@code 1.0f})
+     */
     public float getGlobalTextScale() {
         return globalTextScale;
     }
@@ -333,12 +356,20 @@ public final class FontManager implements AutoCloseable {
         dispose();
     }
 
-    /** @return {@code true} if {@link #dispose()} has been called */
+    /**
+     * Returns whether this font manager has been disposed.
+     *
+     * @return {@code true} if {@link #dispose()} has been called
+     */
     public boolean isDisposed() {
         return disposed;
     }
 
-    /** @return number of cached {@link FontAtlas} entries currently held */
+    /**
+     * Returns the number of cached {@link FontAtlas} entries.
+     *
+     * @return number of cached {@link FontAtlas} entries currently held
+     */
     public int getCachedAtlasCount() {
         return atlasCache.size();
     }

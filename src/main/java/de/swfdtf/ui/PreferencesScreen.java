@@ -16,7 +16,7 @@ import java.util.Objects;
 
 /**
  * Built-in Dark-Slate Preferences screen ({@code Z = 400}, modal) exposing live audio sliders,
- * text speed & auto-advance sliders, display/skip toggles, Dialogue Mode & Render Mode controls,
+ * text speed &amp; auto-advance sliders, display/skip toggles, Dialogue Mode &amp; Render Mode controls,
  * live {@link LocalizationManager} language switching, accessibility controls, and disk persistence.
  */
 public class PreferencesScreen extends Screen {
@@ -108,8 +108,8 @@ public class PreferencesScreen extends Screen {
         });
         this.textSpeedSlider = addSliderRow(leftCol, "Text Speed (CPS)", prefs.getTextSpeedCps(), 0.0f, 120.0f,
                 prefs::setTextSpeedCps);
-        this.autoDelaySlider = addSliderRow(leftCol, "Auto-Advance Delay (s)", prefs.getAutoForwardDelaySeconds(), 0.5f, 10.0f,
-                prefs::setAutoForwardDelaySeconds);
+        this.autoDelaySlider = addSliderRow(leftCol, "Auto-Advance Delay (s)",
+                prefs.getAutoForwardDelaySeconds(), 0.5f, 10.0f, prefs::setAutoForwardDelaySeconds);
 
         VBox rightCol = new VBox();
         rightCol.setSpacing(12.0f);
@@ -127,7 +127,8 @@ public class PreferencesScreen extends Screen {
             prefs.setSkipAfterChoices(!prefs.isSkipAfterChoices());
             refreshLabels();
         });
-        this.dialogueModeButton = addSelectorRow(rightCol, "Dialogue Mode", prefs.getDialogueMode(), this::cycleDialogueMode);
+        this.dialogueModeButton = addSelectorRow(
+                rightCol, "Dialogue Mode", prefs.getDialogueMode(), this::cycleDialogueMode);
         this.languageButton = addSelectorRow(rightCol, "Language", prefs.getLanguage(), this::cycleLanguage);
         this.renderModeButton = addSelectorRow(rightCol, "Render Mode", prefs.getRenderMode(), this::toggleRenderMode);
         this.selfVoicingToggle = addToggleRow(rightCol, "Self-Voicing [V]", prefs.isSelfVoicing(), () -> {
@@ -139,14 +140,15 @@ public class PreferencesScreen extends Screen {
             }
             refreshLabels();
         });
-        this.dyslexiaFontToggle = addToggleRow(rightCol, "High-Contrast Dyslexia Font", prefs.isHighContrastDyslexiaFont(), () -> {
-            boolean next = !prefs.isHighContrastDyslexiaFont();
-            prefs.setHighContrastDyslexiaFont(next);
-            if (fontManager != null) {
-                fontManager.setDyslexiaFriendlyMode(next);
-            }
-            refreshLabels();
-        });
+        this.dyslexiaFontToggle = addToggleRow(
+                rightCol, "High-Contrast Dyslexia Font", prefs.isHighContrastDyslexiaFont(), () -> {
+                    boolean next = !prefs.isHighContrastDyslexiaFont();
+                    prefs.setHighContrastDyslexiaFont(next);
+                    if (fontManager != null) {
+                        fontManager.setDyslexiaFriendlyMode(next);
+                    }
+                    refreshLabels();
+                });
         this.uiScaleSlider = addSliderRow(rightCol, "UI Text Scale", prefs.getUiTextScale(), 0.75f, 1.75f, val -> {
             prefs.setUiTextScale(val);
             if (fontManager != null) {
@@ -336,24 +338,156 @@ public class PreferencesScreen extends Screen {
         }
     }
 
+    /**
+     * Sets the fontManager value.
+     *
+     * @param fontManager the fontManager argument
+     */
     public void setFontManager(FontManager fontManager) {
         this.fontManager = fontManager;
     }
 
-    public Slider getMasterSlider() { return masterSlider; }
-    public Slider getMusicSlider() { return musicSlider; }
-    public Slider getSfxSlider() { return sfxSlider; }
-    public Slider getVoiceSlider() { return voiceSlider; }
-    public Slider getAmbientSlider() { return ambientSlider; }
-    public Slider getTextSpeedSlider() { return textSpeedSlider; }
-    public Slider getAutoDelaySlider() { return autoDelaySlider; }
-    public Slider getUiScaleSlider() { return uiScaleSlider; }
-    public TextButton getFullscreenToggle() { return fullscreenToggle; }
-    public TextButton getSkipUnreadToggle() { return skipUnreadToggle; }
-    public TextButton getSkipAfterChoicesToggle() { return skipAfterChoicesToggle; }
-    public TextButton getDialogueModeButton() { return dialogueModeButton; }
-    public TextButton getLanguageButton() { return languageButton; }
-    public TextButton getRenderModeButton() { return renderModeButton; }
-    public TextButton getSelfVoicingToggle() { return selfVoicingToggle; }
-    public TextButton getDyslexiaFontToggle() { return dyslexiaFontToggle; }
+    /**
+     * Returns the masterSlider value.
+     *
+     * @return the resulting value
+     */
+    public Slider getMasterSlider() {
+        return masterSlider;
+    }
+
+    /**
+     * Returns the musicSlider value.
+     *
+     * @return the resulting value
+     */
+    public Slider getMusicSlider() {
+        return musicSlider;
+    }
+
+    /**
+     * Returns the sfxSlider value.
+     *
+     * @return the resulting value
+     */
+    public Slider getSfxSlider() {
+        return sfxSlider;
+    }
+
+    /**
+     * Returns the voiceSlider value.
+     *
+     * @return the resulting value
+     */
+    public Slider getVoiceSlider() {
+        return voiceSlider;
+    }
+
+    /**
+     * Returns the ambientSlider value.
+     *
+     * @return the resulting value
+     */
+    public Slider getAmbientSlider() {
+        return ambientSlider;
+    }
+
+    /**
+     * Returns the textSpeedSlider value.
+     *
+     * @return the resulting value
+     */
+    public Slider getTextSpeedSlider() {
+        return textSpeedSlider;
+    }
+
+    /**
+     * Returns the autoDelaySlider value.
+     *
+     * @return the resulting value
+     */
+    public Slider getAutoDelaySlider() {
+        return autoDelaySlider;
+    }
+
+    /**
+     * Returns the uiScaleSlider value.
+     *
+     * @return the resulting value
+     */
+    public Slider getUiScaleSlider() {
+        return uiScaleSlider;
+    }
+
+    /**
+     * Returns the fullscreenToggle value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getFullscreenToggle() {
+        return fullscreenToggle;
+    }
+
+    /**
+     * Returns the skipUnreadToggle value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getSkipUnreadToggle() {
+        return skipUnreadToggle;
+    }
+
+    /**
+     * Returns the skipAfterChoicesToggle value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getSkipAfterChoicesToggle() {
+        return skipAfterChoicesToggle;
+    }
+
+    /**
+     * Returns the dialogueModeButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getDialogueModeButton() {
+        return dialogueModeButton;
+    }
+
+    /**
+     * Returns the languageButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getLanguageButton() {
+        return languageButton;
+    }
+
+    /**
+     * Returns the renderModeButton value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getRenderModeButton() {
+        return renderModeButton;
+    }
+
+    /**
+     * Returns the selfVoicingToggle value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getSelfVoicingToggle() {
+        return selfVoicingToggle;
+    }
+
+    /**
+     * Returns the dyslexiaFontToggle value.
+     *
+     * @return the resulting value
+     */
+    public TextButton getDyslexiaFontToggle() {
+        return dyslexiaFontToggle;
+    }
 }

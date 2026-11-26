@@ -32,6 +32,10 @@ public final class AnimationEngine {
 
     private final Map<String, ActiveAnimation> activeAnimations = new LinkedHashMap<>();
 
+    /** Creates a new {@code AnimationEngine} with no active animations. */
+    public AnimationEngine() {
+    }
+
     /**
      * Starts and registers an {@link ATLTransform} bound to {@code node} under identifier {@code id}.
      * If an animation with the same {@code id} is already active, it is replaced.

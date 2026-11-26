@@ -1,0 +1,38 @@
+define aria = Character("Aria", color="#58a6ff")
+
+:: Kode für VN: Benutzerdefinierte Inventar-Klassen @->{
+    public static class InventarItem {
+        public final String name;
+        public final int anzahl;
+
+        public InventarItem(String name, int anzahl) {
+            this.name = name;
+            this.anzahl = anzahl;
+        }
+    }
+
+    public static class SpezialGegenstand extends InventarItem {
+        public final String seltenheit;
+
+        public SpezialGegenstand(String name, int anzahl, String seltenheit) {
+            super(name, anzahl);
+            this.seltenheit = seltenheit;
+        }
+    }
+}<<
+
+image bg_room = "assets/images/bg/bg_room.png"
+
+label start:
+    scene bg_room
+    $ kapitel = 1
+    :: Inventar setzen @->{
+        state.set("aktives_item", new SpezialGegenstand("Sternenkompass", 1, "Relikt"));
+    }<<
+    aria "Erster Dialog vor der Sperre."
+    $ kapitel = 2
+    aria "Zweiter Dialog vor der Sperre."
+    block_rollback
+    $ kapitel = 3
+    aria "Dritter Dialog nach block_rollback."
+    return

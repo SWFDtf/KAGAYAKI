@@ -1,0 +1,9 @@
+define narrator = Character("Packager", color="#58a6ff")
+image bg_pack = "assets/images/bg/bg_pack.png"
+
+label start:
+    scene bg_pack
+    play music "assets/audio/tone.wav"
+    narrator "Verpacktes Projekt läuft."
+    stop music
+    return

@@ -49,6 +49,8 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- 
 | `WeatherOverlayController` | `final class` | Dynamische Wetter-Presets (`CLEAR`, `RAIN`, `SNOW`, `FOG`, `EMBERS`) mit Windvektor, sanftem Intensitätsübergang, Nebel-Tint (`ColorMatrix4f`) und optionaler `ParticleSystem`-Synchronisation. |
 | `ColorBlindnessFilter` | `final class` | Barrierefreiheits-Farbmatrix-Generator (`NONE`, `PROTANOPIA`, `DEUTERANOPIA`, `TRITANOPIA`, `HIGH_CONTRAST`, `GRAYSCALE`) mit Intensitätsmischung `0..1`. |
 | `CameraDirectorPresets` | `final class` | Kinematische Kamera-Presets (`ESTABLISHING`, `CLOSE_UP`, `DRAMATIC_TILT`, `PAN_LEFT_TO_RIGHT`, `ZOOM_PULSE`) mit flüssiger Interpolation zu `CameraState` und `Transform2D`. |
+| `ObjectMotionController` | `final class` | Interaktive Bewegungs-, WASD-, 2D-Physik- und AABB-Kollisionssteuerung (`MotionInput`) auf aktiven `SceneController`-Sprites. |
+| `ObjectMotionController.MotionInput` | `record` | Unveränderlicher Bewegungs- und Sprung-Eingabevektor (`up`, `down`, `left`, `right`, `jumpPressed`) für `ObjectMotionController.update`. |
 | `ScreenshotCaptureService` | `final class` | Schreibt RGBA8-Framebuffer-Snapshots ohne `java.awt` über `TextureManager.writePng` als PNGs inklusive Dateinamen-Bereinigung und Listing. |
 | `CinematicLetterboxController` | `final class` | Animiert Kinobalken (`Rect2f` oben/unten) im logischen `1920x1080`-Koordinatenraum. |
 

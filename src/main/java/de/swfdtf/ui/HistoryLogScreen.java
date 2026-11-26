@@ -45,11 +45,50 @@ public class HistoryLogScreen extends Screen {
             this.jumpBackButton = jumpBackButton;
         }
 
-        public HistoryLog.HistoryEntry getEntry() { return entry; }
-        public TextWidget getSpeakerLabel() { return speakerLabel; }
-        public TextWidget getTextLabel() { return textLabel; }
-        public TextButton getReplayVoiceButton() { return replayVoiceButton; }
-        public TextButton getJumpBackButton() { return jumpBackButton; }
+        /**
+         * Returns the entry value.
+         *
+         * @return the resulting value
+         */
+        public HistoryLog.HistoryEntry getEntry() {
+            return entry;
+        }
+
+        /**
+         * Returns the speakerLabel value.
+         *
+         * @return the resulting value
+         */
+        public TextWidget getSpeakerLabel() {
+            return speakerLabel;
+        }
+
+        /**
+         * Returns the textLabel value.
+         *
+         * @return the resulting value
+         */
+        public TextWidget getTextLabel() {
+            return textLabel;
+        }
+
+        /**
+         * Returns the replayVoiceButton value.
+         *
+         * @return the resulting value
+         */
+        public TextButton getReplayVoiceButton() {
+            return replayVoiceButton;
+        }
+
+        /**
+         * Returns the jumpBackButton value.
+         *
+         * @return the resulting value
+         */
+        public TextButton getJumpBackButton() {
+            return jumpBackButton;
+        }
     }
 
     private final ScriptSession session;
@@ -72,6 +111,10 @@ public class HistoryLogScreen extends Screen {
 
     /**
      * Creates a {@code HistoryLogScreen} with an optional explicit {@link AudioEngine}.
+     *
+     * @param session       active script session
+     * @param screenManager UI screen manager
+     * @param audioEngine   explicit audio engine (nullable)
      */
     public HistoryLogScreen(ScriptSession session, ScreenManager screenManager, AudioEngine audioEngine) {
         super(SCREEN_NAME, SceneLayer.Z_MODAL, true);
@@ -184,6 +227,8 @@ public class HistoryLogScreen extends Screen {
 
     /**
      * Replays a voice clip via {@link AudioEngine#voice(String)}.
+     *
+     * @param voicePath path to the voice audio file
      */
     public void replayVoice(String voicePath) {
         if (voicePath == null || voicePath.isBlank()) {
@@ -221,14 +266,29 @@ public class HistoryLogScreen extends Screen {
         }
     }
 
+    /**
+     * Sets the audioEngine value.
+     *
+     * @param audioEngine the audioEngine argument
+     */
     public void setAudioEngine(AudioEngine audioEngine) {
         this.explicitAudioEngine = audioEngine;
     }
 
+    /**
+     * Returns the rowViews value.
+     *
+     * @return the resulting value
+     */
     public List<HistoryRowView> getRowViews() {
         return Collections.unmodifiableList(rowViews);
     }
 
+    /**
+     * Returns the viewport value.
+     *
+     * @return the resulting value
+     */
     public Viewport getViewport() {
         return viewport;
     }

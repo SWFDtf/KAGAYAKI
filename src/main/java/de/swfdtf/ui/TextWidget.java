@@ -60,7 +60,11 @@ public class TextWidget extends UiNode {
         return this;
     }
 
-    /** @return raw text string */
+    /**
+     * Returns raw text string.
+     *
+     * @return raw text string
+     */
     public String getText() {
         return text;
     }
@@ -79,7 +83,11 @@ public class TextWidget extends UiNode {
         return this;
     }
 
-    /** @return base font size in logical pixels */
+    /**
+     * Returns base font size in logical pixels.
+     *
+     * @return base font size in logical pixels
+     */
     public float getFontSize() {
         return fontSize;
     }
@@ -98,7 +106,11 @@ public class TextWidget extends UiNode {
         return this;
     }
 
-    /** @return line spacing multiplier */
+    /**
+     * Returns line spacing multiplier.
+     *
+     * @return line spacing multiplier
+     */
     public float getLineSpacing() {
         return lineSpacing;
     }
@@ -115,7 +127,11 @@ public class TextWidget extends UiNode {
         return this;
     }
 
-    /** @return foreground hex color */
+    /**
+     * Returns foreground hex color.
+     *
+     * @return foreground hex color
+     */
     public String getColorHex() {
         return colorHex;
     }
@@ -134,7 +150,11 @@ public class TextWidget extends UiNode {
         return this;
     }
 
-    /** @return {@code true} if drop shadow is enabled */
+    /**
+     * Returns {@code true} if drop shadow is enabled.
+     *
+     * @return {@code true} if drop shadow is enabled
+     */
     public boolean isDropShadow() {
         return dropShadow;
     }
@@ -155,7 +175,11 @@ public class TextWidget extends UiNode {
         return this;
     }
 
-    /** @return configured typewriter CPS ({@code 0} when disabled) */
+    /**
+     * Returns configured typewriter CPS ({@code 0} when disabled).
+     *
+     * @return configured typewriter CPS ({@code 0} when disabled)
+     */
     public float getTypewriterCps() {
         return typewriterCps;
     }
@@ -172,7 +196,11 @@ public class TextWidget extends UiNode {
         return this;
     }
 
-    /** @return active {@link StyledTextLayout.TypewriterController}, or {@code null} if disabled */
+    /**
+     * Returns active {@link StyledTextLayout.TypewriterController}, or {@code null} if disabled.
+     *
+     * @return active {@link StyledTextLayout.TypewriterController}, or {@code null} if disabled
+     */
     public StyledTextLayout.TypewriterController getTypewriter() {
         return typewriter;
     }

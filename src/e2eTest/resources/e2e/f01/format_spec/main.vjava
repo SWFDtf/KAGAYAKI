@@ -1,0 +1,9 @@
+define narrator = Character(None)
+default gold = 1234.5
+default ratio = 0.256
+
+label start:
+    narrator "Plain: [gold:.2f]"
+    narrator "Grouped: [gold:,.2f]"
+    narrator "Percent: [ratio:.1%]"
+    return

@@ -6,6 +6,7 @@ import de.swfdtf.core.EngineLogger;
 import de.swfdtf.parser.ProjectScanner;
 import de.swfdtf.parser.ScriptRuntime;
 import de.swfdtf.parser.VJavaAst;
+import de.swfdtf.parser.VJavaLocalizationBridge;
 import de.swfdtf.state.LocalizationManager;
 import de.swfdtf.state.PreferencesState;
 import org.junit.jupiter.api.Test;
@@ -70,7 +71,7 @@ class AudioEngineAndLipSyncTest {
         prefs.setVoiceVolume(1.0f);
 
         LocalizationManager loc = new LocalizationManager("deutsch");
-        loc.indexProject(project);
+        VJavaLocalizationBridge.indexProject(loc, project);
 
         try (AudioEngine engine = new AudioEngine(projectRoot, prefs, loc, new EngineLogger(), true)) {
             engine.init();

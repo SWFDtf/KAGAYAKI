@@ -33,7 +33,11 @@ public class Hotspot extends UiNode {
         setFocusable(true);
     }
 
-    /** @return configured hotspot area rectangle */
+    /**
+     * Returns configured hotspot area rectangle.
+     *
+     * @return configured hotspot area rectangle
+     */
     public Rect2f getArea() {
         return area;
     }
@@ -61,7 +65,11 @@ public class Hotspot extends UiNode {
         return this;
     }
 
-    /** @return configured click callback */
+    /**
+     * Returns configured click callback.
+     *
+     * @return configured click callback
+     */
     public Runnable getOnClick() {
         return onClick;
     }
@@ -77,7 +85,11 @@ public class Hotspot extends UiNode {
         return this;
     }
 
-    /** @return hover highlight hex color, or {@code null} */
+    /**
+     * Returns hover highlight hex color, or {@code null}.
+     *
+     * @return hover highlight hex color, or {@code null}
+     */
     public String getHoveredColorHex() {
         return hoveredColorHex;
     }

@@ -49,7 +49,7 @@ public final class StudioWindowController implements StudioBridge {
 
     /** Active top-level Studio view in Window A. */
     public enum StudioView {
-        /** Project Hub / Main Menu showing engine & project versions, New Project, and Recent Projects. */
+        /** Project Hub / Main Menu showing engine &amp; project versions, New Project, and Recent Projects. */
         MAIN_MENU,
         /** Full 3-column Studio IDE workspace with Explorer, Linter, Live Variables, and Console. */
         WORKSPACE
@@ -76,7 +76,8 @@ public final class StudioWindowController implements StudioBridge {
 
     private Path activeProjectRoot;
     private StudioView activeView = StudioView.MAIN_MENU;
-    private ProjectTemplateGenerator.TemplateType selectedTemplateType = ProjectTemplateGenerator.TemplateType.FULL_DEMO;
+    private ProjectTemplateGenerator.TemplateType selectedTemplateType =
+            ProjectTemplateGenerator.TemplateType.FULL_DEMO;
     private final StudioWorkspaceState workspaceState = StudioWorkspaceState.defaults();
 
     private VJavaAst.ProjectAst lastScannedAst;
@@ -100,6 +101,7 @@ public final class StudioWindowController implements StudioBridge {
     private double refreshTimer = 0.0;
     private boolean disposed = false;
 
+    /** Creates a new {@code StudioWindowController} instance. */
     public StudioWindowController() {
     }
 
@@ -369,8 +371,13 @@ public final class StudioWindowController implements StudioBridge {
     }
 
     /**
-     * Generates a playable starter template in {@code targetDir} using {@link ProjectTemplateGenerator.TemplateType#FULL_DEMO}
-     * and refreshes diagnostics.
+     * Generates a playable starter template in {@code targetDir} using
+     * {@link ProjectTemplateGenerator.TemplateType#FULL_DEMO} and refreshes diagnostics.
+     *
+     * @param targetDir  destination directory for the new project
+     * @param title      project display title
+     * @param renderMode render backend mode ({@code "2D"} or {@code "3D"})
+     * @return normalized path to the generated project root
      */
     public Path generateStarterProject(Path targetDir, String title, String renderMode) {
         return createNewProject(targetDir, title, renderMode, ProjectTemplateGenerator.TemplateType.FULL_DEMO, false);
@@ -499,6 +506,8 @@ public final class StudioWindowController implements StudioBridge {
 
     /**
      * Scans the active project directory and executes {@link VJavaLinter}.
+     *
+     * @return latest lint report
      */
     public VJavaLinter.LintReport runLint() {
         refreshProjectAndLint();
@@ -508,6 +517,9 @@ public final class StudioWindowController implements StudioBridge {
     /**
      * Switches the owning {@link EngineApplication} between {@link RenderMode#MODE_2D}
      * and {@link RenderMode#MODE_3D} (activating the controlled 3D stub warning).
+     *
+     * @param targetMode desired render mode
+     * @return active render mode after switching
      */
     public RenderMode switchRenderMode(RenderMode targetMode) {
         EngineApplication app = api.getService(EngineApplication.class);
@@ -531,11 +543,16 @@ public final class StudioWindowController implements StudioBridge {
 
     /**
      * Exports the active project into a standalone Game-only bundle in {@code outputDir}.
+     *
+     * @param outputDir             target standalone distribution directory
+     * @param optionalStandaloneJar optional prebuilt standalone JAR to bundle (nullable)
+     * @return standalone build result metadata
      */
     public StandaloneBuilder.BuildResult exportStandalone(Path outputDir, Path optionalStandaloneJar) {
         Path projectRoot = getActiveProjectRoot();
         try {
-            StandaloneBuilder.BuildResult result = StandaloneBuilder.build(projectRoot, outputDir, optionalStandaloneJar);
+            StandaloneBuilder.BuildResult result =
+                    StandaloneBuilder.build(projectRoot, outputDir, optionalStandaloneJar);
             this.lastExportResult = result;
             api.getLogger().info("Studio", "Exported standalone bundle to " + result.outputDir()
                     + " (" + result.packagedEntries() + " entries in .vpak)");
@@ -559,6 +576,7 @@ public final class StudioWindowController implements StudioBridge {
         refreshInspectorTextViews();
     }
 
+    /** Refreshes the inspector text widgets from current AST, lint, and runtime state. */
     public void refreshInspectors() {
         refreshInspectorTextViews();
     }
@@ -685,12 +703,20 @@ public final class StudioWindowController implements StudioBridge {
         }
     }
 
-    /** @return currently active top-level Studio view ({@link StudioView#MAIN_MENU} or {@link StudioView#WORKSPACE}) */
+    /**
+     * Returns the currently active top-level Studio view.
+     *
+     * @return currently active top-level Studio view ({@link StudioView#MAIN_MENU} or {@link StudioView#WORKSPACE})
+     */
     public StudioView getActiveView() {
         return activeView;
     }
 
-    /** @return currently selected scaffolding template preset */
+    /**
+     * Returns the currently selected scaffolding template preset.
+     *
+     * @return currently selected scaffolding template preset
+     */
     public ProjectTemplateGenerator.TemplateType getSelectedTemplateType() {
         return selectedTemplateType;
     }
@@ -707,12 +733,20 @@ public final class StudioWindowController implements StudioBridge {
         }
     }
 
-    /** @return formatted engine and {@code .vjava} specification version banner */
+    /**
+     * Returns the formatted engine and DSL version banner.
+     *
+     * @return formatted engine and {@code .vjava} specification version banner
+     */
     public String getEngineVersionBanner() {
         return EngineVersion.formatBanner();
     }
 
-    /** @return active project semantic version string */
+    /**
+     * Returns the active project semantic version string.
+     *
+     * @return active project semantic version string
+     */
     public String getActiveProjectVersion() {
         ProjectDescriptor desc = api != null ? api.getProjectDescriptor() : null;
         return (desc != null && desc.getVersion() != null && !desc.getVersion().isBlank())
@@ -720,7 +754,11 @@ public final class StudioWindowController implements StudioBridge {
                 : EngineVersion.VERSION;
     }
 
-    /** @return active Studio project root directory */
+    /**
+     * Returns the active Studio project root directory.
+     *
+     * @return active Studio project root directory
+     */
     public Path getActiveProjectRoot() {
         if (activeProjectRoot != null) {
             return activeProjectRoot;
@@ -728,39 +766,83 @@ public final class StudioWindowController implements StudioBridge {
         return api.getConfig().projectDir().toAbsolutePath().normalize();
     }
 
-    /** @return unmodifiable list of recently opened or created project paths */
+    /**
+     * Returns an unmodifiable list of recently opened or created project paths.
+     *
+     * @return unmodifiable list of recently opened or created project paths
+     */
     public List<String> getRecentProjects() {
         return workspaceState.getRecentProjectPaths();
     }
 
+    /**
+     * Returns the most recently scanned project AST.
+     *
+     * @return latest {@link VJavaAst.ProjectAst}, or {@code null} if not yet scanned
+     */
     public VJavaAst.ProjectAst getLastScannedAst() {
         return lastScannedAst;
     }
 
+    /**
+     * Returns the most recent project lint report.
+     *
+     * @return latest {@link VJavaLinter.LintReport}, or {@code null} if not yet linted
+     */
     public VJavaLinter.LintReport getLastLintReport() {
         return lastLintReport;
     }
 
+    /**
+     * Returns the most recent standalone export build result.
+     *
+     * @return latest {@link StandaloneBuilder.BuildResult}, or {@code null} if not yet exported
+     */
     public StandaloneBuilder.BuildResult getLastExportResult() {
         return lastExportResult;
     }
 
+    /**
+     * Returns the native GLFW handle of Studio Window A.
+     *
+     * @return native Studio window handle, or {@code 0L} when headless
+     */
     public long getStudioWindowHandle() {
         return studioWindowHandle;
     }
 
+    /**
+     * Returns the native GLFW handle of Game Window B.
+     *
+     * @return native Game window handle, or {@code 0L} when headless
+     */
     public long getGameWindowHandle() {
         return gameWindowHandle;
     }
 
+    /**
+     * Returns whether an OpenGL context is ready for Studio rendering.
+     *
+     * @return {@code true} if OpenGL rendering is enabled for the Studio window
+     */
     public boolean isGlReady() {
         return glReady;
     }
 
+    /**
+     * Returns whether this controller has been disposed.
+     *
+     * @return {@code true} if {@link #dispose()} has been called
+     */
     public boolean isDisposed() {
         return disposed;
     }
 
+    /**
+     * Returns the Studio Window A screen manager.
+     *
+     * @return Studio {@link ScreenManager}, or {@code null} before {@link #init}
+     */
     public ScreenManager getStudioScreenManager() {
         return studioScreenManager;
     }

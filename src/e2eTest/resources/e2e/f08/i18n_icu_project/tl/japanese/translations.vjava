@@ -1,0 +1,11 @@
+translate japanese line_01:
+    # lena "Willkommen, [spieler_name]! Du hast {b}[star_count]{/b} Sterne."
+    lena "ようこそ、[spieler_name]！星は{b}[star_count]{/b}個です。"
+
+translate japanese line_02:
+    # lena "{star_count, plural, one {# Stern gefunden.} other {# Sterne gefunden.}}"
+    lena "{star_count, plural, other {星を#個見つけました。}}"
+
+translate japanese line_03:
+    # lena "{speaker_gender, select, female {Sie ist bereit.} male {Er ist bereit.} other {Bereit.}}"
+    lena "{speaker_gender, select, female {彼女の準備ができました。} male {彼の準備ができました。} other {準備完了です。}}"
