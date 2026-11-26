@@ -5,10 +5,13 @@ import de.swfdtf.parser.VJavaAst.AtlStep;
 import de.swfdtf.parser.VJavaAst.AttributeEntry;
 import de.swfdtf.parser.VJavaAst.BlockRollbackStatement;
 import de.swfdtf.parser.VJavaAst.CallStatement;
+import de.swfdtf.parser.VJavaAst.CameraFollowStatement;
 import de.swfdtf.parser.VJavaAst.CharacterDef;
+import de.swfdtf.parser.VJavaAst.CollisionMaskStatement;
 import de.swfdtf.parser.VJavaAst.ConditionalLayerEntry;
 import de.swfdtf.parser.VJavaAst.GroupLayerEntry;
 import de.swfdtf.parser.VJavaAst.HideStatement;
+import de.swfdtf.parser.VJavaAst.HitboxStatement;
 import de.swfdtf.parser.VJavaAst.IfBranch;
 import de.swfdtf.parser.VJavaAst.IfStatement;
 import de.swfdtf.parser.VJavaAst.ImageDef;
@@ -19,30 +22,40 @@ import de.swfdtf.parser.VJavaAst.JumpStatement;
 import de.swfdtf.parser.VJavaAst.LabelNode;
 import de.swfdtf.parser.VJavaAst.LayeredEntry;
 import de.swfdtf.parser.VJavaAst.LayeredImageDef;
+import de.swfdtf.parser.VJavaAst.MatchCase;
+import de.swfdtf.parser.VJavaAst.MatchStatement;
 import de.swfdtf.parser.VJavaAst.MenuChoice;
 import de.swfdtf.parser.VJavaAst.MenuStatement;
+import de.swfdtf.parser.VJavaAst.MovePathStatement;
 import de.swfdtf.parser.VJavaAst.MoveStatement;
 import de.swfdtf.parser.VJavaAst.NvlStatement;
 import de.swfdtf.parser.VJavaAst.OnCollideStatement;
+import de.swfdtf.parser.VJavaAst.OnOverlapStatement;
+import de.swfdtf.parser.VJavaAst.ParallelStatement;
 import de.swfdtf.parser.VJavaAst.PauseStatement;
 import de.swfdtf.parser.VJavaAst.PhysicsInitStatement;
 import de.swfdtf.parser.VJavaAst.PhysicsStopStatement;
 import de.swfdtf.parser.VJavaAst.PlayStatement;
 import de.swfdtf.parser.VJavaAst.QueueStatement;
 import de.swfdtf.parser.VJavaAst.ReturnStatement;
+import de.swfdtf.parser.VJavaAst.RotateStatement;
 import de.swfdtf.parser.VJavaAst.SayStatement;
+import de.swfdtf.parser.VJavaAst.ScaleStatement;
 import de.swfdtf.parser.VJavaAst.SceneStatement;
 import de.swfdtf.parser.VJavaAst.ScreenDef;
 import de.swfdtf.parser.VJavaAst.ScreenItem;
 import de.swfdtf.parser.VJavaAst.ScriptFileAst;
 import de.swfdtf.parser.VJavaAst.SetVarStatement;
 import de.swfdtf.parser.VJavaAst.ShowStatement;
+import de.swfdtf.parser.VJavaAst.SolidPlatformStatement;
 import de.swfdtf.parser.VJavaAst.Statement;
 import de.swfdtf.parser.VJavaAst.StopStatement;
 import de.swfdtf.parser.VJavaAst.TransformDef;
 import de.swfdtf.parser.VJavaAst.TranslateBlock;
 import de.swfdtf.parser.VJavaAst.TranslateEntry;
+import de.swfdtf.parser.VJavaAst.TriggerZoneStatement;
 import de.swfdtf.parser.VJavaAst.VoiceStatement;
+import de.swfdtf.parser.VJavaAst.WaitMoveStatement;
 import de.swfdtf.parser.VJavaAst.WasdInitStatement;
 import de.swfdtf.parser.VJavaAst.WasdStopStatement;
 import de.swfdtf.parser.VJavaAst.WindowStatement;
@@ -1012,11 +1025,24 @@ public final class VJavaParser {
                     case "input" -> statements.add(parseInputStatement(curr));
                     case "move" -> statements.add(parseMoveStatement(curr, false));
                     case "move_by" -> statements.add(parseMoveStatement(curr, true));
+                    case "move_path" -> statements.add(parseMovePathStatement(curr));
+                    case "rotate" -> statements.add(parseRotateStatement(curr));
+                    case "scale" -> statements.add(parseScaleStatement(curr));
+                    case "collision_mask" -> statements.add(parseCollisionMaskStatement(curr));
+                    case "hitbox" -> statements.add(parseHitboxStatement(curr));
+                    case "on_overlap" -> statements.add(parseOnOverlapStatement(curr));
+                    case "solid_platform" -> statements.add(parseSolidPlatformStatement(curr));
+                    case "parallel" -> statements.add(parseParallelStatement(curr));
+                    case "wait_move" -> statements.add(parseWaitMoveStatement(curr));
+                    case "camera" -> statements.add(parseCameraStatement(curr));
+                    case "trigger_zone" -> statements.add(parseTriggerZoneStatement(curr));
                     case "wasd_init" -> statements.add(parseWasdInitStatement(curr));
                     case "wasd_stop" -> statements.add(parseWasdStopStatement(curr));
                     case "physics_init" -> statements.add(parsePhysicsInitStatement(curr));
                     case "physics_stop" -> statements.add(parsePhysicsStopStatement(curr));
                     case "on_collide" -> statements.add(parseOnCollideStatement(curr));
+                    case "match" -> statements.add(parseMatchStatement(curr));
+                    case "case", "default" -> throw error(curr, "Orphaned '" + keyword + "' outside 'match' block");
                     case "if" -> statements.add(parseIfStatement(curr));
                     case "elif", "else" -> throw error(curr, "Orphaned '" + keyword + "' without preceding 'if'");
                     case "menu" -> statements.add(parseMenuStatement(curr));
@@ -1355,6 +1381,8 @@ public final class VJavaParser {
         Double maxX = null;
         Double maxY = null;
         boolean normalizeDiagonal = true;
+        double friction = 0.0;
+        double acceleration = 0.0;
 
         int i = 1;
         while (i < parts.size()) {
@@ -1384,11 +1412,26 @@ public final class VJavaParser {
                     normalizeDiagonal = parseBooleanStrict(parts.get(i + 1), token, "diagonal_norm");
                     i += 2;
                 }
+                case "friction" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected numeric value after 'friction'");
+                    }
+                    friction = Math.max(0.0, parseDoubleStrict(parts.get(i + 1), token, "friction"));
+                    i += 2;
+                }
+                case "accel", "acceleration" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected numeric value after '" + opt + "'");
+                    }
+                    acceleration = Math.max(0.0, parseDoubleStrict(parts.get(i + 1), token, opt));
+                    i += 2;
+                }
                 default -> throw error(token, "Unknown option in 'wasd_init': " + parts.get(i));
             }
         }
         return new WasdInitStatement(
-                tag, speed, minX, minY, maxX, maxY, normalizeDiagonal, token.sourceFile(), token.lineNumber());
+                tag, speed, minX, minY, maxX, maxY, normalizeDiagonal,
+                friction, acceleration, token.sourceFile(), token.lineNumber());
     }
 
     private WasdStopStatement parseWasdStopStatement(Token token) {
@@ -1458,6 +1501,350 @@ public final class VJavaParser {
             throw error(token, "Expected 'on_collide <tagA> <tagB> jump <label>', got: " + token.text());
         }
         return new OnCollideStatement(parts.get(0), parts.get(1), parts.get(3), token.sourceFile(), token.lineNumber());
+    }
+
+    private MovePathStatement parseMovePathStatement(Token token) {
+        String rest = stripKeyword(token.text(), "move_path", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.size() < 7) {
+            throw error(token,
+                    "Expected 'move_path <tag> <x1> <y1> <x2> <y2> <x3> <y3> [duration <sec>] [ease <name>]'");
+        }
+        String tag = parts.get(0);
+        double x1 = parseDoubleStrict(parts.get(1), token, "move_path x1");
+        double y1 = parseDoubleStrict(parts.get(2), token, "move_path y1");
+        double x2 = parseDoubleStrict(parts.get(3), token, "move_path x2");
+        double y2 = parseDoubleStrict(parts.get(4), token, "move_path y2");
+        double x3 = parseDoubleStrict(parts.get(5), token, "move_path x3");
+        double y3 = parseDoubleStrict(parts.get(6), token, "move_path y3");
+        double durationSeconds = 0.0;
+        String easing = "linear";
+        int i = 7;
+        while (i < parts.size()) {
+            String opt = parts.get(i).toLowerCase(Locale.ROOT);
+            switch (opt) {
+                case "duration" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected duration value after 'duration'");
+                    }
+                    durationSeconds = parseDoubleStrict(parts.get(i + 1), token, "duration");
+                    i += 2;
+                }
+                case "ease", "easing" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected easing type after '" + parts.get(i) + "'");
+                    }
+                    easing = parts.get(i + 1).toLowerCase(Locale.ROOT);
+                    i += 2;
+                }
+                default -> throw error(token, "Unknown option in 'move_path' statement: " + parts.get(i));
+            }
+        }
+        return new MovePathStatement(
+                tag, x1, y1, x2, y2, x3, y3, durationSeconds, easing, token.sourceFile(), token.lineNumber());
+    }
+
+    private RotateStatement parseRotateStatement(Token token) {
+        String rest = stripKeyword(token.text(), "rotate", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.isEmpty()) {
+            throw error(token, "Expected sprite tag after 'rotate'");
+        }
+        String tag = parts.get(0);
+        int degIdx = (parts.size() > 1 && "to".equalsIgnoreCase(parts.get(1))) ? 2 : 1;
+        if (parts.size() <= degIdx) {
+            throw error(token, "Expected target degrees in 'rotate' statement");
+        }
+        double targetDegrees = parseDoubleStrict(parts.get(degIdx), token, "rotate degrees");
+        double durationSeconds = 0.0;
+        String easing = "linear";
+        int i = degIdx + 1;
+        while (i < parts.size()) {
+            String opt = parts.get(i).toLowerCase(Locale.ROOT);
+            switch (opt) {
+                case "duration" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected duration value after 'duration'");
+                    }
+                    durationSeconds = parseDoubleStrict(parts.get(i + 1), token, "duration");
+                    i += 2;
+                }
+                case "ease", "easing" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected easing type after '" + parts.get(i) + "'");
+                    }
+                    easing = parts.get(i + 1).toLowerCase(Locale.ROOT);
+                    i += 2;
+                }
+                default -> throw error(token, "Unknown option in 'rotate' statement: " + parts.get(i));
+            }
+        }
+        return new RotateStatement(tag, targetDegrees, durationSeconds, easing, token.sourceFile(), token.lineNumber());
+    }
+
+    private ScaleStatement parseScaleStatement(Token token) {
+        String rest = stripKeyword(token.text(), "scale", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.isEmpty()) {
+            throw error(token, "Expected sprite tag after 'scale'");
+        }
+        String tag = parts.get(0);
+        int idx = (parts.size() > 1 && "to".equalsIgnoreCase(parts.get(1))) ? 2 : 1;
+        if (parts.size() <= idx) {
+            throw error(token, "Expected zoom factor in 'scale' statement");
+        }
+        double zx = parseDoubleStrict(parts.get(idx), token, "scale xzoom");
+        double zy = zx;
+        int i = idx + 1;
+        if (i < parts.size()) {
+            String nextLower = parts.get(i).toLowerCase(Locale.ROOT);
+            if (!"duration".equals(nextLower) && !"ease".equals(nextLower) && !"easing".equals(nextLower)) {
+                zy = parseDoubleStrict(parts.get(i), token, "scale yzoom");
+                i++;
+            }
+        }
+        double durationSeconds = 0.0;
+        String easing = "linear";
+        while (i < parts.size()) {
+            String opt = parts.get(i).toLowerCase(Locale.ROOT);
+            switch (opt) {
+                case "duration" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected duration value after 'duration'");
+                    }
+                    durationSeconds = parseDoubleStrict(parts.get(i + 1), token, "duration");
+                    i += 2;
+                }
+                case "ease", "easing" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected easing type after '" + parts.get(i) + "'");
+                    }
+                    easing = parts.get(i + 1).toLowerCase(Locale.ROOT);
+                    i += 2;
+                }
+                default -> throw error(token, "Unknown option in 'scale' statement: " + parts.get(i));
+            }
+        }
+        return new ScaleStatement(tag, zx, zy, durationSeconds, easing, token.sourceFile(), token.lineNumber());
+    }
+
+    private CollisionMaskStatement parseCollisionMaskStatement(Token token) {
+        String rest = stripKeyword(token.text(), "collision_mask", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.size() < 2) {
+            throw error(token, "Expected 'collision_mask <tag> <layer> [collides_with <mask1> ...]'");
+        }
+        String tag = parts.get(0);
+        String layer = parts.get(1);
+        List<String> collidesWith = new ArrayList<>();
+        if (parts.size() > 2) {
+            if (!"collides_with".equalsIgnoreCase(parts.get(2)) || parts.size() < 4) {
+                throw error(token, "Expected 'collides_with <mask>...' in 'collision_mask' statement");
+            }
+            for (int i = 3; i < parts.size(); i++) {
+                String raw = parts.get(i).replace(",", "").trim();
+                if (!raw.isEmpty()) {
+                    collidesWith.add(raw);
+                }
+            }
+        }
+        return new CollisionMaskStatement(tag, layer, collidesWith, token.sourceFile(), token.lineNumber());
+    }
+
+    private HitboxStatement parseHitboxStatement(Token token) {
+        String rest = stripKeyword(token.text(), "hitbox", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.size() < 3) {
+            throw error(token, "Expected 'hitbox <tag> circle <radius>' or 'hitbox <tag> rect <w> <h>'");
+        }
+        String tag = parts.get(0);
+        String shape = parts.get(1).toLowerCase(Locale.ROOT);
+        if ("circle".equals(shape)) {
+            if (parts.size() != 3) {
+                throw error(token, "Expected 'hitbox <tag> circle <radius>'");
+            }
+            double radius = parseDoubleStrict(parts.get(2), token, "hitbox circle radius");
+            if (!Double.isFinite(radius) || radius <= 0.0) {
+                throw error(token, "Hitbox circle radius must be positive, got: " + radius);
+            }
+            return new HitboxStatement(tag, "circle", radius, 0.0, token.sourceFile(), token.lineNumber());
+        }
+        if ("rect".equals(shape)) {
+            if (parts.size() != 4) {
+                throw error(token, "Expected 'hitbox <tag> rect <w> <h>'");
+            }
+            double w = parseDoubleStrict(parts.get(2), token, "hitbox rect width");
+            double h = parseDoubleStrict(parts.get(3), token, "hitbox rect height");
+            if (!Double.isFinite(w) || !Double.isFinite(h) || w <= 0.0 || h <= 0.0) {
+                throw error(token, "Hitbox rect dimensions must be positive, got: " + w + "x" + h);
+            }
+            return new HitboxStatement(tag, "rect", w, h, token.sourceFile(), token.lineNumber());
+        }
+        throw error(token, "Unsupported hitbox shape '" + parts.get(1) + "' (expected circle or rect)");
+    }
+
+    private OnOverlapStatement parseOnOverlapStatement(Token token) {
+        String rest = stripKeyword(token.text(), "on_overlap", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.size() != 4) {
+            throw error(token, "Expected 'on_overlap <tagA> <tagB> <enter|stay|exit> <label>'");
+        }
+        String phase = parts.get(2).toLowerCase(Locale.ROOT);
+        if (!"enter".equals(phase) && !"stay".equals(phase) && !"exit".equals(phase)) {
+            throw error(token, "Invalid overlap phase '" + parts.get(2) + "' (expected enter, stay, or exit)");
+        }
+        return new OnOverlapStatement(parts.get(0), parts.get(1), phase, parts.get(3),
+                token.sourceFile(), token.lineNumber());
+    }
+
+    private SolidPlatformStatement parseSolidPlatformStatement(Token token) {
+        String rest = stripKeyword(token.text(), "solid_platform", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.isEmpty() || parts.size() > 2) {
+            throw error(token, "Expected 'solid_platform <tag> [one_way]'");
+        }
+        String tag = parts.get(0);
+        boolean oneWay = false;
+        if (parts.size() == 2) {
+            if (!"one_way".equalsIgnoreCase(parts.get(1))) {
+                throw error(token, "Unknown option in 'solid_platform': " + parts.get(1));
+            }
+            oneWay = true;
+        }
+        return new SolidPlatformStatement(tag, oneWay, token.sourceFile(), token.lineNumber());
+    }
+
+    private ParallelStatement parseParallelStatement(Token token) {
+        String headerRest = stripRequiredColon(stripKeywordSafe(token.text(), "parallel"), token);
+        if (!headerRest.isEmpty()) {
+            throw error(token, "Unexpected header arguments in 'parallel:' statement: " + headerRest);
+        }
+        if (!consumeOptionalIndent()) {
+            throw error(token, "Expected indented body after 'parallel:'");
+        }
+        List<Statement> nested = parseStatementBlock(token);
+        return new ParallelStatement(nested, token.sourceFile(), token.lineNumber());
+    }
+
+    private WaitMoveStatement parseWaitMoveStatement(Token token) {
+        String rest = stripKeyword(token.text(), "wait_move", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.size() != 1) {
+            throw error(token, "Expected 'wait_move <tag>', got: " + token.text());
+        }
+        return new WaitMoveStatement(parts.get(0), token.sourceFile(), token.lineNumber());
+    }
+
+    private CameraFollowStatement parseCameraStatement(Token token) {
+        String rest = stripKeyword(token.text(), "camera", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.isEmpty()) {
+            throw error(token, "Expected subcommand after 'camera' (follow <tag> or stop)");
+        }
+        String sub = parts.get(0).toLowerCase(Locale.ROOT);
+        if ("stop".equals(sub)) {
+            return new CameraFollowStatement(null, 0.0, token.sourceFile(), token.lineNumber());
+        }
+        if (!"follow".equals(sub) || parts.size() < 2) {
+            throw error(token, "Expected 'camera follow <tag> [smooth <factor>]', got: " + token.text());
+        }
+        String targetTag = parts.get(1);
+        double smooth = 5.0;
+        int i = 2;
+        while (i < parts.size()) {
+            String opt = parts.get(i).toLowerCase(Locale.ROOT);
+            if ("smooth".equals(opt)) {
+                if (i + 1 >= parts.size()) {
+                    throw error(token, "Expected numeric factor after 'smooth'");
+                }
+                smooth = parseDoubleStrict(parts.get(i + 1), token, "camera smooth");
+                i += 2;
+            } else {
+                throw error(token, "Unknown option in 'camera follow': " + parts.get(i));
+            }
+        }
+        return new CameraFollowStatement(targetTag, smooth, token.sourceFile(), token.lineNumber());
+    }
+
+    private TriggerZoneStatement parseTriggerZoneStatement(Token token) {
+        String rest = stripKeyword(token.text(), "trigger_zone", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.size() != 8 || !"rect".equalsIgnoreCase(parts.get(1))) {
+            throw error(token,
+                    "Expected 'trigger_zone <id> rect <x> <y> <w> <h> <call|jump> <label>', got: " + token.text());
+        }
+        String zoneId = parts.get(0);
+        double x = parseDoubleStrict(parts.get(2), token, "trigger_zone x");
+        double y = parseDoubleStrict(parts.get(3), token, "trigger_zone y");
+        double w = parseDoubleStrict(parts.get(4), token, "trigger_zone width");
+        double h = parseDoubleStrict(parts.get(5), token, "trigger_zone height");
+        if (!Double.isFinite(w) || !Double.isFinite(h) || w <= 0.0 || h <= 0.0) {
+            throw error(token, "trigger_zone dimensions must be positive");
+        }
+        String action = parts.get(6).toLowerCase(Locale.ROOT);
+        if (!"call".equals(action) && !"jump".equals(action)) {
+            throw error(token, "trigger_zone action must be 'call' or 'jump', got: " + parts.get(6));
+        }
+        String targetLabel = parts.get(7);
+        return new TriggerZoneStatement(zoneId, x, y, w, h, action, targetLabel,
+                token.sourceFile(), token.lineNumber());
+    }
+
+    private MatchStatement parseMatchStatement(Token matchToken) {
+        String rawAfterKw = stripKeywordSafe(matchToken.text(), "match");
+        if (!endsWithColonOutsideQuotes(rawAfterKw)) {
+            throw error(matchToken, "Expected ':' at end of 'match' header: " + matchToken.text());
+        }
+        String subjectExpr = stripRequiredColon(rawAfterKw, matchToken);
+        if (subjectExpr.isEmpty()) {
+            throw error(matchToken, "Expected expression after 'match'");
+        }
+        expectIndent(matchToken);
+        List<MatchCase> cases = new ArrayList<>();
+        List<Statement> defaultBody = null;
+        try {
+            while (!isAtEnd() && peek().type() != TokenType.DEDENT) {
+                Token armTok = expectLine("match body");
+                String armKw = firstWord(armTok.text());
+                if ("case".equals(armKw)) {
+                    String afterCase = stripKeywordSafe(armTok.text(), "case");
+                    if (!endsWithColonOutsideQuotes(afterCase)) {
+                        throw error(armTok, "Expected ':' after 'case' pattern: " + armTok.text());
+                    }
+                    String patternExpr = stripRequiredColon(afterCase, armTok);
+                    if (patternExpr.isEmpty()) {
+                        throw error(armTok, "Expected pattern expression after 'case'");
+                    }
+                    expectIndent(armTok);
+                    cases.add(new MatchCase(
+                            patternExpr, parseStatementBlock(armTok), armTok.sourceFile(), armTok.lineNumber()));
+                } else if ("default".equals(armKw)) {
+                    String afterDefault = stripKeywordSafe(armTok.text(), "default");
+                    if (!endsWithColonOutsideQuotes(afterDefault)) {
+                        throw error(armTok, "Expected ':' after 'default': " + armTok.text());
+                    }
+                    String extra = stripRequiredColon(afterDefault, armTok);
+                    if (!extra.isEmpty()) {
+                        throw error(armTok, "Unexpected expression after 'default': " + extra);
+                    }
+                    if (defaultBody != null) {
+                        throw error(armTok, "Duplicate 'default:' branch in 'match' statement");
+                    }
+                    expectIndent(armTok);
+                    defaultBody = parseStatementBlock(armTok);
+                } else {
+                    throw error(armTok, "Expected 'case <expr>:' or 'default:' inside 'match' block, got: "
+                            + armTok.text());
+                }
+            }
+            consumeRequiredDedent(matchToken);
+        } finally {
+            // Note: blockDepth is managed per parseStatementBlock call
+        }
+        if (cases.isEmpty() && defaultBody == null) {
+            throw error(matchToken, "Empty 'match' block requires at least one 'case' or 'default' branch");
+        }
+        return new MatchStatement(subjectExpr, cases, defaultBody, matchToken.sourceFile(), matchToken.lineNumber());
     }
 
     private PauseStatement parsePauseStatement(Token token) {

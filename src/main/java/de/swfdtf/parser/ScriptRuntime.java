@@ -2,9 +2,9 @@ package de.swfdtf.parser;
 
 import de.swfdtf.core.EngineAPI;
 import de.swfdtf.core.EngineConfig;
+import de.swfdtf.graphics.ObjectMotionController;
 import de.swfdtf.graphics.SceneController;
 import de.swfdtf.graphics.SceneGraph;
-import de.swfdtf.graphics.SpriteNode;
 import de.swfdtf.graphics.TextTagParser;
 import de.swfdtf.math.ScreenShake;
 import de.swfdtf.math.Transform2D;
@@ -346,6 +346,7 @@ public final class ScriptRuntime {
     private String activeVoicePath;
     private double pauseRemainingSeconds = 0.0;
     private boolean pauseTimed = false;
+    private String waitingMoveTag = null;
     private String windowAction = "auto";
     private final List<AudioEvent> audioEvents = new ArrayList<>();
 
@@ -411,7 +412,10 @@ public final class ScriptRuntime {
             this.sceneController.setProjectRoot(project.projectRoot());
         }
         this.sceneController.setStateContext(this.stateStore, this.persistentAccess);
-        this.sceneController.getMotionController().setCollisionJumpListener(this::handleCollisionJump);
+        ObjectMotionController motion = this.sceneController.getMotionController();
+        motion.setCollisionJumpListener(this::handleCollisionJump);
+        motion.setSubroutineCallListener(this::handleSubroutineCallback);
+        motion.setTweenCompleteListener(this::handleMotionTweenComplete);
         registerServices();
     }
 
@@ -474,6 +478,9 @@ public final class ScriptRuntime {
                 // No-op: cannot advance without choice/input or after end
             }
             case PAUSING -> {
+                if (waitingMoveTag != null) {
+                    return;
+                }
                 pauseRemainingSeconds = 0.0;
                 pauseTimed = false;
                 status = Status.READY;
@@ -583,7 +590,14 @@ public final class ScriptRuntime {
         if (dt <= 0.0 || !Double.isFinite(dt)) {
             return;
         }
-        if (status == Status.PAUSING && pauseTimed) {
+        sceneController.updateAtl(dt);
+        if (status == Status.PAUSING && waitingMoveTag != null) {
+            if (!sceneController.getMotionController().hasActiveTween(waitingMoveTag)) {
+                waitingMoveTag = null;
+                status = Status.READY;
+                stepUntilPause();
+            }
+        } else if (status == Status.PAUSING && pauseTimed) {
             pauseRemainingSeconds -= dt;
             if (pauseRemainingSeconds <= 0.0) {
                 pauseRemainingSeconds = 0.0;
@@ -646,6 +660,7 @@ public final class ScriptRuntime {
         activeVoicePath = null;
         pauseRemainingSeconds = 0.0;
         pauseTimed = false;
+        waitingMoveTag = null;
         status = Status.READY;
         enterLabel(label.trim());
         stepUntilPause();
@@ -694,6 +709,8 @@ public final class ScriptRuntime {
         this.activeVoicePath = snapshot.activeVoicePath();
         this.pauseRemainingSeconds = 0.0;
         this.pauseTimed = false;
+        this.waitingMoveTag = null;
+        this.waitingMoveTag = null;
 
         if (!this.callStack.isEmpty() && !this.callStack.get(this.callStack.size() - 1).isCallBoundary()) {
             this.currentStatements = this.callStack.get(this.callStack.size() - 1).childStatements();
@@ -782,6 +799,8 @@ public final class ScriptRuntime {
         this.activeVoicePath = pos.activeVoicePath();
         this.pauseRemainingSeconds = 0.0;
         this.pauseTimed = false;
+        this.waitingMoveTag = null;
+        this.waitingMoveTag = null;
         this.activeDialogue = null;
         this.activeMenu = null;
         this.activeMenuAst = null;
@@ -853,6 +872,8 @@ public final class ScriptRuntime {
 
         if (pos.stageSnapshot() != null) {
             sceneController.restoreState(pos.stageSnapshot());
+        } else {
+            sceneController.getMotionController().clearAll();
         }
     }
 
@@ -920,14 +941,14 @@ public final class ScriptRuntime {
         }
         if (stmt instanceof VJavaAst.ShowStatement show) {
             applyTransitionEffects(show.transitionExpr());
-            SpriteNode sprite = sceneController.showSprite(
+            sceneController.showSprite(
                     show.tag(),
                     show.attributes(),
                     show.positionExpr(),
                     show.transitionExpr()
             );
             if (!show.inlineAtl().isEmpty()) {
-                applyAtlToTransform(show.inlineAtl(), sprite.getTransform());
+                sceneController.attachAtlTransform(show.tag(), show.inlineAtl());
             }
             statementIndex++;
             return false;
@@ -1096,6 +1117,26 @@ public final class ScriptRuntime {
             statementIndex++;
             return false;
         }
+        if (stmt instanceof VJavaAst.MatchStatement match) {
+            Object subject = ConditionEvaluator.evaluate(match.subjectExpr(), stateStore, persistentAccess);
+            for (VJavaAst.MatchCase mc : match.cases()) {
+                Object pattern = ConditionEvaluator.evaluate(mc.patternExpr(), stateStore, persistentAccess);
+                if (valuesMatch(subject, pattern)) {
+                    if (!mc.body().isEmpty()) {
+                        pushNestedBlock(mc.body());
+                    } else {
+                        statementIndex++;
+                    }
+                    return false;
+                }
+            }
+            if (match.defaultBody() != null && !match.defaultBody().isEmpty()) {
+                pushNestedBlock(match.defaultBody());
+            } else {
+                statementIndex++;
+            }
+            return false;
+        }
         if (stmt instanceof VJavaAst.SetVarStatement setVar) {
             if (!setVar.isDefaultOnly() || !stateStore.has(setVar.varName())) {
                 Object value = ConditionEvaluator.evaluate(setVar.expression(), stateStore, persistentAccess);
@@ -1142,6 +1183,108 @@ public final class ScriptRuntime {
             statementIndex++;
             return false;
         }
+        if (stmt instanceof VJavaAst.MovePathStatement path) {
+            sceneController.getMotionController().startMovePath(
+                    path.tag(),
+                    (float) path.x1(),
+                    (float) path.y1(),
+                    (float) path.x2(),
+                    (float) path.y2(),
+                    (float) path.x3(),
+                    (float) path.y3(),
+                    path.durationSeconds(),
+                    path.easing()
+            );
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.RotateStatement rot) {
+            sceneController.getMotionController().startRotate(
+                    rot.tag(),
+                    (float) rot.targetDegrees(),
+                    rot.durationSeconds(),
+                    rot.easing()
+            );
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.ScaleStatement scale) {
+            sceneController.getMotionController().startScale(
+                    scale.tag(),
+                    (float) scale.targetXZoom(),
+                    (float) scale.targetYZoom(),
+                    scale.durationSeconds(),
+                    scale.easing()
+            );
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.CollisionMaskStatement mask) {
+            sceneController.getMotionController().setCollisionMask(mask.tag(), mask.layer(), mask.collidesWith());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.HitboxStatement hitbox) {
+            if ("circle".equalsIgnoreCase(hitbox.shape())) {
+                sceneController.getMotionController().setCircularHitbox(hitbox.tag(), (float) hitbox.param1());
+            } else {
+                sceneController.getMotionController().setRectHitbox(
+                        hitbox.tag(), (float) hitbox.param1(), (float) hitbox.param2());
+            }
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.OnOverlapStatement overlap) {
+            sceneController.getMotionController().registerOverlapTrigger(
+                    overlap.tagA(), overlap.tagB(), overlap.phase(), overlap.targetLabel());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.SolidPlatformStatement platform) {
+            sceneController.getMotionController().registerSolidPlatform(platform.tag(), platform.oneWay());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.ParallelStatement parallel) {
+            int savedIdx = statementIndex;
+            for (VJavaAst.Statement nested : parallel.statements()) {
+                executeStatement(nested);
+            }
+            statementIndex = savedIdx + 1;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.WaitMoveStatement waitMove) {
+            statementIndex++;
+            if (sceneController.getMotionController().hasActiveTween(waitMove.tag())) {
+                this.waitingMoveTag = waitMove.tag();
+                this.status = Status.PAUSING;
+                return true;
+            }
+            return false;
+        }
+        if (stmt instanceof VJavaAst.CameraFollowStatement cam) {
+            if (cam.targetTag() == null || cam.targetTag().isBlank()) {
+                sceneController.getMotionController().disableCameraFollow();
+            } else {
+                sceneController.getMotionController().enableCameraFollow(
+                        cam.targetTag(), (float) cam.smoothFactor());
+            }
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.TriggerZoneStatement zone) {
+            sceneController.getMotionController().registerTriggerZone(
+                    zone.zoneId(),
+                    (float) zone.x(),
+                    (float) zone.y(),
+                    (float) zone.width(),
+                    (float) zone.height(),
+                    "call".equalsIgnoreCase(zone.action()),
+                    zone.targetLabel()
+            );
+            statementIndex++;
+            return false;
+        }
         if (stmt instanceof VJavaAst.WasdInitStatement wasdInit) {
             sceneController.getMotionController().enableWasd(
                     wasdInit.tag(),
@@ -1150,7 +1293,9 @@ public final class ScriptRuntime {
                     wasdInit.minY() != null ? wasdInit.minY().floatValue() : null,
                     wasdInit.maxX() != null ? wasdInit.maxX().floatValue() : null,
                     wasdInit.maxY() != null ? wasdInit.maxY().floatValue() : null,
-                    wasdInit.normalizeDiagonal()
+                    wasdInit.normalizeDiagonal(),
+                    (float) wasdInit.friction(),
+                    (float) wasdInit.acceleration()
             );
             statementIndex++;
             return false;
@@ -1198,6 +1343,61 @@ public final class ScriptRuntime {
         } else {
             engineApi.logWarn("Collision jump target label not found: " + trimmed);
         }
+    }
+
+    private void handleSubroutineCallback(String targetLabel) {
+        if (targetLabel == null || targetLabel.isBlank() || status == Status.ENDED) {
+            return;
+        }
+        String trimmed = targetLabel.trim();
+        if (!projectAst.labels().containsKey(trimmed)) {
+            engineApi.logWarn("Subroutine callback target label not found: " + trimmed);
+            return;
+        }
+        Status prevStatus = this.status;
+        DialoguePrompt prevDialogue = this.activeDialogue;
+        MenuPrompt prevMenu = this.activeMenu;
+        VJavaAst.MenuStatement prevMenuAst = this.activeMenuAst;
+        InputPrompt prevInput = this.activeInput;
+
+        int baseDepth = callStack.size();
+        callStack.add(new StackFrame(currentLabel, statementIndex, currentStatements, List.of(), true));
+        enterLabel(trimmed);
+        this.status = Status.READY;
+
+        int steps = 0;
+        while (status == Status.READY && callStack.size() > baseDepth) {
+            if (++steps > MAX_CONSECUTIVE_STEPS) {
+                throw new IllegalStateException("Exceeded maximum steps inside callback label '" + trimmed + "'");
+            }
+            if (statementIndex >= currentStatements.size()) {
+                popCompletedFrameOrEnd();
+            } else {
+                executeStatement(currentStatements.get(statementIndex));
+            }
+        }
+        if (callStack.size() == baseDepth && status == Status.READY) {
+            this.status = prevStatus;
+            this.activeDialogue = prevDialogue;
+            this.activeMenu = prevMenu;
+            this.activeMenuAst = prevMenuAst;
+            this.activeInput = prevInput;
+        }
+    }
+
+    private void handleMotionTweenComplete(String completedTag) {
+        if (status == Status.PAUSING && waitingMoveTag != null && waitingMoveTag.equals(completedTag)) {
+            waitingMoveTag = null;
+            status = Status.READY;
+            stepUntilPause();
+        }
+    }
+
+    private static boolean valuesMatch(Object a, Object b) {
+        if (a instanceof Number numA && b instanceof Number numB) {
+            return Math.abs(numA.doubleValue() - numB.doubleValue()) <= 1.0e-9;
+        }
+        return Objects.equals(a, b);
     }
 
     private void enterDialoguePrompt(VJavaAst.SayStatement say) {
@@ -1326,6 +1526,7 @@ public final class ScriptRuntime {
             Transform2D transform = new Transform2D();
             applyAtlToTransform(transformDef.steps(), transform);
             sceneController.registerTransform(transformDef.name(), transform);
+            sceneController.registerTransformSteps(transformDef.name(), transformDef.steps());
         }
     }
 
@@ -1401,6 +1602,8 @@ public final class ScriptRuntime {
         this.activeVoicePath = null;
         this.pauseRemainingSeconds = 0.0;
         this.pauseTimed = false;
+        this.waitingMoveTag = null;
+        this.waitingMoveTag = null;
         this.windowAction = "auto";
         this.audioEvents.clear();
     }

@@ -48,11 +48,23 @@ public final class VJavaAst {
             WithStatement,
             WindowStatement,
             MoveStatement,
+            MovePathStatement,
+            RotateStatement,
+            ScaleStatement,
+            CollisionMaskStatement,
+            HitboxStatement,
+            OnOverlapStatement,
+            SolidPlatformStatement,
+            ParallelStatement,
+            WaitMoveStatement,
+            CameraFollowStatement,
+            TriggerZoneStatement,
             WasdInitStatement,
             WasdStopStatement,
             PhysicsInitStatement,
             PhysicsStopStatement,
-            OnCollideStatement {
+            OnCollideStatement,
+            MatchStatement {
 
         /**
          * Returns the source file path where this statement appears.
@@ -778,7 +790,8 @@ public final class VJavaAst {
     }
 
     /**
-     * Binds interactive WASD / arrow-key movement to a sprite tag with optional speed and stage bounds.
+     * Binds interactive WASD / arrow-key movement to a sprite tag with optional speed, bounds,
+     * and inertia parameters.
      *
      * @param tag               target sprite tag
      * @param speedPxPerSec     speed in logical pixels per second
@@ -787,6 +800,8 @@ public final class VJavaAst {
      * @param maxX              optional maximum X clamp (nullable)
      * @param maxY              optional maximum Y clamp (nullable)
      * @param normalizeDiagonal whether diagonal vectors are normalized to constant speed
+     * @param friction          deceleration damping rate when input is released ({@code <= 0} disables inertia)
+     * @param acceleration      acceleration responsiveness when input is held ({@code <= 0} uses instant speed)
      * @param sourceFile        source script path
      * @param lineNumber        1-based line number
      */
@@ -798,9 +813,37 @@ public final class VJavaAst {
             Double maxX,
             Double maxY,
             boolean normalizeDiagonal,
+            double friction,
+            double acceleration,
             String sourceFile,
             int lineNumber
     ) implements Statement {
+        /**
+         * Backwards-compatible constructor without explicit inertia parameters.
+         *
+         * @param tag               target sprite tag
+         * @param speedPxPerSec     speed in logical pixels per second
+         * @param minX              optional minimum X clamp (nullable)
+         * @param minY              optional minimum Y clamp (nullable)
+         * @param maxX              optional maximum X clamp (nullable)
+         * @param maxY              optional maximum Y clamp (nullable)
+         * @param normalizeDiagonal whether diagonal vectors are normalized to constant speed
+         * @param sourceFile        source script path
+         * @param lineNumber        1-based line number
+         */
+        public WasdInitStatement(
+                String tag,
+                double speedPxPerSec,
+                Double minX,
+                Double minY,
+                Double maxX,
+                Double maxY,
+                boolean normalizeDiagonal,
+                String sourceFile,
+                int lineNumber
+        ) {
+            this(tag, speedPxPerSec, minX, minY, maxX, maxY, normalizeDiagonal, 0.0, 0.0, sourceFile, lineNumber);
+        }
     }
 
     /**
@@ -855,6 +898,273 @@ public final class VJavaAst {
     public record OnCollideStatement(
             String tagA,
             String tagB,
+            String targetLabel,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Single {@code case <pattern>:} arm inside a {@link MatchStatement}.
+     *
+     * @param patternExpr pattern expression compared for equality against the match subject
+     * @param body        arm body statements
+     * @param sourceFile  source script path
+     * @param lineNumber  1-based line number
+     */
+    public record MatchCase(
+            String patternExpr,
+            List<Statement> body,
+            String sourceFile,
+            int lineNumber
+    ) {
+        /** Copies case body statements defensively. */
+        public MatchCase {
+            body = body != null ? List.copyOf(body) : List.of();
+        }
+    }
+
+    /**
+     * Pattern-matching control-flow statement ({@code match <expr>:}).
+     *
+     * @param subjectExpr expression evaluated once and matched against each case
+     * @param cases       ordered case arms
+     * @param defaultBody optional default branch statements ({@code null} when {@code default:} is omitted)
+     * @param sourceFile  source script path
+     * @param lineNumber  1-based line number
+     */
+    public record MatchStatement(
+            String subjectExpr,
+            List<MatchCase> cases,
+            List<Statement> defaultBody,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+        /** Copies case arms and optional default body defensively. */
+        public MatchStatement {
+            cases = cases != null ? List.copyOf(cases) : List.of();
+            defaultBody = defaultBody != null ? List.copyOf(defaultBody) : null;
+        }
+    }
+
+    /**
+     * Cubic Bezier path tween statement ({@code move_path <tag> x1 y1 x2 y2 x3 y3 [duration <d>] [ease <e>]}).
+     *
+     * @param tag             target sprite tag
+     * @param x1              first control point X
+     * @param y1              first control point Y
+     * @param x2              second control point X
+     * @param y2              second control point Y
+     * @param x3              end point X
+     * @param y3              end point Y
+     * @param durationSeconds duration in seconds
+     * @param easing          easing curve name
+     * @param sourceFile      source script path
+     * @param lineNumber      1-based line number
+     */
+    public record MovePathStatement(
+            String tag,
+            double x1,
+            double y1,
+            double x2,
+            double y2,
+            double x3,
+            double y3,
+            double durationSeconds,
+            String easing,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Shortest-arc sprite rotation tween ({@code rotate <tag> [to] <deg> [duration <d>] [ease <e>]}).
+     *
+     * @param tag             target sprite tag
+     * @param targetDegrees   target rotation angle in degrees
+     * @param durationSeconds duration in seconds
+     * @param easing          easing curve name
+     * @param sourceFile      source script path
+     * @param lineNumber      1-based line number
+     */
+    public record RotateStatement(
+            String tag,
+            double targetDegrees,
+            double durationSeconds,
+            String easing,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Sprite non-uniform scale tween ({@code scale <tag> [to] <zx> [<zy>] [duration <d>] [ease <e>]}).
+     *
+     * @param tag             target sprite tag
+     * @param targetXZoom     target horizontal zoom factor
+     * @param targetYZoom     target vertical zoom factor
+     * @param durationSeconds duration in seconds
+     * @param easing          easing curve name
+     * @param sourceFile      source script path
+     * @param lineNumber      1-based line number
+     */
+    public record ScaleStatement(
+            String tag,
+            double targetXZoom,
+            double targetYZoom,
+            double durationSeconds,
+            String easing,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Assigns a collision layer and accepted target layers to a sprite tag.
+     *
+     * @param tag          target sprite tag
+     * @param layer        layer name this sprite belongs to
+     * @param collidesWith list of layer names this sprite collides with
+     * @param sourceFile   source script path
+     * @param lineNumber   1-based line number
+     */
+    public record CollisionMaskStatement(
+            String tag,
+            String layer,
+            List<String> collidesWith,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+        /** Copies mask target layers defensively. */
+        public CollisionMaskStatement {
+            collidesWith = collidesWith != null ? List.copyOf(collidesWith) : List.of();
+        }
+    }
+
+    /**
+     * Configures an explicit circular or rectangular collision hitbox for a sprite tag.
+     *
+     * @param tag        target sprite tag
+     * @param shape      hitbox shape ({@code "circle"} or {@code "rect"})
+     * @param param1     radius for circle or width for rect
+     * @param param2     unused for circle ({@code 0.0}) or height for rect
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record HitboxStatement(
+            String tag,
+            String shape,
+            double param1,
+            double param2,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Registers an overlap phase callback ({@code enter}, {@code stay}, {@code exit}) between two sprites.
+     *
+     * @param tagA        first sprite tag
+     * @param tagB        second sprite tag
+     * @param phase       overlap phase ({@code "enter"}, {@code "stay"}, or {@code "exit"})
+     * @param targetLabel subroutine label to invoke
+     * @param sourceFile  source script path
+     * @param lineNumber  1-based line number
+     */
+    public record OnOverlapStatement(
+            String tagA,
+            String tagB,
+            String phase,
+            String targetLabel,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Marks a sprite tag as a solid or one-way collision platform for physics bodies.
+     *
+     * @param tag        target platform sprite tag
+     * @param oneWay     {@code true} if upward jumps may pass through the platform from below
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record SolidPlatformStatement(
+            String tag,
+            boolean oneWay,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Executes nested statements concurrently in the same frame ({@code parallel:}).
+     *
+     * @param statements nested statements launched simultaneously
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record ParallelStatement(
+            List<Statement> statements,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+        /** Copies nested statements list defensively. */
+        public ParallelStatement {
+            statements = statements != null ? List.copyOf(statements) : List.of();
+        }
+    }
+
+    /**
+     * Pauses script progression until all active motion tweens for {@code tag} complete.
+     *
+     * @param tag        target sprite tag
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record WaitMoveStatement(
+            String tag,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Enables or disables smooth camera follow tracking on the stage.
+     *
+     * @param targetTag    sprite tag to follow, or {@code null} to stop following
+     * @param smoothFactor smoothing rate ({@code >= 0})
+     * @param sourceFile   source script path
+     * @param lineNumber   1-based line number
+     */
+    public record CameraFollowStatement(
+            String targetTag,
+            double smoothFactor,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Defines an invisible rectangular trigger zone invoking or jumping to a label upon entry.
+     *
+     * @param zoneId      unique trigger zone identifier
+     * @param x           zone left X coordinate
+     * @param y           zone top Y coordinate
+     * @param width       zone width
+     * @param height      zone height
+     * @param action      trigger action ({@code "call"} or {@code "jump"})
+     * @param targetLabel target label name
+     * @param sourceFile  source script path
+     * @param lineNumber  1-based line number
+     */
+    public record TriggerZoneStatement(
+            String zoneId,
+            double x,
+            double y,
+            double width,
+            double height,
+            String action,
             String targetLabel,
             String sourceFile,
             int lineNumber

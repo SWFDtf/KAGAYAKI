@@ -15,6 +15,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -203,6 +204,7 @@ public final class VJavaLinter {
         }
 
         checkUnreachableLabels(project, entryLabel, callGraph, issues);
+        checkStrictTypes(project, issues);
         checkJavaBlocks(project, issues);
 
         return createReport(issues);
@@ -421,6 +423,34 @@ public final class VJavaLinter {
                 for (VJavaAst.IfBranch branch : ifStmt.branches()) {
                     checkStatements(project, branch.body(), outgoingEdges, knownAssets, issues);
                 }
+            } else if (stmt instanceof VJavaAst.MatchStatement matchStmt) {
+                Set<String> seenPatterns = new HashSet<>();
+                for (VJavaAst.MatchCase mc : matchStmt.cases()) {
+                    String normPattern = mc.patternExpr() != null ? mc.patternExpr().trim() : "";
+                    if (!seenPatterns.add(normPattern)) {
+                        issues.add(new LintIssue(
+                                Severity.ERROR,
+                                "DUPLICATE_MATCH_CASE",
+                                "Duplicate match case pattern '" + normPattern + "'.",
+                                mc.sourceFile(),
+                                mc.lineNumber()
+                        ));
+                    }
+                    checkStatements(project, mc.body(), outgoingEdges, knownAssets, issues);
+                }
+                if (matchStmt.defaultBody() == null) {
+                    issues.add(new LintIssue(
+                            Severity.WARNING,
+                            "MATCH_MISSING_DEFAULT",
+                            "Non-exhaustive match statement is missing a 'default:' branch.",
+                            matchStmt.sourceFile(),
+                            matchStmt.lineNumber()
+                    ));
+                } else {
+                    checkStatements(project, matchStmt.defaultBody(), outgoingEdges, knownAssets, issues);
+                }
+            } else if (stmt instanceof VJavaAst.ParallelStatement parallelStmt) {
+                checkStatements(project, parallelStmt.statements(), outgoingEdges, knownAssets, issues);
             } else if (stmt instanceof VJavaAst.SayStatement say) {
                 if (say.speakerId() != null && !say.speakerId().isBlank()) {
                     String speakerId = say.speakerId().trim();
@@ -496,6 +526,44 @@ public final class VJavaLinter {
                 } else {
                     outgoingEdges.add(target);
                 }
+            } else if (stmt instanceof VJavaAst.OnOverlapStatement overlap) {
+                String target = overlap.targetLabel() != null ? overlap.targetLabel().trim() : "";
+                if (target.isEmpty() || !project.labels().containsKey(target)) {
+                    issues.add(new LintIssue(
+                            Severity.ERROR,
+                            "MISSING_OVERLAP_TARGET",
+                            "Overlap target label '" + target + "' is not defined.",
+                            overlap.sourceFile(),
+                            overlap.lineNumber()
+                    ));
+                } else {
+                    outgoingEdges.add(target);
+                }
+            } else if (stmt instanceof VJavaAst.TriggerZoneStatement zone) {
+                String target = zone.targetLabel() != null ? zone.targetLabel().trim() : "";
+                if (target.isEmpty() || !project.labels().containsKey(target)) {
+                    issues.add(new LintIssue(
+                            Severity.ERROR,
+                            "MISSING_TRIGGER_TARGET",
+                            "Trigger zone target label '" + target + "' is not defined.",
+                            zone.sourceFile(),
+                            zone.lineNumber()
+                    ));
+                } else {
+                    outgoingEdges.add(target);
+                }
+            } else if (stmt instanceof VJavaAst.MovePathStatement path) {
+                checkDurationAndEasing(
+                        path.tag(), path.durationSeconds(), path.easing(),
+                        path.sourceFile(), path.lineNumber(), issues);
+            } else if (stmt instanceof VJavaAst.RotateStatement rot) {
+                checkDurationAndEasing(
+                        rot.tag(), rot.durationSeconds(), rot.easing(),
+                        rot.sourceFile(), rot.lineNumber(), issues);
+            } else if (stmt instanceof VJavaAst.ScaleStatement scale) {
+                checkDurationAndEasing(
+                        scale.tag(), scale.durationSeconds(), scale.easing(),
+                        scale.sourceFile(), scale.lineNumber(), issues);
             } else if (stmt instanceof VJavaAst.MoveStatement move) {
                 if (move.durationSeconds() < 0.0) {
                     issues.add(new LintIssue(
@@ -657,6 +725,384 @@ public final class VJavaLinter {
                 ));
             }
         }
+    }
+
+    private static void checkDurationAndEasing(
+            String tag,
+            double durationSeconds,
+            String easing,
+            String sourceFile,
+            int lineNumber,
+            List<LintIssue> issues
+    ) {
+        if (durationSeconds < 0.0) {
+            issues.add(new LintIssue(
+                    Severity.WARNING,
+                    "INVALID_MOVE_DURATION",
+                    "Negative motion duration " + durationSeconds + " for sprite '" + tag + "'.",
+                    sourceFile,
+                    lineNumber
+            ));
+        }
+        if (easing != null && !ObjectMotionController.SUPPORTED_EASINGS.contains(
+                easing.trim().toLowerCase(Locale.ROOT))) {
+            issues.add(new LintIssue(
+                    Severity.WARNING,
+                    "UNKNOWN_EASING",
+                    "Unknown easing '" + easing + "' for sprite '" + tag + "'.",
+                    sourceFile,
+                    lineNumber
+            ));
+        }
+    }
+
+    private enum ExprType {
+        NUMBER,
+        BOOLEAN,
+        STRING,
+        NULL,
+        UNKNOWN
+    }
+
+    private static void checkStrictTypes(VJavaAst.ProjectAst project, List<LintIssue> issues) {
+        Map<String, ExprType> globalEnv = new HashMap<>();
+        for (VJavaAst.SetVarStatement dv : project.defaultVariables()) {
+            ExprType t = inferExpressionType(
+                    dv.expression(), globalEnv, dv.varName(), dv.sourceFile(), dv.lineNumber(), issues);
+            globalEnv.put(dv.varName(), t);
+        }
+        for (VJavaAst.LabelNode label : project.labels().values()) {
+            Map<String, ExprType> localEnv = new HashMap<>(globalEnv);
+            checkStatementTypes(label.statements(), localEnv, issues);
+        }
+    }
+
+    private static void checkStatementTypes(
+            List<VJavaAst.Statement> statements,
+            Map<String, ExprType> env,
+            List<LintIssue> issues
+    ) {
+        for (VJavaAst.Statement stmt : statements) {
+            if (stmt instanceof VJavaAst.SetVarStatement sv) {
+                ExprType inferred = inferExpressionType(
+                        sv.expression(), env, sv.varName(), sv.sourceFile(), sv.lineNumber(), issues);
+                env.put(sv.varName(), inferred);
+            } else if (stmt instanceof VJavaAst.IfStatement ifs) {
+                for (VJavaAst.IfBranch branch : ifs.branches()) {
+                    checkStatementTypes(branch.body(), new HashMap<>(env), issues);
+                }
+            } else if (stmt instanceof VJavaAst.MatchStatement ms) {
+                for (VJavaAst.MatchCase mc : ms.cases()) {
+                    checkStatementTypes(mc.body(), new HashMap<>(env), issues);
+                }
+                if (ms.defaultBody() != null) {
+                    checkStatementTypes(ms.defaultBody(), new HashMap<>(env), issues);
+                }
+            } else if (stmt instanceof VJavaAst.MenuStatement menu) {
+                for (VJavaAst.MenuChoice choice : menu.choices()) {
+                    checkStatementTypes(choice.body(), new HashMap<>(env), issues);
+                }
+            } else if (stmt instanceof VJavaAst.ParallelStatement ps) {
+                checkStatementTypes(ps.statements(), env, issues);
+            }
+        }
+    }
+
+    private static ExprType inferExpressionType(
+            String rawExpr,
+            Map<String, ExprType> env,
+            String targetVar,
+            String sourceFile,
+            int lineNumber,
+            List<LintIssue> issues
+    ) {
+        if (rawExpr == null) {
+            return ExprType.UNKNOWN;
+        }
+        String expr = unwrapOuterParens(rawExpr.trim());
+        if (expr.isEmpty()) {
+            return ExprType.UNKNOWN;
+        }
+
+        int orIdx = findBinaryOpOutsideQuotes(expr, "||");
+        if (orIdx > 0) {
+            inferExpressionType(expr.substring(0, orIdx), env, targetVar, sourceFile, lineNumber, issues);
+            inferExpressionType(expr.substring(orIdx + 2), env, targetVar, sourceFile, lineNumber, issues);
+            return ExprType.BOOLEAN;
+        }
+        int andIdx = findBinaryOpOutsideQuotes(expr, "&&");
+        if (andIdx > 0) {
+            inferExpressionType(expr.substring(0, andIdx), env, targetVar, sourceFile, lineNumber, issues);
+            inferExpressionType(expr.substring(andIdx + 2), env, targetVar, sourceFile, lineNumber, issues);
+            return ExprType.BOOLEAN;
+        }
+
+        for (String cmpOp : List.of("==", "!=", "<=", ">=", "<", ">")) {
+            int cmpIdx = findBinaryOpOutsideQuotes(expr, cmpOp);
+            if (cmpIdx > 0) {
+                inferExpressionType(expr.substring(0, cmpIdx), env, targetVar, sourceFile, lineNumber, issues);
+                inferExpressionType(
+                        expr.substring(cmpIdx + cmpOp.length()), env, targetVar, sourceFile, lineNumber, issues);
+                return ExprType.BOOLEAN;
+            }
+        }
+
+        int addSubIdx = findAdditiveOpRightToLeft(expr);
+        if (addSubIdx > 0) {
+            char op = expr.charAt(addSubIdx);
+            ExprType left = inferExpressionType(
+                    expr.substring(0, addSubIdx), env, targetVar, sourceFile, lineNumber, issues);
+            ExprType right = inferExpressionType(
+                    expr.substring(addSubIdx + 1), env, targetVar, sourceFile, lineNumber, issues);
+            if (op == '+') {
+                if (left == ExprType.BOOLEAN && (right == ExprType.STRING
+                        || right == ExprType.NUMBER || right == ExprType.BOOLEAN)) {
+                    issues.add(new LintIssue(
+                            Severity.ERROR,
+                            "TYPE_MISMATCH",
+                            "Type mismatch in assignment to '" + targetVar + "': cannot add "
+                                    + left + " and " + right + ".",
+                            sourceFile,
+                            lineNumber
+                    ));
+                    return ExprType.UNKNOWN;
+                }
+                if (right == ExprType.BOOLEAN && (left == ExprType.STRING
+                        || left == ExprType.NUMBER || left == ExprType.BOOLEAN)) {
+                    issues.add(new LintIssue(
+                            Severity.ERROR,
+                            "TYPE_MISMATCH",
+                            "Type mismatch in assignment to '" + targetVar + "': cannot add "
+                                    + left + " and " + right + ".",
+                            sourceFile,
+                            lineNumber
+                    ));
+                    return ExprType.UNKNOWN;
+                }
+                if (left == ExprType.STRING || right == ExprType.STRING) {
+                    return ExprType.STRING;
+                }
+                if (left == ExprType.NUMBER && right == ExprType.NUMBER) {
+                    return ExprType.NUMBER;
+                }
+                return ExprType.UNKNOWN;
+            } else {
+                if (left == ExprType.BOOLEAN || left == ExprType.STRING
+                        || right == ExprType.BOOLEAN || right == ExprType.STRING) {
+                    issues.add(new LintIssue(
+                            Severity.ERROR,
+                            "TYPE_MISMATCH",
+                            "Type mismatch in assignment to '" + targetVar + "': operator '" + op
+                                    + "' is invalid for " + left + " and " + right + ".",
+                            sourceFile,
+                            lineNumber
+                    ));
+                    return ExprType.UNKNOWN;
+                }
+                return ExprType.NUMBER;
+            }
+        }
+
+        int mulIdx = findMultiplicativeOpRightToLeft(expr);
+        if (mulIdx > 0) {
+            char op = expr.charAt(mulIdx);
+            ExprType left = inferExpressionType(
+                    expr.substring(0, mulIdx), env, targetVar, sourceFile, lineNumber, issues);
+            ExprType right = inferExpressionType(
+                    expr.substring(mulIdx + 1), env, targetVar, sourceFile, lineNumber, issues);
+            if (left == ExprType.BOOLEAN || left == ExprType.STRING
+                    || right == ExprType.BOOLEAN || right == ExprType.STRING) {
+                issues.add(new LintIssue(
+                        Severity.ERROR,
+                        "TYPE_MISMATCH",
+                        "Type mismatch in assignment to '" + targetVar + "': operator '" + op
+                                + "' is invalid for " + left + " and " + right + ".",
+                        sourceFile,
+                        lineNumber
+                ));
+                return ExprType.UNKNOWN;
+            }
+            return ExprType.NUMBER;
+        }
+
+        if (expr.startsWith("!")) {
+            inferExpressionType(expr.substring(1), env, targetVar, sourceFile, lineNumber, issues);
+            return ExprType.BOOLEAN;
+        }
+        if ((expr.startsWith("-") || expr.startsWith("+")) && expr.length() > 1) {
+            inferExpressionType(expr.substring(1), env, targetVar, sourceFile, lineNumber, issues);
+            return ExprType.NUMBER;
+        }
+        if ((expr.startsWith("\"") && expr.endsWith("\"") && expr.length() >= 2)
+                || (expr.startsWith("'") && expr.endsWith("'") && expr.length() >= 2)) {
+            return ExprType.STRING;
+        }
+        if ("true".equals(expr) || "false".equals(expr)) {
+            return ExprType.BOOLEAN;
+        }
+        if ("null".equals(expr) || "None".equals(expr)) {
+            return ExprType.NULL;
+        }
+        try {
+            Double.parseDouble(expr);
+            return ExprType.NUMBER;
+        } catch (NumberFormatException ignored) {
+            // Identifier or compound call
+        }
+        if (IDENTIFIER_PATTERN.matcher(expr).matches()) {
+            return env.getOrDefault(expr, ExprType.UNKNOWN);
+        }
+        return ExprType.UNKNOWN;
+    }
+
+    private static String unwrapOuterParens(String expr) {
+        String s = expr;
+        while (s.startsWith("(") && s.endsWith(")") && s.length() >= 2) {
+            int depth = 0;
+            boolean inSingle = false;
+            boolean inDouble = false;
+            boolean wrapsWhole = true;
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                if (c == '\\' && (inSingle || inDouble)) {
+                    i++;
+                    continue;
+                }
+                if (c == '\'' && !inDouble) {
+                    inSingle = !inSingle;
+                } else if (c == '"' && !inSingle) {
+                    inDouble = !inDouble;
+                } else if (!inSingle && !inDouble) {
+                    if (c == '(') {
+                        depth++;
+                    } else if (c == ')') {
+                        depth--;
+                        if (depth == 0 && i < s.length() - 1) {
+                            wrapsWhole = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!wrapsWhole || depth != 0) {
+                break;
+            }
+            s = s.substring(1, s.length() - 1).trim();
+        }
+        return s;
+    }
+
+    private static int findBinaryOpOutsideQuotes(String expr, String op) {
+        int paren = 0;
+        int bracket = 0;
+        boolean inSingle = false;
+        boolean inDouble = false;
+        int limit = expr.length() - op.length();
+        for (int i = 0; i <= limit; i++) {
+            char c = expr.charAt(i);
+            if (c == '\\' && (inSingle || inDouble)) {
+                i++;
+                continue;
+            }
+            if (c == '\'' && !inDouble) {
+                inSingle = !inSingle;
+            } else if (c == '"' && !inSingle) {
+                inDouble = !inDouble;
+            } else if (!inSingle && !inDouble) {
+                if (c == '(') {
+                    paren++;
+                } else if (c == ')') {
+                    paren = Math.max(0, paren - 1);
+                } else if (c == '[') {
+                    bracket++;
+                } else if (c == ']') {
+                    bracket = Math.max(0, bracket - 1);
+                } else if (paren == 0 && bracket == 0 && expr.startsWith(op, i)) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private static int findAdditiveOpRightToLeft(String expr) {
+        int paren = 0;
+        int bracket = 0;
+        boolean inSingle = false;
+        boolean inDouble = false;
+        int lastIdx = -1;
+        for (int i = 0; i < expr.length(); i++) {
+            char c = expr.charAt(i);
+            if (c == '\\' && (inSingle || inDouble)) {
+                i++;
+                continue;
+            }
+            if (c == '\'' && !inDouble) {
+                inSingle = !inSingle;
+            } else if (c == '"' && !inSingle) {
+                inDouble = !inDouble;
+            } else if (!inSingle && !inDouble) {
+                if (c == '(') {
+                    paren++;
+                } else if (c == ')') {
+                    paren = Math.max(0, paren - 1);
+                } else if (c == '[') {
+                    bracket++;
+                } else if (c == ']') {
+                    bracket = Math.max(0, bracket - 1);
+                } else if (paren == 0 && bracket == 0 && (c == '+' || c == '-') && i > 0) {
+                    char prev = findPrevNonSpace(expr, i - 1);
+                    if (prev != '+' && prev != '-' && prev != '*' && prev != '/'
+                            && prev != '(' && prev != '=' && prev != '!' && prev != '<' && prev != '>') {
+                        lastIdx = i;
+                    }
+                }
+            }
+        }
+        return lastIdx;
+    }
+
+    private static int findMultiplicativeOpRightToLeft(String expr) {
+        int paren = 0;
+        int bracket = 0;
+        boolean inSingle = false;
+        boolean inDouble = false;
+        int lastIdx = -1;
+        for (int i = 0; i < expr.length(); i++) {
+            char c = expr.charAt(i);
+            if (c == '\\' && (inSingle || inDouble)) {
+                i++;
+                continue;
+            }
+            if (c == '\'' && !inDouble) {
+                inSingle = !inSingle;
+            } else if (c == '"' && !inSingle) {
+                inDouble = !inDouble;
+            } else if (!inSingle && !inDouble) {
+                if (c == '(') {
+                    paren++;
+                } else if (c == ')') {
+                    paren = Math.max(0, paren - 1);
+                } else if (c == '[') {
+                    bracket++;
+                } else if (c == ']') {
+                    bracket = Math.max(0, bracket - 1);
+                } else if (paren == 0 && bracket == 0 && (c == '*' || c == '/' || c == '%') && i > 0) {
+                    lastIdx = i;
+                }
+            }
+        }
+        return lastIdx;
+    }
+
+    private static char findPrevNonSpace(String s, int idx) {
+        for (int i = idx; i >= 0; i--) {
+            char c = s.charAt(i);
+            if (!Character.isWhitespace(c)) {
+                return c;
+            }
+        }
+        return '(';
     }
 
     private static void verifyTransitionAssets(

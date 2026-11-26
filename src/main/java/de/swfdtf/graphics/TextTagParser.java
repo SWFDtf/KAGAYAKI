@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Parser for KAGAYAKI Visual Novel rich text strings supporting {@code [variable]} interpolation,
@@ -22,6 +24,9 @@ public final class TextTagParser {
      * character position of each {@code {image=...}} inline image span.
      */
     public static final char OBJECT_REPLACEMENT_CHAR = '\uFFFC';
+
+    private static final Pattern FORMAT_SPEC_PATTERN =
+            Pattern.compile("^([0 +,\\-]*)([0-9]*)(\\.[0-9]+)?([fFdDs%])$");
 
     private TextTagParser() {
     }
@@ -354,11 +359,20 @@ public final class TextTagParser {
                 }
                 String key = raw.substring(i + 1, closeIdx).trim();
                 if (!key.isEmpty() && lookup != null) {
-                    Object value = lookup.apply(key);
-                    if (value != null) {
-                        out.append(value);
-                        i = closeIdx + 1;
-                        continue;
+                    int colonIdx = findFormatColonIndex(key);
+                    String varExpr = colonIdx > 0 ? key.substring(0, colonIdx).trim() : key;
+                    String formatSpec = colonIdx > 0 ? key.substring(colonIdx + 1).trim() : null;
+                    if (!varExpr.isEmpty()) {
+                        Object value = lookup.apply(varExpr);
+                        if (value != null) {
+                            if (formatSpec != null && !formatSpec.isEmpty()) {
+                                out.append(formatInterpolatedValue(value, formatSpec));
+                            } else {
+                                out.append(value);
+                            }
+                            i = closeIdx + 1;
+                            continue;
+                        }
                     }
                 }
                 out.append(raw, i, closeIdx + 1);
@@ -369,6 +383,77 @@ public final class TextTagParser {
             }
         }
         return out.toString();
+    }
+
+    private static int findFormatColonIndex(String token) {
+        int parenDepth = 0;
+        boolean inSingle = false;
+        boolean inDouble = false;
+        for (int i = 0; i < token.length(); i++) {
+            char c = token.charAt(i);
+            if (c == '\\' && (inSingle || inDouble)) {
+                i++;
+                continue;
+            }
+            if (c == '\'' && !inDouble) {
+                inSingle = !inSingle;
+            } else if (c == '"' && !inSingle) {
+                inDouble = !inDouble;
+            } else if (!inSingle && !inDouble) {
+                if (c == '(') {
+                    parenDepth++;
+                } else if (c == ')') {
+                    parenDepth = Math.max(0, parenDepth - 1);
+                } else if (c == ':' && parenDepth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private static String formatInterpolatedValue(Object value, String formatSpec) {
+        Matcher matcher = FORMAT_SPEC_PATTERN.matcher(formatSpec);
+        if (!matcher.matches()) {
+            return String.valueOf(value);
+        }
+        String flags = matcher.group(1) != null ? matcher.group(1) : "";
+        String width = matcher.group(2) != null ? matcher.group(2) : "";
+        String precision = matcher.group(3) != null ? matcher.group(3) : "";
+        char conversion = matcher.group(4).charAt(0);
+        try {
+            if (conversion == '%') {
+                if (!(value instanceof Number num)) {
+                    return String.valueOf(value);
+                }
+                String fmt = "%" + flags + width + precision + "f%%";
+                return String.format(Locale.US, fmt, num.doubleValue() * 100.0);
+            }
+            if (conversion == 'f' || conversion == 'F') {
+                if (!(value instanceof Number num)) {
+                    return String.valueOf(value);
+                }
+                String fmt = "%" + flags + width + precision + "f";
+                return String.format(Locale.US, fmt, num.doubleValue());
+            }
+            if (conversion == 'd' || conversion == 'D') {
+                if (!(value instanceof Number num) || !precision.isEmpty()) {
+                    return String.valueOf(value);
+                }
+                String fmt = "%" + flags + width + "d";
+                return String.format(Locale.US, fmt, num.longValue());
+            }
+            if (conversion == 's') {
+                if (flags.isEmpty() && width.isEmpty() && precision.isEmpty()) {
+                    return String.valueOf(value);
+                }
+                String fmt = "%" + flags + width + precision + "s";
+                return String.format(Locale.US, fmt, String.valueOf(value));
+            }
+        } catch (RuntimeException ignored) {
+            return String.valueOf(value);
+        }
+        return String.valueOf(value);
     }
 
     /**

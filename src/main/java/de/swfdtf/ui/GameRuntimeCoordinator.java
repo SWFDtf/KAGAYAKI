@@ -20,9 +20,12 @@ import de.swfdtf.graphics.RenderMode;
 import de.swfdtf.graphics.RenderPipeline2D;
 import de.swfdtf.graphics.SceneController;
 import de.swfdtf.graphics.SceneGraph;
+import de.swfdtf.graphics.SceneNode;
+import de.swfdtf.graphics.SpriteNode;
 import de.swfdtf.graphics.TextureManager;
 import de.swfdtf.graphics.Transition;
 import de.swfdtf.graphics.TransitionManager;
+import de.swfdtf.math.Rect2f;
 import de.swfdtf.parser.ProjectScanner;
 import de.swfdtf.parser.ScriptRuntime;
 import de.swfdtf.parser.ScriptSession;
@@ -49,6 +52,7 @@ public final class GameRuntimeCoordinator implements GameHost {
 
     private static final String LIVE_DIRECTOR_CLASS = "de.swfdtf.tools.LiveDirectorOverlay";
     private static final String DEVELOPER_INSPECTORS_CLASS = "de.swfdtf.tools.DeveloperInspectors";
+    private static final String COLLISION_DEBUG_TAG = "collision_debug_overlay";
 
     private EngineApplication app;
     private EngineAPI api;
@@ -88,6 +92,7 @@ public final class GameRuntimeCoordinator implements GameHost {
     private final boolean[] prevKeys = new boolean[512];
     private String lastSpokenLineId = "";
     private boolean autoStartMainMenu = true;
+    private boolean collisionDebugOverlayEnabled = false;
     private boolean initialized = false;
 
     /**
@@ -393,6 +398,9 @@ public final class GameRuntimeCoordinator implements GameHost {
             handleGlobalShortcuts(input);
         }
 
+        if (collisionDebugOverlayEnabled) {
+            syncCollisionDebugOverlay();
+        }
         syncDialogueAndOverlayScreens();
         screenManager.update(dt, input);
     }
@@ -451,6 +459,12 @@ public final class GameRuntimeCoordinator implements GameHost {
             }
         }
 
+        if (justPressed(input, GLFW.GLFW_KEY_F9)) {
+            collisionDebugOverlayEnabled = !collisionDebugOverlayEnabled;
+            api.setProperty("collisionDebugOverlay", collisionDebugOverlayEnabled);
+            syncCollisionDebugOverlay();
+        }
+
         if (screenManager.isModalActive()) {
             if (justPressed(input, GLFW.GLFW_KEY_ESCAPE)) {
                 Screen topModal = screenManager.getTopModalScreen();
@@ -500,6 +514,47 @@ public final class GameRuntimeCoordinator implements GameHost {
             toastOverlay.setSkipPillActive(true);
         } else if (advScreen != null && !input.isCtrlDown() && advScreen.isSkipActive()) {
             // Leave skip toggleable from QuickMenu too; hold Ctrl activates fast skip
+        }
+    }
+
+    private void syncCollisionDebugOverlay() {
+        if (app == null || app.getSceneGraph() == null) {
+            return;
+        }
+        SceneGraph graph = app.getSceneGraph();
+        graph.removeByTag(SceneGraph.LAYER_INSPECTOR, COLLISION_DEBUG_TAG);
+        if (!collisionDebugOverlayEnabled || session == null) {
+            return;
+        }
+        SceneNode banner = new SceneNode("collision_debug:banner", COLLISION_DEBUG_TAG);
+        banner.getTransform().setXpos(16.0f).setYpos(16.0f);
+        banner.setSize(220.0f, 28.0f);
+        banner.setFillColorRgba(new float[]{0.05f, 0.14f, 0.10f, 0.78f});
+        banner.setBorderThickness(2.0f);
+        banner.setBorderColorRgba(new float[]{0.15f, 0.95f, 0.55f, 0.95f});
+        graph.addNode(SceneGraph.LAYER_INSPECTOR, banner);
+
+        SceneController sc = session.getSceneController();
+        ObjectMotionController motion = sc.getMotionController();
+        for (java.util.Map.Entry<String, SpriteNode> entry : sc.getActiveSprites().entrySet()) {
+            Rect2f box = motion.resolveDebugHitbox(entry.getKey(), entry.getValue());
+            SceneNode boxNode = new SceneNode("collision_debug:sprite:" + entry.getKey(), COLLISION_DEBUG_TAG);
+            boxNode.getTransform().setXpos(box.x()).setYpos(box.y());
+            boxNode.setSize(Math.max(1.0f, box.width()), Math.max(1.0f, box.height()));
+            boxNode.setFillColorRgba(new float[]{0.10f, 0.90f, 0.45f, 0.16f});
+            boxNode.setBorderThickness(2.0f);
+            boxNode.setBorderColorRgba(new float[]{0.15f, 1.0f, 0.50f, 0.92f});
+            graph.addNode(SceneGraph.LAYER_INSPECTOR, boxNode);
+        }
+        for (java.util.Map.Entry<String, Rect2f> zone : motion.getTriggerZoneRects().entrySet()) {
+            Rect2f zr = zone.getValue();
+            SceneNode zoneNode = new SceneNode("collision_debug:zone:" + zone.getKey(), COLLISION_DEBUG_TAG);
+            zoneNode.getTransform().setXpos(zr.x()).setYpos(zr.y());
+            zoneNode.setSize(Math.max(1.0f, zr.width()), Math.max(1.0f, zr.height()));
+            zoneNode.setFillColorRgba(new float[]{1.0f, 0.85f, 0.15f, 0.14f});
+            zoneNode.setBorderThickness(2.0f);
+            zoneNode.setBorderColorRgba(new float[]{1.0f, 0.85f, 0.15f, 0.92f});
+            graph.addNode(SceneGraph.LAYER_INSPECTOR, zoneNode);
         }
     }
 

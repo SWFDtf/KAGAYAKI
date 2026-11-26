@@ -57,13 +57,32 @@ public final class SceneController {
      * @param backgroundAssetPath active background path (nullable)
      * @param backgroundTransform background transform copy
      * @param activeSprites       ordered map of active character/master sprite tags
+     * @param motionSnapshot      optional captured {@link ObjectMotionController.MotionSnapshot} (nullable)
      */
     public record StageSnapshot(
             String backgroundTag,
             String backgroundAssetPath,
             Transform2D backgroundTransform,
-            Map<String, StageEntry> activeSprites
+            Map<String, StageEntry> activeSprites,
+            ObjectMotionController.MotionSnapshot motionSnapshot
     ) {
+        /**
+         * Backwards-compatible 4-argument constructor without motion state.
+         *
+         * @param backgroundTag       active background tag (nullable)
+         * @param backgroundAssetPath active background path (nullable)
+         * @param backgroundTransform background transform copy
+         * @param activeSprites       ordered map of active character/master sprite tags
+         */
+        public StageSnapshot(
+                String backgroundTag,
+                String backgroundAssetPath,
+                Transform2D backgroundTransform,
+                Map<String, StageEntry> activeSprites
+        ) {
+            this(backgroundTag, backgroundAssetPath, backgroundTransform, activeSprites, null);
+        }
+
         /** Normalizes the background transform and defensively copies active sprite entries. */
         public StageSnapshot {
             backgroundTransform = backgroundTransform != null ? backgroundTransform.copy() : new Transform2D();
@@ -87,6 +106,8 @@ public final class SceneController {
     private final Map<String, String> imageDefinitions = new LinkedHashMap<>();
     private final Map<String, VJavaAst.LayeredImageDef> layeredImageDefinitions = new LinkedHashMap<>();
     private final Map<String, Transform2D> namedTransforms = new LinkedHashMap<>();
+    private final Map<String, List<VJavaAst.AtlStep>> namedTransformSteps = new LinkedHashMap<>();
+    private final Map<String, ATLTransform> activeSpriteAtl = new LinkedHashMap<>();
     private final ObjectMotionController motionController = new ObjectMotionController(activeSprites);
 
     private Path projectRoot;
@@ -241,8 +262,14 @@ public final class SceneController {
         }
 
         activeSprites.put(tag, sprite);
+        activeSpriteAtl.remove(tag);
         if (resolvedPositionName != null) {
             spritePositionNames.put(tag, resolvedPositionName);
+            List<VJavaAst.AtlStep> namedSteps = findNamedTransformSteps(resolvedPositionName);
+            if (namedSteps != null && !namedSteps.isEmpty()) {
+                sprite.setTransform(new Transform2D());
+                attachAtlTransform(tag, namedSteps);
+            }
         } else {
             spritePositionNames.remove(tag);
         }
@@ -264,6 +291,7 @@ public final class SceneController {
         }
         SpriteNode removed = activeSprites.remove(tag);
         spritePositionNames.remove(tag);
+        activeSpriteAtl.remove(tag);
         if (removed != null) {
             sceneGraph.getLayer(SceneGraph.LAYER_MASTER).removeNode(removed);
             notifyTransition("hide:" + tag, transitionExpr);
@@ -294,6 +322,74 @@ public final class SceneController {
         if (name != null && transform != null) {
             namedTransforms.put(name.trim(), transform.copy());
         }
+    }
+
+    /**
+     * Registers executable ATL keyframes for a named {@code transform} declaration so subsequent
+     * {@code show <tag> at <name>} animations play and loop automatically over frames.
+     *
+     * @param name  transform name
+     * @param steps ATL timeline steps
+     */
+    public void registerTransformSteps(String name, List<VJavaAst.AtlStep> steps) {
+        if (name != null && steps != null && !steps.isEmpty()) {
+            namedTransformSteps.put(name.trim(), List.copyOf(steps));
+        }
+    }
+
+    /**
+     * Attaches and starts an executable {@link ATLTransform} on an active sprite tag.
+     * Clears {@code xalign}/{@code yalign} automatically when {@code xpos}/{@code ypos} are explicitly set.
+     *
+     * @param tag   target sprite tag
+     * @param steps ATL steps to execute
+     */
+    public void attachAtlTransform(String tag, List<VJavaAst.AtlStep> steps) {
+        if (tag == null || steps == null || steps.isEmpty()) {
+            return;
+        }
+        SpriteNode sprite = activeSprites.get(tag);
+        if (sprite == null) {
+            return;
+        }
+        Transform2D tf = sprite.getTransform();
+        clearAlignIfAbsolutePosInAtl(steps, tf);
+        ATLTransform atl = ATLTransform.fromAst(steps);
+        atl.start(tf);
+        if (!atl.isFinished()) {
+            activeSpriteAtl.put(tag, atl);
+        } else {
+            activeSpriteAtl.remove(tag);
+        }
+    }
+
+    /**
+     * Moves an active sprite immediately to {@code (x, y)} in logical stage coordinates (for Java blocks).
+     * Safe no-op if {@code tag} is not currently visible on stage.
+     *
+     * @param tag sprite tag
+     * @param x   target X coordinate
+     * @param y   target Y coordinate
+     */
+    public void moveSprite(String tag, float x, float y) {
+        moveSprite(tag, x, y, 0.0, "linear");
+    }
+
+    /**
+     * Moves an active sprite to {@code (x, y)} immediately or animated over {@code durationSeconds}.
+     * Safe no-op if {@code tag} is not currently visible on stage.
+     *
+     * @param tag             sprite tag
+     * @param x               target X coordinate
+     * @param y               target Y coordinate
+     * @param durationSeconds tween duration in seconds ({@code <= 0} places immediately)
+     * @param easing          easing curve name
+     */
+    public void moveSprite(String tag, float x, float y, double durationSeconds, String easing) {
+        if (tag == null || !activeSprites.containsKey(tag)) {
+            return;
+        }
+        motionController.startMove(tag, x, y, false, durationSeconds, easing);
     }
 
     /**
@@ -332,17 +428,43 @@ public final class SceneController {
     }
 
     /**
-     * Advances time-dependent displayables on active stage sprites and the background node.
+     * Advances time-dependent displayables and active ATL keyframe timelines on stage sprites.
      *
      * @param dt elapsed frame delta in seconds
      */
     public void update(double dt) {
+        updateAtl(dt);
         updateMotion(dt, ObjectMotionController.MotionInput.NONE);
     }
 
     /**
+     * Advances active ATL keyframe timelines attached to stage sprites by {@code dt} seconds.
+     *
+     * @param dt elapsed frame delta in seconds
+     */
+    public void updateAtl(double dt) {
+        if (dt <= 0.0 || !Double.isFinite(dt) || activeSpriteAtl.isEmpty()) {
+            return;
+        }
+        var it = activeSpriteAtl.entrySet().iterator();
+        while (it.hasNext()) {
+            var entry = it.next();
+            SpriteNode sprite = activeSprites.get(entry.getKey());
+            if (sprite == null) {
+                it.remove();
+                continue;
+            }
+            ATLTransform atl = entry.getValue();
+            atl.update(dt, sprite.getTransform());
+            if (atl.isFinished()) {
+                it.remove();
+            }
+        }
+    }
+
+    /**
      * Advances active displayables plus sprite movement tweens, WASD controls, 2D physics,
-     * and collision triggers using the supplied {@link ObjectMotionController.MotionInput}.
+     * camera follow offsets, and collision triggers using the supplied {@link ObjectMotionController.MotionInput}.
      *
      * @param dt          elapsed frame delta in seconds
      * @param motionInput frame movement and jump input (nullable)
@@ -355,6 +477,13 @@ public final class SceneController {
             sprite.update(dt);
         }
         motionController.update(dt, motionInput);
+        if (motionController.isCameraFollowActive() && backgroundNode != null) {
+            backgroundNode.getTransform()
+                    .setXalign(Float.NaN)
+                    .setYalign(Float.NaN)
+                    .setXpos(-motionController.getCameraOffsetX())
+                    .setYpos(-motionController.getCameraOffsetY());
+        }
     }
 
     /**
@@ -387,12 +516,13 @@ public final class SceneController {
                 backgroundTag,
                 backgroundNode != null ? backgroundNode.getAssetPath() : null,
                 backgroundNode != null ? backgroundNode.getTransform() : new Transform2D(),
-                entries
+                entries,
+                motionController.snapshotState()
         );
     }
 
     /**
-     * Restores stage background and sprites cleanly from a previously captured {@link StageSnapshot}.
+     * Restores stage background, sprites, and motion/physics state cleanly from {@link StageSnapshot}.
      *
      * @param snapshot stage snapshot to restore
      */
@@ -420,6 +550,7 @@ public final class SceneController {
                 node.setAssetPath(entry.assetPath());
             }
         }
+        motionController.restoreState(snapshot.motionSnapshot());
     }
 
     /**
@@ -428,6 +559,7 @@ public final class SceneController {
     public void clearMasterSprites() {
         activeSprites.clear();
         spritePositionNames.clear();
+        activeSpriteAtl.clear();
         sceneGraph.getLayer(SceneGraph.LAYER_MASTER).clear();
     }
 
@@ -503,6 +635,63 @@ public final class SceneController {
      */
     public void setProjectRoot(Path projectRoot) {
         this.projectRoot = projectRoot;
+    }
+
+    private List<VJavaAst.AtlStep> findNamedTransformSteps(String name) {
+        if (name == null) {
+            return null;
+        }
+        String trimmed = name.trim();
+        List<VJavaAst.AtlStep> exact = namedTransformSteps.get(trimmed);
+        if (exact != null) {
+            return exact;
+        }
+        return namedTransformSteps.get(trimmed.toLowerCase(Locale.ROOT));
+    }
+
+    private static void clearAlignIfAbsolutePosInAtl(List<VJavaAst.AtlStep> steps, Transform2D tf) {
+        boolean setsXpos = false;
+        boolean setsYpos = false;
+        boolean setsXalign = false;
+        boolean setsYalign = false;
+        for (VJavaAst.AtlStep step : steps) {
+            if (step == null) {
+                continue;
+            }
+            for (String rawKey : step.properties().keySet()) {
+                if (rawKey == null) {
+                    continue;
+                }
+                String key = rawKey.trim().toLowerCase(Locale.ROOT);
+                switch (key) {
+                    case "xpos", "pos" -> {
+                        setsXpos = true;
+                        if ("pos".equals(key)) {
+                            setsYpos = true;
+                        }
+                    }
+                    case "ypos" -> setsYpos = true;
+                    case "xalign", "align" -> {
+                        setsXalign = true;
+                        if ("align".equals(key)) {
+                            setsYalign = true;
+                        }
+                    }
+                    case "yalign" -> setsYalign = true;
+                    default -> {
+                    }
+                }
+            }
+            if (!step.children().isEmpty()) {
+                clearAlignIfAbsolutePosInAtl(step.children(), tf);
+            }
+        }
+        if (setsXpos && !setsXalign) {
+            tf.setXalign(Float.NaN);
+        }
+        if (setsYpos && !setsYalign) {
+            tf.setYalign(Float.NaN);
+        }
     }
 
     private Transform2D resolvePositionTransform(String name) {

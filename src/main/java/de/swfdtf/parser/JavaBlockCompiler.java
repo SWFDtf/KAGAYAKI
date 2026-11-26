@@ -5,8 +5,12 @@ import de.swfdtf.graphics.SceneController;
 import de.swfdtf.math.Transform2D;
 import de.swfdtf.state.StateStore;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,12 +20,17 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.CodeSource;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -74,6 +83,25 @@ public final class JavaBlockCompiler {
     private static final Set<String> VISIBILITY_OR_STATIC_MODIFIERS = Set.of(
             "public", "private", "protected", "static"
     );
+
+    private static final String CACHE_DIR_RELATIVE = ".vjava-cache";
+    private static final int CACHE_MAGIC = 0x564A4331;
+    private static final int MAX_MEMORY_CACHE_ENTRIES = 64;
+    private static final Map<String, CachedProjectArtifact> MEMORY_CACHE =
+            Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, CachedProjectArtifact> eldest) {
+                    return size() > MAX_MEMORY_CACHE_ENTRIES;
+                }
+            });
+
+    private record CachedProjectArtifact(
+            boolean hasUserTypes,
+            Map<String, byte[]> bytecode,
+            Map<String, String> snippetClassByBlockId,
+            Set<String> emptyBlockIds
+    ) {
+    }
 
     /** Creates a new {@code JavaBlockCompiler} instance. */
     public JavaBlockCompiler() {
@@ -227,7 +255,7 @@ public final class JavaBlockCompiler {
      */
     public CompiledProjectBlocks compile(VJavaAst.ProjectAst project) throws VJavaCompileException {
         Objects.requireNonNull(project, "project must not be null");
-        return compile(collectJavaBlocks(project));
+        return compile(collectJavaBlocks(project), project.projectRoot());
     }
 
     /**
@@ -238,9 +266,36 @@ public final class JavaBlockCompiler {
      * @throws VJavaCompileException if any block fails Java compilation
      */
     public CompiledProjectBlocks compile(List<VJavaAst.JavaBlockNode> blocks) throws VJavaCompileException {
+        return compile(blocks, null);
+    }
+
+    /**
+     * Compiles an ordered list of {@link VJavaAst.JavaBlockNode} instances with optional on-disk bytecode
+     * caching under {@code <projectRoot>/build/.vjava-cache}.
+     *
+     * @param blocks      ordered list of Java blocks to compile
+     * @param projectRoot optional project root enabling {@code build/.vjava-cache} persistence (nullable)
+     * @return compiled block registry and classloader
+     * @throws VJavaCompileException if any block fails Java compilation
+     */
+    public CompiledProjectBlocks compile(List<VJavaAst.JavaBlockNode> blocks, Path projectRoot)
+            throws VJavaCompileException {
         Objects.requireNonNull(blocks, "blocks must not be null");
         if (blocks.isEmpty()) {
             return new CompiledProjectBlocks(Map.of(), resolveParentClassLoader(), false);
+        }
+
+        ClassLoader parentLoader = resolveParentClassLoader();
+        Path cacheFile = projectRoot != null
+                ? projectRoot.resolve("build").resolve(CACHE_DIR_RELATIVE)
+                        .resolve(computeBlocksDigest(blocks) + ".vjc")
+                : null;
+
+        if (cacheFile != null) {
+            CachedProjectArtifact cached = tryLoadCachedArtifact(cacheFile);
+            if (cached != null) {
+                return instantiateFromCache(cached, parentLoader);
+            }
         }
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
@@ -282,7 +337,6 @@ public final class JavaBlockCompiler {
         }
 
         Map<String, byte[]> compiledBytecode = new LinkedHashMap<>();
-        ClassLoader parentLoader = resolveParentClassLoader();
         String classpath = buildCompilerClasspath();
         boolean hasUserTypes = !userTypeMembers.isEmpty();
 
@@ -291,12 +345,15 @@ public final class JavaBlockCompiler {
         }
 
         Map<String, VJavaExecutable> executableMap = new LinkedHashMap<>();
+        Map<String, String> snippetClassByBlockId = new LinkedHashMap<>();
+        Set<String> emptyBlockIds = new LinkedHashSet<>();
         List<SnippetUnit> snippetUnits = new ArrayList<>();
         Map<String, SnippetUnit> unitByFileUri = new HashMap<>();
 
         int snippetIndex = 0;
         for (ParsedBlock parsed : parsedBlocks) {
             if (parsed.executableStatements().isEmpty()) {
+                emptyBlockIds.add(parsed.block().id());
                 executableMap.put(parsed.block().id(), (state, persistent, engine, scene) -> {
                     // Declaration/import-only Java block
                 });
@@ -308,6 +365,7 @@ public final class JavaBlockCompiler {
             InMemorySourceFile sourceObj = new InMemorySourceFile(binaryName, built.source());
             SnippetUnit unit = new SnippetUnit(parsed, className, binaryName, built, sourceObj);
             snippetUnits.add(unit);
+            snippetClassByBlockId.put(parsed.block().id(), binaryName);
             unitByFileUri.put(sourceObj.toUri().toString(), unit);
         }
 
@@ -343,7 +401,152 @@ public final class JavaBlockCompiler {
             }
         }
 
+        if (cacheFile != null) {
+            CachedProjectArtifact artifact = new CachedProjectArtifact(
+                    hasUserTypes, compiledBytecode, snippetClassByBlockId, emptyBlockIds);
+            storeCachedArtifact(cacheFile, artifact);
+        }
+
         return new CompiledProjectBlocks(executableMap, classLoader, hasUserTypes);
+    }
+
+    private static String computeBlocksDigest(List<VJavaAst.JavaBlockNode> blocks) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            md.update("kagayaki-vjc-v1|".getBytes(StandardCharsets.UTF_8));
+            md.update(System.getProperty("java.specification.version", "21").getBytes(StandardCharsets.UTF_8));
+            for (VJavaAst.JavaBlockNode block : blocks) {
+                md.update((byte) '|');
+                md.update(block.id().getBytes(StandardCharsets.UTF_8));
+                md.update((byte) '=');
+                md.update(block.code().getBytes(StandardCharsets.UTF_8));
+            }
+            return HexFormat.of().formatHex(md.digest());
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 MessageDigest unavailable", ex);
+        }
+    }
+
+    private static CachedProjectArtifact tryLoadCachedArtifact(Path cacheFile) {
+        if (!Files.isRegularFile(cacheFile)) {
+            return null;
+        }
+        String memKey = cacheFile.toAbsolutePath().normalize().toString();
+        CachedProjectArtifact memHit = MEMORY_CACHE.get(memKey);
+        if (memHit != null) {
+            return memHit;
+        }
+        try (DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(cacheFile)))) {
+            if (in.readInt() != CACHE_MAGIC) {
+                return null;
+            }
+            boolean hasUserTypes = in.readBoolean();
+            int byteCount = in.readInt();
+            if (byteCount < 0 || byteCount > 4096) {
+                return null;
+            }
+            Map<String, byte[]> bytecode = new LinkedHashMap<>();
+            for (int i = 0; i < byteCount; i++) {
+                String name = in.readUTF();
+                int len = in.readInt();
+                if (len < 0 || len > 16 * 1024 * 1024) {
+                    return null;
+                }
+                byte[] bytes = in.readNBytes(len);
+                if (bytes.length != len) {
+                    return null;
+                }
+                bytecode.put(name, bytes);
+            }
+            int mapCount = in.readInt();
+            if (mapCount < 0 || mapCount > 4096) {
+                return null;
+            }
+            Map<String, String> snippetClassByBlockId = new LinkedHashMap<>();
+            for (int i = 0; i < mapCount; i++) {
+                snippetClassByBlockId.put(in.readUTF(), in.readUTF());
+            }
+            int emptyCount = in.readInt();
+            if (emptyCount < 0 || emptyCount > 4096) {
+                return null;
+            }
+            Set<String> emptyBlockIds = new LinkedHashSet<>();
+            for (int i = 0; i < emptyCount; i++) {
+                emptyBlockIds.add(in.readUTF());
+            }
+            CachedProjectArtifact loaded = new CachedProjectArtifact(
+                    hasUserTypes, bytecode, snippetClassByBlockId, emptyBlockIds);
+            MEMORY_CACHE.put(memKey, loaded);
+            return loaded;
+        } catch (IOException ex) {
+            return null;
+        }
+    }
+
+    private static void storeCachedArtifact(Path cacheFile, CachedProjectArtifact artifact) {
+        String memKey = cacheFile.toAbsolutePath().normalize().toString();
+        MEMORY_CACHE.put(memKey, artifact);
+        try {
+            Path parent = cacheFile.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Path tmp = Files.createTempFile(parent != null ? parent : Path.of("."), "vjc-", ".tmp");
+            try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(tmp)))) {
+                out.writeInt(CACHE_MAGIC);
+                out.writeBoolean(artifact.hasUserTypes());
+                out.writeInt(artifact.bytecode().size());
+                for (Map.Entry<String, byte[]> entry : artifact.bytecode().entrySet()) {
+                    out.writeUTF(entry.getKey());
+                    out.writeInt(entry.getValue().length);
+                    out.write(entry.getValue());
+                }
+                out.writeInt(artifact.snippetClassByBlockId().size());
+                for (Map.Entry<String, String> entry : artifact.snippetClassByBlockId().entrySet()) {
+                    out.writeUTF(entry.getKey());
+                    out.writeUTF(entry.getValue());
+                }
+                out.writeInt(artifact.emptyBlockIds().size());
+                for (String emptyId : artifact.emptyBlockIds()) {
+                    out.writeUTF(emptyId);
+                }
+            }
+            try {
+                Files.move(tmp, cacheFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException ignored) {
+                Files.move(tmp, cacheFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException ignored) {
+            // Disk cache write failure is non-fatal
+        }
+    }
+
+    private CompiledProjectBlocks instantiateFromCache(CachedProjectArtifact cached, ClassLoader parentLoader) {
+        InMemoryClassLoader classLoader = new InMemoryClassLoader(parentLoader, cached.bytecode());
+        if (cached.hasUserTypes()) {
+            try {
+                Class.forName(USER_TYPES_BINARY_NAME, true, classLoader);
+            } catch (ClassNotFoundException e) {
+                throw new VJavaCompileException("Cached VJavaUserTypes could not be loaded", e);
+            }
+        }
+        Map<String, VJavaExecutable> executableMap = new LinkedHashMap<>();
+        for (String emptyId : cached.emptyBlockIds()) {
+            executableMap.put(emptyId, (state, persistent, engine, scene) -> {
+                // Declaration/import-only Java block
+            });
+        }
+        for (Map.Entry<String, String> entry : cached.snippetClassByBlockId().entrySet()) {
+            try {
+                Class<?> snippetClass = Class.forName(entry.getValue(), true, classLoader);
+                Object instance = snippetClass.getDeclaredConstructor().newInstance();
+                executableMap.put(entry.getKey(), (VJavaExecutable) instance);
+            } catch (Exception e) {
+                throw new VJavaCompileException(
+                        "Failed to instantiate cached snippet '" + entry.getValue() + "': " + e.getMessage(), e);
+            }
+        }
+        return new CompiledProjectBlocks(executableMap, classLoader, cached.hasUserTypes());
     }
 
     /**
@@ -384,6 +587,15 @@ public final class JavaBlockCompiler {
                 for (VJavaAst.IfBranch branch : ifs.branches()) {
                     collectFromStatements(branch.body(), out, seenIds);
                 }
+            } else if (stmt instanceof VJavaAst.MatchStatement ms) {
+                for (VJavaAst.MatchCase mc : ms.cases()) {
+                    collectFromStatements(mc.body(), out, seenIds);
+                }
+                if (ms.defaultBody() != null) {
+                    collectFromStatements(ms.defaultBody(), out, seenIds);
+                }
+            } else if (stmt instanceof VJavaAst.ParallelStatement ps) {
+                collectFromStatements(ps.statements(), out, seenIds);
             } else if (stmt instanceof VJavaAst.MenuStatement ms) {
                 for (VJavaAst.MenuChoice choice : ms.choices()) {
                     collectFromStatements(choice.body(), out, seenIds);
