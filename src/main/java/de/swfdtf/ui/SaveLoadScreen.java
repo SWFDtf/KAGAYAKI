@@ -424,6 +424,7 @@ public class SaveLoadScreen extends Screen {
 
         HBox cardRow = new HBox();
         cardRow.setSpacing(14.0f);
+        cardRow.setFillHeight(true);
 
         UiMediaSupport.PreviewImageNode thumb = new UiMediaSupport.PreviewImageNode();
         thumb.setPreferredSize(180.0f, 110.0f);
@@ -500,9 +501,20 @@ public class SaveLoadScreen extends Screen {
     public void handleSlotAction(String slotId) {
         try {
             if (mode == Mode.SAVE) {
-                String label = customNameInput.getText();
-                session.saveToSlot(slotId, label, 0, 0, null);
-                refreshSlots();
+                if (screenManager != null && session.getSaveManager().slotExists(slotId)) {
+                    ConfirmationDialogScreen dialog = getOrCreateConfirmDialog();
+                    dialog.configure(
+                            "Spielstand überschreiben?",
+                            "Slot '" + slotId + "' ist belegt. Überschreiben?",
+                            "Überschreiben",
+                            "Abbrechen",
+                            () -> executeSaveToSlot(slotId),
+                            null
+                    );
+                    screenManager.showScreen(dialog);
+                    return;
+                }
+                executeSaveToSlot(slotId);
             } else if (session.getSaveManager().slotExists(slotId)) {
                 session.loadFromSlot(slotId);
                 closeScreen();
@@ -513,6 +525,27 @@ public class SaveLoadScreen extends Screen {
         } catch (IOException ex) {
             session.getEngineApi().logError("Save/Load failed for slot '" + slotId + "': " + ex.getMessage(), ex);
         }
+    }
+
+    private void executeSaveToSlot(String slotId) {
+        try {
+            String label = customNameInput.getText();
+            session.saveToSlot(slotId, label, 0, 0, null);
+            refreshSlots();
+        } catch (IOException ex) {
+            session.getEngineApi().logError("Save failed for slot '" + slotId + "': " + ex.getMessage(), ex);
+        }
+    }
+
+    private ConfirmationDialogScreen getOrCreateConfirmDialog() {
+        Screen existing = screenManager.getScreen(ConfirmationDialogScreen.SCREEN_NAME);
+        if (existing instanceof ConfirmationDialogScreen dialog) {
+            return dialog;
+        }
+        ConfirmationDialogScreen dialog = new ConfirmationDialogScreen(screenManager);
+        dialog.setVisible(false);
+        screenManager.registerScreen(dialog);
+        return dialog;
     }
 
     /**

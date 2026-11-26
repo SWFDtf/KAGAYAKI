@@ -34,7 +34,12 @@ import de.swfdtf.parser.ScriptRuntime;
 import de.swfdtf.parser.ScriptSession;
 import de.swfdtf.parser.VJavaAst;
 import de.swfdtf.state.AutoSaveScheduler;
+import de.swfdtf.state.ChapterRegistry;
+import de.swfdtf.state.CodexGlossaryManager;
 import de.swfdtf.state.PreferencesState;
+import de.swfdtf.state.QuoteBook;
+import de.swfdtf.state.RelationshipAffinityTracker;
+import de.swfdtf.state.SaveSlotData;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.IOException;
@@ -95,8 +100,18 @@ public final class GameRuntimeCoordinator implements GameHost {
     private NotificationToastOverlay toastOverlay;
     private ClosedCaptionOverlayScreen closedCaptionOverlay;
     private ActionPromptOverlayScreen actionPromptOverlay;
+    private ConfirmationDialogScreen confirmationDialogScreen;
+    private CodexScreen codexScreen;
+    private ChapterSelectScreen chapterSelectScreen;
+    private RelationshipOverviewScreen relationshipOverviewScreen;
+    private QuoteBookScreen quoteBookScreen;
     private KeybindingRemapper keybindingRemapper;
     private ColorBlindnessFilter colorBlindnessFilter;
+
+    private CodexGlossaryManager codexGlossaryManager;
+    private ChapterRegistry chapterRegistry;
+    private RelationshipAffinityTracker relationshipTracker;
+    private QuoteBook quoteBook;
 
     private Screen liveDirectorScreen;
     private Screen developerInspectorsScreen;
@@ -166,6 +181,10 @@ public final class GameRuntimeCoordinator implements GameHost {
                         : null
         );
         this.lastObservedRuntimeStatus = session.getRuntime().getStatus();
+        this.codexGlossaryManager = new CodexGlossaryManager(session.getPersistentState());
+        this.chapterRegistry = new ChapterRegistry(session.getPersistentState());
+        this.relationshipTracker = new RelationshipAffinityTracker(session.getStateStore());
+        this.quoteBook = new QuoteBook(session.getPersistentState());
 
         this.audioEngine = new AudioEngine(
                 projectRoot,
@@ -254,6 +273,10 @@ public final class GameRuntimeCoordinator implements GameHost {
         api.registerService(KeybindingRemapper.class, keybindingRemapper);
         api.registerService(GamepadNavigationRouter.class, screenManager.getGamepadRouter());
         api.registerService(ColorBlindnessFilter.class, colorBlindnessFilter);
+        api.registerService(CodexGlossaryManager.class, codexGlossaryManager);
+        api.registerService(ChapterRegistry.class, chapterRegistry);
+        api.registerService(RelationshipAffinityTracker.class, relationshipTracker);
+        api.registerService(QuoteBook.class, quoteBook);
     }
 
     private void buildAndRegisterScreens() {
@@ -277,6 +300,11 @@ public final class GameRuntimeCoordinator implements GameHost {
         this.toastOverlay = new NotificationToastOverlay(session, screenManager);
         this.closedCaptionOverlay = new ClosedCaptionOverlayScreen(audioEngine.getClosedCaptionQueue());
         this.actionPromptOverlay = new ActionPromptOverlayScreen();
+        this.confirmationDialogScreen = new ConfirmationDialogScreen(screenManager);
+        this.codexScreen = new CodexScreen(codexGlossaryManager, screenManager);
+        this.chapterSelectScreen = new ChapterSelectScreen(chapterRegistry, session, screenManager);
+        this.relationshipOverviewScreen = new RelationshipOverviewScreen(relationshipTracker, screenManager);
+        this.quoteBookScreen = new QuoteBookScreen(quoteBook, screenManager);
 
         registerHidden(advScreen);
         registerHidden(nvlScreen);
@@ -296,13 +324,103 @@ public final class GameRuntimeCoordinator implements GameHost {
         registerHidden(achievementsScreen);
         registerHidden(closedCaptionOverlay);
         registerHidden(actionPromptOverlay);
+        registerHidden(confirmationDialogScreen);
+        registerHidden(codexScreen);
+        registerHidden(chapterSelectScreen);
+        registerHidden(relationshipOverviewScreen);
+        registerHidden(quoteBookScreen);
         screenManager.showScreen(toastOverlay);
 
         // Register custom .vjava screen definitions
         for (VJavaAst.ScreenDef def : session.getRuntime().getProjectAst().screens().values()) {
             Screen custom = ScreenAstBuilder.build(def, session.getRuntime(), action -> handleAstScreenAction(action));
+            if ("template_save_screen".equals(def.name()) || "template_load_screen".equals(def.name())) {
+                custom = wrapTemplateSaveLoadScreen(def, custom);
+            }
             registerHidden(custom);
         }
+    }
+
+    private Screen wrapTemplateSaveLoadScreen(VJavaAst.ScreenDef def, Screen base) {
+        boolean saveMode = "template_save_screen".equals(def.name());
+        java.util.List<TextButton> slotButtons = new java.util.ArrayList<>();
+        VBox targetVBox = findFirstVBox(base.getRoot());
+        for (int i = 1; i <= 4; i++) {
+            final int slotNum = i;
+            final String slotId = "slot_" + i;
+            TextButton btn = UiMediaSupport.createActionButton("Slot " + i + " — Leer", 340.0f, 36.0f, () -> { });
+            slotButtons.add(btn);
+            if (targetVBox != null) {
+                targetVBox.addChild(btn);
+            } else if (base.getRoot() != null) {
+                base.getRoot().addChild(btn);
+            }
+        }
+        Screen wrapped = new Screen(base.getName(), base.getZOrder(), base.isModal()) {
+            @Override
+            public void onShow() {
+                refreshTemplateSlotButtons(slotButtons, saveMode);
+            }
+        };
+        wrapped.setRoot(base.getRoot());
+        for (Screen.KeyBinding kb : base.getKeyBindings()) {
+            wrapped.addKeyBinding(kb.glfwKey(), kb.requiredModsMask(), kb.action());
+        }
+        refreshTemplateSlotButtons(slotButtons, saveMode);
+        return wrapped;
+    }
+
+    private void refreshTemplateSlotButtons(java.util.List<TextButton> slotButtons, boolean saveMode) {
+        for (int i = 0; i < slotButtons.size(); i++) {
+            final int slotNum = i + 1;
+            final String slotId = "slot_" + slotNum;
+            TextButton btn = slotButtons.get(i);
+            boolean exists = session.getSaveManager().slotExists(slotId);
+            String slotLabel = "Slot " + slotNum + " — Leer";
+            if (exists) {
+                SaveSlotData.SaveMetadata meta = null;
+                try {
+                    meta = session.getSaveManager().readSlotMetadata(slotId).orElse(null);
+                } catch (IOException ignored) {
+                }
+                String name = meta != null && meta.customName() != null && !meta.customName().isBlank()
+                        ? meta.customName()
+                        : "Belegt";
+                slotLabel = "Slot " + slotNum + " — " + name;
+            }
+            btn.setText(slotLabel);
+            btn.setEnabled(saveMode || exists);
+            btn.setOnClick(() -> {
+                try {
+                    if (saveMode) {
+                        session.saveToSlot(slotId, "Slot " + slotNum, 0, 0, null);
+                        refreshTemplateSlotButtons(slotButtons, true);
+                    } else if (session.getSaveManager().slotExists(slotId)) {
+                        session.loadFromSlot(slotId);
+                        screenManager.hideScreen("template_load_screen");
+                        screenManager.hideScreen(MainMenuScreen.SCREEN_NAME);
+                    }
+                } catch (IOException ex) {
+                    api.logError("Template slot action failed: " + ex.getMessage());
+                }
+            });
+        }
+    }
+
+    private static VBox findFirstVBox(UiNode node) {
+        if (node == null) {
+            return null;
+        }
+        if (node instanceof VBox box) {
+            return box;
+        }
+        for (UiNode child : node.getChildren()) {
+            VBox found = findFirstVBox(child);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
     }
 
     private void registerHidden(Screen screen) {
@@ -585,6 +703,15 @@ public final class GameRuntimeCoordinator implements GameHost {
         } else if (justPressed(input, historyKey) && !ctrl && !shift) {
             historyLogScreen.refreshEntries();
             screenManager.showScreen(historyLogScreen);
+        } else if (!ctrl && !shift && justPressed(input, GLFW.GLFW_KEY_B)) {
+            ScriptRuntime runtime = session.getRuntime();
+            ScriptRuntime.DialoguePrompt prompt = runtime.getActiveDialogue();
+            if (runtime.getStatus() == ScriptRuntime.Status.WAITING_DIALOGUE && prompt != null) {
+                quoteBook.addQuote(prompt.speakerName(), prompt.interpolatedText(), runtime.getCurrentLabel());
+                if (toastOverlay != null) {
+                    toastOverlay.pushToast("Quote Book", "Zitat gespeichert");
+                }
+            }
         } else if (justPressed(input, autoKey) && (!wasdActive || autoKey != GLFW.GLFW_KEY_A)
                 && !ctrl && !shift) {
             advScreen.toggleAuto();

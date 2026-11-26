@@ -130,6 +130,7 @@ public final class F07UiScreensBoundaryE2eTest {
 
             // #0347: Occupy slot_1, open SaveLoadScreen in SAVE mode, trigger overwrite popup, then Escape
             screens.hideScreen(MainMenuScreen.SCREEN_NAME);
+            session.getPreferencesState().setTextSpeedCps(0.0f);
             session.start();
             app.stepOnce(FIXED_DT);
             session.saveToSlot("slot_1", "Geschützter Stand", 0, 0, null);
@@ -445,6 +446,7 @@ public final class F07UiScreensBoundaryE2eTest {
             prefs.setSkipAfterChoices(false);
 
             screens.hideScreen(MainMenuScreen.SCREEN_NAME);
+            session.getPreferencesState().setTextSpeedCps(0.0f);
             session.start();
             app.stepOnce(FIXED_DT);
 
@@ -485,6 +487,7 @@ public final class F07UiScreensBoundaryE2eTest {
             ScreenManager screens = app.getApi().getService(ScreenManager.class);
             ScriptSession session = app.getApi().getService(ScriptSession.class);
             screens.hideScreen(MainMenuScreen.SCREEN_NAME);
+            session.getPreferencesState().setTextSpeedCps(0.0f);
             session.start();
             app.stepOnce(FIXED_DT);
 

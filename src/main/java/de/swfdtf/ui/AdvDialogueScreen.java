@@ -3,12 +3,16 @@ package de.swfdtf.ui;
 import de.swfdtf.audio.AudioEngine;
 import de.swfdtf.audio.TextToSpeechService;
 import de.swfdtf.core.KeybindingRemapper;
+import de.swfdtf.graphics.FontManager;
+import de.swfdtf.graphics.RenderPipeline2D;
 import de.swfdtf.graphics.SceneLayer;
 import de.swfdtf.graphics.StyledTextLayout;
 import de.swfdtf.graphics.TextTagParser;
+import de.swfdtf.graphics.TextureManager;
 import de.swfdtf.math.Rect2f;
 import de.swfdtf.parser.ScriptRuntime;
 import de.swfdtf.parser.ScriptSession;
+import de.swfdtf.parser.VJavaAst;
 import de.swfdtf.state.PreferencesState;
 import org.lwjgl.glfw.GLFW;
 
@@ -53,6 +57,7 @@ public class AdvDialogueScreen extends Screen {
 
     private final Fixed rootContainer;
     private final Frame dialoguePanel;
+    private final Frame sidePortraitNode;
     private final Frame speakerBox;
     private final TextWidget speakerText;
     private final TextWidget dialogueText;
@@ -61,6 +66,7 @@ public class AdvDialogueScreen extends Screen {
     private final TextButton skipButton;
     private final TextButton autoButton;
 
+    private String sidePortraitAssetPath;
     private ScriptRuntime.DialoguePrompt lastPrompt;
     private StyledTextLayout.TypewriterController fallbackTypewriter;
     private int lastObservedVisibleChars = 0;
@@ -68,6 +74,7 @@ public class AdvDialogueScreen extends Screen {
     private int bleepCount = 0;
 
     private boolean skipActive = false;
+    private boolean skipToChoiceActive = false;
     private boolean autoActive = false;
     private double autoTimer = 0.0;
     private double skipTimer = 0.0;
@@ -108,6 +115,9 @@ public class AdvDialogueScreen extends Screen {
             @Override
             protected boolean onMouseDown(float lx, float ly, int button) {
                 if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                    if (tryHandleDialogueLinkClick(lx, ly)) {
+                        return true;
+                    }
                     handlePrimaryAdvance();
                     return true;
                 }
@@ -119,6 +129,30 @@ public class AdvDialogueScreen extends Screen {
                 .setBorderThickness(1.5f)
                 .setCornerRadius(10.0f)
                 .setPadding(24.0f);
+
+        this.sidePortraitNode = new Frame() {
+            @Override
+            protected void renderSelf(
+                    RenderPipeline2D pipeline,
+                    FontManager fontManager,
+                    TextureManager textureManager,
+                    double elapsedSeconds
+            ) {
+                if (sidePortraitAssetPath != null && !sidePortraitAssetPath.isBlank()) {
+                    UiRenderSupport.drawTexture(
+                            pipeline, textureManager, sidePortraitAssetPath,
+                            getContentBounds(), null, getAlpha()
+                    );
+                }
+            }
+        };
+        this.sidePortraitNode.setId("speaker_side_portrait");
+        this.sidePortraitNode.setBackgroundColorHex(ThemePalette.ELEVATED)
+                .setBorderColorHex(ThemePalette.BORDER)
+                .setBorderThickness(1.0f)
+                .setCornerRadius(6.0f)
+                .setPadding(4.0f);
+        this.sidePortraitNode.setVisible(false);
 
         this.speakerBox = new Frame();
         this.speakerBox.setBackgroundColorHex(ThemePalette.ELEVATED)
@@ -164,8 +198,9 @@ public class AdvDialogueScreen extends Screen {
         this.quickMenuRow.addChild(prefsBtn);
 
         this.rootContainer.addChildAt(this.dialoguePanel, PANEL_X, PANEL_Y, PANEL_W, PANEL_H);
+        this.rootContainer.addChildAt(this.sidePortraitNode, PANEL_X + 18.0f, PANEL_Y + 26.0f, 110.0f, 140.0f);
         this.rootContainer.addChildAt(this.speakerBox, PANEL_X + 24.0f, PANEL_Y - 42.0f, 340.0f, 50.0f);
-        this.rootContainer.addChildAt(this.dialogueText, PANEL_X + 36.0f, PANEL_Y + 26.0f, PANEL_W - 72.0f, 152.0f);
+        this.rootContainer.addChildAt(this.dialogueText, PANEL_X + 144.0f, PANEL_Y + 26.0f, PANEL_W - 180.0f, 152.0f);
         this.rootContainer.addChildAt(this.statusBadge, PANEL_X + PANEL_W - 240.0f, PANEL_Y + 12.0f, 210.0f, 28.0f);
         this.rootContainer.addChildAt(
                 this.quickMenuRow, PANEL_X + PANEL_W - 770.0f, PANEL_Y + PANEL_H - 50.0f, 740.0f, 36.0f);
@@ -245,8 +280,12 @@ public class AdvDialogueScreen extends Screen {
         ScriptRuntime runtime = session.getRuntime();
         PreferencesState prefs = session.getPreferencesState();
 
-        if (runtime.getStatus() == ScriptRuntime.Status.WAITING_MENU && !prefs.isSkipAfterChoices()) {
-            skipActive = false;
+        if (runtime.getStatus() == ScriptRuntime.Status.WAITING_MENU
+                || runtime.getStatus() == ScriptRuntime.Status.ENDED) {
+            skipToChoiceActive = false;
+            if (!prefs.isSkipAfterChoices()) {
+                skipActive = false;
+            }
         }
 
         syncFromRuntime(false);
@@ -284,6 +323,21 @@ public class AdvDialogueScreen extends Screen {
             PreferencesState prefs,
             StyledTextLayout.TypewriterController tw
     ) {
+        if (skipToChoiceActive) {
+            skipTimer += dt;
+            if (skipTimer >= SKIP_STEP_SECONDS) {
+                skipTimer = 0.0;
+                revealAllImmediate(tw);
+                session.advance();
+                syncFromRuntime(false);
+                if (runtime.getStatus() == ScriptRuntime.Status.WAITING_MENU
+                        || runtime.getStatus() == ScriptRuntime.Status.ENDED) {
+                    skipToChoiceActive = false;
+                }
+            }
+            return;
+        }
+
         if (skipActive) {
             if (!canSkipPrompt(lastPrompt, prefs)) {
                 skipActive = false;
@@ -391,6 +445,70 @@ public class AdvDialogueScreen extends Screen {
      */
     public boolean isSkipActive() {
         return skipActive;
+    }
+
+    /**
+     * Activates skip-to-next-choice fast-forward mode regardless of {@code skipUnread} until a
+     * menu choice ({@code WAITING_MENU}) or script end is reached.
+     */
+    public void startSkipToNextChoice() {
+        this.skipToChoiceActive = true;
+        this.skipActive = false;
+        this.autoActive = false;
+        this.skipTimer = 0.0;
+        this.autoTimer = 0.0;
+        updateStatusIndicators();
+    }
+
+    /**
+     * Returns whether skip-to-next-choice mode is currently active.
+     *
+     * @return {@code true} if skipping to next choice
+     */
+    public boolean isSkipToChoiceActive() {
+        return skipToChoiceActive;
+    }
+
+    /**
+     * Returns the speaker side-image portrait node.
+     *
+     * @return side portrait {@link UiNode}
+     */
+    public UiNode getSidePortraitNode() {
+        return sidePortraitNode;
+    }
+
+    private boolean tryHandleDialogueLinkClick(float lx, float ly) {
+        StyledTextLayout layout = dialogueText.getLayout();
+        if (layout == null || layout.getHyperlinkHitboxes().isEmpty()) {
+            return false;
+        }
+        Rect2f textInner = dialogueText.getContentBounds();
+        float localX = lx - textInner.x();
+        float localY = ly - textInner.y();
+        for (StyledTextLayout.HyperlinkHitbox hitbox : layout.getHyperlinkHitboxes()) {
+            if (hitbox.bounds().contains(localX, localY)) {
+                String target = hitbox.actionTarget();
+                if (target != null && target.startsWith("codex:") && screenManager != null) {
+                    String entryId = target.substring("codex:".length()).trim();
+                    Screen screen = screenManager.getScreen(CodexScreen.SCREEN_NAME);
+                    if (screen instanceof CodexScreen codex) {
+                        codex.openEntry(entryId);
+                    }
+                    screenManager.showScreen(CodexScreen.SCREEN_NAME);
+                    return true;
+                }
+                if (target != null && target.startsWith("jump:")) {
+                    session.getRuntime().jumpToLabel(target.substring("jump:".length()).trim());
+                    return true;
+                }
+                if (target != null && target.startsWith("screen:") && screenManager != null) {
+                    screenManager.showScreen(target.substring("screen:".length()).trim());
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -508,6 +626,8 @@ public class AdvDialogueScreen extends Screen {
         autoTimer = 0.0;
         if (prompt == null) {
             speakerBox.setVisible(false);
+            sidePortraitNode.setVisible(false);
+            sidePortraitAssetPath = null;
             speakerText.setText("");
             dialogueText.setText("");
             fallbackTypewriter = null;
@@ -523,6 +643,19 @@ public class AdvDialogueScreen extends Screen {
             speakerText.setColorHex(prompt.speakerColorHex());
         } else {
             speakerText.setColorHex(ThemePalette.ACCENT_HOVER);
+        }
+
+        VJavaAst.CharacterDef charDef = prompt.speakerId() != null
+                ? runtime.getProjectAst().characters().get(prompt.speakerId())
+                : null;
+        String imageTag = charDef != null ? charDef.imageTag() : null;
+        if (imageTag != null && !imageTag.isBlank()) {
+            VJavaAst.ImageDef imgDef = runtime.getProjectAst().images().get(imageTag);
+            sidePortraitAssetPath = imgDef != null ? imgDef.assetPath() : imageTag;
+            sidePortraitNode.setVisible(true);
+        } else {
+            sidePortraitAssetPath = null;
+            sidePortraitNode.setVisible(false);
         }
 
         String lineText = prompt.interpolatedText() != null ? prompt.interpolatedText() : "";

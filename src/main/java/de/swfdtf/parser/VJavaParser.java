@@ -93,16 +93,17 @@ public final class VJavaParser {
     );
 
     private static final Set<String> SCREEN_WIDGET_KEYWORDS = Set.of(
-            "vbox", "hbox", "grid", "fixed", "frame", "window", "viewport", "vpgrid",
+            "vbox", "hbox", "grid", "gridbox", "fixed", "frame", "window", "viewport", "vpgrid",
             "textbutton", "imagebutton", "text", "label", "bar", "vbar", "slider",
-            "input", "hotspot", "hotbar", "imagemap", "draggroup", "drag",
+            "input", "selectbox", "checkbox", "toggleswitch", "tabpanel", "tab",
+            "hotspot", "hotbar", "imagemap", "draggroup", "drag",
             "key", "timer", "custom", "add", "null", "button", "side", "mousearea",
             "use", "on", "if", "elif", "else", "for"
     );
 
     private static final Set<String> SCREEN_POSITIONAL_WIDGETS = Set.of(
             "text", "textbutton", "label", "key", "timer", "custom",
-            "add", "use", "hotspot", "hotbar", "side"
+            "add", "use", "hotspot", "hotbar", "side", "tab"
     );
 
     private static final int MAX_BLOCK_DEPTH = 64;

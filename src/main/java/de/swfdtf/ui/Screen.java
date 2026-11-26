@@ -79,6 +79,12 @@ public class Screen {
         }
     }
 
+    private enum TransitionState {
+        IDLE,
+        SHOWING,
+        HIDING
+    }
+
     private final String name;
     private int zOrder = SceneLayer.Z_SCREENS;
     private boolean modal = false;
@@ -86,6 +92,10 @@ public class Screen {
     private UiNode root;
     private final List<KeyBinding> keyBindings = new ArrayList<>();
     private final List<ScreenTimer> timers = new ArrayList<>();
+    private double transitionDurationSeconds = 0.0;
+    private TransitionState transitionState = TransitionState.IDLE;
+    private double transitionElapsed = 0.0;
+    private float transitionStartAlpha = 1.0f;
 
     /**
      * Creates a non-modal screen with default Z-order.
@@ -323,5 +333,106 @@ public class Screen {
     public Screen setRoot(UiNode root) {
         this.root = root;
         return this;
+    }
+
+    /**
+     * Returns the configured fade show/hide duration in seconds ({@code 0.0} means instant).
+     *
+     * @return transition duration in seconds
+     */
+    public double getTransitionDurationSeconds() {
+        return transitionDurationSeconds;
+    }
+
+    /**
+     * Sets the fade show/hide duration in seconds ({@code <= 0} disables animation).
+     *
+     * @param seconds transition duration in seconds
+     * @return {@code this}
+     */
+    public Screen setTransitionDurationSeconds(double seconds) {
+        this.transitionDurationSeconds = Double.isFinite(seconds) ? Math.max(0.0, seconds) : 0.0;
+        return this;
+    }
+
+    /**
+     * Returns whether this screen is currently animating a show or hide transition.
+     *
+     * @return {@code true} if transitioning
+     */
+    public boolean isTransitioning() {
+        return transitionState != TransitionState.IDLE;
+    }
+
+    /**
+     * Returns whether this screen is currently fading out before hiding.
+     *
+     * @return {@code true} when fading out
+     */
+    public boolean isHidingTransition() {
+        return transitionState == TransitionState.HIDING;
+    }
+
+    void clearTransition() {
+        this.transitionState = TransitionState.IDLE;
+        this.transitionElapsed = 0.0;
+        this.transitionStartAlpha = 1.0f;
+    }
+
+    void beginShowTransition() {
+        float currentAlpha = (visible && root != null) ? root.getAlpha() : 0.0f;
+        this.transitionStartAlpha = Math.max(0.0f, Math.min(1.0f, currentAlpha));
+        this.transitionElapsed = 0.0;
+        this.transitionState = TransitionState.SHOWING;
+        this.visible = true;
+        if (root != null) {
+            root.setAlpha(this.transitionStartAlpha);
+        }
+    }
+
+    void beginHideTransition() {
+        float currentAlpha = (root != null) ? root.getAlpha() : 1.0f;
+        this.transitionStartAlpha = Math.max(0.05f, Math.min(1.0f, currentAlpha));
+        this.transitionElapsed = 0.0;
+        this.transitionState = TransitionState.HIDING;
+        this.visible = true;
+        if (root != null) {
+            root.setAlpha(this.transitionStartAlpha);
+        }
+    }
+
+    boolean advanceTransition(double dt) {
+        if (transitionState == TransitionState.IDLE) {
+            return false;
+        }
+        if (transitionDurationSeconds <= 0.0) {
+            boolean wasHiding = transitionState == TransitionState.HIDING;
+            transitionState = TransitionState.IDLE;
+            if (root != null) {
+                root.setAlpha(wasHiding ? 0.0f : 1.0f);
+            }
+            return wasHiding;
+        }
+        transitionElapsed += Math.max(0.0, dt);
+        float progress = (float) Math.min(1.0, transitionElapsed / transitionDurationSeconds);
+        if (transitionState == TransitionState.SHOWING) {
+            float alpha = transitionStartAlpha + (1.0f - transitionStartAlpha) * progress;
+            if (root != null) {
+                root.setAlpha(alpha);
+            }
+            if (progress >= 1.0f) {
+                transitionState = TransitionState.IDLE;
+            }
+            return false;
+        }
+        float alpha = transitionStartAlpha * (1.0f - progress);
+        if (root != null) {
+            root.setAlpha(alpha);
+        }
+        if (progress >= 1.0f) {
+            transitionState = TransitionState.IDLE;
+            return true;
+        }
+        return false;
     }
 }

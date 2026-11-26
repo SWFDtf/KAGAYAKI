@@ -25,6 +25,7 @@ public class QuickMenuScreen extends Screen {
     private final TextButton backButton;
     private final TextButton historyButton;
     private final TextButton skipButton;
+    private final TextButton skipChoiceButton;
     private final TextButton autoButton;
     private final TextButton saveButton;
     private final TextButton quickSaveButton;
@@ -56,6 +57,7 @@ public class QuickMenuScreen extends Screen {
         this.backButton = createHudButton("Back", () -> session.rollback());
         this.historyButton = createHudButton("History", () -> openScreen(HistoryLogScreen.SCREEN_NAME));
         this.skipButton = createHudButton("Skip", this::toggleSkip);
+        this.skipChoiceButton = UiMediaSupport.createActionButton("Skip Choice", 118.0f, 32.0f, this::skipToChoice);
         this.autoButton = createHudButton("Auto", this::toggleAuto);
         this.saveButton = createHudButton("Save", this::openSaveScreen);
         this.quickSaveButton = createHudButton("Q.Save", this::quickSave);
@@ -65,13 +67,14 @@ public class QuickMenuScreen extends Screen {
         this.barBox.addChild(backButton);
         this.barBox.addChild(historyButton);
         this.barBox.addChild(skipButton);
+        this.barBox.addChild(skipChoiceButton);
         this.barBox.addChild(autoButton);
         this.barBox.addChild(saveButton);
         this.barBox.addChild(quickSaveButton);
         this.barBox.addChild(quickLoadButton);
         this.barBox.addChild(prefsButton);
 
-        root.addChildAt(barBox, 510.0f, 1026.0f, 900.0f, 46.0f);
+        root.addChildAt(barBox, 440.0f, 1026.0f, 1040.0f, 46.0f);
         setRoot(root);
     }
 
@@ -85,9 +88,27 @@ public class QuickMenuScreen extends Screen {
         if (screenManager != null
                 && screenManager.getScreen(AdvDialogueScreen.SCREEN_NAME) instanceof AdvDialogueScreen adv) {
             skipButton.setSelected(adv.isSkipActive());
+            skipChoiceButton.setSelected(adv.isSkipToChoiceActive());
             autoButton.setSelected(adv.isAutoActive());
         }
         backButton.setEnabled(session.getStateStore().canRollback());
+    }
+
+    private void skipToChoice() {
+        if (screenManager != null
+                && screenManager.getScreen(AdvDialogueScreen.SCREEN_NAME) instanceof AdvDialogueScreen adv) {
+            adv.startSkipToNextChoice();
+            skipChoiceButton.setSelected(adv.isSkipToChoiceActive());
+        }
+    }
+
+    /**
+     * Returns the Skip-to-Choice action button.
+     *
+     * @return skip-to-choice button
+     */
+    public TextButton getSkipChoiceButton() {
+        return skipChoiceButton;
     }
 
     private void toggleSkip() {

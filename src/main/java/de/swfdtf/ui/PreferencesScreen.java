@@ -60,6 +60,7 @@ public class PreferencesScreen extends Screen {
      */
     public PreferencesScreen(ScriptSession session, ScreenManager screenManager) {
         super(SCREEN_NAME, SceneLayer.Z_MODAL, true);
+        setTransitionDurationSeconds(0.12);
         this.session = Objects.requireNonNull(session, "session must not be null");
         this.screenManager = screenManager;
         this.fontManager = session.getEngineApi().getService(FontManager.class);

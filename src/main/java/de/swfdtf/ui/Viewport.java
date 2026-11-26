@@ -21,9 +21,17 @@ public class Viewport extends UiNode {
     private float scrollY = 0.0f;
     private float maxScrollY = 0.0f;
     private float contentHeight = 0.0f;
+    private float scrollX = 0.0f;
+    private float maxScrollX = 0.0f;
+    private float contentWidth = 0.0f;
     private float scrollStep = DEFAULT_SCROLL_STEP;
     private boolean scrollbarVisible = true;
     private boolean draggingScrollbar = false;
+    private boolean draggingContent = false;
+    private float lastDragX = 0.0f;
+    private float lastDragY = 0.0f;
+    private float dragVelocityX = 0.0f;
+    private float dragVelocityY = 0.0f;
 
     /**
      * Creates an empty {@code Viewport}.
@@ -45,12 +53,34 @@ public class Viewport extends UiNode {
     }
 
     /**
+     * Sets the horizontal scroll offset, clamped to {@code [0, getMaxScrollX()]}.
+     *
+     * @param scrollX desired horizontal scroll offset in logical pixels
+     * @return {@code this}
+     */
+    public Viewport setScrollX(float scrollX) {
+        float clamped = Float.isFinite(scrollX) ? Math.max(0.0f, scrollX) : 0.0f;
+        this.scrollX = Math.min(clamped, maxScrollX);
+        relayoutChildren();
+        return this;
+    }
+
+    /**
      * Returns current vertical scroll offset in logical pixels.
      *
      * @return current vertical scroll offset in logical pixels
      */
     public float getScrollY() {
         return scrollY;
+    }
+
+    /**
+     * Returns current horizontal scroll offset in logical pixels.
+     *
+     * @return current horizontal scroll offset in logical pixels
+     */
+    public float getScrollX() {
+        return scrollX;
     }
 
     /**
@@ -63,12 +93,30 @@ public class Viewport extends UiNode {
     }
 
     /**
+     * Returns maximum scrollable horizontal offset ({@code max(0, contentWidth - innerWidth)}).
+     *
+     * @return maximum scrollable horizontal offset
+     */
+    public float getMaxScrollX() {
+        return maxScrollX;
+    }
+
+    /**
      * Returns total measured vertical height of child content.
      *
      * @return total measured vertical height of child content
      */
     public float getContentHeight() {
         return contentHeight;
+    }
+
+    /**
+     * Returns maximum measured horizontal width of child content.
+     *
+     * @return measured horizontal content width
+     */
+    public float getContentWidth() {
+        return contentWidth;
     }
 
     /**
@@ -131,35 +179,77 @@ public class Viewport extends UiNode {
 
     @Override
     public void layout(Rect2f resolvedBounds) {
-        setBounds(resolvedBounds);
+        if (resolvedBounds != null && getParent() == null) {
+            float w = getPreferredWidth() > 0.0f
+                    ? Math.min(resolvedBounds.width(), getPreferredWidth())
+                    : resolvedBounds.width();
+            float h = getPreferredHeight() > 0.0f
+                    ? Math.min(resolvedBounds.height(), getPreferredHeight())
+                    : resolvedBounds.height();
+            setBounds(new Rect2f(resolvedBounds.x(), resolvedBounds.y(), w, h));
+        } else {
+            setBounds(resolvedBounds);
+        }
         relayoutChildren();
     }
 
     private void relayoutChildren() {
         Rect2f inner = getContentBounds();
         float totalH = 0.0f;
+        float maxW = inner.width();
         for (UiNode child : children) {
             if (!child.isVisible()) {
                 continue;
             }
             Vec2f measured = child.measure(inner.width(), inner.height());
             float childH = Math.max(measured.y(), child.getPreferredHeight());
+            float childW = Math.max(measured.x(), child.getPreferredWidth());
+            maxW = Math.max(maxW, childW);
             totalH += childH;
         }
         this.contentHeight = totalH;
+        this.contentWidth = maxW;
         this.maxScrollY = Math.max(0.0f, contentHeight - inner.height());
+        this.maxScrollX = Math.max(0.0f, contentWidth - inner.width());
         this.scrollY = Math.clamp(this.scrollY, 0.0f, this.maxScrollY);
+        this.scrollX = Math.clamp(this.scrollX, 0.0f, this.maxScrollX);
 
         float cursorY = inner.y() - this.scrollY;
+        float originX = inner.x() - this.scrollX;
         for (UiNode child : children) {
             if (!child.isVisible()) {
                 continue;
             }
             Vec2f measured = child.measure(inner.width(), inner.height());
             float childH = Math.max(measured.y(), child.getPreferredHeight());
-            float childW = inner.width();
-            child.layout(new Rect2f(inner.x(), cursorY, childW, childH));
+            float childW = Math.max(inner.width(), Math.max(measured.x(), child.getPreferredWidth()));
+            child.layout(new Rect2f(originX, cursorY, childW, childH));
             cursorY += childH;
+        }
+    }
+
+    @Override
+    public void update(double dt) {
+        super.update(dt);
+        if (draggingContent || draggingScrollbar || dt <= 0.0) {
+            return;
+        }
+        if (Math.abs(dragVelocityX) > 1.0f || Math.abs(dragVelocityY) > 1.0f) {
+            if (maxScrollX > 0.0f && Math.abs(dragVelocityX) > 1.0f) {
+                setScrollX(scrollX + dragVelocityX * (float) dt);
+            }
+            if (maxScrollY > 0.0f && Math.abs(dragVelocityY) > 1.0f) {
+                setScrollY(scrollY + dragVelocityY * (float) dt);
+            }
+            float decay = (float) Math.exp(-5.0 * dt);
+            dragVelocityX *= decay;
+            dragVelocityY *= decay;
+            if (Math.abs(dragVelocityX) < 1.0f) {
+                dragVelocityX = 0.0f;
+            }
+            if (Math.abs(dragVelocityY) < 1.0f) {
+                dragVelocityY = 0.0f;
+            }
         }
     }
 
@@ -213,15 +303,27 @@ public class Viewport extends UiNode {
 
     @Override
     protected boolean onMouseDown(float lx, float ly, int button) {
-        if (button != 0 || !scrollbarVisible || maxScrollY <= 0.0f) {
+        if (button != 0) {
             return false;
         }
         Rect2f inner = getContentBounds();
-        Rect2f track = computeScrollbarTrack(inner);
-        float clampedX = Math.max(track.x(), Math.min(track.right(), lx));
-        if (lx >= track.x() - 4.0f && lx <= getBounds().right() && track.contains(clampedX, ly)) {
-            draggingScrollbar = true;
-            updateScrollFromPointerY(ly, inner, track);
+        if (scrollbarVisible && maxScrollY > 0.0f) {
+            Rect2f track = computeScrollbarTrack(inner);
+            float clampedX = Math.max(track.x(), Math.min(track.right(), lx));
+            if (lx >= track.x() - 4.0f && lx <= getBounds().right() && track.contains(clampedX, ly)) {
+                draggingScrollbar = true;
+                dragVelocityX = 0.0f;
+                dragVelocityY = 0.0f;
+                updateScrollFromPointerY(ly, inner, track);
+                return true;
+            }
+        }
+        if (maxScrollY > 0.0f || maxScrollX > 0.0f) {
+            draggingContent = true;
+            lastDragX = lx;
+            lastDragY = ly;
+            dragVelocityX = 0.0f;
+            dragVelocityY = 0.0f;
             return true;
         }
         return false;
@@ -232,13 +334,45 @@ public class Viewport extends UiNode {
         if (draggingScrollbar) {
             Rect2f inner = getContentBounds();
             updateScrollFromPointerY(ly, inner, computeScrollbarTrack(inner));
+            return;
+        }
+        if (draggingContent) {
+            float dx = lastDragX - lx;
+            float dy = lastDragY - ly;
+            lastDragX = lx;
+            lastDragY = ly;
+            if (Math.abs(dx) > 0.001f && maxScrollX > 0.0f) {
+                dragVelocityX = dx / 0.016f;
+                setScrollX(scrollX + dx);
+            }
+            if (Math.abs(dy) > 0.001f && maxScrollY > 0.0f) {
+                dragVelocityY = dy / 0.016f;
+                setScrollY(scrollY + dy);
+            }
         }
     }
 
     @Override
     protected boolean onMouseUp(float lx, float ly, int button) {
-        if (draggingScrollbar && button == 0) {
+        if (button != 0) {
+            return false;
+        }
+        if (draggingScrollbar) {
             draggingScrollbar = false;
+            return true;
+        }
+        if (draggingContent) {
+            float dx = lastDragX - lx;
+            float dy = lastDragY - ly;
+            if (Math.abs(dx) > 0.001f && maxScrollX > 0.0f) {
+                dragVelocityX = dx / 0.016f;
+                setScrollX(scrollX + dx);
+            }
+            if (Math.abs(dy) > 0.001f && maxScrollY > 0.0f) {
+                dragVelocityY = dy / 0.016f;
+                setScrollY(scrollY + dy);
+            }
+            draggingContent = false;
             return true;
         }
         return false;

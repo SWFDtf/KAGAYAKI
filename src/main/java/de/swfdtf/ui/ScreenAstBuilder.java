@@ -13,6 +13,7 @@ import de.swfdtf.state.PersistentAccess;
 import de.swfdtf.state.StateStore;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -150,6 +151,7 @@ public final class ScreenAstBuilder {
             case "vbox" -> buildVBox(props);
             case "hbox" -> buildHBox(props);
             case "grid" -> buildGrid(item.primaryArg(), props);
+            case "gridbox" -> buildGridBox(props);
             case "fixed" -> new Fixed();
             case "frame" -> new Frame();
             case "window" -> buildWindowBox(item.primaryArg(), props, runtime);
@@ -162,6 +164,10 @@ public final class ScreenAstBuilder {
             case "vbar" -> buildVBar(props, state);
             case "slider" -> buildSlider(props, state);
             case "input" -> buildTextInput(props, state, actionDispatcher);
+            case "selectbox" -> buildSelectBox(props, state);
+            case "checkbox" -> buildCheckbox(item.primaryArg(), props, state);
+            case "toggleswitch" -> buildToggleSwitch(item.primaryArg(), props, state);
+            case "tabpanel" -> buildTabPanel(item, screen, runtime, actionDispatcher);
             case "hotspot" -> buildHotspot(item.primaryArg(), props, actionDispatcher);
             case "hotbar" -> buildHotbar(item.primaryArg(), props, state);
             case "imagemap" -> buildImagemap(props);
@@ -173,7 +179,7 @@ public final class ScreenAstBuilder {
 
         applyCommonProperties(node, props);
 
-        if (!item.children().isEmpty() && !(node instanceof TextWidget)) {
+        if (!item.children().isEmpty() && !(node instanceof TextWidget) && !(node instanceof TabPanel)) {
             buildChildrenInto(node, item.children(), screen, runtime, actionDispatcher);
         }
         return node;
@@ -556,6 +562,108 @@ public final class ScreenAstBuilder {
         } else if (props.containsKey("enabled")) {
             node.setEnabled(parseBoolean(props.get("enabled"), true));
         }
+        if (props.containsKey("tooltip")) {
+            node.setTooltipText(props.get("tooltip"));
+        }
+    }
+
+    private static GridBox buildGridBox(Map<String, String> props) {
+        int cols = Math.max(1, parseInt(props.get("cols"), 3));
+        GridBox box = new GridBox(cols);
+        if (props.containsKey("spacing")) {
+            box.setSpacing(parseFloat(props.get("spacing"), 8.0f));
+        }
+        if (props.containsKey("xspacing") || props.containsKey("yspacing")) {
+            box.setSpacing(
+                    parseFloat(props.getOrDefault("xspacing", props.get("spacing")), 8.0f),
+                    parseFloat(props.getOrDefault("yspacing", props.get("spacing")), 8.0f)
+            );
+        }
+        return box;
+    }
+
+    private static SelectBox buildSelectBox(Map<String, String> props, StateStore state) {
+        SelectBox box = new SelectBox();
+        String rawOpts = props.getOrDefault("options", "");
+        List<String> opts = new ArrayList<>();
+        for (String part : rawOpts.split(",")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                opts.add(trimmed);
+            }
+        }
+        box.setOptions(opts);
+        String varName = extractVariableName(props.get("value"));
+        String defaultVal = props.getOrDefault("default", opts.isEmpty() ? "" : opts.get(0));
+        if (state != null && varName != null) {
+            if (!state.has(varName) && !defaultVal.isEmpty()) {
+                state.set(varName, defaultVal);
+            }
+            box.setSelectedOption(state.getString(varName, defaultVal));
+            box.setOnChanged(val -> state.set(varName, val));
+        } else if (!defaultVal.isEmpty()) {
+            box.setSelectedOption(defaultVal);
+        }
+        return box;
+    }
+
+    private static Checkbox buildCheckbox(String primaryArg, Map<String, String> props, StateStore state) {
+        String label = props.getOrDefault("text", primaryArg != null ? primaryArg : "");
+        Checkbox cb = new Checkbox(label);
+        String varName = extractVariableName(props.get("value"));
+        if (state != null && varName != null) {
+            cb.setChecked(state.getBoolean(varName, false));
+            cb.setOnChanged(val -> state.set(varName, val));
+        }
+        return cb;
+    }
+
+    private static ToggleSwitch buildToggleSwitch(String primaryArg, Map<String, String> props, StateStore state) {
+        String label = props.getOrDefault("text", primaryArg != null ? primaryArg : "");
+        ToggleSwitch ts = new ToggleSwitch(label);
+        String varName = extractVariableName(props.get("value"));
+        if (state != null && varName != null) {
+            ts.setToggled(state.getBoolean(varName, false));
+            ts.setOnChanged(val -> state.set(varName, val));
+        }
+        return ts;
+    }
+
+    private static TabPanel buildTabPanel(
+            VJavaAst.ScreenItem item,
+            Screen screen,
+            ScriptRuntime runtime,
+            Consumer<String> actionDispatcher
+    ) {
+        TabPanel panel = new TabPanel();
+        for (VJavaAst.ScreenItem child : item.children()) {
+            if ("tab".equalsIgnoreCase(child.keyword())) {
+                String title = child.primaryArg() != null && !child.primaryArg().isBlank()
+                        ? child.primaryArg()
+                        : child.properties().getOrDefault("title", "Tab");
+                VBox body = new VBox();
+                body.setPadding(10.0f);
+                body.setSpacing(6.0f);
+                buildChildrenInto(body, child.children(), screen, runtime, actionDispatcher);
+                panel.addTab(title, body);
+            }
+        }
+        return panel;
+    }
+
+    private static String extractVariableName(String expr) {
+        if (expr == null) {
+            return null;
+        }
+        Matcher vm = VARIABLE_VALUE_PATTERN.matcher(expr.trim());
+        if (vm.matches()) {
+            return vm.group(1);
+        }
+        Matcher vim = VARIABLE_INPUT_PATTERN.matcher(expr.trim());
+        if (vim.matches()) {
+            return vim.group(1);
+        }
+        return null;
     }
 
     private static void applyPaddingProp(UiNode node, String raw) {

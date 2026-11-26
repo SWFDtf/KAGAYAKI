@@ -212,9 +212,9 @@ public final class F07UiScreensE2eTest {
 
             long saveFiles;
             try (var files = Files.list(projectDir.resolve("saves"))) {
-                saveFiles = files.filter(p -> p.getFileName().toString().endsWith(".vjsave")).count();
+                saveFiles = files.filter(p -> p.getFileName().toString().endsWith(".ksav")).count();
             }
-            assertTrue(saveFiles > 0, "Clicking a dynamic slot card must write a .vjsave file");
+            assertTrue(saveFiles > 0, "Clicking a dynamic slot card must write a .ksav file");
             assertNotEquals(beforeLabel, firstSlotBtn.getText(),
                     "Dynamic slot card label must update immediately after saving");
         }

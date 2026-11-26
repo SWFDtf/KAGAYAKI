@@ -27,6 +27,7 @@ public class TextInput extends UiNode {
     public static final float DEFAULT_FONT_SIZE = 20.0f;
 
     private String text = "";
+    private int cursorIndex = 0;
     private String placeholder = "";
     private String allowChars;
     private int maxLength = 0;
@@ -68,6 +69,27 @@ public class TextInput extends UiNode {
             }
         }
         this.text = filtered.toString();
+        this.cursorIndex = this.text.length();
+        return this;
+    }
+
+    /**
+     * Returns current zero-based caret offset inside {@link #getText()}.
+     *
+     * @return cursor character index
+     */
+    public int getCursorIndex() {
+        return cursorIndex;
+    }
+
+    /**
+     * Moves the caret to {@code cursorIndex}, clamped to {@code [0, getText().length()]}.
+     *
+     * @param cursorIndex desired cursor position
+     * @return {@code this}
+     */
+    public TextInput setCursorIndex(int cursorIndex) {
+        this.cursorIndex = Math.clamp(cursorIndex, 0, text.length());
         return this;
     }
 
@@ -220,6 +242,7 @@ public class TextInput extends UiNode {
         if (button == 0 && isEnabled() && getBounds().contains(lx, ly)) {
             clearFocusInTree(findRoot());
             setFocused(true);
+            cursorIndex = text.length();
             return true;
         }
         return false;
@@ -236,7 +259,9 @@ public class TextInput extends UiNode {
         if (maxLength > 0 && text.length() >= maxLength) {
             return true;
         }
-        text = text + ch;
+        int idx = Math.clamp(cursorIndex, 0, text.length());
+        text = text.substring(0, idx) + ch + text.substring(idx);
+        cursorIndex = idx + 1;
         if (onChanged != null) {
             onChanged.accept(text);
         }
@@ -248,9 +273,40 @@ public class TextInput extends UiNode {
         if (!isEnabled() || !isFocused()) {
             return false;
         }
+        if (key == GLFW.GLFW_KEY_LEFT) {
+            if (cursorIndex > 0) {
+                cursorIndex--;
+            }
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_RIGHT) {
+            if (cursorIndex < text.length()) {
+                cursorIndex++;
+            }
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_HOME) {
+            cursorIndex = 0;
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_END) {
+            cursorIndex = text.length();
+            return true;
+        }
         if (key == GLFW.GLFW_KEY_BACKSPACE) {
-            if (!text.isEmpty()) {
-                text = text.substring(0, text.length() - 1);
+            if (cursorIndex > 0 && !text.isEmpty()) {
+                int idx = Math.clamp(cursorIndex, 1, text.length());
+                text = text.substring(0, idx - 1) + text.substring(idx);
+                cursorIndex = idx - 1;
+                if (onChanged != null) {
+                    onChanged.accept(text);
+                }
+            }
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_DELETE) {
+            if (cursorIndex < text.length()) {
+                text = text.substring(0, cursorIndex) + text.substring(cursorIndex + 1);
                 if (onChanged != null) {
                     onChanged.accept(text);
                 }

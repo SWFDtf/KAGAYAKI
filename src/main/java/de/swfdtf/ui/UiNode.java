@@ -36,6 +36,7 @@ public abstract class UiNode {
     private String borderColorHex;
     private float borderThickness = 0.0f;
     private float cornerRadius = 0.0f;
+    private String tooltipText = "";
 
     private UiNode parent;
     /** Ordered child UI nodes. */
@@ -169,6 +170,16 @@ public abstract class UiNode {
         UiNode hitChild = null;
         for (int i = children.size() - 1; i >= 0; i--) {
             UiNode child = children.get(i);
+            if (child instanceof SelectBox sb && sb.isVisible() && sb.isEnabled() && sb.isExpanded()) {
+                UiNode candidate = sb.dispatchMouseMove(lx, ly);
+                if (candidate != null) {
+                    hitChild = candidate;
+                    break;
+                }
+            }
+        }
+        for (int i = children.size() - 1; i >= 0; i--) {
+            UiNode child = children.get(i);
             UiNode candidate = child.dispatchMouseMove(lx, ly);
             if (candidate != null && hitChild == null) {
                 hitChild = candidate;
@@ -196,6 +207,13 @@ public abstract class UiNode {
             return false;
         }
         for (int i = children.size() - 1; i >= 0; i--) {
+            UiNode child = children.get(i);
+            if (child instanceof SelectBox sb && sb.isVisible() && sb.isEnabled() && sb.isExpanded()
+                    && sb.dispatchMouseDown(lx, ly, button)) {
+                return true;
+            }
+        }
+        for (int i = children.size() - 1; i >= 0; i--) {
             if (children.get(i).dispatchMouseDown(lx, ly, button)) {
                 return true;
             }
@@ -220,6 +238,13 @@ public abstract class UiNode {
             return false;
         }
         boolean handled = false;
+        for (int i = children.size() - 1; i >= 0; i--) {
+            UiNode child = children.get(i);
+            if (child instanceof SelectBox sb && sb.isVisible() && sb.isExpanded()
+                    && sb.dispatchMouseUp(lx, ly, button)) {
+                return true;
+            }
+        }
         for (int i = children.size() - 1; i >= 0; i--) {
             if (children.get(i).dispatchMouseUp(lx, ly, button)) {
                 handled = true;
@@ -819,6 +844,26 @@ public abstract class UiNode {
      */
     public UiNode setCornerRadius(float r) {
         this.cornerRadius = Math.max(0.0f, r);
+        return this;
+    }
+
+    /**
+     * Returns the hover tooltip text associated with this UI node.
+     *
+     * @return tooltip text (empty string if unset)
+     */
+    public String getTooltipText() {
+        return tooltipText;
+    }
+
+    /**
+     * Sets hover tooltip text shown when the pointer rests over this UI node.
+     *
+     * @param tooltipText tooltip text (null treated as empty)
+     * @return {@code this}
+     */
+    public UiNode setTooltipText(String tooltipText) {
+        this.tooltipText = tooltipText != null ? tooltipText : "";
         return this;
     }
 }

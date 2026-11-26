@@ -20,6 +20,10 @@ import java.util.Objects;
  */
 public final class ScreenManager {
 
+    /** Internal non-modal overlay screen name used for delayed hover tooltips. */
+    public static final String TOOLTIP_OVERLAY_NAME = "_tooltip_overlay";
+    private static final double TOOLTIP_HOVER_DELAY_SECONDS = 0.4;
+
     private final Map<String, Screen> screens = new LinkedHashMap<>();
     private final GamepadNavigationRouter gamepadRouter = new GamepadNavigationRouter();
     private float logicalWidth = RenderPipeline2D.DEFAULT_LOGICAL_WIDTH;
@@ -28,10 +32,32 @@ public final class ScreenManager {
     private final boolean[] previousTrackedKeys = new boolean[512];
     private UiNode focusedNode;
 
+    private final Screen tooltipOverlayScreen;
+    private final Fixed tooltipOverlayRoot;
+    private final Frame tooltipBox;
+    private final TextWidget tooltipLabel;
+    private UiNode hoveredTooltipNode;
+    private double hoverTooltipElapsed = 0.0;
+
     /**
      * Creates an empty {@code ScreenManager}.
      */
     public ScreenManager() {
+        this.tooltipOverlayScreen = new Screen(TOOLTIP_OVERLAY_NAME, 9999, false);
+        this.tooltipOverlayScreen.setVisible(false);
+        this.tooltipOverlayRoot = new Fixed();
+        this.tooltipBox = new Frame();
+        this.tooltipBox.setBackgroundColorHex(ThemePalette.PANEL_SURFACE)
+                .setBorderColorHex(ThemePalette.ACCENT_IDLE)
+                .setBorderThickness(1.5f)
+                .setCornerRadius(6.0f)
+                .setPadding(10.0f, 8.0f);
+        this.tooltipLabel = new TextWidget("");
+        this.tooltipLabel.setFontSize(18.0f).setColorHex(ThemePalette.TEXT_PRIMARY);
+        this.tooltipBox.addChild(this.tooltipLabel);
+        this.tooltipOverlayRoot.addChildAt(this.tooltipBox, 0.0f, 0.0f, 220.0f, 44.0f);
+        this.tooltipOverlayScreen.setRoot(this.tooltipOverlayRoot);
+        this.screens.put(TOOLTIP_OVERLAY_NAME, this.tooltipOverlayScreen);
     }
 
     /**
@@ -63,7 +89,15 @@ public final class ScreenManager {
     public void showScreen(Screen screen) {
         Objects.requireNonNull(screen, "screen must not be null");
         screens.put(screen.getName(), screen);
-        screen.setVisible(true);
+        if (screen.getTransitionDurationSeconds() > 0.0) {
+            screen.beginShowTransition();
+        } else {
+            screen.clearTransition();
+            screen.setVisible(true);
+            if (screen.getRoot() != null) {
+                screen.getRoot().setAlpha(1.0f);
+            }
+        }
         screen.onShow();
         screen.layout(logicalWidth, logicalHeight);
         if (focusedNode != null && !screen.isVisible()) {
@@ -103,14 +137,58 @@ public final class ScreenManager {
             return false;
         }
         if (s.isVisible()) {
-            s.setVisible(false);
-            s.onHide();
-            if (focusedNode != null) {
-                focusedNode.setFocused(false);
-                focusedNode = null;
+            clearFocusIfOwnedBy(s);
+            if (s.getTransitionDurationSeconds() > 0.0) {
+                s.beginHideTransition();
+            } else {
+                s.clearTransition();
+                s.setVisible(false);
+                s.onHide();
             }
         }
         return true;
+    }
+
+    /**
+     * Hides a screen immediately without playing any fade-out transition.
+     *
+     * @param name canonical screen name
+     * @return {@code true} if the screen is registered
+     */
+    public boolean hideScreenImmediate(String name) {
+        Screen s = screens.get(name);
+        if (s == null) {
+            return false;
+        }
+        if (s.isVisible()) {
+            clearFocusIfOwnedBy(s);
+            s.clearTransition();
+            s.setVisible(false);
+            s.onHide();
+        }
+        return true;
+    }
+
+    private void clearFocusIfOwnedBy(Screen screen) {
+        if (focusedNode == null) {
+            return;
+        }
+        if (screen.getRoot() == null || containsNode(screen.getRoot(), focusedNode)) {
+            focusedNode.setFocused(false);
+            focusedNode = null;
+        }
+    }
+
+    private static boolean containsNode(UiNode root, UiNode target) {
+        if (root == target) {
+            return true;
+        }
+        for (UiNode child : root.getChildren()) {
+            if (containsNode(child, target)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -209,13 +287,81 @@ public final class ScreenManager {
     public void update(double dt, InputManager input) {
         List<Screen> sorted = getVisibleScreensSorted();
         for (Screen s : sorted) {
+            if (TOOLTIP_OVERLAY_NAME.equals(s.getName())) {
+                continue;
+            }
             s.layout(logicalWidth, logicalHeight);
             s.update(dt);
+            if (s.advanceTransition(dt)) {
+                clearFocusIfOwnedBy(s);
+                s.setVisible(false);
+                s.onHide();
+            }
         }
         if (input != null) {
+            updateHoverTooltip(dt, input);
             routeInput(input);
             routeGamepadNavigation(dt, input);
         }
+    }
+
+    private void updateHoverTooltip(double dt, InputManager input) {
+        float lx = (float) input.getLogicalMouseX();
+        float ly = (float) input.getLogicalMouseY();
+        UiNode hit = null;
+        for (Screen s : getInputEligibleScreensTopDown()) {
+            if (TOOLTIP_OVERLAY_NAME.equals(s.getName()) || s.getRoot() == null) {
+                continue;
+            }
+            hit = findTooltipNodeAt(s.getRoot(), lx, ly);
+            if (hit != null) {
+                break;
+            }
+        }
+        if (hit == null || hit != hoveredTooltipNode) {
+            hoveredTooltipNode = hit;
+            hoverTooltipElapsed = 0.0;
+            tooltipOverlayScreen.setVisible(false);
+            return;
+        }
+        hoverTooltipElapsed += Math.max(0.0, dt);
+        if (hoverTooltipElapsed < TOOLTIP_HOVER_DELAY_SECONDS) {
+            tooltipOverlayScreen.setVisible(false);
+            return;
+        }
+        String text = hit.getTooltipText();
+        if (text == null || text.isBlank()) {
+            tooltipOverlayScreen.setVisible(false);
+            return;
+        }
+        tooltipLabel.setText(text);
+        float boxW = Math.min(460.0f, Math.max(160.0f, text.length() * 11.0f + 28.0f));
+        float boxH = 44.0f;
+        float boxX = Math.max(0.0f, Math.min(logicalWidth - boxW, lx + 14.0f));
+        float boxY = Math.max(0.0f, Math.min(logicalHeight - boxH, ly + 18.0f));
+        tooltipOverlayRoot.clearChildren();
+        tooltipOverlayRoot.addChildAt(tooltipBox, boxX, boxY, boxW, boxH);
+        tooltipOverlayScreen.setVisible(true);
+        tooltipOverlayScreen.layout(logicalWidth, logicalHeight);
+    }
+
+    private static UiNode findTooltipNodeAt(UiNode node, float lx, float ly) {
+        if (node == null || !node.isVisible()) {
+            return null;
+        }
+        List<UiNode> children = node.getChildren();
+        for (int i = children.size() - 1; i >= 0; i--) {
+            UiNode nested = findTooltipNodeAt(children.get(i), lx, ly);
+            if (nested != null) {
+                return nested;
+            }
+        }
+        if (node.getBounds().contains(lx, ly)
+                && node.getTooltipText() != null
+                && !node.getTooltipText().isBlank()) {
+            return node;
+        }
+        return null;
     }
 
     private void routeGamepadNavigation(double dt, InputManager input) {
@@ -247,7 +393,7 @@ public final class ScreenManager {
                 case CANCEL -> {
                     Screen topModal = getTopModalScreen();
                     if (topModal != null && !MainMenuScreen.SCREEN_NAME.equals(topModal.getName())) {
-                        hideScreen(topModal.getName());
+                        hideScreenImmediate(topModal.getName());
                         eligible = getInputEligibleScreensTopDown();
                         focusTarget = findTopFocusableScreen(eligible);
                     }
@@ -391,7 +537,15 @@ public final class ScreenManager {
      */
     public boolean dispatchKeyPressed(int key, int mods) {
         List<Screen> eligible = getInputEligibleScreensTopDown();
+        if (key == GLFW.GLFW_KEY_TAB && (mods & GLFW.GLFW_MOD_CONTROL) != 0) {
+            if (cycleActiveTabPanel(eligible, (mods & GLFW.GLFW_MOD_SHIFT) != 0)) {
+                return true;
+            }
+        }
         for (Screen s : eligible) {
+            if (TOOLTIP_OVERLAY_NAME.equals(s.getName())) {
+                continue;
+            }
             if (s.triggerKeyBindings(key, mods)) {
                 return true;
             }
@@ -402,10 +556,16 @@ public final class ScreenManager {
                 break;
             }
         }
-        if (key == GLFW.GLFW_KEY_TAB && !eligible.isEmpty()) {
+        boolean isReverseFocus = key == GLFW.GLFW_KEY_UP
+                || key == GLFW.GLFW_KEY_LEFT
+                || (key == GLFW.GLFW_KEY_TAB && (mods & GLFW.GLFW_MOD_SHIFT) != 0);
+        boolean isForwardFocus = key == GLFW.GLFW_KEY_DOWN
+                || key == GLFW.GLFW_KEY_RIGHT
+                || (key == GLFW.GLFW_KEY_TAB && (mods & GLFW.GLFW_MOD_SHIFT) == 0);
+        if ((isReverseFocus || isForwardFocus) && !eligible.isEmpty()) {
             Screen target = findTopFocusableScreen(eligible);
             if (target != null) {
-                cycleFocus(target, (mods & GLFW.GLFW_MOD_SHIFT) != 0);
+                cycleFocus(target, isReverseFocus);
             }
             return true;
         }
@@ -463,6 +623,39 @@ public final class ScreenManager {
         for (UiNode child : node.getChildren()) {
             collectFocusables(child, out);
         }
+    }
+
+    private static boolean cycleActiveTabPanel(List<Screen> eligible, boolean reverse) {
+        for (Screen s : eligible) {
+            if (TOOLTIP_OVERLAY_NAME.equals(s.getName()) || s.getRoot() == null) {
+                continue;
+            }
+            TabPanel tabPanel = findFirstTabPanel(s.getRoot());
+            if (tabPanel != null && tabPanel.getTabCount() > 0) {
+                tabPanel.cycleTab(reverse);
+                return true;
+            }
+            if (s.isModal()) {
+                break;
+            }
+        }
+        return false;
+    }
+
+    private static TabPanel findFirstTabPanel(UiNode node) {
+        if (node == null || !node.isVisible()) {
+            return null;
+        }
+        if (node instanceof TabPanel tp) {
+            return tp;
+        }
+        for (UiNode child : node.getChildren()) {
+            TabPanel found = findFirstTabPanel(child);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
     }
 
     private Screen findTopFocusableScreen(List<Screen> eligible) {

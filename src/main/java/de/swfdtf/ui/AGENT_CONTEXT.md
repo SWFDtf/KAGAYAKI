@@ -29,6 +29,8 @@ Vollständiges Dark-Slate-UI-, Screen-Management-, Widget-, `screen`-AST-Builder
 | `VBox` | `class` | Vertikaler Stapel-Container (`extends UiNode`) mit `spacing`, `fillWidth` und `alignCenterX`. |
 | `HBox` | `class` | Horizontaler Stapel-Container (`extends UiNode`) mit `spacing`, `alignCenterY` und `fillHeight`. |
 | `Grid` | `class` | Gleichmäßiger Zeilen-/Spalten-Rastercontainer (`extends UiNode`) mit konfigurierbarem horizontalem und vertikalem Zellabstand. |
+| `GridBox` | `class` | Automatischer Spaltenraster-Container (`extends UiNode`) für dynamisch verteilte Kinder in `cols` Spalten. |
+| `TabPanel` | `class` | Mehrseitiger Tab-Container (`extends UiNode`) mit Reiterleiste und `Ctrl+Tab`-Zykluswechsel. |
 | `Fixed` | `class` | Koordinaten- und ausrichtungsbasierter Container (`extends UiNode`) mit expliziten Pixel-Rechtecken (`addChildAt`) und `AlignmentSpec` (`xpos`/`ypos`/`xalign`/`yalign`). |
 | `Frame` | `class` | Gerundeter Dark-Slate-Panel-Container (`extends UiNode`) mit optionalem `NineSliceDrawable`-Rahmen. |
 | `WindowBox` | `class` | Erhabener Dark-Slate-Fenster-Container (`extends UiNode`) mit Titelkopfzeile (`DEFAULT_HEADER_HEIGHT = 40.0f`) über dem Inhaltsbereich. |
@@ -47,7 +49,10 @@ Vollständiges Dark-Slate-UI-, Screen-Management-, Widget-, `screen`-AST-Builder
 | `Bar` | `class` | Horizontaler Fortschritts-/Pegelbalken (`extends UiNode`) mit Dark-Slate-Track und Füllfarbe. |
 | `VBar` | `class` | Vertikaler Bottom-to-Top-Fortschritts-/Pegelbalken (`extends UiNode`), u. a. für den Musikraum-Spektrumanalyzer. |
 | `Slider` | `class` | Interaktiver horizontaler Schieberegler (`extends UiNode`) mit Klick-Sprung, Dragging, `step`-Einrasten und Links/Rechts-Tastensteuerung. |
-| `TextInput` | `class` | Einzeiliges Texteingabefeld (`extends UiNode`) mit `allowChars`-Whitelist, `maxLength`-Begrenzung, Backspace, Platzhalter, blinkendem Caret und Enter-Submit. |
+| `TextInput` | `class` | Einzeiliges Texteingabefeld (`extends UiNode`) mit `allowChars`-Whitelist, `maxLength`-Begrenzung, Cursor-Navigation (`LEFT`/`RIGHT`/`HOME`/`END`), `Delete`/`Backspace` und Enter-Submit. |
+| `SelectBox` | `class` | Aufklappbares Auswahlfeld (`extends UiNode`) für Listen-Optionen per Klick, Tastatur und `Escape`-Abbruch. |
+| `Checkbox` | `class` | Fokusierbare Checkbox (`extends UiNode`) für boolesche Zustände via Klick oder `Space`/`Enter`. |
+| `ToggleSwitch` | `class` | Fokusierbarer Kippschalter (`extends UiNode`) mit Pill-Track und Zustandswechsel-Callback. |
 | `DragItem` | `class` | Ziehbares Element und/oder Drop-Target-Widget (`extends UiNode`) zur Koordination durch `DragGroup`. |
 | `DragGroup` | `class` | Drag-and-Drop-Container (`extends UiNode`) für Pointer-Tracking, Drop-Target-Schnittsuche, zentriertes Einrasten (`snappedTo`) und `onDrop`-Callbacks. |
 | `CustomDisplayableWidget` | `class` | UI-Wrapper (`extends UiNode`), der beliebige `CustomDisplayable`-Instanzen (z. B. `LayeredImage`, `ParticleSystem`) in deklarative UI-Layouts einbettet. |
@@ -88,6 +93,11 @@ Vollständiges Dark-Slate-UI-, Screen-Management-, Widget-, `screen`-AST-Builder
 | `UiTranslations` | `final class` | Fünfsprachiges UI-Übersetzungsbündel (`deutsch`, `english`, `french`, `spanish`, `japanese`) mit Projekt-Override und sicherem Fallback. |
 | `ClosedCaptionOverlayScreen` | `class` | Bodenverankertes Closed-Caption-Overlay (`Z = Z_TOAST - 10`) für bis zu 3 gleichzeitige Untertitel aus `ClosedCaptionQueue`. |
 | `ActionPromptOverlayScreen` | `class` | Kontextsensitives Interaktions-Badge (`[Key] Aktion`) neben interaktiven WASD-Objekten mit `KeybindingRemapper`-Synchronisation. |
+| `ConfirmationDialogScreen` | `class` | Wiederverwendbarer modaler Bestätigungsdialog (`Z = 950`) mit `Bestätigen`/`Abbrechen` und `Escape`-Schließung. |
+| `CodexScreen` | `class` | In-Game-Codex/Glossar-Screen (`Z = 460`, modal) mit `"Neu"`-Badges, Lesefortschritt und Sperrschutz. |
+| `ChapterSelectScreen` | `class` | Kapitelauswahl-Screen (`Z = 460`, modal) mit Aktivierung freigeschalteter `ChapterRegistry`-Einträge. |
+| `RelationshipOverviewScreen` | `class` | Beziehungsübersicht (`Z = 460`, modal) mit Affinitäts-Punkten, Tiers und Fortschritts-`Bar`s. |
+| `QuoteBookScreen` | `class` | Zitatebuch-Screen (`Z = 460`, modal) für über Taste `B` gespeicherte Dialogzitate aus `QuoteBook`. |
 | `GameRuntimeCoordinator` | `final class` | Vollständiger Spiel-Laufzeitkoordinator (`implements GameHost`) für `EngineApplication`, der `ScriptSession`, `AudioEngine`, `LipSyncAnalyzer`, `TextToSpeechService`, `AnimationEngine`, `TransitionManager`, `ScreenManager`, alle Dialog-/System-Screens, globale Shortcuts und (im Studio-Modus) `LiveDirectorOverlay`/`DeveloperInspectors` integriert. |
 
 ### Paketinterne Render- & Medienhelfer
