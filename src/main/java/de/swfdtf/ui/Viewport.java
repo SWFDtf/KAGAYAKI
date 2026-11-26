@@ -185,7 +185,7 @@ public class Viewport extends UiNode {
                 }
             }
         } finally {
-            UiRenderSupport.popScissor(scissor);
+            UiRenderSupport.popScissor(pipeline, scissor);
         }
 
         if (scrollbarVisible && maxScrollY > 0.0f) {

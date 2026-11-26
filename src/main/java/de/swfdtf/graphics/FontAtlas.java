@@ -30,6 +30,19 @@ public final class FontAtlas implements AutoCloseable {
     private static final int DEFAULT_INITIAL_ATLAS_SIZE = 512;
     private static final int MAX_ATLAS_SIZE = 4096;
     private static final int GLYPH_PADDING_PX = 2;
+    private static final float DEFAULT_SDF_SPREAD_PX = 4.0f;
+
+    /**
+     * Sampling representation stored in a {@link FontAtlas} texture.
+     */
+    public enum GlyphFieldMode {
+        /** Standard single-channel antialiased coverage bitmap. */
+        BITMAP,
+        /** Single-channel signed distance field centered at {@code 0.5}. */
+        SDF,
+        /** Multi-channel signed distance field evaluated via median(R, G, B). */
+        MSDF
+    }
 
     /**
      * Immutable metrics and normalized UV coordinates for a single baked glyph.
@@ -80,6 +93,8 @@ public final class FontAtlas implements AutoCloseable {
 
     private final float baseSize;
     private final boolean builtinFallback;
+    private final GlyphFieldMode fieldMode;
+    private final float sdfSpreadPx;
     private final float ascent;
     private final float descent;
     private final float lineGap;
@@ -105,6 +120,8 @@ public final class FontAtlas implements AutoCloseable {
     private FontAtlas(
             float baseSize,
             boolean builtinFallback,
+            GlyphFieldMode fieldMode,
+            float sdfSpreadPx,
             float ascent,
             float descent,
             float lineGap,
@@ -115,6 +132,8 @@ public final class FontAtlas implements AutoCloseable {
     ) {
         this.baseSize = baseSize;
         this.builtinFallback = builtinFallback;
+        this.fieldMode = Objects.requireNonNull(fieldMode, "fieldMode must not be null");
+        this.sdfSpreadPx = sdfSpreadPx;
         this.ascent = ascent;
         this.descent = descent;
         this.lineGap = lineGap;
@@ -136,6 +155,26 @@ public final class FontAtlas implements AutoCloseable {
      * @return initialized fallback {@link FontAtlas}
      */
     public static FontAtlas createBuiltinFallback(float baseSize, boolean uploadGl) {
+        return createBuiltinFallback(baseSize, uploadGl, GlyphFieldMode.BITMAP);
+    }
+
+    /**
+     * Creates a CPU-procedural SDF fallback {@code FontAtlas} encoded for resolution-independent
+     * smooth signed-distance-field rendering.
+     *
+     * @param baseSize target pixel height ({@code > 0})
+     * @param uploadGl whether to upload immediately to OpenGL
+     * @return initialized SDF {@link FontAtlas}
+     */
+    public static FontAtlas createSdfBuiltinFallback(float baseSize, boolean uploadGl) {
+        return createBuiltinFallback(baseSize, uploadGl, GlyphFieldMode.SDF);
+    }
+
+    private static FontAtlas createBuiltinFallback(
+            float baseSize,
+            boolean uploadGl,
+            GlyphFieldMode fieldMode
+    ) {
         float validSize = validateBaseSize(baseSize);
         float ascentPx = validSize * 0.80f;
         float descentPx = -validSize * 0.20f;
@@ -145,6 +184,8 @@ public final class FontAtlas implements AutoCloseable {
         FontAtlas atlas = new FontAtlas(
                 validSize,
                 true,
+                fieldMode,
+                DEFAULT_SDF_SPREAD_PX,
                 ascentPx,
                 descentPx,
                 lineGapPx,
@@ -170,6 +211,28 @@ public final class FontAtlas implements AutoCloseable {
      * @throws IllegalArgumentException if {@code fontBytes} is null/empty or invalid TTF/OTF data
      */
     public static FontAtlas fromTrueTypeBytes(byte[] fontBytes, float baseSize, boolean uploadGl) {
+        return fromTrueTypeBytes(fontBytes, baseSize, uploadGl, GlyphFieldMode.BITMAP);
+    }
+
+    /**
+     * Bakes a signed-distance-field ({@link GlyphFieldMode#SDF}) {@code FontAtlas} from raw
+     * TrueType/OpenType bytes via LWJGL {@link STBTruetype}.
+     *
+     * @param fontBytes raw {@code .ttf} or {@code .otf} byte array
+     * @param baseSize  target pixel height ({@code > 0})
+     * @param uploadGl  whether to upload immediately to OpenGL
+     * @return initialized SDF {@link FontAtlas}
+     */
+    public static FontAtlas fromTrueTypeBytesSdf(byte[] fontBytes, float baseSize, boolean uploadGl) {
+        return fromTrueTypeBytes(fontBytes, baseSize, uploadGl, GlyphFieldMode.SDF);
+    }
+
+    private static FontAtlas fromTrueTypeBytes(
+            byte[] fontBytes,
+            float baseSize,
+            boolean uploadGl,
+            GlyphFieldMode fieldMode
+    ) {
         Objects.requireNonNull(fontBytes, "fontBytes must not be null");
         if (fontBytes.length == 0) {
             throw new IllegalArgumentException("fontBytes must not be empty");
@@ -207,6 +270,8 @@ public final class FontAtlas implements AutoCloseable {
             FontAtlas atlas = new FontAtlas(
                     validSize,
                     false,
+                    fieldMode,
+                    DEFAULT_SDF_SPREAD_PX,
                     ascentPx,
                     descentPx,
                     lineGapPx,
@@ -507,6 +572,114 @@ public final class FontAtlas implements AutoCloseable {
     }
 
     /**
+     * Converts a 1-byte-per-pixel coverage bitmap into an 8-bit signed distance field centered at {@code 0.5}.
+     *
+     * <p>Inside pixels ({@code coverage >= 128}) store {@code > 128} approaching {@code 255}; outside
+     * pixels store {@code < 128} approaching {@code 0}.</p>
+     *
+     * @param alphaCoverage 1-byte-per-pixel coverage buffer of size {@code width * height}
+     * @param width         bitmap width in pixels ({@code > 0})
+     * @param height        bitmap height in pixels ({@code > 0})
+     * @param spreadPx      distance normalization radius in pixels ({@code > 0})
+     * @return 8-bit unsigned SDF buffer of size {@code width * height}
+     */
+    public static byte[] computeSdfFromCoverage(byte[] alphaCoverage, int width, int height, float spreadPx) {
+        Objects.requireNonNull(alphaCoverage, "alphaCoverage must not be null");
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("SDF bitmap dimensions must be positive: " + width + "x" + height);
+        }
+        if (!Float.isFinite(spreadPx) || spreadPx <= 0.0f) {
+            throw new IllegalArgumentException("spreadPx must be finite and > 0, got " + spreadPx);
+        }
+        int total = Math.multiplyExact(width, height);
+        if (alphaCoverage.length < total) {
+            throw new IllegalArgumentException(
+                    "Expected at least " + total + " coverage bytes, got " + alphaCoverage.length
+            );
+        }
+
+        int radius = Math.max(1, (int) Math.ceil(spreadPx));
+        byte[] sdf = new byte[total];
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                boolean inside = (alphaCoverage[y * width + x] & 0xFF) >= 128;
+                float minDistSq = spreadPx * spreadPx;
+                int y0 = Math.max(0, y - radius);
+                int y1 = Math.min(height - 1, y + radius);
+                int x0 = Math.max(0, x - radius);
+                int x1 = Math.min(width - 1, x + radius);
+                for (int sy = y0; sy <= y1; sy++) {
+                    float dy = sy - y;
+                    for (int sx = x0; sx <= x1; sx++) {
+                        boolean sampleInside = (alphaCoverage[sy * width + sx] & 0xFF) >= 128;
+                        if (sampleInside != inside) {
+                            float dx = sx - x;
+                            float d2 = dx * dx + dy * dy;
+                            if (d2 < minDistSq) {
+                                minDistSq = d2;
+                            }
+                        }
+                    }
+                }
+                float dist = (float) Math.sqrt(minDistSq);
+                float signed = inside ? (0.5f + 0.5f * (dist / spreadPx)) : (0.5f - 0.5f * (dist / spreadPx));
+                sdf[y * width + x] = (byte) Math.clamp(Math.round(signed * 255.0f), 0, 255);
+            }
+        }
+        return sdf;
+    }
+
+    /**
+     * Evaluates the multi-channel SDF median {@code median(r, g, b)} used by MSDF shaders.
+     *
+     * @param r red signed distance channel in {@code [0, 1]}
+     * @param g green signed distance channel in {@code [0, 1]}
+     * @param b blue signed distance channel in {@code [0, 1]}
+     * @return median signed distance value
+     */
+    public static float evaluateMsdfMedian(float r, float g, float b) {
+        return Math.max(Math.min(r, g), Math.min(Math.max(r, g), b));
+    }
+
+    /**
+     * Evaluates anti-aliased SDF/MSDF alpha coverage from a normalized {@code [0, 1]} distance sample.
+     *
+     * @param signedDistance01 normalized signed distance ({@code 0.5} on glyph contour)
+     * @param pxRange          screen-pixel SDF range ({@code > 0})
+     * @param smoothing        edge smoothing factor ({@code > 0})
+     * @return smooth alpha coverage in {@code [0, 1]}
+     */
+    public static float evaluateSdfCoverage(float signedDistance01, float pxRange, float smoothing) {
+        float effectiveRange = (Float.isFinite(pxRange) && pxRange > 0.0f) ? pxRange : 4.0f;
+        float halfWidth = (Float.isFinite(smoothing) && smoothing > 0.0f)
+                ? smoothing / (effectiveRange * 2.0f)
+                : 1.0f / (effectiveRange * 2.0f);
+        float edge0 = 0.5f - halfWidth;
+        float edge1 = 0.5f + halfWidth;
+        float t = Math.clamp((signedDistance01 - edge0) / Math.max(1.0e-5f, edge1 - edge0), 0.0f, 1.0f);
+        return t * t * (3.0f - 2.0f * t);
+    }
+
+    /**
+     * Returns whether this atlas encodes bitmap coverage, SDF, or MSDF glyphs.
+     *
+     * @return active {@link GlyphFieldMode}
+     */
+    public GlyphFieldMode getFieldMode() {
+        return fieldMode;
+    }
+
+    /**
+     * Returns the signed-distance spread radius in texels used for {@link GlyphFieldMode#SDF} and
+     * {@link GlyphFieldMode#MSDF}.
+     *
+     * @return SDF spread in pixels
+     */
+    public float getSdfSpreadPx() {
+        return sdfSpreadPx;
+    }
+
+    /**
      * Returns whether this atlas uses CPU procedural fallback bitmaps.
      *
      * @return {@code true} if this atlas uses CPU procedural fallback bitmaps
@@ -710,19 +883,41 @@ public final class FontAtlas implements AutoCloseable {
             int dstX,
             int dstY
     ) {
+        if (fieldMode == GlyphFieldMode.BITMAP) {
+            for (int py = 0; py < bh; py++) {
+                float gy = (py + 0.5f) / bh * gridH - 0.5f;
+                for (int px = 0; px < bw; px++) {
+                    float gx = (px + 0.5f) / bw * gridW - 0.5f;
+                    float cov = (rows != null)
+                            ? samplePatternBilinear(rows, gx, gy)
+                            : sampleFallbackBox(px, py, bw, bh, wideCjk);
+                    int c = Math.clamp(Math.round(cov * 255.0f), 0, 255);
+                    int idx = ((dstY + py) * atlasWidth + (dstX + px)) * 4;
+                    byte b = (byte) c;
+                    atlasRgba[idx] = b;
+                    atlasRgba[idx + 1] = b;
+                    atlasRgba[idx + 2] = b;
+                    atlasRgba[idx + 3] = b;
+                }
+            }
+            return;
+        }
+        byte[] raw = new byte[bw * bh];
         for (int py = 0; py < bh; py++) {
             float gy = (py + 0.5f) / bh * gridH - 0.5f;
             for (int px = 0; px < bw; px++) {
                 float gx = (px + 0.5f) / bw * gridW - 0.5f;
-                float cov;
-                if (rows != null) {
-                    cov = samplePatternBilinear(rows, gx, gy);
-                } else {
-                    cov = sampleFallbackBox(px, py, bw, bh, wideCjk);
-                }
-                int c = Math.clamp(Math.round(cov * 255.0f), 0, 255);
+                float cov = (rows != null)
+                        ? samplePatternBilinear(rows, gx, gy)
+                        : sampleFallbackBox(px, py, bw, bh, wideCjk);
+                raw[py * bw + px] = (byte) Math.clamp(Math.round(cov * 255.0f), 0, 255);
+            }
+        }
+        byte[] sdf = computeSdfFromCoverage(raw, bw, bh, sdfSpreadPx);
+        for (int py = 0; py < bh; py++) {
+            for (int px = 0; px < bw; px++) {
+                byte b = sdf[py * bw + px];
                 int idx = ((dstY + py) * atlasWidth + (dstX + px)) * 4;
-                byte b = (byte) c;
                 atlasRgba[idx] = b;
                 atlasRgba[idx + 1] = b;
                 atlasRgba[idx + 2] = b;
@@ -878,11 +1073,18 @@ public final class FontAtlas implements AutoCloseable {
     }
 
     private void copyCoverageToAtlas(ByteBuffer bitmap, int bw, int bh, int dstX, int dstY) {
+        byte[] coverage = new byte[bw * bh];
+        for (int i = 0; i < coverage.length; i++) {
+            coverage[i] = bitmap.get(i);
+        }
+        if (fieldMode != GlyphFieldMode.BITMAP) {
+            coverage = computeSdfFromCoverage(coverage, bw, bh, sdfSpreadPx);
+        }
         for (int py = 0; py < bh; py++) {
             int srcRow = py * bw;
             int dstRow = (dstY + py) * atlasWidth;
             for (int px = 0; px < bw; px++) {
-                byte cov = bitmap.get(srcRow + px);
+                byte cov = coverage[srcRow + px];
                 int idx = (dstRow + dstX + px) * 4;
                 atlasRgba[idx] = cov;
                 atlasRgba[idx + 1] = cov;

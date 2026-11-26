@@ -14,10 +14,13 @@ import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.FloatBuffer;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Production LWJGL 3 / OpenGL 3.3 Core 2D rendering pipeline for KAGAYAKI.
@@ -62,6 +65,31 @@ public final class RenderPipeline2D implements IRenderPipeline {
     public RenderPipeline2D() {
     }
 
+    /**
+     * Configuration parameters for the offscreen FBO ping-pong post-processing pipeline.
+     *
+     * @param gaussianBlurRadius separable Gaussian blur radius in pixels ({@code 0} disables full-scene blur)
+     * @param bloomThreshold     luminance threshold above which bright pixels contribute to bloom
+     * @param bloomIntensity     additive bloom glow multiplier ({@code 0} disables bloom pass)
+     */
+    public record PostProcessConfig(float gaussianBlurRadius, float bloomThreshold, float bloomIntensity) {
+        /** Disabled post-processing configuration. */
+        public static final PostProcessConfig NONE = new PostProcessConfig(0.0f, 0.85f, 0.0f);
+
+        /** Sanitizes non-finite or negative parameters cleanly. */
+        public PostProcessConfig {
+            gaussianBlurRadius = (Float.isFinite(gaussianBlurRadius) && gaussianBlurRadius > 0.0f)
+                    ? gaussianBlurRadius
+                    : 0.0f;
+            bloomThreshold = Float.isFinite(bloomThreshold)
+                    ? Math.clamp(bloomThreshold, 0.0f, 1.0f)
+                    : 0.85f;
+            bloomIntensity = (Float.isFinite(bloomIntensity) && bloomIntensity > 0.0f)
+                    ? bloomIntensity
+                    : 0.0f;
+        }
+    }
+
     private static final String QUAD_VERTEX_SHADER = """
             #version 330 core
             layout(location = 0) in vec2 aPos;
@@ -94,6 +122,10 @@ public final class RenderPipeline2D implements IRenderPipeline {
             uniform vec2 uRectSize;
             uniform float uCornerRadius;
             uniform float uBorderThickness;
+            uniform int uSdfTextMode;
+            uniform float uSdfPxRange;
+            uniform int uShadowMode;
+            uniform float uShadowRadius;
 
             out vec4 fragColor;
 
@@ -102,7 +134,34 @@ public final class RenderPipeline2D implements IRenderPipeline {
                 return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
             }
 
+            float median3(vec3 v) {
+                return max(min(v.r, v.g), min(max(v.r, v.g), v.b));
+            }
+
             void main() {
+                if (uShadowMode != 0) {
+                    vec2 size = max(uRectSize, vec2(1.0));
+                    vec2 halfSize = size * 0.5;
+                    float pad = max(uShadowRadius, 0.0);
+                    vec2 innerHalf = max(halfSize - vec2(pad), vec2(1.0));
+                    float radius = clamp(uCornerRadius, 0.0, min(innerHalf.x, innerHalf.y));
+                    vec2 p = vLocalPos * size - halfSize;
+                    float dist = roundedBoxSdf(p, innerHalf, radius);
+                    float softEdge = max(pad, 1.0);
+                    float shadowAlpha = 1.0 - smoothstep(-softEdge * 0.35, softEdge, dist);
+                    fragColor = uColorMatrix * (uColor * shadowAlpha);
+                    return;
+                }
+
+                if (uSdfTextMode != 0 && uUseTexture != 0) {
+                    vec4 texel = texture(uTexture, vTexCoord);
+                    float sd = (uSdfTextMode == 2) ? median3(texel.rgb) : texel.a;
+                    float smoothing = max(fwidth(sd), 1.0 / max(uSdfPxRange * 2.0, 2.0));
+                    float glyphAlpha = smoothstep(0.5 - smoothing, 0.5 + smoothing, sd);
+                    fragColor = uColorMatrix * (uColor * glyphAlpha);
+                    return;
+                }
+
                 vec4 baseSample = uUseTexture != 0
                     ? texture(uTexture, vTexCoord) * uColor
                     : uColor;
@@ -129,6 +188,83 @@ public final class RenderPipeline2D implements IRenderPipeline {
                 }
 
                 fragColor = uColorMatrix * finalColor;
+            }
+            """;
+
+    private static final String POSTFX_VERTEX_SHADER = """
+            #version 330 core
+            layout(location = 0) in vec2 aPos;
+            layout(location = 1) in vec2 aUv;
+
+            uniform mat4 uProjection;
+            uniform mat4 uModel;
+
+            out vec2 vTexCoord;
+
+            void main() {
+                gl_Position = uProjection * uModel * vec4(aPos, 0.0, 1.0);
+                vTexCoord = aUv;
+            }
+            """;
+
+    private static final String GAUSSIAN_BLUR_FRAGMENT_SHADER = """
+            #version 330 core
+            in vec2 vTexCoord;
+
+            uniform sampler2D uTexture;
+            uniform vec2 uTexelStep;
+            uniform float uBlurRadius;
+
+            out vec4 fragColor;
+
+            void main() {
+                float r = max(uBlurRadius, 0.0);
+                if (r <= 0.001) {
+                    fragColor = texture(uTexture, vTexCoord);
+                    return;
+                }
+                vec4 sum = texture(uTexture, vTexCoord) * 0.227027;
+                float weights[4] = float[4](0.1945946, 0.1216216, 0.054054, 0.016216);
+                for (int i = 0; i < 4; i++) {
+                    vec2 offset = uTexelStep * (float(i + 1) * (r * 0.25));
+                    sum += texture(uTexture, clamp(vTexCoord + offset, 0.0, 1.0)) * weights[i];
+                    sum += texture(uTexture, clamp(vTexCoord - offset, 0.0, 1.0)) * weights[i];
+                }
+                fragColor = sum;
+            }
+            """;
+
+    private static final String BLOOM_THRESHOLD_FRAGMENT_SHADER = """
+            #version 330 core
+            in vec2 vTexCoord;
+
+            uniform sampler2D uTexture;
+            uniform float uThreshold;
+
+            out vec4 fragColor;
+
+            void main() {
+                vec4 color = texture(uTexture, vTexCoord);
+                float lum = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+                float factor = smoothstep(uThreshold, uThreshold + 0.15, lum);
+                fragColor = vec4(color.rgb * factor, color.a * factor);
+            }
+            """;
+
+    private static final String BLOOM_COMPOSITE_FRAGMENT_SHADER = """
+            #version 330 core
+            in vec2 vTexCoord;
+
+            uniform sampler2D uSceneTexture;
+            uniform sampler2D uBloomTexture;
+            uniform float uBloomIntensity;
+
+            out vec4 fragColor;
+
+            void main() {
+                vec4 baseColor = texture(uSceneTexture, vTexCoord);
+                vec4 glowColor = texture(uBloomTexture, vTexCoord);
+                fragColor = vec4(baseColor.rgb + glowColor.rgb * uBloomIntensity, max(baseColor.a, glowColor.a));
             }
             """;
 
@@ -169,15 +305,24 @@ public final class RenderPipeline2D implements IRenderPipeline {
     private int currentWindowHeight = 0;
 
     private Framebuffer offscreenFbo;
+    private Framebuffer postProcessPingFbo;
+    private Framebuffer postProcessPongFbo;
     private ShaderProgram quadShader;
     private ShaderProgram blitShader;
+    private ShaderProgram gaussianBlurShader;
+    private ShaderProgram bloomThresholdShader;
+    private ShaderProgram bloomCompositeShader;
     private int quadVao = 0;
     private int quadVbo = 0;
 
     private final Matrix4f logicalProjection = new Matrix4f();
+    private final Matrix4f postProcessProjection = new Matrix4f().setOrtho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f);
     private final Matrix4f windowProjection = new Matrix4f();
     private final Matrix4f modelMatrix = new Matrix4f();
+    private final Deque<Rect2f> scissorStack = new ArrayDeque<>();
 
+    private PostProcessConfig postProcessConfig = PostProcessConfig.NONE;
+    private float frameNodeBlurRadius = 0.0f;
     private Rect2f lastLetterboxViewport = new Rect2f(0.0f, 0.0f, 0.0f, 0.0f);
     private Rect2f currentRenderBounds = null;
     private float currentEffectiveAlpha = 1.0f;
@@ -237,11 +382,20 @@ public final class RenderPipeline2D implements IRenderPipeline {
         try {
             this.offscreenFbo = new Framebuffer(logicalWidth, logicalHeight);
             this.offscreenFbo.init();
+            this.postProcessPingFbo = new Framebuffer(logicalWidth, logicalHeight);
+            this.postProcessPingFbo.init();
+            this.postProcessPongFbo = new Framebuffer(logicalWidth, logicalHeight);
+            this.postProcessPongFbo.init();
 
             this.quadShader = new ShaderProgram(QUAD_VERTEX_SHADER, QUAD_FRAGMENT_SHADER);
             this.blitShader = new ShaderProgram(BLIT_VERTEX_SHADER, BLIT_FRAGMENT_SHADER);
+            this.gaussianBlurShader = new ShaderProgram(POSTFX_VERTEX_SHADER, GAUSSIAN_BLUR_FRAGMENT_SHADER);
+            this.bloomThresholdShader = new ShaderProgram(POSTFX_VERTEX_SHADER, BLOOM_THRESHOLD_FRAGMENT_SHADER);
+            this.bloomCompositeShader = new ShaderProgram(POSTFX_VERTEX_SHADER, BLOOM_COMPOSITE_FRAGMENT_SHADER);
 
             initQuadGeometry();
+            this.scissorStack.clear();
+            this.frameNodeBlurRadius = 0.0f;
             this.lastLetterboxViewport = new Rect2f(0.0f, 0.0f, 0.0f, 0.0f);
             this.initialized = true;
         } catch (RuntimeException ex) {
@@ -289,8 +443,11 @@ public final class RenderPipeline2D implements IRenderPipeline {
         requireInitialized();
         this.currentWindowWidth = Math.max(0, windowWidth);
         this.currentWindowHeight = Math.max(0, windowHeight);
+        this.scissorStack.clear();
+        this.frameNodeBlurRadius = 0.0f;
 
         offscreenFbo.bind();
+        GL11.glDisable(GL11.GL_SCISSOR_TEST);
         GL11.glDisable(GL11.GL_DEPTH_TEST);
         GL11.glDisable(GL11.GL_CULL_FACE);
         GL11.glEnable(GL11.GL_BLEND);
@@ -380,8 +537,36 @@ public final class RenderPipeline2D implements IRenderPipeline {
 
         float effectiveAlpha = Math.clamp(inheritedAlpha * transform.getAlpha(), 0.0f, 1.0f);
         ColorMatrix4f effectiveColorMatrix = combineColorMatrices(inheritedColorMatrix, transform.getColorMatrix());
+        float nodeBlur = transform.getBlur();
+        if (Float.isFinite(nodeBlur) && nodeBlur > frameNodeBlurRadius) {
+            frameNodeBlurRadius = nodeBlur;
+        }
 
         if (node.shouldDrawStandardQuad() && drawW > 0.0f && drawH > 0.0f && effectiveAlpha > 0.0f) {
+            if (node.hasShadow()) {
+                float radius = node.getShadowRadius();
+                float[] shadowPremul = node.getPremultipliedShadowColor(effectiveAlpha);
+                drawQuadWithPivotInternal(
+                        0,
+                        drawX + node.getShadowOffsetX() - radius,
+                        drawY + node.getShadowOffsetY() - radius,
+                        drawW + radius * 2.0f,
+                        drawH + radius * 2.0f,
+                        drawX + transform.getXanchor() * drawW + node.getShadowOffsetX(),
+                        drawY + transform.getYanchor() * drawH + node.getShadowOffsetY(),
+                        transform.getRotate(),
+                        FULL_UV_RECT,
+                        shadowPremul,
+                        effectiveColorMatrix,
+                        node.getCornerRadius(),
+                        0.0f,
+                        NO_BORDER_COLOR,
+                        0,
+                        4.0f,
+                        1,
+                        radius
+                );
+            }
             Rect2f effectiveUv = resolveEffectiveUv(node, transform);
             float[] fillPremul = node.getPremultipliedFillColor(effectiveAlpha);
             float[] borderPremul = node.getBorderThickness() > 0.0f
@@ -457,6 +642,8 @@ public final class RenderPipeline2D implements IRenderPipeline {
     @Override
     public void endFrame() {
         requireInitialized();
+        scissorStack.clear();
+        GL11.glDisable(GL11.GL_SCISSOR_TEST);
         offscreenFbo.unbind();
 
         if (currentWindowWidth <= 0 || currentWindowHeight <= 0) {
@@ -466,6 +653,9 @@ public final class RenderPipeline2D implements IRenderPipeline {
             return;
         }
 
+        Framebuffer sourceFbo = applyPostProcessChain(offscreenFbo);
+
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
         GL11.glViewport(0, 0, currentWindowWidth, currentWindowHeight);
         GL11.glDisable(GL11.GL_BLEND);
         GL11.glClearColor(CLEAR_R, CLEAR_G, CLEAR_B, CLEAR_A);
@@ -489,7 +679,7 @@ public final class RenderPipeline2D implements IRenderPipeline {
         blitShader.setUniformInt("uTexture", 0);
 
         GL13.glActiveTexture(GL13.GL_TEXTURE0);
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, offscreenFbo.getTextureId());
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, sourceFbo.getTextureId());
 
         GL30.glBindVertexArray(quadVao);
         GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
@@ -835,7 +1025,72 @@ public final class RenderPipeline2D implements IRenderPipeline {
                 colorMatrix != null ? colorMatrix : ColorMatrix4f.identity(),
                 0.0f,
                 0.0f,
-                NO_BORDER_COLOR
+                NO_BORDER_COLOR,
+                0,
+                4.0f,
+                0,
+                0.0f
+        );
+    }
+
+    /**
+     * Draws an SDF or multi-channel MSDF text glyph quad using {@link RenderPipeline2D}'s smooth
+     * signed-distance-field anti-aliasing fragment path.
+     *
+     * @param textureId    OpenGL atlas texture ID
+     * @param x            left X coordinate in logical pixels
+     * @param y            top Y coordinate in logical pixels
+     * @param width        quad width in logical pixels
+     * @param height       quad height in logical pixels
+     * @param uvRect       UV sub-rectangle in the glyph atlas
+     * @param tintRgba     4-element straight RGBA text tint color
+     * @param pxRange      distance field screen-pixel range ({@code > 0})
+     * @param multiChannel {@code true} for 3-channel MSDF median decoding, {@code false} for single-channel SDF
+     */
+    public void drawMsdfTextQuad(
+            int textureId,
+            float x,
+            float y,
+            float width,
+            float height,
+            Rect2f uvRect,
+            float[] tintRgba,
+            float pxRange,
+            boolean multiChannel
+    ) {
+        requireInitialized();
+        if (textureId == 0 || width <= 0.0f || height <= 0.0f) {
+            return;
+        }
+        float[] tint = tintRgba != null ? tintRgba : new float[]{1.0f, 1.0f, 1.0f, 1.0f};
+        if (tint.length != 4) {
+            throw new IllegalArgumentException("Expected 4 RGBA components for tintRgba");
+        }
+        float a = Math.clamp(tint[3], 0.0f, 1.0f);
+        if (a <= 0.0f) {
+            return;
+        }
+        float[] premulTint = new float[]{tint[0] * a, tint[1] * a, tint[2] * a, a};
+        float validRange = (Float.isFinite(pxRange) && pxRange > 0.0f) ? pxRange : 4.0f;
+        drawQuadWithPivotInternal(
+                textureId,
+                x,
+                y,
+                width,
+                height,
+                x,
+                y,
+                0.0f,
+                uvRect != null ? uvRect : FULL_UV_RECT,
+                premulTint,
+                ColorMatrix4f.identity(),
+                0.0f,
+                0.0f,
+                NO_BORDER_COLOR,
+                multiChannel ? 2 : 1,
+                validRange,
+                0,
+                0.0f
         );
     }
 
@@ -869,7 +1124,11 @@ public final class RenderPipeline2D implements IRenderPipeline {
                 colorMatrix,
                 cornerRadius,
                 borderThickness,
-                borderPremul
+                borderPremul,
+                0,
+                4.0f,
+                0,
+                0.0f
         );
     }
 
@@ -887,7 +1146,11 @@ public final class RenderPipeline2D implements IRenderPipeline {
             ColorMatrix4f colorMatrix,
             float cornerRadius,
             float borderThickness,
-            float[] borderPremul
+            float[] borderPremul,
+            int sdfTextMode,
+            float sdfPxRange,
+            int shadowMode,
+            float shadowRadius
     ) {
         if (rotateDeg != 0.0f) {
             modelMatrix.identity()
@@ -911,6 +1174,10 @@ public final class RenderPipeline2D implements IRenderPipeline {
         quadShader.setUniformVec2("uRectSize", width, height);
         quadShader.setUniformFloat("uCornerRadius", cornerRadius);
         quadShader.setUniformFloat("uBorderThickness", borderThickness);
+        quadShader.setUniformInt("uSdfTextMode", sdfTextMode);
+        quadShader.setUniformFloat("uSdfPxRange", sdfPxRange);
+        quadShader.setUniformInt("uShadowMode", shadowMode);
+        quadShader.setUniformFloat("uShadowRadius", shadowRadius);
 
         GL13.glActiveTexture(GL13.GL_TEXTURE0);
         if (textureId != 0) {
@@ -976,6 +1243,18 @@ public final class RenderPipeline2D implements IRenderPipeline {
             blitShader.dispose();
             blitShader = null;
         }
+        if (gaussianBlurShader != null) {
+            gaussianBlurShader.dispose();
+            gaussianBlurShader = null;
+        }
+        if (bloomThresholdShader != null) {
+            bloomThresholdShader.dispose();
+            bloomThresholdShader = null;
+        }
+        if (bloomCompositeShader != null) {
+            bloomCompositeShader.dispose();
+            bloomCompositeShader = null;
+        }
         if (quadVao != 0) {
             GL30.glDeleteVertexArrays(quadVao);
             quadVao = 0;
@@ -984,10 +1263,20 @@ public final class RenderPipeline2D implements IRenderPipeline {
             GL15.glDeleteBuffers(quadVbo);
             quadVbo = 0;
         }
+        if (postProcessPingFbo != null) {
+            postProcessPingFbo.dispose();
+            postProcessPingFbo = null;
+        }
+        if (postProcessPongFbo != null) {
+            postProcessPongFbo.dispose();
+            postProcessPongFbo = null;
+        }
         if (offscreenFbo != null) {
             offscreenFbo.dispose();
             offscreenFbo = null;
         }
+        scissorStack.clear();
+        frameNodeBlurRadius = 0.0f;
         currentRenderBounds = null;
         currentEffectiveAlpha = 1.0f;
         currentEffectiveColorMatrix = ColorMatrix4f.identity();
@@ -1109,6 +1398,350 @@ public final class RenderPipeline2D implements IRenderPipeline {
      */
     public boolean isInitialized() {
         return initialized;
+    }
+
+    /**
+     * Pushes a clip rectangle onto the hierarchical scissor stack, intersecting it with any active
+     * parent scissor bounds and logical canvas bounds.
+     *
+     * <p>Safe to call headlessly to compute and verify clipped regions; when OpenGL resources are
+     * initialized, updates {@code GL_SCISSOR_TEST} and {@code glScissor} immediately.</p>
+     *
+     * @param clipRect clip rectangle in top-down logical canvas coordinates (must not be {@code null})
+     * @return effective intersected clip rectangle pushed onto the stack
+     */
+    public Rect2f pushScissor(Rect2f clipRect) {
+        Objects.requireNonNull(clipRect, "clipRect must not be null");
+        Rect2f canvasBounds = new Rect2f(0.0f, 0.0f, logicalWidth, logicalHeight);
+        Rect2f sanitized = new Rect2f(
+                clipRect.x(),
+                clipRect.y(),
+                Math.max(0.0f, clipRect.width()),
+                Math.max(0.0f, clipRect.height())
+        );
+        Rect2f effective = intersectScissorRects(canvasBounds, sanitized);
+        if (!scissorStack.isEmpty()) {
+            effective = intersectScissorRects(scissorStack.peek(), effective);
+        }
+        scissorStack.push(effective);
+        if (initialized) {
+            applyGlScissor(effective);
+        }
+        return effective;
+    }
+
+    /**
+     * Pops the active scissor rectangle and restores the enclosing parent clip rectangle (or disables
+     * {@code GL_SCISSOR_TEST} when the stack becomes empty).
+     *
+     * @return the popped {@link Rect2f} clip rectangle
+     * @throws IllegalStateException if the scissor stack is currently empty
+     */
+    public Rect2f popScissor() {
+        if (scissorStack.isEmpty()) {
+            throw new IllegalStateException("Cannot popScissor() on an empty scissor stack");
+        }
+        Rect2f popped = scissorStack.pop();
+        if (initialized) {
+            if (scissorStack.isEmpty()) {
+                GL11.glDisable(GL11.GL_SCISSOR_TEST);
+            } else {
+                applyGlScissor(scissorStack.peek());
+            }
+        }
+        return popped;
+    }
+
+    /**
+     * Returns the currently active top scissor rectangle, if any.
+     *
+     * @return top intersected scissor rectangle, or empty when scissor clipping is inactive
+     */
+    public Optional<Rect2f> getActiveScissor() {
+        return Optional.ofNullable(scissorStack.peek());
+    }
+
+    /**
+     * Returns the current nesting depth of the scissor stack.
+     *
+     * @return scissor stack depth ({@code >= 0})
+     */
+    public int getScissorDepth() {
+        return scissorStack.size();
+    }
+
+    /**
+     * Computes the axis-aligned intersection of two scissor rectangles, collapsing disjoint regions
+     * cleanly to a zero-area rectangle.
+     *
+     * @param a first rectangle (non-null)
+     * @param b second rectangle (non-null)
+     * @return intersected rectangle with non-negative dimensions
+     */
+    public static Rect2f intersectScissorRects(Rect2f a, Rect2f b) {
+        Objects.requireNonNull(a, "a must not be null");
+        Objects.requireNonNull(b, "b must not be null");
+        float x1 = Math.max(a.x(), b.x());
+        float y1 = Math.max(a.y(), b.y());
+        float x2 = Math.min(a.right(), b.right());
+        float y2 = Math.min(a.bottom(), b.bottom());
+        float w = Math.max(0.0f, x2 - x1);
+        float h = Math.max(0.0f, y2 - y1);
+        return new Rect2f(x1, y1, w, h);
+    }
+
+    /**
+     * Converts a top-down logical scissor rectangle into OpenGL bottom-left integer
+     * {@code [x, y, width, height]} arguments for {@code glScissor}.
+     *
+     * @param rect         top-down scissor rectangle
+     * @param targetHeight target framebuffer height in pixels
+     * @return 4-element integer array {@code [x, y, width, height]}
+     */
+    public static int[] toGlScissorBox(Rect2f rect, int targetHeight) {
+        Objects.requireNonNull(rect, "rect must not be null");
+        int x = Math.max(0, Math.round(rect.x()));
+        int w = Math.max(0, Math.round(rect.width()));
+        int h = Math.max(0, Math.round(rect.height()));
+        int y = Math.max(0, targetHeight - Math.round(rect.y() + h));
+        return new int[]{x, y, w, h};
+    }
+
+    /**
+     * Computes smooth soft-shadow SDF attenuation in {@code [0, 1]} for a rounded-box signed distance.
+     *
+     * @param signedDistance signed distance in logical pixels (negative inside the box)
+     * @param radius         softness blur radius in pixels
+     * @return normalized shadow opacity weight in {@code [0, 1]}
+     */
+    public static float computeSoftShadowAlpha(float signedDistance, float radius) {
+        float safeRadius = (Float.isFinite(radius) && radius > 0.0f) ? radius : 1.0f;
+        float edge0 = -safeRadius * 0.35f;
+        float edge1 = safeRadius;
+        float t = Math.clamp((signedDistance - edge0) / Math.max(1.0e-5f, edge1 - edge0), 0.0f, 1.0f);
+        float smooth = t * t * (3.0f - 2.0f * t);
+        return 1.0f - smooth;
+    }
+
+    /**
+     * Computes normalized symmetric 1D Gaussian filter weights summing to {@code 1.0f} for
+     * separable horizontal/vertical blur passes.
+     *
+     * @param sigma  standard deviation ({@code > 0})
+     * @param radius one-sided tap radius ({@code >= 0})
+     * @return array of {@code 2 * radius + 1} normalized weights
+     */
+    public static float[] computeGaussianWeights(float sigma, int radius) {
+        int r = Math.max(0, radius);
+        float s = (Float.isFinite(sigma) && sigma > 0.0f) ? sigma : 1.0f;
+        float[] weights = new float[2 * r + 1];
+        double twoSigmaSq = 2.0 * s * s;
+        double sum = 0.0;
+        for (int i = -r; i <= r; i++) {
+            double w = Math.exp(-(i * i) / twoSigmaSq);
+            weights[i + r] = (float) w;
+            sum += w;
+        }
+        for (int i = 0; i < weights.length; i++) {
+            weights[i] = (float) (weights[i] / sum);
+        }
+        return weights;
+    }
+
+    /**
+     * Evaluates extracted Rec.709 bloom contribution weight above {@code threshold}.
+     *
+     * @param r         red component in {@code [0, 1]}
+     * @param g         green component in {@code [0, 1]}
+     * @param b         blue component in {@code [0, 1]}
+     * @param threshold luminance extraction threshold in {@code [0, 1]}
+     * @return extracted bloom brightness factor in {@code [0, 1]}
+     */
+    public static float computeBloomBrightness(float r, float g, float b, float threshold) {
+        float lum = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+        float clampedThresh = Math.clamp(threshold, 0.0f, 1.0f);
+        float t = Math.clamp((lum - clampedThresh) / 0.15f, 0.0f, 1.0f);
+        return t * t * (3.0f - 2.0f * t);
+    }
+
+    /**
+     * Configures the offscreen FBO ping-pong post-processing passes.
+     *
+     * @param config post-processing settings ({@code null} resets to {@link PostProcessConfig#NONE})
+     */
+    public void setPostProcessConfig(PostProcessConfig config) {
+        this.postProcessConfig = config != null ? config : PostProcessConfig.NONE;
+    }
+
+    /**
+     * Returns the current offscreen FBO post-processing configuration.
+     *
+     * @return current {@link PostProcessConfig}
+     */
+    public PostProcessConfig getPostProcessConfig() {
+        return postProcessConfig;
+    }
+
+    /**
+     * Sets the global scene two-pass Gaussian blur radius in pixels ({@code 0} disables blur).
+     *
+     * @param blurRadius blur radius in pixels
+     */
+    public void setSceneBlurRadius(float blurRadius) {
+        this.postProcessConfig = new PostProcessConfig(
+                blurRadius,
+                postProcessConfig.bloomThreshold(),
+                postProcessConfig.bloomIntensity()
+        );
+    }
+
+    /**
+     * Returns the configured global scene Gaussian blur radius in pixels.
+     *
+     * @return global Gaussian blur radius in pixels
+     */
+    public float getSceneBlurRadius() {
+        return postProcessConfig.gaussianBlurRadius();
+    }
+
+    /**
+     * Configures the bloom/glow extraction threshold and additive intensity.
+     *
+     * @param threshold luminance threshold in {@code [0, 1]}
+     * @param intensity additive bloom intensity ({@code 0} disables bloom)
+     */
+    public void setBloomConfig(float threshold, float intensity) {
+        this.postProcessConfig = new PostProcessConfig(
+                postProcessConfig.gaussianBlurRadius(),
+                threshold,
+                intensity
+        );
+    }
+
+    /**
+     * Returns whether bloom post-processing is currently enabled.
+     *
+     * @return {@code true} if bloom intensity &gt; 0
+     */
+    public boolean isBloomEnabled() {
+        return postProcessConfig.bloomIntensity() > 0.0f;
+    }
+
+    /**
+     * Returns the maximum per-node {@link Transform2D#getBlur()} observed during the most recent frame.
+     *
+     * @return maximum active node blur radius observed in pixels
+     */
+    public float getLastFrameNodeBlurRadius() {
+        return frameNodeBlurRadius;
+    }
+
+    private void applyGlScissor(Rect2f clipRect) {
+        int[] box = toGlScissorBox(clipRect, logicalHeight);
+        GL11.glEnable(GL11.GL_SCISSOR_TEST);
+        GL11.glScissor(box[0], box[1], box[2], box[3]);
+    }
+
+    private Framebuffer applyPostProcessChain(Framebuffer sceneSource) {
+        float effectiveBlur = Math.max(postProcessConfig.gaussianBlurRadius(), frameNodeBlurRadius);
+        boolean doBlur = effectiveBlur > 0.0f && gaussianBlurShader != null
+                && postProcessPingFbo != null && postProcessPongFbo != null;
+        boolean doBloom = postProcessConfig.bloomIntensity() > 0.0f
+                && bloomThresholdShader != null && bloomCompositeShader != null
+                && gaussianBlurShader != null && postProcessPingFbo != null && postProcessPongFbo != null;
+
+        if (!doBlur && !doBloom) {
+            return sceneSource;
+        }
+
+        GL11.glDisable(GL11.GL_BLEND);
+        Framebuffer active = sceneSource;
+
+        if (doBlur) {
+            active = runGaussianBlurPasses(active, effectiveBlur);
+        }
+
+        if (doBloom) {
+            postProcessPongFbo.bind();
+            GL11.glViewport(0, 0, logicalWidth, logicalHeight);
+            GL11.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+            bloomThresholdShader.bind();
+            bloomThresholdShader.setUniformMat4("uProjection", postProcessProjection);
+            bloomThresholdShader.setUniformMat4("uModel", modelMatrix.identity());
+            bloomThresholdShader.setUniformInt("uTexture", 0);
+            bloomThresholdShader.setUniformFloat("uThreshold", postProcessConfig.bloomThreshold());
+            GL13.glActiveTexture(GL13.GL_TEXTURE0);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, active.getTextureId());
+            GL30.glBindVertexArray(quadVao);
+            GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
+            bloomThresholdShader.unbind();
+            postProcessPongFbo.unbind();
+
+            Framebuffer blurredBloom = runGaussianBlurIntoPong(postProcessPongFbo, Math.max(4.0f, effectiveBlur));
+
+            Framebuffer compositeTarget = (active == postProcessPingFbo) ? sceneSource : postProcessPingFbo;
+            compositeTarget.bind();
+            GL11.glViewport(0, 0, logicalWidth, logicalHeight);
+            bloomCompositeShader.bind();
+            bloomCompositeShader.setUniformMat4("uProjection", postProcessProjection);
+            bloomCompositeShader.setUniformMat4("uModel", modelMatrix.identity());
+            bloomCompositeShader.setUniformInt("uSceneTexture", 0);
+            bloomCompositeShader.setUniformInt("uBloomTexture", 1);
+            bloomCompositeShader.setUniformFloat("uBloomIntensity", postProcessConfig.bloomIntensity());
+            GL13.glActiveTexture(GL13.GL_TEXTURE0);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, active.getTextureId());
+            GL13.glActiveTexture(GL13.GL_TEXTURE1);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, blurredBloom.getTextureId());
+            GL30.glBindVertexArray(quadVao);
+            GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
+            GL13.glActiveTexture(GL13.GL_TEXTURE1);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+            GL13.glActiveTexture(GL13.GL_TEXTURE0);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+            bloomCompositeShader.unbind();
+            compositeTarget.unbind();
+            active = compositeTarget;
+        }
+
+        GL11.glEnable(GL11.GL_BLEND);
+        return active;
+    }
+
+    private Framebuffer runGaussianBlurPasses(Framebuffer inputFbo, float radius) {
+        drawGaussianPass(inputFbo, postProcessPingFbo, 1.0f / logicalWidth, 0.0f, radius);
+        drawGaussianPass(postProcessPingFbo, postProcessPongFbo, 0.0f, 1.0f / logicalHeight, radius);
+        return postProcessPongFbo;
+    }
+
+    private Framebuffer runGaussianBlurIntoPong(Framebuffer pongInput, float radius) {
+        drawGaussianPass(pongInput, postProcessPingFbo, 1.0f / logicalWidth, 0.0f, radius);
+        drawGaussianPass(postProcessPingFbo, postProcessPongFbo, 0.0f, 1.0f / logicalHeight, radius);
+        return postProcessPongFbo;
+    }
+
+    private void drawGaussianPass(
+            Framebuffer srcFbo,
+            Framebuffer dstFbo,
+            float stepX,
+            float stepY,
+            float radius
+    ) {
+        dstFbo.bind();
+        GL11.glViewport(0, 0, logicalWidth, logicalHeight);
+        gaussianBlurShader.bind();
+        gaussianBlurShader.setUniformMat4("uProjection", postProcessProjection);
+        gaussianBlurShader.setUniformMat4("uModel", modelMatrix.identity());
+        gaussianBlurShader.setUniformInt("uTexture", 0);
+        gaussianBlurShader.setUniformVec2("uTexelStep", stepX, stepY);
+        gaussianBlurShader.setUniformFloat("uBlurRadius", radius);
+        GL13.glActiveTexture(GL13.GL_TEXTURE0);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, srcFbo.getTextureId());
+        GL30.glBindVertexArray(quadVao);
+        GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        gaussianBlurShader.unbind();
+        dstFbo.unbind();
     }
 
     private void requireInitialized() {

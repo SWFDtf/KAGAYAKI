@@ -35,6 +35,10 @@ public class SceneNode {
     private boolean borderColorPremultiplied = false;
     private int textureId = 0;
     private Rect2f uvRect = new Rect2f(0.0f, 0.0f, 1.0f, 1.0f);
+    private float shadowOffsetX = 0.0f;
+    private float shadowOffsetY = 0.0f;
+    private float shadowRadius = 0.0f;
+    private final float[] shadowColorRgba = new float[]{0.0f, 0.0f, 0.0f, 0.45f};
     private Object userData;
     private SceneNode parent;
     private final List<SceneNode> children = new ArrayList<>();
@@ -476,6 +480,148 @@ public class SceneNode {
      */
     public float[] getPremultipliedBorderColor(float additionalAlpha) {
         return toPremultiplied(borderColorRgba, borderColorPremultiplied, additionalAlpha);
+    }
+
+    /**
+     * Configures soft drop-shadow rendering parameters for this node using a hex color string.
+     *
+     * @param offsetX  horizontal shadow offset in logical pixels
+     * @param offsetY  vertical shadow offset in logical pixels
+     * @param radius   blur/softness radius in logical pixels ({@code <= 0} disables shadow)
+     * @param colorHex straight RGBA hex color string (nullable keeps current shadow color)
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode setShadow(float offsetX, float offsetY, float radius, String colorHex) {
+        setShadowOffset(offsetX, offsetY);
+        setShadowRadius(radius);
+        if (colorHex != null && !colorHex.isBlank()) {
+            setShadowColorHex(colorHex);
+        }
+        return this;
+    }
+
+    /**
+     * Configures soft drop-shadow rendering parameters for this node using a straight RGBA color array.
+     *
+     * @param offsetX   horizontal shadow offset in logical pixels
+     * @param offsetY   vertical shadow offset in logical pixels
+     * @param radius    blur/softness radius in logical pixels ({@code <= 0} disables shadow)
+     * @param colorRgba 4-element straight RGBA array (nullable keeps current shadow color)
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode setShadow(float offsetX, float offsetY, float radius, float[] colorRgba) {
+        setShadowOffset(offsetX, offsetY);
+        setShadowRadius(radius);
+        if (colorRgba != null) {
+            setShadowColorRgba(colorRgba);
+        }
+        return this;
+    }
+
+    /**
+     * Sets the soft-shadow offset in logical pixels.
+     *
+     * @param offsetX horizontal offset in logical pixels
+     * @param offsetY vertical offset in logical pixels
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode setShadowOffset(float offsetX, float offsetY) {
+        this.shadowOffsetX = Float.isFinite(offsetX) ? offsetX : 0.0f;
+        this.shadowOffsetY = Float.isFinite(offsetY) ? offsetY : 0.0f;
+        return this;
+    }
+
+    /**
+     * Returns horizontal soft-shadow offset in logical pixels.
+     *
+     * @return horizontal shadow offset
+     */
+    public float getShadowOffsetX() {
+        return shadowOffsetX;
+    }
+
+    /**
+     * Returns vertical soft-shadow offset in logical pixels.
+     *
+     * @return vertical shadow offset
+     */
+    public float getShadowOffsetY() {
+        return shadowOffsetY;
+    }
+
+    /**
+     * Returns soft-shadow softness radius in logical pixels ({@code 0} when disabled).
+     *
+     * @return shadow softness radius ({@code >= 0})
+     */
+    public float getShadowRadius() {
+        return shadowRadius;
+    }
+
+    /**
+     * Sets soft-shadow softness radius in logical pixels (negative or non-finite values clamp to {@code 0}).
+     *
+     * @param shadowRadius softness radius in logical pixels
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode setShadowRadius(float shadowRadius) {
+        this.shadowRadius = (Float.isFinite(shadowRadius) && shadowRadius > 0.0f) ? shadowRadius : 0.0f;
+        return this;
+    }
+
+    /**
+     * Returns a defensive copy of the straight RGBA soft-shadow color array.
+     *
+     * @return 4-element straight RGBA array
+     */
+    public float[] getShadowColorRgba() {
+        return shadowColorRgba.clone();
+    }
+
+    /**
+     * Sets the straight RGBA soft-shadow color from a 4-float array.
+     *
+     * @param rgba 4-element straight RGBA array {@code [r, g, b, a]}
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode setShadowColorRgba(float[] rgba) {
+        Objects.requireNonNull(rgba, "rgba must not be null");
+        if (rgba.length != 4) {
+            throw new IllegalArgumentException("Expected 4 RGBA components, got " + rgba.length);
+        }
+        System.arraycopy(rgba, 0, this.shadowColorRgba, 0, 4);
+        return this;
+    }
+
+    /**
+     * Sets the straight RGBA soft-shadow color from a hex color string.
+     *
+     * @param hex hex color string ({@code #RRGGBB} or {@code #RRGGBBAA})
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode setShadowColorHex(String hex) {
+        float[] parsed = parseHexRgba(hex);
+        System.arraycopy(parsed, 0, this.shadowColorRgba, 0, 4);
+        return this;
+    }
+
+    /**
+     * Returns whether this node currently has an active soft shadow configured.
+     *
+     * @return {@code true} if shadow radius &gt; 0 and shadow alpha &gt; 0
+     */
+    public boolean hasShadow() {
+        return shadowRadius > 0.0f && shadowColorRgba[3] > 0.0f;
+    }
+
+    /**
+     * Computes the premultiplied RGBA soft-shadow color scaled by {@code additionalAlpha}.
+     *
+     * @param additionalAlpha external opacity multiplier
+     * @return 4-element premultiplied RGBA shadow color
+     */
+    public float[] getPremultipliedShadowColor(float additionalAlpha) {
+        return toPremultiplied(shadowColorRgba, false, additionalAlpha);
     }
 
     /**

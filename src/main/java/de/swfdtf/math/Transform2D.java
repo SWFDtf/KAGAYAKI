@@ -305,13 +305,13 @@ public final class Transform2D {
     }
 
     /**
-     * Sets the blur radius.
+     * Sets the blur radius (negative or non-finite values are clamped to {@code 0.0f}).
      *
-     * @param blur blur radius
+     * @param blur blur radius in pixels
      * @return {@code this} for fluent chaining
      */
     public Transform2D setBlur(float blur) {
-        this.blur = blur;
+        this.blur = (Float.isFinite(blur) && blur > 0.0f) ? blur : 0.0f;
         return this;
     }
 

@@ -53,6 +53,9 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- 
 | `ObjectMotionController.MotionInput` | `record` | Unveränderlicher Bewegungs- und Sprung-Eingabevektor (`up`, `down`, `left`, `right`, `jumpPressed`) für `ObjectMotionController.update`. |
 | `ScreenshotCaptureService` | `final class` | Schreibt RGBA8-Framebuffer-Snapshots ohne `java.awt` über `TextureManager.writePng` als PNGs inklusive Dateinamen-Bereinigung und Listing. |
 | `CinematicLetterboxController` | `final class` | Animiert Kinobalken (`Rect2f` oben/unten) im logischen `1920x1080`-Koordinatenraum. |
+| `DynamicTextureAtlas` | `final class` | Dynamischer Shelf-Packer für Sprite-/Icon-Atlanten (`AtlasRegion`, `BatchStats`) im Premultiplied-`RGBA8`-Format zur Minimierung von Textur-Binds. |
+| `AnimatedSpriteNode` | `class` | Animierter Sprite-Sheet-`SpriteNode` (`PlayMode`: `LOOP`, `PING_PONG`, `ONCE`) mit automatischer Grid-UV-Fortschaltung über `update(dt)`. |
+| `WebpVp8lDecoder` | `final class` | Reiner Java-Decoder für verlustfreie `RIFF/WEBP/VP8L`-Bilder (`DecodedRgba`) ohne `java.awt`. |
 
 ## Öffentliche API-Signaturen
 
@@ -1022,3 +1025,59 @@ public final class ObjectMotionController {
 }
 ```
 - `SceneController` ergänzt `updateMotion(double dt, ObjectMotionController.MotionInput)` und `getMotionController()`.
+
+### `DynamicTextureAtlas`
+```java
+public final class DynamicTextureAtlas implements AutoCloseable {
+    public record AtlasRegion(String key, int x, int y, int width, int height, Rect2f uvRect) {}
+    public record BatchStats(int spriteCount, int originalBindCount, int atlasBindCount, double bindReductionRatio) {}
+
+    public DynamicTextureAtlas()
+    public DynamicTextureAtlas(int initialSize, int maxSize, int paddingPx)
+    public AtlasRegion pack(String key, int width, int height, byte[] straightRgba)
+    public AtlasRegion packFromFile(String key, Path imagePath)
+    public Optional<AtlasRegion> getRegion(String key)
+    public boolean contains(String key)
+    public BatchStats computeBatchStats(List<String> drawKeys)
+    public void uploadToOpenGl()
+    public int getRegionCount() / public int getAtlasWidth() / public int getAtlasHeight()
+    public int getGlTextureId() / public boolean isDirty() / public byte[] getAtlasRgbaCopy()
+    public void dispose() / @Override public void close()
+}
+```
+
+### `AnimatedSpriteNode`
+```java
+public class AnimatedSpriteNode extends SpriteNode {
+    public enum PlayMode { LOOP, PING_PONG, ONCE }
+
+    public AnimatedSpriteNode(String id, int columns, int rows, float fps)
+    public AnimatedSpriteNode(String id, int columns, int rows, float fps, PlayMode playMode)
+    public AnimatedSpriteNode(String id, String tag, int columns, int rows, float fps, PlayMode playMode)
+    @Override public void update(double dt)
+    public Rect2f computeFrameUv(int frameIndex)
+    public void reset()
+    public int getColumns() / public int getRows() / public int getFrameCount() / public AnimatedSpriteNode setFrameCount(int frameCount)
+    public float getFps() / public AnimatedSpriteNode setFps(float fps)
+    public PlayMode getPlayMode() / public AnimatedSpriteNode setPlayMode(PlayMode playMode)
+    public int getCurrentFrame() / public AnimatedSpriteNode setCurrentFrame(int frameIndex)
+    public boolean isPaused() / public AnimatedSpriteNode setPaused(boolean paused) / public boolean isFinished()
+}
+```
+
+### `WebpVp8lDecoder`
+```java
+public final class WebpVp8lDecoder {
+    public record DecodedRgba(int width, int height, byte[] straightRgba) {}
+
+    public static boolean isWebp(byte[] data)
+    public static DecodedRgba decode(byte[] data)
+}
+```
+
+### Ergänzte Wave-2a-APIs in bestehenden Grafikklassen
+- `RenderPipeline2D`: `PostProcessConfig`, `pushScissor`, `popScissor`, `getActiveScissor`, `getScissorDepth`, `intersectScissorRects`, `toGlScissorBox`, `drawMsdfTextQuad`, `computeSoftShadowAlpha`, `computeGaussianWeights`, `computeBloomBrightness`, `setPostProcessConfig`, `getPostProcessConfig`, `setSceneBlurRadius`, `getSceneBlurRadius`, `setBloomConfig`, `isBloomEnabled`, `getLastFrameNodeBlurRadius`
+- `SceneNode`: `setShadow`, `setShadowOffset`, `getShadowOffsetX`, `getShadowOffsetY`, `getShadowRadius`, `setShadowRadius`, `getShadowColorRgba`, `setShadowColorRgba`, `setShadowColorHex`, `hasShadow`, `getPremultipliedShadowColor`
+- `TextureManager`: `DecodedImage`, `preloadAsync`, `preloadAllAsync`, `isPreloaded`, `getPreloadedCount`, `uploadPreloadedTextures` sowie WebP/VP8L-Dispatch in `readImageFileRgba`
+- `FontAtlas`: `GlyphFieldMode`, `createSdfBuiltinFallback`, `fromTrueTypeBytesSdf`, `computeSdfFromCoverage`, `evaluateMsdfMedian`, `evaluateSdfCoverage`, `getFieldMode`, `getSdfSpreadPx`
+- `StyledTextLayout`: Japanische Kinsoku-Shori-Umbruchregeln in `wrapAtoms` (`KINSOKU_NO_START` / `KINSOKU_NO_END`)

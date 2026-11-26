@@ -13,9 +13,18 @@ import java.nio.IntBuffer;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Pure LWJGL / STB texture loader, CPU image codec helper, procedural fallback generator,
@@ -40,9 +49,40 @@ public final class TextureManager {
     private static final int FALLBACK_BORDER_PX = 2;
     private static final int FALLBACK_STRIPE_PX = 8;
 
+    /**
+     * CPU-decoded image payload produced asynchronously during asset preloading.
+     *
+     * @param width        image width in pixels ({@code > 0})
+     * @param height       image height in pixels ({@code > 0})
+     * @param straightRgba tightly packed top-to-bottom straight RGBA8 pixel bytes
+     */
+    public record DecodedImage(int width, int height, byte[] straightRgba) {
+        /** Validates dimensions and copies pixel bytes defensively. */
+        public DecodedImage {
+            if (width <= 0 || height <= 0) {
+                throw new IllegalArgumentException("DecodedImage dimensions must be positive: " + width + "x" + height);
+            }
+            Objects.requireNonNull(straightRgba, "straightRgba must not be null");
+            straightRgba = straightRgba.clone();
+        }
+
+        /**
+         * Returns a defensive copy of the straight RGBA8 pixel bytes.
+         *
+         * @return cloned RGBA8 byte array
+         */
+        @Override
+        public byte[] straightRgba() {
+            return straightRgba.clone();
+        }
+    }
+
     private final EngineLogger logger;
-    private Path assetRoot;
+    private volatile Path assetRoot;
     private final Map<String, Texture> cache = new LinkedHashMap<>();
+    private final Map<String, DecodedImage> preloadedImages = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<Boolean>> inFlightPreloads = new ConcurrentHashMap<>();
+    private final ExecutorService preloadExecutor;
     private Texture fallbackTexture;
 
     /**
@@ -79,6 +119,14 @@ public final class TextureManager {
     public TextureManager(EngineLogger logger, Path assetRoot) {
         this.logger = Objects.requireNonNull(logger, "logger must not be null");
         this.assetRoot = assetRoot != null ? assetRoot.toAbsolutePath().normalize() : null;
+        int threads = Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors()));
+        AtomicInteger threadIndex = new AtomicInteger(1);
+        ThreadFactory factory = runnable -> {
+            Thread t = new Thread(runnable, "kagayaki-tex-preload-" + threadIndex.getAndIncrement());
+            t.setDaemon(true);
+            return t;
+        };
+        this.preloadExecutor = Executors.newFixedThreadPool(threads, factory);
     }
 
     /**
@@ -212,6 +260,15 @@ public final class TextureManager {
             throw new IllegalStateException("Image file is empty: " + path);
         }
 
+        if (WebpVp8lDecoder.isWebp(fileBytes)) {
+            WebpVp8lDecoder.DecodedRgba decodedWebp = WebpVp8lDecoder.decode(fileBytes);
+            if (outSize != null) {
+                outSize[0] = decodedWebp.width();
+                outSize[1] = decodedWebp.height();
+            }
+            return decodedWebp.straightRgba();
+        }
+
         ByteBuffer rawFileBuffer = MemoryUtil.memAlloc(fileBytes.length);
         ByteBuffer decoded = null;
         try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -306,6 +363,15 @@ public final class TextureManager {
         Texture cached = cache.get(cacheKey);
         if (cached != null && !cached.isDisposed()) {
             return cached;
+        }
+
+        DecodedImage preloaded = preloadedImages.remove(cacheKey);
+        if (preloaded != null) {
+            Texture uploadedPreloaded = Texture.createFromRgba(
+                    preloaded.width(), preloaded.height(), preloaded.straightRgba(), false, cacheKey
+            );
+            cache.put(cacheKey, uploadedPreloaded);
+            return uploadedPreloaded;
         }
 
         int[] size = new int[2];
@@ -431,10 +497,166 @@ public final class TextureManager {
     }
 
     /**
-     * Disposes all OpenGL textures managed by this {@code TextureManager}. Safe to call multiple times.
+     * Disposes all OpenGL textures managed by this {@code TextureManager} and stops preload worker threads.
+     * Safe to call multiple times.
      */
     public void dispose() {
+        inFlightPreloads.clear();
+        preloadedImages.clear();
+        preloadExecutor.shutdownNow();
         clearCache();
+    }
+
+    /**
+     * Queues an asset path for asynchronous CPU image decoding on a background worker thread.
+     *
+     * <p>Missing, invalid, or corrupt assets never throw uncaught exceptions; failures log a
+     * structured warning and resolve the returned future to {@code false}.</p>
+     *
+     * @param assetPath relative or absolute asset path string
+     * @return future completing with {@code true} if decoded or already cached, {@code false} on error
+     */
+    public CompletableFuture<Boolean> preloadAsync(String assetPath) {
+        if (assetPath == null || assetPath.isBlank()) {
+            logger.warn(LOG_CATEGORY, "Ignoring blank preload asset path.");
+            return CompletableFuture.completedFuture(Boolean.FALSE);
+        }
+        try {
+            return preloadAsync(Path.of(assetPath));
+        } catch (InvalidPathException ex) {
+            logger.warn(LOG_CATEGORY, "Invalid preload asset path '" + assetPath + "': " + ex.getMessage());
+            return CompletableFuture.completedFuture(Boolean.FALSE);
+        }
+    }
+
+    /**
+     * Queues a filesystem image path for asynchronous CPU image decoding on a background worker thread.
+     *
+     * @param path image path to decode into the CPU preload cache
+     * @return future completing with {@code true} if decoded or already cached, {@code false} on error
+     */
+    public CompletableFuture<Boolean> preloadAsync(Path path) {
+        if (path == null) {
+            logger.warn(LOG_CATEGORY, "Ignoring null preload Path.");
+            return CompletableFuture.completedFuture(Boolean.FALSE);
+        }
+        Path resolved = resolvePath(path);
+        String cacheKey = toCanonicalKey(resolved);
+        Texture cached = cache.get(cacheKey);
+        if ((cached != null && !cached.isDisposed()) || preloadedImages.containsKey(cacheKey)) {
+            return CompletableFuture.completedFuture(Boolean.TRUE);
+        }
+        if (preloadExecutor.isShutdown()) {
+            return CompletableFuture.completedFuture(Boolean.FALSE);
+        }
+        return inFlightPreloads.computeIfAbsent(cacheKey, key -> CompletableFuture.supplyAsync(() -> {
+            try {
+                int[] dims = new int[2];
+                byte[] rgba = readImageFileRgba(resolved, dims);
+                preloadedImages.put(key, new DecodedImage(dims[0], dims[1], rgba));
+                return Boolean.TRUE;
+            } catch (RuntimeException ex) {
+                logger.warn(LOG_CATEGORY, "Async preload failed for '" + resolved + "': " + ex.getMessage());
+                return Boolean.FALSE;
+            } finally {
+                inFlightPreloads.remove(key);
+            }
+        }, preloadExecutor));
+    }
+
+    /**
+     * Queues multiple image paths concurrently on worker threads and returns a future resolving to
+     * the number of successfully decoded images.
+     *
+     * @param paths collection of image paths to preload
+     * @return future completing with count of successfully preloaded images
+     */
+    public CompletableFuture<Integer> preloadAllAsync(Collection<Path> paths) {
+        if (paths == null || paths.isEmpty()) {
+            return CompletableFuture.completedFuture(0);
+        }
+        List<CompletableFuture<Boolean>> futures = new ArrayList<>(paths.size());
+        for (Path p : paths) {
+            futures.add(preloadAsync(p));
+        }
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenApply(ignored -> {
+                    int okCount = 0;
+                    for (CompletableFuture<Boolean> f : futures) {
+                        if (Boolean.TRUE.equals(f.join())) {
+                            okCount++;
+                        }
+                    }
+                    return okCount;
+                });
+    }
+
+    /**
+     * Returns whether an asset path currently has a CPU-decoded image ready in the preload cache.
+     *
+     * @param assetPath asset path string
+     * @return {@code true} if decoded in the CPU preload cache
+     */
+    public boolean isPreloaded(String assetPath) {
+        if (assetPath == null || assetPath.isBlank()) {
+            return false;
+        }
+        try {
+            return isPreloaded(Path.of(assetPath));
+        } catch (InvalidPathException ignored) {
+            return false;
+        }
+    }
+
+    /**
+     * Returns whether {@code path} currently has a CPU-decoded image ready in the preload cache.
+     *
+     * @param path image path
+     * @return {@code true} if decoded in the CPU preload cache
+     */
+    public boolean isPreloaded(Path path) {
+        if (path == null) {
+            return false;
+        }
+        String key = toCanonicalKey(resolvePath(path));
+        return preloadedImages.containsKey(key);
+    }
+
+    /**
+     * Returns the number of CPU-decoded images waiting in the preload cache.
+     *
+     * @return number of preloaded CPU images
+     */
+    public int getPreloadedCount() {
+        return preloadedImages.size();
+    }
+
+    /**
+     * Uploads all CPU-preloaded images to OpenGL on the active render thread and caches the
+     * resulting GPU {@link Texture} handles.
+     *
+     * @return number of newly uploaded OpenGL textures
+     */
+    public int uploadPreloadedTextures() {
+        if (preloadedImages.isEmpty()) {
+            return 0;
+        }
+        int uploaded = 0;
+        List<String> keys = new ArrayList<>(preloadedImages.keySet());
+        for (String key : keys) {
+            DecodedImage img = preloadedImages.remove(key);
+            if (img == null) {
+                continue;
+            }
+            Texture existing = cache.get(key);
+            if (existing != null && !existing.isDisposed()) {
+                continue;
+            }
+            Texture tex = Texture.createFromRgba(img.width(), img.height(), img.straightRgba(), false, key);
+            cache.put(key, tex);
+            uploaded++;
+        }
+        return uploaded;
     }
 
     private Path resolvePath(Path path) {

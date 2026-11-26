@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Rich text word-wrapping, layout, animation-aware OpenGL renderer, and progressive
@@ -28,6 +29,16 @@ public final class StyledTextLayout {
     private static final float DEFAULT_SHADOW_OFFSET = 2.0f;
     private static final String DEFAULT_SHADOW_HEX = "#000000b3";
     private static final Rect2f FULL_UV_RECT = new Rect2f(0.0f, 0.0f, 1.0f, 1.0f);
+    private static final Set<Integer> KINSOKU_NO_START = Set.of(
+            (int) '。', (int) '、', (int) '」', (int) '』', (int) '）',
+            (int) '！', (int) '？', (int) '・', (int) 'ー', (int) '】',
+            (int) '〕', (int) '〉', (int) '》', (int) '］', (int) '｝',
+            (int) '…', (int) '‥', (int) '：', (int) '；'
+    );
+    private static final Set<Integer> KINSOKU_NO_END = Set.of(
+            (int) '「', (int) '『', (int) '（', (int) '【',
+            (int) '〔', (int) '〈', (int) '《', (int) '［', (int) '｛'
+    );
 
     /**
      * Decoration categories generated or applied by {@link StyledTextLayout}.
@@ -1549,13 +1560,18 @@ public final class StyledTextLayout {
                 if (Float.isFinite(maxWidth) && currentLineWidth + gap + atomW > maxWidth) {
                     if (!currentLine.isEmpty()) {
                         trimTrailingSpaces(currentLine);
-                        wrapped.add(currentLine);
-                        currentLine = new ArrayList<>();
-                        currentLineWidth = 0.0f;
-                        gap = 0.0f;
+                        if (!currentLine.isEmpty()) {
+                            List<LayoutAtom> carryOver = extractKinsokuCarryOver(currentLine, atom);
+                            wrapped.add(currentLine);
+                            currentLine = new ArrayList<>(carryOver);
+                            currentLineWidth = recomputeAtomsWidth(currentLine);
+                            gap = computeInterAtomGap(currentLine, atom);
+                        } else {
+                            gap = 0.0f;
+                        }
                     }
 
-                    if (atom instanceof WordAtom word && word.width() > maxWidth) {
+                    if (currentLine.isEmpty() && atom instanceof WordAtom word && word.width() > maxWidth) {
                         List<WordAtom> splitParts = splitOversizedWord(word);
                         for (int p = 0; p < splitParts.size(); p++) {
                             WordAtom part = splitParts.get(p);
@@ -2014,9 +2030,58 @@ public final class StyledTextLayout {
         }
 
         private static boolean isCjkBreakable(int cp) {
-            return (cp >= 0x3040 && cp <= 0x30FF)
+            return (cp >= 0x3000 && cp <= 0x30FF)
                     || (cp >= 0x4E00 && cp <= 0x9FFF)
-                    || (cp >= 0xAC00 && cp <= 0xD7AF);
+                    || (cp >= 0xAC00 && cp <= 0xD7AF)
+                    || (cp >= 0xFF00 && cp <= 0xFF60)
+                    || (cp >= 0xFFE0 && cp <= 0xFFE6);
+        }
+
+        private List<LayoutAtom> extractKinsokuCarryOver(List<LayoutAtom> currentLine, LayoutAtom incomingAtom) {
+            List<LayoutAtom> carryOver = new ArrayList<>();
+            if (isKinsokuNoStartAtom(incomingAtom)) {
+                for (int splitIdx = currentLine.size() - 1; splitIdx >= 1; splitIdx--) {
+                    LayoutAtom candidateStart = currentLine.get(splitIdx);
+                    LayoutAtom prevAtom = currentLine.get(splitIdx - 1);
+                    if (!isKinsokuNoStartAtom(candidateStart) && !isKinsokuNoEndAtom(prevAtom)) {
+                        for (int k = splitIdx; k < currentLine.size(); k++) {
+                            carryOver.add(currentLine.get(k));
+                        }
+                        currentLine.subList(splitIdx, currentLine.size()).clear();
+                        return carryOver;
+                    }
+                }
+            }
+            while (currentLine.size() > 1 && isKinsokuNoEndAtom(currentLine.get(currentLine.size() - 1))) {
+                carryOver.add(0, currentLine.remove(currentLine.size() - 1));
+            }
+            return carryOver;
+        }
+
+        private float recomputeAtomsWidth(List<LayoutAtom> lineAtoms) {
+            float total = 0.0f;
+            for (int i = 0; i < lineAtoms.size(); i++) {
+                if (i > 0) {
+                    StyledChar sc = firstStyledChar(lineAtoms.get(i));
+                    if (sc != null) {
+                        total += sc.style().kerning() + fontManager.getAccessibilityExtraKerning();
+                    }
+                }
+                total += lineAtoms.get(i).width();
+            }
+            return total;
+        }
+
+        private static boolean isKinsokuNoStartAtom(LayoutAtom atom) {
+            StyledChar sc = firstStyledChar(atom);
+            return sc != null && KINSOKU_NO_START.contains(sc.codepoint());
+        }
+
+        private static boolean isKinsokuNoEndAtom(LayoutAtom atom) {
+            if (atom instanceof WordAtom w && !w.chars().isEmpty()) {
+                return KINSOKU_NO_END.contains(w.chars().get(w.chars().size() - 1).codepoint());
+            }
+            return false;
         }
     }
 

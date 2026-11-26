@@ -2,6 +2,7 @@ package de.swfdtf.tools;
 
 import de.swfdtf.core.ProjectDescriptor;
 import de.swfdtf.graphics.ObjectMotionController;
+import de.swfdtf.graphics.Transition;
 import de.swfdtf.parser.JavaBlockCompiler;
 import de.swfdtf.parser.ProjectScanner;
 import de.swfdtf.parser.VJavaAst;
@@ -444,6 +445,9 @@ public final class VJavaLinter {
                         scene.lineNumber(),
                         issues
                 );
+                verifyTransitionAssets(
+                        project, knownAssets, scene.transitionExpr(), scene.sourceFile(), scene.lineNumber(), issues
+                );
             } else if (stmt instanceof VJavaAst.ShowStatement show) {
                 verifySceneOrShowAsset(
                         project,
@@ -452,6 +456,22 @@ public final class VJavaLinter {
                         show.attributes(),
                         show.sourceFile(),
                         show.lineNumber(),
+                        issues
+                );
+                verifyTransitionAssets(
+                        project, knownAssets, show.transitionExpr(), show.sourceFile(), show.lineNumber(), issues
+                );
+            } else if (stmt instanceof VJavaAst.HideStatement hide) {
+                verifyTransitionAssets(
+                        project, knownAssets, hide.transitionExpr(), hide.sourceFile(), hide.lineNumber(), issues
+                );
+            } else if (stmt instanceof VJavaAst.WithStatement withStmt) {
+                verifyTransitionAssets(
+                        project,
+                        knownAssets,
+                        withStmt.transitionExpr(),
+                        withStmt.sourceFile(),
+                        withStmt.lineNumber(),
                         issues
                 );
             } else if (stmt instanceof VJavaAst.PlayStatement play) {
@@ -639,6 +659,46 @@ public final class VJavaLinter {
         }
     }
 
+    private static void verifyTransitionAssets(
+            VJavaAst.ProjectAst project,
+            Set<String> knownAssets,
+            String transitionExpr,
+            String sourceFile,
+            int lineNumber,
+            List<LintIssue> issues
+    ) {
+        if (transitionExpr == null || transitionExpr.isBlank()) {
+            return;
+        }
+        try {
+            Transition parsed = Transition.parse(transitionExpr);
+            verifyTransitionNodeAssets(project, knownAssets, parsed, sourceFile, lineNumber, issues);
+        } catch (IllegalArgumentException ignored) {
+            // Invalid transition expressions are ignored cleanly here to preserve existing parse/runtime checks.
+        }
+    }
+
+    private static void verifyTransitionNodeAssets(
+            VJavaAst.ProjectAst project,
+            Set<String> knownAssets,
+            Transition transition,
+            String sourceFile,
+            int lineNumber,
+            List<LintIssue> issues
+    ) {
+        if (transition == null) {
+            return;
+        }
+        if (transition.getKind() == Transition.Kind.IMAGE_DISSOLVE
+                && transition.getMaskImagePath() != null
+                && !transition.getMaskImagePath().isBlank()) {
+            verifyAssetExists(project, knownAssets, transition.getMaskImagePath(), sourceFile, lineNumber, issues);
+        }
+        for (Transition sub : transition.getSubTransitions()) {
+            verifyTransitionNodeAssets(project, knownAssets, sub, sourceFile, lineNumber, issues);
+        }
+    }
+
     private static void verifySceneOrShowAsset(
             VJavaAst.ProjectAst project,
             Set<String> knownAssets,
@@ -669,18 +729,21 @@ public final class VJavaLinter {
             return;
         }
 
-        String candidateSuffix = attributes.isEmpty()
-                ? cleanTag + ".png"
-                : cleanTag + "_" + String.join("_", attributes) + ".png";
-        List<String> candidates = List.of(
-                "assets/images/" + candidateSuffix,
-                "assets/images/bg/" + candidateSuffix,
-                "assets/images/char/" + candidateSuffix,
-                "assets/images/sprites/" + candidateSuffix
+        String baseName = attributes.isEmpty()
+                ? cleanTag
+                : cleanTag + "_" + String.join("_", attributes);
+        List<String> extensions = List.of(".png", ".jpg", ".jpeg", ".webp");
+        List<String> folders = List.of(
+                "assets/images/",
+                "assets/images/bg/",
+                "assets/images/char/",
+                "assets/images/sprites/"
         );
-        for (String candidate : candidates) {
-            if (assetExists(project, knownAssets, candidate)) {
-                return;
+        for (String ext : extensions) {
+            for (String folder : folders) {
+                if (assetExists(project, knownAssets, folder + baseName + ext)) {
+                    return;
+                }
             }
         }
 

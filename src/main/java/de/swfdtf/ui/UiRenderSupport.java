@@ -18,7 +18,7 @@ final class UiRenderSupport {
     private static final float[] NO_COLOR = new float[]{0.0f, 0.0f, 0.0f, 0.0f};
     private static final FontManager HEADLESS_FALLBACK_FONT_MANAGER = new FontManager();
 
-    record ScissorState(boolean wasEnabled, int x, int y, int width, int height) {
+    record ScissorState(boolean usedPipelineStack, boolean wasEnabled, int x, int y, int width, int height) {
     }
 
     private UiRenderSupport() {
@@ -107,35 +107,16 @@ final class UiRenderSupport {
         if (!isPipelineReady(pipeline) || clipBounds == null) {
             return null;
         }
-        boolean wasEnabled = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
-        int[] prevBox = new int[4];
-        if (wasEnabled) {
-            GL11.glGetIntegerv(GL11.GL_SCISSOR_BOX, prevBox);
-        }
-        int logicalH = pipeline.getLogicalHeight();
-        int sx = Math.max(0, Math.round(clipBounds.x()));
-        int sy = Math.max(0, Math.round(logicalH - clipBounds.bottom()));
-        int sw = Math.max(0, Math.round(clipBounds.width()));
-        int sh = Math.max(0, Math.round(clipBounds.height()));
-
-        if (wasEnabled) {
-            int ix1 = Math.max(sx, prevBox[0]);
-            int iy1 = Math.max(sy, prevBox[1]);
-            int ix2 = Math.min(sx + sw, prevBox[0] + prevBox[2]);
-            int iy2 = Math.min(sy + sh, prevBox[1] + prevBox[3]);
-            sx = ix1;
-            sy = iy1;
-            sw = Math.max(0, ix2 - ix1);
-            sh = Math.max(0, iy2 - iy1);
-        }
-
-        GL11.glEnable(GL11.GL_SCISSOR_TEST);
-        GL11.glScissor(sx, sy, sw, sh);
-        return new ScissorState(wasEnabled, prevBox[0], prevBox[1], prevBox[2], prevBox[3]);
+        pipeline.pushScissor(clipBounds);
+        return new ScissorState(true, true, 0, 0, 0, 0);
     }
 
-    static void popScissor(ScissorState state) {
+    static void popScissor(RenderPipeline2D pipeline, ScissorState state) {
         if (state == null) {
+            return;
+        }
+        if (state.usedPipelineStack() && pipeline != null) {
+            pipeline.popScissor();
             return;
         }
         if (state.wasEnabled()) {
@@ -144,6 +125,10 @@ final class UiRenderSupport {
         } else {
             GL11.glDisable(GL11.GL_SCISSOR_TEST);
         }
+    }
+
+    static void popScissor(ScissorState state) {
+        popScissor(null, state);
     }
 
     static void drawScrollbar(

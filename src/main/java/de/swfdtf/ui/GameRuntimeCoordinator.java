@@ -16,6 +16,7 @@ import de.swfdtf.graphics.RenderPipeline2D;
 import de.swfdtf.graphics.SceneController;
 import de.swfdtf.graphics.SceneGraph;
 import de.swfdtf.graphics.TextureManager;
+import de.swfdtf.graphics.Transition;
 import de.swfdtf.graphics.TransitionManager;
 import de.swfdtf.parser.ProjectScanner;
 import de.swfdtf.parser.ScriptRuntime;
@@ -126,6 +127,7 @@ public final class GameRuntimeCoordinator implements GameHost {
         SceneController sceneController = new SceneController(
                 sceneGraph, textureManager, api.getLogger(), projectRoot, glEnabled
         );
+        sceneController.setTransitionListener((context, expr) -> handleSceneTransition(expr));
 
         Path savesDir = projectRoot.resolve("saves");
         try {
@@ -157,6 +159,28 @@ public final class GameRuntimeCoordinator implements GameHost {
         }
 
         this.initialized = true;
+    }
+
+    private void handleSceneTransition(String transitionExpr) {
+        if (transitionExpr == null || transitionExpr.isBlank()) {
+            return;
+        }
+        Transition transition;
+        try {
+            transition = Transition.parse(transitionExpr);
+        } catch (IllegalArgumentException ex) {
+            api.logWarn("Ignoring invalid transition expression '" + transitionExpr + "': " + ex.getMessage());
+            return;
+        }
+        if (glEnabled && app.getActivePipeline() instanceof RenderPipeline2D pipeline2D && pipeline2D.isInitialized()) {
+            if (!transitionManager.isGlInitialized()) {
+                transitionManager.initGl(pipeline2D.getLogicalWidth(), pipeline2D.getLogicalHeight());
+            }
+            if (pipeline2D.getOffscreenFramebuffer() != null && pipeline2D.getOffscreenFramebuffer().isInitialized()) {
+                transitionManager.captureFromFbo(pipeline2D.getOffscreenFramebuffer());
+            }
+        }
+        transitionManager.startTransition(transition);
     }
 
     private VJavaAst.ProjectAst loadProjectAst(Path projectRoot) {
@@ -604,6 +628,7 @@ public final class GameRuntimeCoordinator implements GameHost {
             reloaded.getRuntime().compile();
             reloaded.getStateStore().restoreMap(vars);
             reloaded.getRuntime().setAudioBridge(audioEngine.createScriptAudioBridge());
+            reloaded.getSceneController().setTransitionListener((context, expr) -> handleSceneTransition(expr));
             reloaded.getRuntime().restoreExecution(snapshot);
             this.session = reloaded;
             api.logInfo("Live Reload completed cleanly for project: " + projectRoot.getFileName());
