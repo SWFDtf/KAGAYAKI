@@ -51,6 +51,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -93,7 +94,13 @@ public final class F09StudioToolingE2eTest {
 
             studio.showWorkspace();
             assertEquals(StudioWindowController.StudioView.WORKSPACE, studio.getActiveView());
-            assertTrue(studio.runLint().isClean());
+            VJavaLinter.LintReport baselineLint = studio.runLint();
+            assertFalse(baselineLint.hasErrors(),
+                    "Baseline authoring project must have 0 lint errors: " + baselineLint.issues());
+            assertTrue(
+                    baselineLint.issues().stream().allMatch(i -> "UNREACHABLE_LABEL".equals(i.code())),
+                    "Only intentional UNREACHABLE_LABEL warning is expected: " + baselineLint.issues()
+            );
 
             assertEquals(RenderMode.MODE_3D, studio.switchRenderMode(RenderMode.MODE_3D));
             assertEquals(RenderMode.MODE_2D, studio.switchRenderMode(RenderMode.MODE_2D));
@@ -129,9 +136,11 @@ public final class F09StudioToolingE2eTest {
             wp.checkAll(store, "start");
             store.set("score", 25);
             wp.checkAll(store, "helper");
-            assertEquals(1, events.size());
-            assertEquals(10, events.get(0).previousValue());
-            assertEquals(25, events.get(0).newValue());
+            assertEquals(2, events.size());
+            assertNull(events.get(0).previousValue());
+            assertEquals(10, events.get(0).newValue());
+            assertEquals(10, events.get(1).previousValue());
+            assertEquals(25, events.get(1).newValue());
 
             StudioCommandPalette palette = new StudioCommandPalette();
             AtomicBoolean ran = new AtomicBoolean(false);
@@ -525,7 +534,13 @@ public final class F09StudioToolingE2eTest {
             Path trashedPath = projectDir.resolve(".trash/assets/images/unused_prop.png");
             assertFalse(Files.exists(unusedPath), "Cleanup wizard must remove unused asset from assets/");
             assertTrue(Files.exists(trashedPath), "Cleanup wizard must move unused asset into .trash/");
-            assertTrue(studio.runLint().isClean(), "Remaining project must lint with 0 MISSING_ASSET errors");
+            VJavaLinter.LintReport afterCleanupLint = studio.runLint();
+            assertFalse(afterCleanupLint.hasErrors(),
+                    "Remaining project must lint with 0 errors: " + afterCleanupLint.issues());
+            assertTrue(
+                    afterCleanupLint.issues().stream().noneMatch(i -> "MISSING_ASSET".equals(i.code())),
+                    "Remaining project must lint with 0 MISSING_ASSET errors: " + afterCleanupLint.issues()
+            );
 
             TextButton undoBtn = findButtonContaining(ws.getRoot(), "undo");
             if (undoBtn == null) {

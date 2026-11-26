@@ -53,6 +53,7 @@ Vollständige `.vjava`-Skript-Pipeline von KAGAYAKI (Meilenstein M3 + M4): einr�
 | `TypeSafeStateView` | `final class` | Typsichere Lese-Fassade über `StateStore` mit `Optional<String|Integer|Long|Double|Boolean|BigDecimal|T>`-Methoden. |
 | `VJavaLocalizationBridge` | `final class` | Brücke zwischen `VJavaAst.ProjectAst` und dem AST-freien `LocalizationManager` (`indexProject`, `toTranslationBlocks`, `extractTranslationTemplate`). |
 | `HotReloadWatcher` | `final class` | Nicht-blockierender Polling-Dateiwächter für `**/*.vjava` und `project.vjava.json` (`ReloadDelta` mit `added`/`modified`/`deleted`). |
+| `ScriptDebugger` | `final class` | Interaktiver AST-Statement-Debugger (`Breakpoint`, `DebugMode`, `stepInto`, `stepOver`, `continueExecution`, Call-Stack-Zusammenfassung). |
 
 ## Öffentliche API-Signaturen
 

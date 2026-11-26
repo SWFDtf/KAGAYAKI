@@ -1972,6 +1972,30 @@ public final class ScriptRuntime {
     }
 
     /**
+     * Returns the current call/block stack depth.
+     *
+     * @return call stack frame count
+     */
+    public int getCallStackDepth() {
+        return callStack.size();
+    }
+
+    /**
+     * Returns an ordered snapshot of active call-stack labels (bottom to top).
+     *
+     * @return immutable list of label names on the call stack
+     */
+    public List<String> getCallStackLabels() {
+        List<String> labels = new ArrayList<>(callStack.size());
+        for (StackFrame frame : callStack) {
+            if (frame.labelName() != null) {
+                labels.add(frame.labelName());
+            }
+        }
+        return Collections.unmodifiableList(labels);
+    }
+
+    /**
      * Returns whether NVL cumulative mode is active.
      *
      * @return {@code true} if NVL cumulative mode is active

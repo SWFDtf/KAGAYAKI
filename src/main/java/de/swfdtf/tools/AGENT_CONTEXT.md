@@ -52,6 +52,7 @@ Entwickler-Werkzeuge, Dual-Window-Studio-UI und Standalone-Build-Pipeline von KA
 | `VpakManifestInspector` | `final class` | Prüft alle Einträge eines `.vpak`-Archivs inklusive CRC32-Verifikation, Kompressionsrate und Extension-Statistik (`VpakInspectionReport`). |
 | `StudioWorkspaceState` | `final class` | Persistiert Studio-Workspace-Einstellungen (letztes Projekt, Recent-Projects, Panel-Auswahl) atomar als JSON. |
 | `PerformanceBenchmarkRunner` | `final class` | Reproduzierbare Micro-Benchmark-Suite für Lexer, Parser, Motion-Controller, SceneGraph-Traversal und Rich-Text-Layout inkl. `docs/BENCHMARKS.md`-Export (`BenchmarkMetric`, `BenchmarkSuiteReport`). |
+| `VJavaSyntaxHighlighter` | `final class` | Schneller Single-Pass-Lexikal-Tokenizer (`TokenType`, `TokenRun`) für `.vjava`-Code mit `< 2 ms` pro 1.000 Zeilen und Java-Block-Schutz (`"}<<"`). |
 
 ## Öffentliche API-Signaturen
 

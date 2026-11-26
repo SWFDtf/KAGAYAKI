@@ -81,6 +81,10 @@ public class LiveDirectorOverlay extends Screen {
     private final List<TextButton> attributeButtons = new ArrayList<>();
     private String selectedSpriteTag;
     private boolean updatingControls = false;
+    private boolean draggingStageSprite = false;
+    private float dragOffsetX = 0.0f;
+    private float dragOffsetY = 0.0f;
+    private String lastGeneratedSnippet = "";
 
     /**
      * Creates a {@code LiveDirectorOverlay} bound to {@code session} without a {@link ScreenManager}.
@@ -102,7 +106,41 @@ public class LiveDirectorOverlay extends Screen {
         this.session = Objects.requireNonNull(session, "session must not be null");
         this.screenManager = screenManager;
 
-        Fixed root = new Fixed();
+        Fixed root = new Fixed() {
+            @Override
+            protected boolean onMouseDown(float lx, float ly, int button) {
+                if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT
+                        && !panelBox.getBounds().contains(lx, ly)
+                        && selectedSpriteTag != null) {
+                    SpriteNode sprite = session.getSceneController().getActiveSprite(selectedSpriteTag);
+                    if (sprite != null) {
+                        draggingStageSprite = true;
+                        dragOffsetX = sprite.getTransform().getXpos() - lx;
+                        dragOffsetY = sprite.getTransform().getYpos() - ly;
+                        return true;
+                    }
+                }
+                return super.onMouseDown(lx, ly, button);
+            }
+
+            @Override
+            protected void onMouseMoved(float lx, float ly, boolean inside) {
+                if (draggingStageSprite && selectedSpriteTag != null) {
+                    applyDraggedCoordinates(lx, ly);
+                }
+                super.onMouseMoved(lx, ly, inside);
+            }
+
+            @Override
+            protected boolean onMouseUp(float lx, float ly, int button) {
+                if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && draggingStageSprite) {
+                    applyDraggedCoordinates(lx, ly);
+                    draggingStageSprite = false;
+                    return true;
+                }
+                return super.onMouseUp(lx, ly, button);
+            }
+        };
         this.panelBox = new WindowBox("Live Director [D]");
         this.panelBox.setPadding(14.0f, 12.0f);
         this.panelBox.setBackgroundColorHex(ThemePalette.PANEL_GLASS)
@@ -583,6 +621,49 @@ public class LiveDirectorOverlay extends Screen {
             }
         }
         updateSliderLabels(xposSlider.getValue(), yposSlider.getValue(), zoomSlider.getValue(), alphaSlider.getValue());
+        publishTransformSnippet(selectedSpriteTag, t.getXpos(), t.getYpos());
+    }
+
+    private void applyDraggedCoordinates(float lx, float ly) {
+        SpriteNode sprite = session.getSceneController().getActiveSprite(selectedSpriteTag);
+        if (sprite == null) {
+            return;
+        }
+        float nx = Math.clamp(lx + dragOffsetX, 0.0f, 1920.0f);
+        float ny = Math.clamp(ly + dragOffsetY, 0.0f, 1080.0f);
+        Transform2D t = sprite.getTransform();
+        t.setXalign(Float.NaN).setXanchor(0.0f).setXpos(nx);
+        t.setYalign(Float.NaN).setYanchor(0.0f).setYpos(ny);
+        updatingControls = true;
+        try {
+            xposSlider.setValue(nx);
+            yposSlider.setValue(ny);
+            updateSliderLabels(nx, ny, zoomSlider.getValue(), alphaSlider.getValue());
+        } finally {
+            updatingControls = false;
+        }
+        publishTransformSnippet(selectedSpriteTag, nx, ny);
+    }
+
+    private void publishTransformSnippet(String tag, float xpos, float ypos) {
+        if (tag == null || tag.isBlank()) {
+            return;
+        }
+        String snippet = String.format(Locale.US, "move %s xpos %.0f ypos %.0f", tag, xpos, ypos);
+        this.lastGeneratedSnippet = snippet;
+        statusLabel.setText(snippet);
+        if (session.getEngineApi() != null) {
+            session.getEngineApi().setProperty("studio.lastTransformSnippet", snippet);
+        }
+    }
+
+    /**
+     * Returns the most recently generated {@code move ... xpos ... ypos ...} transform snippet.
+     *
+     * @return last generated transform snippet (empty string if none yet)
+     */
+    public String getLastGeneratedSnippet() {
+        return lastGeneratedSnippet;
     }
 
     private void updateSliderLabels(float xpos, float ypos, float zoom, float alpha) {

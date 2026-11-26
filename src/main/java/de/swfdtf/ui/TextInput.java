@@ -31,6 +31,7 @@ public class TextInput extends UiNode {
     private String placeholder = "";
     private String allowChars;
     private int maxLength = 0;
+    private boolean multiline = false;
     private float fontSize = DEFAULT_FONT_SIZE;
     private Consumer<String> onSubmit;
     private Consumer<String> onChanged;
@@ -61,7 +62,7 @@ public class TextInput extends UiNode {
         StringBuilder filtered = new StringBuilder(raw.length());
         for (int i = 0; i < raw.length(); i++) {
             char ch = raw.charAt(i);
-            if (!Character.isISOControl(ch) && isCharAllowed(ch)) {
+            if ((!Character.isISOControl(ch) || isPermittedControlChar(ch)) && isCharAllowed(ch)) {
                 if (maxLength > 0 && filtered.length() >= maxLength) {
                     break;
                 }
@@ -232,6 +233,30 @@ public class TextInput extends UiNode {
         return curr;
     }
 
+    /**
+     * Enables or disables preservation of newline and tab characters for multiline editors.
+     *
+     * @param multiline {@code true} to allow newlines and tabs
+     * @return {@code this}
+     */
+    public TextInput setMultiline(boolean multiline) {
+        this.multiline = multiline;
+        return this;
+    }
+
+    /**
+     * Returns whether multiline characters ({@code \n}, {@code \r}, {@code \t}) are preserved.
+     *
+     * @return {@code true} if multiline mode is enabled
+     */
+    public boolean isMultiline() {
+        return multiline;
+    }
+
+    private boolean isPermittedControlChar(char ch) {
+        return multiline && (ch == '\n' || ch == '\r' || ch == '\t');
+    }
+
     @Override
     protected boolean isInteractive() {
         return true;
@@ -250,7 +275,7 @@ public class TextInput extends UiNode {
 
     @Override
     protected boolean onCharTyped(char ch) {
-        if (!isEnabled() || !isFocused() || Character.isISOControl(ch)) {
+        if (!isEnabled() || !isFocused() || (Character.isISOControl(ch) && !isPermittedControlChar(ch))) {
             return false;
         }
         if (!isCharAllowed(ch)) {

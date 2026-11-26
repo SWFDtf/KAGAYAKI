@@ -93,17 +93,43 @@ public final class ProjectTemplateGenerator {
             String renderMode,
             TemplateType templateType
     ) throws IOException {
+        return generate(targetDir, title, null, renderMode, templateType);
+    }
+
+    /**
+     * Generates a KAGAYAKI project in {@code targetDir} with custom author metadata using the
+     * requested {@link TemplateType}.
+     *
+     * @param targetDir    destination project root directory
+     * @param title        project display title (falls back to default if null or blank)
+     * @param author       project author metadata (falls back to Studio default if null or blank)
+     * @param renderMode   render backend mode ({@code "2D"} or {@code "3D"})
+     * @param templateType scaffolding preset ({@link TemplateType#FULL_DEMO}, {@link TemplateType#STARTER},
+     *                     or {@link TemplateType#MINIMAL})
+     * @return normalized path to the generated project root directory
+     * @throws IOException if writing project files or assets fails
+     */
+    public static Path generate(
+            Path targetDir,
+            String title,
+            String author,
+            String renderMode,
+            TemplateType templateType
+    ) throws IOException {
         Objects.requireNonNull(targetDir, "targetDir must not be null");
         TemplateType effectiveType = templateType != null ? templateType : TemplateType.STARTER;
         Path root = targetDir.toAbsolutePath().normalize();
         Files.createDirectories(root);
 
         String effectiveTitle = (title == null || title.isBlank()) ? DEFAULT_TITLE : title.trim();
+        String effectiveAuthor = (author == null || author.isBlank())
+                ? "KAGAYAKI Studio (" + EngineVersion.VERSION + ")"
+                : author.trim();
         ProjectDescriptor descriptor = ProjectDescriptor.createDefault(effectiveTitle);
         if (renderMode != null && !renderMode.isBlank()) {
             descriptor.setRenderMode(renderMode);
         }
-        descriptor.setAuthor("KAGAYAKI Studio (" + EngineVersion.VERSION + ")");
+        descriptor.setAuthor(effectiveAuthor);
         descriptor.setVersion(EngineVersion.VERSION);
         descriptor.normalizeDefaults();
         ProjectDescriptor.save(root, descriptor);

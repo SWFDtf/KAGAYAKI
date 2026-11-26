@@ -49,7 +49,7 @@ Vollständiges Dark-Slate-UI-, Screen-Management-, Widget-, `screen`-AST-Builder
 | `Bar` | `class` | Horizontaler Fortschritts-/Pegelbalken (`extends UiNode`) mit Dark-Slate-Track und Füllfarbe. |
 | `VBar` | `class` | Vertikaler Bottom-to-Top-Fortschritts-/Pegelbalken (`extends UiNode`), u. a. für den Musikraum-Spektrumanalyzer. |
 | `Slider` | `class` | Interaktiver horizontaler Schieberegler (`extends UiNode`) mit Klick-Sprung, Dragging, `step`-Einrasten und Links/Rechts-Tastensteuerung. |
-| `TextInput` | `class` | Einzeiliges Texteingabefeld (`extends UiNode`) mit `allowChars`-Whitelist, `maxLength`-Begrenzung, Cursor-Navigation (`LEFT`/`RIGHT`/`HOME`/`END`), `Delete`/`Backspace` und Enter-Submit. |
+| `TextInput` | `class` | Einzeiliges oder mehrzeiliges (`setMultiline(true)`) Texteingabefeld (`extends UiNode`) mit `allowChars`-Whitelist, `maxLength`-Begrenzung, Cursor-Navigation (`LEFT`/`RIGHT`/`HOME`/`END`), `Delete`/`Backspace` und Enter-Submit. |
 | `SelectBox` | `class` | Aufklappbares Auswahlfeld (`extends UiNode`) für Listen-Optionen per Klick, Tastatur und `Escape`-Abbruch. |
 | `Checkbox` | `class` | Fokusierbare Checkbox (`extends UiNode`) für boolesche Zustände via Klick oder `Space`/`Enter`. |
 | `ToggleSwitch` | `class` | Fokusierbarer Kippschalter (`extends UiNode`) mit Pill-Track und Zustandswechsel-Callback. |
