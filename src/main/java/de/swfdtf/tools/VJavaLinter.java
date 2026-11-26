@@ -125,6 +125,19 @@ public final class VJavaLinter {
      * @return aggregated {@link LintReport}
      */
     public static LintReport lint(Path projectDir) {
+        return lint(projectDir, false);
+    }
+
+    /**
+     * Scans and lints the KAGAYAKI project directory at {@code projectDir}, optionally enforcing
+     * 100% translation coverage across every declared target language.
+     *
+     * @param projectDir root directory of the project
+     * @param strictI18n {@code true} to emit an {@link Severity#ERROR} whenever any language has
+     *                   incomplete translation coverage
+     * @return aggregated {@link LintReport}
+     */
+    public static LintReport lint(Path projectDir, boolean strictI18n) {
         Objects.requireNonNull(projectDir, "projectDir must not be null");
         Path normalizedRoot = projectDir.toAbsolutePath().normalize();
         if (!Files.exists(normalizedRoot) || !Files.isDirectory(normalizedRoot)) {
@@ -139,7 +152,7 @@ public final class VJavaLinter {
 
         try {
             VJavaAst.ProjectAst project = ProjectScanner.scan(normalizedRoot);
-            return lint(project);
+            return lint(project, strictI18n);
         } catch (VJavaParseException parseEx) {
             return createReport(List.of(new LintIssue(
                     Severity.ERROR,
@@ -166,6 +179,18 @@ public final class VJavaLinter {
      * @return aggregated {@link LintReport}
      */
     public static LintReport lint(VJavaAst.ProjectAst project) {
+        return lint(project, false);
+    }
+
+    /**
+     * Lints an already scanned {@link VJavaAst.ProjectAst}, optionally enforcing 100% translation
+     * coverage across every declared target language.
+     *
+     * @param project    unified project AST
+     * @param strictI18n {@code true} to emit an {@link Severity#ERROR} for incomplete translations
+     * @return aggregated {@link LintReport}
+     */
+    public static LintReport lint(VJavaAst.ProjectAst project, boolean strictI18n) {
         Objects.requireNonNull(project, "project must not be null");
         List<LintIssue> issues = new ArrayList<>();
 
@@ -196,6 +221,10 @@ public final class VJavaLinter {
         checkLayeredImageDefinitions(project, knownAssets, issues);
         checkScreenDefinitions(project, knownAssets, issues);
         checkTranslationSpeakers(project, issues);
+        checkTranslationPlaceholdersAndTags(project, issues);
+        if (strictI18n) {
+            checkStrictTranslationCoverage(project, issues);
+        }
 
         Map<String, Set<String>> callGraph = new LinkedHashMap<>();
         for (VJavaAst.LabelNode label : project.labels().values()) {
@@ -347,6 +376,149 @@ public final class VJavaLinter {
                 }
             }
         }
+    }
+
+    private static void checkTranslationPlaceholdersAndTags(VJavaAst.ProjectAst project, List<LintIssue> issues) {
+        for (VJavaAst.TranslateBlock block : project.translations()) {
+            for (VJavaAst.TranslateEntry entry : block.entries()) {
+                String orig = entry.originalText();
+                String trans = entry.translatedText();
+                if (orig == null || orig.isBlank() || trans == null || trans.isBlank()) {
+                    continue;
+                }
+                Set<String> expectedPlaceholders = extractBracketPlaceholders(orig);
+                Set<String> actualPlaceholders = extractBracketPlaceholders(trans);
+                Set<String> expectedTags = extractStyleTags(orig);
+                Set<String> actualTags = extractStyleTags(trans);
+
+                List<String> missing = new ArrayList<>();
+                for (String placeholder : expectedPlaceholders) {
+                    if (!actualPlaceholders.contains(placeholder)) {
+                        missing.add("[" + placeholder + "]");
+                    }
+                }
+                for (String tag : expectedTags) {
+                    if (!actualTags.contains(tag)) {
+                        missing.add("{" + tag + "}");
+                    }
+                }
+                if (!missing.isEmpty()) {
+                    issues.add(new LintIssue(
+                            Severity.WARNING,
+                            "TRANSLATION_PLACEHOLDER_MISMATCH",
+                            "Translation in block '" + block.id() + "' (" + block.language()
+                                    + ") omits source placeholders/tags: " + String.join(", ", missing),
+                            block.sourceFile(),
+                            block.lineNumber()
+                    ));
+                }
+            }
+        }
+    }
+
+    private static void checkStrictTranslationCoverage(VJavaAst.ProjectAst project, List<LintIssue> issues) {
+        TranslationCoverageAuditor.CoverageReport report = new TranslationCoverageAuditor().audit(project);
+        if (report.totalDialogueLines() <= 0) {
+            return;
+        }
+        for (TranslationCoverageAuditor.LanguageCoverage cov : report.languages().values()) {
+            if (cov.coveragePercent() < 100.0) {
+                issues.add(new LintIssue(
+                        Severity.ERROR,
+                        "INCOMPLETE_TRANSLATION_COVERAGE",
+                        "Language '" + cov.language() + "' has incomplete translation coverage: "
+                                + cov.translatedEntries() + "/" + cov.expectedEntries()
+                                + " (" + String.format(Locale.US, "%.1f%%", cov.coveragePercent()) + ").",
+                        "tl/" + cov.language() + "/translations.vjava",
+                        1
+                ));
+            }
+        }
+    }
+
+    private static Set<String> extractBracketPlaceholders(String text) {
+        Set<String> tokens = new LinkedHashSet<>();
+        int i = 0;
+        int len = text.length();
+        while (i < len) {
+            char c = text.charAt(i);
+            if (c == '[' && i + 1 < len && text.charAt(i + 1) == '[') {
+                i += 2;
+                continue;
+            }
+            if (c == '[') {
+                int close = text.indexOf(']', i + 1);
+                if (close > i + 1) {
+                    String inner = text.substring(i + 1, close).trim();
+                    if (!inner.isEmpty()) {
+                        tokens.add(inner);
+                    }
+                    i = close + 1;
+                    continue;
+                }
+            }
+            i++;
+        }
+        return tokens;
+    }
+
+    private static Set<String> extractStyleTags(String text) {
+        Set<String> tags = new LinkedHashSet<>();
+        int i = 0;
+        int len = text.length();
+        while (i < len) {
+            char c = text.charAt(i);
+            if (c == '{' && i + 1 < len && text.charAt(i + 1) == '{') {
+                i += 2;
+                continue;
+            }
+            if (c == '{') {
+                int close = findMatchingClosingBrace(text, i);
+                if (close > i + 1) {
+                    String inner = text.substring(i + 1, close).trim();
+                    if (isIcuExpression(inner)) {
+                        i = close + 1;
+                        continue;
+                    }
+                    if (!inner.isEmpty()) {
+                        tags.add(inner.toLowerCase(Locale.ROOT));
+                    }
+                    i = close + 1;
+                    continue;
+                }
+            }
+            i++;
+        }
+        return tags;
+    }
+
+    private static int findMatchingClosingBrace(String text, int openIdx) {
+        int depth = 0;
+        for (int i = openIdx; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isIcuExpression(String inner) {
+        int comma1 = inner.indexOf(',');
+        if (comma1 <= 0) {
+            return false;
+        }
+        int comma2 = inner.indexOf(',', comma1 + 1);
+        if (comma2 <= comma1 + 1) {
+            return false;
+        }
+        String kind = inner.substring(comma1 + 1, comma2).trim().toLowerCase(Locale.ROOT);
+        return "plural".equals(kind) || "select".equals(kind);
     }
 
     private static void checkStatements(

@@ -30,10 +30,12 @@ import de.swfdtf.parser.ProjectScanner;
 import de.swfdtf.parser.ScriptRuntime;
 import de.swfdtf.parser.ScriptSession;
 import de.swfdtf.parser.VJavaAst;
+import de.swfdtf.state.AutoSaveScheduler;
 import de.swfdtf.state.PreferencesState;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
@@ -67,6 +69,8 @@ public final class GameRuntimeCoordinator implements GameHost {
     private TransitionManager transitionManager;
     private ScreenManager screenManager;
     private ScriptSession session;
+    private AutoSaveScheduler autoSaveScheduler;
+    private ScriptRuntime.Status lastObservedRuntimeStatus = ScriptRuntime.Status.READY;
 
     private AdvDialogueScreen advScreen;
     private NvlDialogueScreen nvlScreen;
@@ -145,6 +149,13 @@ public final class GameRuntimeCoordinator implements GameHost {
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to initialize ScriptSession: " + ex.getMessage(), ex);
         }
+        this.autoSaveScheduler = new AutoSaveScheduler(
+                session.getSaveManager(),
+                () -> this.session != null
+                        ? this.session.createSaveSlotData("auto_pending", "Auto Save", 0, 0, null)
+                        : null
+        );
+        this.lastObservedRuntimeStatus = session.getRuntime().getStatus();
 
         this.audioEngine = new AudioEngine(
                 projectRoot,
@@ -229,6 +240,7 @@ public final class GameRuntimeCoordinator implements GameHost {
         api.registerService(AnimationEngine.class, animationEngine);
         api.registerService(TransitionManager.class, transitionManager);
         api.registerService(ScreenManager.class, screenManager);
+        api.registerService(AutoSaveScheduler.class, autoSaveScheduler);
     }
 
     private void buildAndRegisterScreens() {
@@ -251,28 +263,35 @@ public final class GameRuntimeCoordinator implements GameHost {
         this.achievementsScreen = new AchievementsScreen(session, screenManager);
         this.toastOverlay = new NotificationToastOverlay(session, screenManager);
 
-        screenManager.registerScreen(advScreen);
-        screenManager.registerScreen(nvlScreen);
-        screenManager.registerScreen(bubbleScreen);
-        screenManager.registerScreen(quickMenuScreen);
-        screenManager.registerScreen(choiceMenuScreen);
-        screenManager.registerScreen(inputOverlayScreen);
-        screenManager.registerScreen(mainMenuScreen);
-        screenManager.registerScreen(saveLoadScreen);
-        screenManager.registerScreen(preferencesScreen);
-        screenManager.registerScreen(controlsScreen);
-        screenManager.registerScreen(aboutScreen);
-        screenManager.registerScreen(historyLogScreen);
-        screenManager.registerScreen(galleryScreen);
-        screenManager.registerScreen(musicRoomScreen);
-        screenManager.registerScreen(endingsTreeScreen);
-        screenManager.registerScreen(achievementsScreen);
+        registerHidden(advScreen);
+        registerHidden(nvlScreen);
+        registerHidden(bubbleScreen);
+        registerHidden(quickMenuScreen);
+        registerHidden(choiceMenuScreen);
+        registerHidden(inputOverlayScreen);
+        registerHidden(mainMenuScreen);
+        registerHidden(saveLoadScreen);
+        registerHidden(preferencesScreen);
+        registerHidden(controlsScreen);
+        registerHidden(aboutScreen);
+        registerHidden(historyLogScreen);
+        registerHidden(galleryScreen);
+        registerHidden(musicRoomScreen);
+        registerHidden(endingsTreeScreen);
+        registerHidden(achievementsScreen);
         screenManager.showScreen(toastOverlay);
 
         // Register custom .vjava screen definitions
         for (VJavaAst.ScreenDef def : session.getRuntime().getProjectAst().screens().values()) {
             Screen custom = ScreenAstBuilder.build(def, session.getRuntime(), action -> handleAstScreenAction(action));
-            screenManager.registerScreen(custom);
+            registerHidden(custom);
+        }
+    }
+
+    private void registerHidden(Screen screen) {
+        if (screen != null) {
+            screen.setVisible(false);
+            screenManager.registerScreen(screen);
         }
     }
 
@@ -385,6 +404,20 @@ public final class GameRuntimeCoordinator implements GameHost {
             return;
         }
         session.update(dt);
+        if (autoSaveScheduler != null && autoSaveScheduler.isEnabled()) {
+            ScriptRuntime.Status currentStatus = session.getRuntime().getStatus();
+            try {
+                if (currentStatus == ScriptRuntime.Status.WAITING_MENU
+                        && lastObservedRuntimeStatus != ScriptRuntime.Status.WAITING_MENU) {
+                    autoSaveScheduler.forceSave();
+                } else {
+                    autoSaveScheduler.update(dt);
+                }
+            } catch (UncheckedIOException ex) {
+                api.logWarn("Auto-save skipped due to I/O error: " + ex.getMessage());
+            }
+            lastObservedRuntimeStatus = currentStatus;
+        }
         audioEngine.update(dt);
         animationEngine.update(dt);
         transitionManager.update(dt);
@@ -477,7 +510,9 @@ public final class GameRuntimeCoordinator implements GameHost {
 
         // In-game shortcuts when no modal screen blocks input
         if (justPressed(input, GLFW.GLFW_KEY_PAGE_UP)) {
-            session.rollback();
+            if (!session.rollback() && session.getStateStore().isRollbackBlocked() && toastOverlay != null) {
+                toastOverlay.pushToast("Rollback Blocked", "Cannot roll back past a decision barrier.");
+            }
         } else if (justPressed(input, GLFW.GLFW_KEY_PAGE_DOWN)) {
             session.rollForward();
         } else if (!wasdActive && justPressed(input, GLFW.GLFW_KEY_S) && !ctrl && !shift) {
@@ -878,5 +913,14 @@ public final class GameRuntimeCoordinator implements GameHost {
      */
     public NotificationToastOverlay getToastOverlay() {
         return toastOverlay;
+    }
+
+    /**
+     * Returns the wired auto-save scheduler instance.
+     *
+     * @return active {@link AutoSaveScheduler}, or {@code null} before {@link #init}
+     */
+    public AutoSaveScheduler getAutoSaveScheduler() {
+        return autoSaveScheduler;
     }
 }

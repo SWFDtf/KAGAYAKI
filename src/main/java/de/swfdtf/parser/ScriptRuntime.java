@@ -8,6 +8,7 @@ import de.swfdtf.graphics.SceneGraph;
 import de.swfdtf.graphics.TextTagParser;
 import de.swfdtf.math.ScreenShake;
 import de.swfdtf.math.Transform2D;
+import de.swfdtf.state.IcuMessageFormatter;
 import de.swfdtf.state.LocalizationManager;
 import de.swfdtf.state.PersistentAccess;
 import de.swfdtf.state.SaveSlotData;
@@ -222,6 +223,23 @@ public final class ScriptRuntime {
          */
         default void resumeVoiceAt(String assetPath, double offsetSeconds) {
         }
+
+        /**
+         * Captures an opaque snapshot of active audio channels for deterministic rollback.
+         *
+         * @return opaque channel snapshot object, or {@code null}
+         */
+        default Object captureAudioSnapshot() {
+            return null;
+        }
+
+        /**
+         * Restores previously captured audio channel state after a rollback or snapshot restore.
+         *
+         * @param snapshot opaque channel snapshot produced by {@link #captureAudioSnapshot()}
+         */
+        default void restoreAudioSnapshot(Object snapshot) {
+        }
     }
 
     /**
@@ -297,6 +315,7 @@ public final class ScriptRuntime {
      * @param nvlLines        immutable list of accumulated NVL lines
      * @param activeVoicePath pending or active voice path (nullable)
      * @param stageSnapshot   captured {@link SceneController} stage snapshot
+     * @param audioSnapshot   optional captured audio channels snapshot (nullable)
      */
     public record ExecutionSnapshot(
             String currentLabel,
@@ -309,12 +328,57 @@ public final class ScriptRuntime {
             boolean nvlMode,
             List<String> nvlLines,
             String activeVoicePath,
-            SceneController.StageSnapshot stageSnapshot
+            SceneController.StageSnapshot stageSnapshot,
+            Object audioSnapshot
     ) {
         /** Normalizes null call stack and NVL line lists to empty immutable lists. */
         public ExecutionSnapshot {
             callStack = callStack != null ? List.copyOf(callStack) : List.of();
             nvlLines = nvlLines != null ? List.copyOf(nvlLines) : List.of();
+        }
+
+        /**
+         * Backwards-compatible constructor omitting {@code audioSnapshot}.
+         *
+         * @param currentLabel    currently active label name
+         * @param statementIndex  current statement index within active block
+         * @param callStack       immutable copy of active stack frames
+         * @param status          runtime status at snapshot time
+         * @param activeDialogue  active dialogue prompt (nullable)
+         * @param activeMenu      active menu prompt (nullable)
+         * @param activeInput     active input prompt (nullable)
+         * @param nvlMode         whether NVL mode is enabled
+         * @param nvlLines        immutable list of accumulated NVL lines
+         * @param activeVoicePath pending or active voice path (nullable)
+         * @param stageSnapshot   captured {@link SceneController} stage snapshot
+         */
+        public ExecutionSnapshot(
+                String currentLabel,
+                int statementIndex,
+                List<StackFrame> callStack,
+                Status status,
+                DialoguePrompt activeDialogue,
+                MenuPrompt activeMenu,
+                InputPrompt activeInput,
+                boolean nvlMode,
+                List<String> nvlLines,
+                String activeVoicePath,
+                SceneController.StageSnapshot stageSnapshot
+        ) {
+            this(
+                    currentLabel,
+                    statementIndex,
+                    callStack,
+                    status,
+                    activeDialogue,
+                    activeMenu,
+                    activeInput,
+                    nvlMode,
+                    nvlLines,
+                    activeVoicePath,
+                    stageSnapshot,
+                    null
+            );
         }
     }
 
@@ -684,7 +748,8 @@ public final class ScriptRuntime {
                 nvlMode,
                 List.copyOf(nvlLines),
                 activeVoicePath,
-                sceneController.snapshotState()
+                sceneController.snapshotState(),
+                audioBridge != null ? audioBridge.captureAudioSnapshot() : null
         );
     }
 
@@ -710,7 +775,6 @@ public final class ScriptRuntime {
         this.pauseRemainingSeconds = 0.0;
         this.pauseTimed = false;
         this.waitingMoveTag = null;
-        this.waitingMoveTag = null;
 
         if (!this.callStack.isEmpty() && !this.callStack.get(this.callStack.size() - 1).isCallBoundary()) {
             this.currentStatements = this.callStack.get(this.callStack.size() - 1).childStatements();
@@ -731,6 +795,9 @@ public final class ScriptRuntime {
 
         if (snapshot.stageSnapshot() != null) {
             sceneController.restoreState(snapshot.stageSnapshot());
+        }
+        if (audioBridge != null && snapshot.audioSnapshot() != null) {
+            audioBridge.restoreAudioSnapshot(snapshot.audioSnapshot());
         }
     }
 
@@ -1612,7 +1679,9 @@ public final class ScriptRuntime {
         if (raw == null) {
             return "";
         }
-        return TextTagParser.interpolateVariables(raw, this::lookupInterpolationVariable);
+        String activeLang = localizationManager != null ? localizationManager.getCurrentLanguage() : "deutsch";
+        String icuFormatted = IcuMessageFormatter.format(raw, activeLang, this::lookupInterpolationVariable);
+        return TextTagParser.interpolateVariables(icuFormatted, this::lookupInterpolationVariable);
     }
 
     private Object lookupInterpolationVariable(String key) {

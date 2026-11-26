@@ -14,6 +14,7 @@ import de.swfdtf.state.PersistentState;
 import de.swfdtf.state.PreferencesState;
 import de.swfdtf.state.RevertableStateStore;
 import de.swfdtf.state.SaveManager;
+import de.swfdtf.state.SaveMigrationService;
 import de.swfdtf.state.SaveSlotData;
 import de.swfdtf.state.SessionState;
 
@@ -38,6 +39,7 @@ public final class ScriptSession {
     private final SessionState sessionState;
     private final HistoryLog historyLog;
     private final SaveManager saveManager;
+    private final SaveMigrationService saveMigrationService;
     private final LocalizationManager localizationManager;
     private final AchievementManager achievementManager;
     private final GalleryManager galleryManager;
@@ -127,6 +129,7 @@ public final class ScriptSession {
         this.sessionState = new SessionState();
         this.historyLog = new HistoryLog();
         this.saveManager = new SaveManager(resolvedSavesDir);
+        this.saveMigrationService = new SaveMigrationService();
 
         String defaultLang = project.descriptor() != null
                 ? project.descriptor().getDefaultLanguage()
@@ -155,6 +158,7 @@ public final class ScriptSession {
         engineApi.registerService(SessionState.class, sessionState);
         engineApi.registerService(HistoryLog.class, historyLog);
         engineApi.registerService(SaveManager.class, saveManager);
+        engineApi.registerService(SaveMigrationService.class, saveMigrationService);
         engineApi.registerService(LocalizationManager.class, localizationManager);
         engineApi.registerService(AchievementManager.class, achievementManager);
         engineApi.registerService(GalleryManager.class, galleryManager);
@@ -435,7 +439,7 @@ public final class ScriptSession {
         ClassLoader userCl = runtime.getCompiledBlocks() != null
                 ? runtime.getCompiledBlocks().getClassLoader()
                 : getClass().getClassLoader();
-        SaveSlotData loaded = saveManager.loadSlot(slotId, userCl);
+        SaveSlotData loaded = saveMigrationService.migrateToLatest(saveManager.loadSlot(slotId, userCl));
 
         stateStore.clear();
         stateStore.restoreMap(loaded.variables());
@@ -533,6 +537,15 @@ public final class ScriptSession {
      */
     public SaveManager getSaveManager() {
         return saveManager;
+    }
+
+    /**
+     * Returns the save schema migration service applied on live slot loads.
+     *
+     * @return save migration service
+     */
+    public SaveMigrationService getSaveMigrationService() {
+        return saveMigrationService;
     }
 
     /**

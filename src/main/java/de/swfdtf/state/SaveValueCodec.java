@@ -61,6 +61,19 @@ public final class SaveValueCodec {
 
     private static final String GENERATED_USER_TYPES_PREFIX = "de.swfdtf.vjava.gen.VJavaUserTypes$";
     private static final String GENERATED_PACKAGE_PREFIX = "de.swfdtf.vjava.gen.";
+    private static final String ENGINE_PACKAGE_PREFIX = "de.swfdtf.";
+    private static final Set<String> ALLOWED_ARRAY_COMPONENTS = Set.of(
+            "java.lang.Object",
+            "java.lang.String",
+            "java.lang.Boolean",
+            "java.lang.Byte",
+            "java.lang.Short",
+            "java.lang.Character",
+            "java.lang.Integer",
+            "java.lang.Long",
+            "java.lang.Float",
+            "java.lang.Double"
+    );
 
     private SaveValueCodec() {
     }
@@ -560,7 +573,7 @@ public final class SaveValueCodec {
             case "char[]" -> obj.get("value").getAsString().toCharArray();
             case "array" -> {
                 String compName = obj.get("componentType").getAsString();
-                Class<?> compType = resolveClassOrPrimitive(compName, userLoader);
+                Class<?> compType = resolveArrayComponentType(compName, userLoader);
                 JsonArray items = obj.getAsJsonArray("items");
                 Object out = Array.newInstance(compType, items.size());
                 for (int i = 0; i < items.size(); i++) {
@@ -782,7 +795,23 @@ public final class SaveValueCodec {
         return fields;
     }
 
+    private static boolean isAllowedCustomClassName(String className) {
+        if (className == null || className.isBlank()) {
+            return false;
+        }
+        String trimmed = className.trim();
+        if (trimmed.startsWith(GENERATED_PACKAGE_PREFIX)
+                || trimmed.startsWith("VJavaUserTypes$")
+                || trimmed.startsWith(ENGINE_PACKAGE_PREFIX)) {
+            return true;
+        }
+        return trimmed.indexOf('.') < 0 && trimmed.indexOf('$') < 0;
+    }
+
     private static Class<?> resolveClass(String className, ClassLoader optionalUserClassLoader) {
+        if (!isAllowedCustomClassName(className)) {
+            throw new SecurityException("Disallowed __vjavaClass not on allowlist: '" + className + "'");
+        }
         List<ClassLoader> loaders = new ArrayList<>();
         if (optionalUserClassLoader != null) {
             loaders.add(optionalUserClassLoader);
@@ -815,7 +844,7 @@ public final class SaveValueCodec {
         throw new IllegalStateException("Cannot resolve saved class '" + className + "'");
     }
 
-    private static Class<?> resolveClassOrPrimitive(String name, ClassLoader userLoader) {
+    private static Class<?> resolveArrayComponentType(String name, ClassLoader userLoader) {
         return switch (name) {
             case "boolean" -> boolean.class;
             case "byte" -> byte.class;
@@ -825,7 +854,16 @@ public final class SaveValueCodec {
             case "long" -> long.class;
             case "float" -> float.class;
             case "double" -> double.class;
-            default -> resolveClass(name, userLoader);
+            default -> {
+                if (ALLOWED_ARRAY_COMPONENTS.contains(name)) {
+                    try {
+                        yield Class.forName(name, false, SaveValueCodec.class.getClassLoader());
+                    } catch (ClassNotFoundException e) {
+                        throw new IllegalStateException("Cannot resolve component class '" + name + "'", e);
+                    }
+                }
+                yield resolveClass(name, userLoader);
+            }
         };
     }
 

@@ -39,6 +39,7 @@ Entwickler-Werkzeuge, Dual-Window-Studio-UI und Standalone-Build-Pipeline von KA
 | `ScriptWordCountAnalyzer` | `final class` | Berechnet Wort-, Zeichen-, Dialogzeilen-Statistiken pro Sprecher und geschätzte Lesezeit unter Stripping von Rich-Text-Tags (`ScriptStatsReport`). |
 | `UnusedAssetDetector` | `final class` | Vergleicht `ProjectAst.discoveredAssets()` gegen Skript-, Charakter-, `LayeredImage`- und `Screen`-Referenzen (`AssetUsageReport`). |
 | `TranslationCoverageAuditor` | `final class` | Prüft Dialogzeilen gegen `TranslateBlock`-Übersetzungen pro Sprache (`CoverageReport`, `LanguageCoverage`). |
+| `TranslationExportService` | `final class` | Exportiert Projektdialoge als PO, CSV und XLIFF (`ExportFormat`) und importiert validiertes CSV zurück in `.vjava`-Übersetzungsblöcke. |
 | `ProjectSearchService` | `final class` | Deterministische Volltext- und Regex-Suche über `**/*.vjava` (`SearchMatch`). |
 | `VJavaScriptFormatter` | `final class` | Formatiert `.vjava`-Skripte (4-Space-Einrückung, Leerzeilen, Trailing-Whitespace) unter Erhalt von `@->{ ... }<<`-Java-Blöcken. |
 | `StateSnapshotDiffService` | `final class` | Berechnet strukturierte Deltas (`StateDiff`: `added`, `removed`, `modified`) zwischen State-Maps oder `SaveSlotData`. |

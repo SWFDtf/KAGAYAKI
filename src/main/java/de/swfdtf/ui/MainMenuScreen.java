@@ -3,6 +3,7 @@ package de.swfdtf.ui;
 import de.swfdtf.core.ProjectDescriptor;
 import de.swfdtf.graphics.SceneLayer;
 import de.swfdtf.parser.ScriptSession;
+import de.swfdtf.state.LocalizationManager;
 import de.swfdtf.state.SaveManager;
 import de.swfdtf.state.SaveSlotData;
 
@@ -107,11 +108,31 @@ public class MainMenuScreen extends Screen {
         root.addChild(layout);
 
         setRoot(root);
+        applyLocalizedLabels();
+        session.getLocalizationManager().addLanguageChangeListener(ignored -> applyLocalizedLabels());
         refreshContinueState();
     }
 
     private static TextButton createMenuButton(String label, Runnable action) {
         return UiMediaSupport.createActionButton(label, 330.0f, 44.0f, action);
+    }
+
+    /**
+     * Updates all main-menu button labels from the active {@link LocalizationManager} locale.
+     */
+    public void applyLocalizedLabels() {
+        LocalizationManager loc = session.getLocalizationManager();
+        startButton.setText(UiTranslations.resolve(loc, "ui.start", "Start"));
+        continueButton.setText(UiTranslations.resolve(loc, "ui.continue", "Continue"));
+        loadButton.setText(UiTranslations.resolve(loc, "ui.load", "Load"));
+        galleryButton.setText(UiTranslations.resolve(loc, "ui.gallery", "Gallery"));
+        musicRoomButton.setText(UiTranslations.resolve(loc, "ui.music_room", "Music Room"));
+        endingsButton.setText(UiTranslations.resolve(loc, "ui.endings", "Endings"));
+        achievementsButton.setText(UiTranslations.resolve(loc, "ui.achievements", "Achievements"));
+        preferencesButton.setText(UiTranslations.resolve(loc, "ui.preferences", "Preferences"));
+        controlsButton.setText(UiTranslations.resolve(loc, "ui.controls", "Controls"));
+        aboutButton.setText(UiTranslations.resolve(loc, "ui.about", "About"));
+        quitButton.setText(UiTranslations.resolve(loc, "ui.quit", "Quit"));
     }
 
     @Override
@@ -121,6 +142,7 @@ public class MainMenuScreen extends Screen {
             titleBanner.setText(desc.getTitle());
             subtitleBanner.setText("v" + desc.getVersion());
         }
+        applyLocalizedLabels();
         refreshContinueState();
     }
 

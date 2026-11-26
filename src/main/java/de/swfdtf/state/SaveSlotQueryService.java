@@ -222,9 +222,9 @@ public final class SaveSlotQueryService {
         List<SaveSlotData> loaded = new ArrayList<>(slotIds.size());
         for (String slotId : slotIds) {
             try {
-                SaveSlotData data = saveManager.loadSlot(slotId);
-                if (data != null) {
-                    loaded.add(data);
+                Optional<SaveMetadata> metaOpt = saveManager.readSlotMetadata(slotId);
+                if (metaOpt.isPresent()) {
+                    loaded.add(new SaveSlotData(metaOpt.get(), Map.of(), null, List.of(), null));
                 }
             } catch (IOException | RuntimeException ignored) {
                 // Skip corrupt, incompatible, or concurrently deleted save slot files safely.

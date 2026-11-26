@@ -196,7 +196,8 @@ public final class SaveMigrationService {
                 input.metadata(),
                 updatedVars,
                 input.scriptPosition(),
-                input.historyEntries()
+                input.historyEntries(),
+                input.voiceBookmark()
         );
     }
 
@@ -267,7 +268,8 @@ public final class SaveMigrationService {
                 working.metadata(),
                 finalVariables,
                 working.scriptPosition(),
-                working.historyEntries()
+                working.historyEntries(),
+                working.voiceBookmark()
         );
     }
 
@@ -282,7 +284,8 @@ public final class SaveMigrationService {
                 source.metadata(),
                 new LinkedHashMap<>(source.variables()),
                 source.scriptPosition(),
-                source.historyEntries()
+                source.historyEntries(),
+                source.voiceBookmark()
         );
     }
 

@@ -30,6 +30,8 @@ public class PreferencesScreen extends Screen {
     private final ScreenManager screenManager;
     private FontManager fontManager;
 
+    private final TextWidget headerTitle;
+    private final TextButton saveAndCloseButton;
     private final Slider masterSlider;
     private final Slider musicSlider;
     private final Slider sfxSlider;
@@ -76,8 +78,10 @@ public class PreferencesScreen extends Screen {
         HBox header = new HBox();
         header.setSpacing(20.0f);
         header.setAlignCenterY(true);
-        header.addChild(UiMediaSupport.createTitleText("Preferences", 34.0f));
-        header.addChild(UiMediaSupport.createActionButton("Save & Close", 180.0f, 40.0f, this::saveAndClose));
+        this.headerTitle = UiMediaSupport.createTitleText("Preferences", 34.0f);
+        this.saveAndCloseButton = UiMediaSupport.createActionButton("Save & Close", 180.0f, 40.0f, this::saveAndClose);
+        header.addChild(headerTitle);
+        header.addChild(saveAndCloseButton);
 
         Grid columns = new Grid(2, 1);
         columns.setSpacing(32.0f, 16.0f);
@@ -165,6 +169,7 @@ public class PreferencesScreen extends Screen {
         setRoot(backdrop);
 
         addKeyBinding(GLFW.GLFW_KEY_ESCAPE, this::saveAndClose);
+        session.getLocalizationManager().addLanguageChangeListener(ignored -> refreshLabels());
         refreshLabels();
     }
 
@@ -238,6 +243,10 @@ public class PreferencesScreen extends Screen {
     }
 
     private void refreshLabels() {
+        LocalizationManager loc = session.getLocalizationManager();
+        headerTitle.setText(UiTranslations.resolve(loc, "ui.preferences", "Preferences"));
+        saveAndCloseButton.setText(UiTranslations.resolve(loc, "ui.save_close", "Save & Close"));
+
         PreferencesState prefs = session.getPreferencesState();
         fullscreenToggle.setText(prefs.isFullscreen() ? "ON" : "OFF");
         fullscreenToggle.setSelected(prefs.isFullscreen());

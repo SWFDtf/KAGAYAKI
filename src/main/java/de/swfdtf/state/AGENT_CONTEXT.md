@@ -51,6 +51,8 @@ Vollständige 4-Schichten-State-, Rollback-, Save/Load-, Verlaufs-, Meta-Progres
 | `ChapterRegistry` | `class` | Kapitelauswahl- und Freischalt-Manager (`ChapterDef`) über `PersistentAccess` inklusive Fortschritts-Prozentwert. |
 | `CodexGlossaryManager` | `class` | In-Game-Codex/Glossar (`CodexEntry`) über `PersistentAccess` mit Kategorie-Filter, Suche und Freischalt-Fortschritt. |
 | `RelationshipAffinityTracker` | `class` | Charakter-Vertrauens-/Zuneigungs-Tracker (`RelationshipTier`: `HOSTILE`..`DEVOTED`) mit optionaler `StateStore`-Synchronisation und Listener-Events. |
+| `IcuMessageFormatter` | `final class` | CLDR-ICU-Pluralisierungs- und Select-Formatter für `deutsch`, `english`, `polish`, `french`, `spanish` und `japanese` mit sicherer Degradation bei ungeschlossenen Klammern. |
+| `TranslationMemory` | `final class` | Translation Memory mit exaktem 100%-Abgleich, Levenshtein-Fuzzy-Match (`# fuzzy`) und Schutz vor Falschtreffern. |
 
 ## Öffentliche API-Signaturen
 

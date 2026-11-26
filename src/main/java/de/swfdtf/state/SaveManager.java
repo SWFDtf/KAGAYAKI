@@ -19,14 +19,18 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -45,6 +49,9 @@ public final class SaveManager {
     /** File extension for KAGAYAKI save slot files. */
     public static final String SAVE_EXTENSION = ".ksav";
 
+    /** Backup suffix appended to save slot files when creating safety backups on overwrite. */
+    public static final String BACKUP_EXTENSION = ".bak";
+
     /** Reserved slot ID for Quick-Save / Quick-Load. */
     public static final String QUICK_SAVE_SLOT = "quick";
 
@@ -60,8 +67,12 @@ public final class SaveManager {
     private static final Object STB_WRITE_LOCK = new Object();
     private static final Gson GSON = SaveValueCodec.createGson(false);
 
+    private record CachedMetadata(long lastModifiedMillis, long fileSize, SaveMetadata metadata) {
+    }
+
     private final Path savesDir;
     private final int autoSaveSlotCount;
+    private final Map<String, CachedMetadata> metadataCache = new HashMap<>();
     private int nextAutoSaveIndex = -1;
 
     /**
@@ -224,8 +235,15 @@ public final class SaveManager {
                     new GZIPOutputStream(Files.newOutputStream(tempFile)), StandardCharsets.UTF_8))) {
                 GSON.toJson(root, writer);
             }
+            fsyncFile(tempFile);
+            if (Files.isRegularFile(target)) {
+                Path backup = resolveBackupPath(target);
+                Files.copy(target, backup, StandardCopyOption.REPLACE_EXISTING);
+                fsyncFile(backup);
+            }
             moveAtomically(tempFile, target);
             moved = true;
+            metadataCache.remove(slotId.trim());
         } finally {
             if (!moved) {
                 Files.deleteIfExists(tempFile);
@@ -268,9 +286,33 @@ public final class SaveManager {
      */
     public synchronized SaveSlotData loadSlot(String slotId, ClassLoader optionalUserClassLoader) throws IOException {
         Path file = resolveSlotPath(slotId);
-        if (!Files.exists(file)) {
+        Path backup = resolveBackupPath(file);
+        if (!Files.exists(file) && !Files.exists(backup)) {
             throw new NoSuchFileException(file.toString());
         }
+        if (Files.exists(file)) {
+            try {
+                return loadSlotFromFile(slotId, file, optionalUserClassLoader);
+            } catch (IOException primaryEx) {
+                if (Files.isRegularFile(backup)) {
+                    try {
+                        return loadSlotFromFile(slotId, backup, optionalUserClassLoader);
+                    } catch (IOException backupEx) {
+                        primaryEx.addSuppressed(backupEx);
+                        throw primaryEx;
+                    }
+                }
+                throw primaryEx;
+            }
+        }
+        return loadSlotFromFile(slotId, backup, optionalUserClassLoader);
+    }
+
+    private SaveSlotData loadSlotFromFile(
+            String slotId,
+            Path file,
+            ClassLoader optionalUserClassLoader
+    ) throws IOException {
         JsonObject root = readSlotJson(file);
         try {
             SaveMetadata metadata = root.has("metadata") && !root.get("metadata").isJsonNull()
@@ -291,6 +333,8 @@ public final class SaveManager {
                             ? GSON.fromJson(root.get("voiceBookmark"), SaveSlotData.SavedVoiceBookmark.class)
                             : null;
             return new SaveSlotData(metadata, variables, scriptPos, history, voiceBookmark);
+        } catch (SecurityException securityEx) {
+            throw securityEx;
         } catch (RuntimeException e) {
             throw new IOException("Failed to deserialize save slot '" + slotId + "': " + e.getMessage(), e);
         }
@@ -306,15 +350,27 @@ public final class SaveManager {
      */
     public synchronized Optional<SaveMetadata> readSlotMetadata(String slotId) throws IOException {
         Path file = resolveSlotPath(slotId);
+        String key = slotId.trim();
         if (!Files.exists(file)) {
+            metadataCache.remove(key);
             return Optional.empty();
+        }
+        BasicFileAttributes attrs = Files.readAttributes(file, BasicFileAttributes.class);
+        long modifiedMs = attrs.lastModifiedTime().toMillis();
+        long size = attrs.size();
+        CachedMetadata cached = metadataCache.get(key);
+        if (cached != null && cached.lastModifiedMillis() == modifiedMs && cached.fileSize() == size) {
+            return Optional.ofNullable(cached.metadata());
         }
         JsonObject root = readSlotJson(file);
         try {
             if (!root.has("metadata") || root.get("metadata").isJsonNull()) {
+                metadataCache.put(key, new CachedMetadata(modifiedMs, size, null));
                 return Optional.empty();
             }
-            return Optional.ofNullable(GSON.fromJson(root.get("metadata"), SaveMetadata.class));
+            SaveMetadata parsed = GSON.fromJson(root.get("metadata"), SaveMetadata.class);
+            metadataCache.put(key, new CachedMetadata(modifiedMs, size, parsed));
+            return Optional.ofNullable(parsed);
         } catch (RuntimeException e) {
             throw new IOException("Failed to parse metadata for save slot '" + slotId + "': " + e.getMessage(), e);
         }
@@ -410,6 +466,8 @@ public final class SaveManager {
      */
     public synchronized boolean deleteSlot(String slotId) throws IOException {
         Path file = resolveSlotPath(slotId);
+        metadataCache.remove(slotId.trim());
+        Files.deleteIfExists(resolveBackupPath(file));
         return Files.deleteIfExists(file);
     }
 
@@ -525,6 +583,16 @@ public final class SaveManager {
             return elem.getAsJsonObject();
         } catch (RuntimeException e) {
             throw new IOException("Failed to read save file " + file + ": " + e.getMessage(), e);
+        }
+    }
+
+    private static Path resolveBackupPath(Path primarySlotPath) {
+        return primarySlotPath.resolveSibling(primarySlotPath.getFileName() + BACKUP_EXTENSION);
+    }
+
+    private static void fsyncFile(Path file) throws IOException {
+        try (FileChannel channel = FileChannel.open(file, StandardOpenOption.WRITE)) {
+            channel.force(true);
         }
     }
 

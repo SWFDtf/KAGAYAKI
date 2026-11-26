@@ -11,11 +11,14 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -45,6 +48,7 @@ public final class PersistentState implements PersistentAccess {
     private final Set<String> unlockedTracks = new LinkedHashSet<>();
     private final Set<String> unlockedEndings = new LinkedHashSet<>();
     private final Set<String> unlockedAchievements = new LinkedHashSet<>();
+    private Path boundSavesDir;
 
     /**
      * Creates an empty {@code PersistentState}.
@@ -75,9 +79,12 @@ public final class PersistentState implements PersistentAccess {
      */
     public static PersistentState load(Path savesDir, ClassLoader optionalUserClassLoader) throws IOException {
         Objects.requireNonNull(savesDir, "savesDir must not be null");
-        Path file = savesDir.resolve(FILE_NAME);
+        Path normalizedDir = savesDir.toAbsolutePath().normalize();
+        Path file = normalizedDir.resolve(FILE_NAME);
         if (!Files.exists(file)) {
-            return new PersistentState();
+            PersistentState fresh = new PersistentState();
+            fresh.bindSavesDir(normalizedDir);
+            return fresh;
         }
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(
                 new GZIPInputStream(Files.newInputStream(file)), StandardCharsets.UTF_8))) {
@@ -95,10 +102,30 @@ public final class PersistentState implements PersistentAccess {
             readStringSet(root.getAsJsonArray("unlockedTracks"), state.unlockedTracks);
             readStringSet(root.getAsJsonArray("unlockedEndings"), state.unlockedEndings);
             readStringSet(root.getAsJsonArray("unlockedAchievements"), state.unlockedAchievements);
+            state.bindSavesDir(normalizedDir);
             return state;
         } catch (RuntimeException e) {
             throw new IOException("Failed to parse persistent state file " + file + ": " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Binds this {@code PersistentState} to {@code savesDir} so critical unlocks and flags flush
+     * immediately to disk without requiring an explicit save call.
+     *
+     * @param savesDir saves directory path (nullable to disable auto-flush)
+     */
+    public synchronized void bindSavesDir(Path savesDir) {
+        this.boundSavesDir = savesDir != null ? savesDir.toAbsolutePath().normalize() : null;
+    }
+
+    /**
+     * Returns the bound saves directory used for immediate unlock flushing, if any.
+     *
+     * @return bound saves directory path, or {@code null}
+     */
+    public synchronized Path getBoundSavesDir() {
+        return boundSavesDir;
     }
 
     /**
@@ -109,9 +136,10 @@ public final class PersistentState implements PersistentAccess {
      */
     public synchronized void save(Path savesDir) throws IOException {
         Objects.requireNonNull(savesDir, "savesDir must not be null");
-        Files.createDirectories(savesDir);
-        Path target = savesDir.resolve(FILE_NAME);
-        Path tempFile = Files.createTempFile(savesDir, "persistent-", ".tmp");
+        Path normalizedDir = savesDir.toAbsolutePath().normalize();
+        Files.createDirectories(normalizedDir);
+        Path target = normalizedDir.resolve(FILE_NAME);
+        Path tempFile = Files.createTempFile(normalizedDir, "persistent-", ".tmp");
         boolean moved = false;
         try {
             JsonObject root = new JsonObject();
@@ -127,8 +155,10 @@ public final class PersistentState implements PersistentAccess {
                     new GZIPOutputStream(Files.newOutputStream(tempFile)), StandardCharsets.UTF_8))) {
                 GSON.toJson(root, writer);
             }
+            fsyncFile(tempFile);
             moveAtomically(tempFile, target);
             moved = true;
+            this.boundSavesDir = normalizedDir;
         } finally {
             if (!moved) {
                 Files.deleteIfExists(tempFile);
@@ -144,6 +174,7 @@ public final class PersistentState implements PersistentAccess {
         } else {
             data.put(key, value);
         }
+        flushIfBound();
     }
 
     @Override
@@ -179,8 +210,8 @@ public final class PersistentState implements PersistentAccess {
 
     @Override
     public synchronized void unlockCg(String cgId) {
-        if (cgId != null && !cgId.isEmpty()) {
-            unlockedCgs.add(cgId);
+        if (cgId != null && !cgId.isEmpty() && unlockedCgs.add(cgId)) {
+            flushIfBound();
         }
     }
 
@@ -191,8 +222,8 @@ public final class PersistentState implements PersistentAccess {
 
     @Override
     public synchronized void unlockTrack(String trackId) {
-        if (trackId != null && !trackId.isEmpty()) {
-            unlockedTracks.add(trackId);
+        if (trackId != null && !trackId.isEmpty() && unlockedTracks.add(trackId)) {
+            flushIfBound();
         }
     }
 
@@ -203,8 +234,8 @@ public final class PersistentState implements PersistentAccess {
 
     @Override
     public synchronized void unlockEnding(String endingId) {
-        if (endingId != null && !endingId.isEmpty()) {
-            unlockedEndings.add(endingId);
+        if (endingId != null && !endingId.isEmpty() && unlockedEndings.add(endingId)) {
+            flushIfBound();
         }
     }
 
@@ -215,8 +246,8 @@ public final class PersistentState implements PersistentAccess {
 
     @Override
     public synchronized void unlockAchievement(String achievementId) {
-        if (achievementId != null && !achievementId.isEmpty()) {
-            unlockedAchievements.add(achievementId);
+        if (achievementId != null && !achievementId.isEmpty() && unlockedAchievements.add(achievementId)) {
+            flushIfBound();
         }
     }
 
@@ -294,6 +325,23 @@ public final class PersistentState implements PersistentAccess {
                     target.add(value);
                 }
             }
+        }
+    }
+
+    private void flushIfBound() {
+        if (boundSavesDir == null) {
+            return;
+        }
+        try {
+            save(boundSavesDir);
+        } catch (IOException ex) {
+            throw new UncheckedIOException("Failed to flush persistent state to " + boundSavesDir, ex);
+        }
+    }
+
+    private static void fsyncFile(Path file) throws IOException {
+        try (FileChannel channel = FileChannel.open(file, StandardOpenOption.WRITE)) {
+            channel.force(true);
         }
     }
 

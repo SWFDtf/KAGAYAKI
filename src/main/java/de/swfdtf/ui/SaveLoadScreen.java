@@ -2,6 +2,7 @@ package de.swfdtf.ui;
 
 import de.swfdtf.graphics.SceneLayer;
 import de.swfdtf.parser.ScriptSession;
+import de.swfdtf.state.LocalizationManager;
 import de.swfdtf.state.SaveManager;
 import de.swfdtf.state.SaveSlotData;
 import org.lwjgl.glfw.GLFW;
@@ -186,10 +187,12 @@ public class SaveLoadScreen extends Screen {
     private final ScriptSession session;
     private final ScreenManager screenManager;
     private final TextWidget headerTitle;
+    private final TextWidget saveNameLabel;
     private final TextInput customNameInput;
     private final TextButton manualTabButton;
     private final TextButton quickTabButton;
     private final TextButton autoTabButton;
+    private final TextButton closeButton;
     private final HBox pageBar;
     private final List<TextButton> pageButtons = new ArrayList<>();
     private final Grid slotGrid;
@@ -232,18 +235,19 @@ public class SaveLoadScreen extends Screen {
                 () -> setFilterTab(FilterTab.QUICK));
         this.autoTabButton = UiMediaSupport.createActionButton("Auto Save", 150.0f, 40.0f,
                 () -> setFilterTab(FilterTab.AUTO));
-        TextButton closeBtn = UiMediaSupport.createActionButton("Back", 120.0f, 40.0f, this::closeScreen);
+        this.closeButton = UiMediaSupport.createActionButton("Back", 120.0f, 40.0f, this::closeScreen);
 
         topBar.addChild(headerTitle);
         topBar.addChild(manualTabButton);
         topBar.addChild(quickTabButton);
         topBar.addChild(autoTabButton);
-        topBar.addChild(closeBtn);
+        topBar.addChild(closeButton);
 
         HBox saveNameRow = new HBox();
         saveNameRow.setSpacing(12.0f);
         saveNameRow.setAlignCenterY(true);
-        saveNameRow.addChild(UiMediaSupport.createMutedText("Save Label:", 20.0f));
+        this.saveNameLabel = UiMediaSupport.createMutedText("Save Label:", 20.0f);
+        saveNameRow.addChild(saveNameLabel);
         this.customNameInput = new TextInput("", text -> {});
         this.customNameInput.setPreferredSize(480.0f, 40.0f);
         this.customNameInput.setPlaceholder("Optional custom save title...");
@@ -272,11 +276,37 @@ public class SaveLoadScreen extends Screen {
         setRoot(backdrop);
 
         addKeyBinding(GLFW.GLFW_KEY_ESCAPE, this::closeScreen);
+        applyLocalizedLabels();
+        session.getLocalizationManager().addLanguageChangeListener(ignored -> applyLocalizedLabels());
         refreshSlots();
+    }
+
+    /**
+     * Updates header, filter tabs, and action labels from {@link LocalizationManager}.
+     */
+    public void applyLocalizedLabels() {
+        LocalizationManager loc = session.getLocalizationManager();
+        headerTitle.setText(mode == Mode.SAVE
+                ? UiTranslations.resolve(loc, "ui.save_game", "Save Game")
+                : UiTranslations.resolve(loc, "ui.load_game", "Load Game"));
+        manualTabButton.setText(UiTranslations.resolve(loc, "ui.save_slots", "Save Slots"));
+        quickTabButton.setText(UiTranslations.resolve(loc, "ui.quick_save", "Quick Save"));
+        autoTabButton.setText(UiTranslations.resolve(loc, "ui.auto_save", "Auto Save"));
+        closeButton.setText(UiTranslations.resolve(loc, "ui.back", "Back"));
+        saveNameLabel.setText(UiTranslations.resolve(loc, "ui.save_label", "Save Label:"));
+        String actionText = mode == Mode.SAVE
+                ? UiTranslations.resolve(loc, "ui.save", "Save")
+                : UiTranslations.resolve(loc, "ui.load", "Load");
+        String deleteText = UiTranslations.resolve(loc, "ui.delete", "Delete");
+        for (SlotCardView card : visibleCards) {
+            card.getActionButton().setText(actionText);
+            card.getDeleteButton().setText(deleteText);
+        }
     }
 
     @Override
     public void onShow() {
+        applyLocalizedLabels();
         refreshSlots();
     }
 
@@ -287,7 +317,10 @@ public class SaveLoadScreen extends Screen {
      */
     public void setMode(Mode mode) {
         this.mode = Objects.requireNonNull(mode, "mode must not be null");
-        headerTitle.setText(mode == Mode.SAVE ? "Save Game" : "Load Game");
+        LocalizationManager loc = session.getLocalizationManager();
+        headerTitle.setText(mode == Mode.SAVE
+                ? UiTranslations.resolve(loc, "ui.save_game", "Save Game")
+                : UiTranslations.resolve(loc, "ui.load_game", "Load Game"));
         customNameInput.setVisible(mode == Mode.SAVE);
         refreshSlots();
     }
@@ -421,7 +454,10 @@ public class SaveLoadScreen extends Screen {
         HBox actionRow = new HBox();
         actionRow.setSpacing(10.0f);
 
-        String actionText = mode == Mode.SAVE ? "Save" : "Load";
+        LocalizationManager loc = session.getLocalizationManager();
+        String actionText = mode == Mode.SAVE
+                ? UiTranslations.resolve(loc, "ui.save", "Save")
+                : UiTranslations.resolve(loc, "ui.load", "Load");
         TextButton actionBtn = UiMediaSupport.createActionButton(actionText, 110.0f, 34.0f,
                 () -> handleSlotAction(slotId));
         actionBtn.setEnabled(mode == Mode.SAVE || occupied);
@@ -429,7 +465,8 @@ public class SaveLoadScreen extends Screen {
             actionBtn.setAlpha(0.45f);
         }
 
-        TextButton deleteBtn = UiMediaSupport.createActionButton("Delete", 100.0f, 34.0f,
+        String deleteText = UiTranslations.resolve(loc, "ui.delete", "Delete");
+        TextButton deleteBtn = UiMediaSupport.createActionButton(deleteText, 100.0f, 34.0f,
                 () -> handleSlotDelete(slotId));
         deleteBtn.setEnabled(occupied);
         deleteBtn.setBorderColorHex(occupied ? ThemePalette.ERROR : ThemePalette.BORDER);

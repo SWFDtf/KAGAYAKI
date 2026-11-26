@@ -46,11 +46,15 @@ public class RevertableStateStore implements StateStore {
         }
     }
 
+    /** Default maximum number of retained rollback checkpoints. */
+    public static final int DEFAULT_MAX_ROLLBACK_DEPTH = 200;
+
     private final RevertableMap<String, Object> variables = new RevertableMap<>();
     private final List<Checkpoint> checkpoints = new ArrayList<>();
 
     private Supplier<Object> runtimeSnapshotter;
     private Consumer<Object> runtimeRestorer;
+    private int maxRollbackDepth = DEFAULT_MAX_ROLLBACK_DEPTH;
     private int cursorIndex = -1;
     private long nextCheckpointId = 1L;
     private boolean pendingRollbackBarrier = false;
@@ -122,9 +126,45 @@ public class RevertableStateStore implements StateStore {
                 barrier
         );
         checkpoints.add(created);
+        while (checkpoints.size() > maxRollbackDepth) {
+            checkpoints.remove(0);
+        }
         this.cursorIndex = checkpoints.size() - 1;
         this.pendingRollbackBarrier = false;
         return created.id();
+    }
+
+    /**
+     * Returns the configured maximum number of retained rollback checkpoints.
+     *
+     * @return maximum retained checkpoint depth ({@code >= 1})
+     */
+    public synchronized int getMaxRollbackDepth() {
+        return maxRollbackDepth;
+    }
+
+    /**
+     * Sets the maximum number of retained rollback checkpoints, immediately evicting the oldest
+     * checkpoints if the current buffer exceeds {@code maxRollbackDepth}.
+     *
+     * @param maxRollbackDepth maximum checkpoint depth ({@code >= 1})
+     */
+    public synchronized void setMaxRollbackDepth(int maxRollbackDepth) {
+        if (maxRollbackDepth < 1) {
+            throw new IllegalArgumentException("maxRollbackDepth must be >= 1, got " + maxRollbackDepth);
+        }
+        this.maxRollbackDepth = maxRollbackDepth;
+        while (checkpoints.size() > maxRollbackDepth) {
+            checkpoints.remove(0);
+            if (cursorIndex >= 0) {
+                cursorIndex--;
+            }
+        }
+        if (checkpoints.isEmpty()) {
+            cursorIndex = -1;
+        } else if (cursorIndex < 0) {
+            cursorIndex = 0;
+        }
     }
 
     /**

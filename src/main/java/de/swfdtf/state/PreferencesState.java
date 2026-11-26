@@ -7,11 +7,13 @@ import com.google.gson.JsonParseException;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -96,6 +98,7 @@ public final class PreferencesState {
             try (Writer writer = Files.newBufferedWriter(tempFile, StandardCharsets.UTF_8)) {
                 GSON.toJson(this, writer);
             }
+            fsyncFile(tempFile);
             moveAtomically(tempFile, target);
             moved = true;
         } finally {
@@ -145,6 +148,12 @@ public final class PreferencesState {
             return fallback;
         }
         return Math.max(0.0f, Math.min(1.0f, value));
+    }
+
+    private static void fsyncFile(Path file) throws IOException {
+        try (FileChannel channel = FileChannel.open(file, StandardOpenOption.WRITE)) {
+            channel.force(true);
+        }
     }
 
     private static void moveAtomically(Path source, Path target) throws IOException {

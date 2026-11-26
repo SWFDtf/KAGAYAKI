@@ -522,6 +522,19 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
         voiceBookmark.updateActivePlayback(trimmed, voiceChannel.getPlaybackSeconds());
     }
 
+    @Override
+    public synchronized Object captureAudioSnapshot() {
+        return snapshotAllChannels();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public synchronized void restoreAudioSnapshot(Object snapshot) {
+        if (snapshot instanceof Map<?, ?> map) {
+            restoreAllChannels((Map<String, AudioChannel.ChannelSnapshot>) map);
+        }
+    }
+
     /**
      * Synthesizes and plays a short character voice bleep on the {@code voice} channel.
      *

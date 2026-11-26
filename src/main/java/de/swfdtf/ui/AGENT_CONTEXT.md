@@ -85,6 +85,7 @@ Vollständiges Dark-Slate-UI-, Screen-Management-, Widget-, `screen`-AST-Builder
 | `AchievementsScreen.AchievementRowView` | `record` | View-Model einer einzelnen Achievement-Zeile. |
 | `NotificationToastOverlay` | `class` | Nicht-modales Toast-Overlay (`Z = 500`), das `AchievementManager.pollToast()` animiert ein-/ausblendet (`4.0s`) und eine `SKIPPING >>`/`AUTO >`-Status-Pill anzeigt. |
 | `NotificationToastOverlay.ToastPayload` | `record` | Toast-Nachrichten-Nutzlast `(title, subtitle)`. |
+| `UiTranslations` | `final class` | Fünfsprachiges UI-Übersetzungsbündel (`deutsch`, `english`, `french`, `spanish`, `japanese`) mit Projekt-Override und sicherem Fallback. |
 | `GameRuntimeCoordinator` | `final class` | Vollständiger Spiel-Laufzeitkoordinator (`implements GameHost`) für `EngineApplication`, der `ScriptSession`, `AudioEngine`, `LipSyncAnalyzer`, `TextToSpeechService`, `AnimationEngine`, `TransitionManager`, `ScreenManager`, alle Dialog-/System-Screens, globale Shortcuts und (im Studio-Modus) `LiveDirectorOverlay`/`DeveloperInspectors` integriert. |
 
 ### Paketinterne Render- & Medienhelfer
