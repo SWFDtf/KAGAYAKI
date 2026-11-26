@@ -3,6 +3,7 @@ import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 plugins {
     id("java")
     id("org.jetbrains.intellij.platform") version "2.20.1"
+    id("org.jetbrains.grammarkit") version "2022.3.2.2"
 }
 
 group = "de.swfdtf.vjava"
@@ -21,8 +22,6 @@ dependencies {
         intellijIdeaCommunity("2024.3")
         // Java plugin for Language Injection (JavaLanguage.INSTANCE)
         bundledPlugin("com.intellij.java")
-        // JFlex for lexer generation
-        instrumentationTools()
         testFramework(TestFrameworkType.Platform)
     }
     testImplementation("junit:junit:4.13.2")
@@ -45,32 +44,11 @@ intellijPlatform {
     }
 }
 
-// JFlex lexer generation task
-val generateLexer = tasks.register<JavaExec>("generateLexer") {
-    group = "build"
-    description = "Generates the VJava lexer from the .flex file"
-
-    val flexFile = file("src/main/flex/VJavaLexer.flex")
-    val outputDir = file("src/main/gen/de/swfdtf/vjava/plugin/lang")
-
-    inputs.file(flexFile)
-    outputs.dir(outputDir)
-
-    classpath = configurations.detachedConfiguration(
-        dependencies.create("de.jflex:jflex:1.9.1")
-    )
-    mainClass.set("jflex.Main")
-    // JFlex 1.9.1 valid options only – no --generated_by, no --skel NONE
-    args = listOf(
-        "--nobak",
-        "--encoding", "UTF-8",
-        "-d", outputDir.absolutePath,
-        flexFile.absolutePath
-    )
-
-    doFirst {
-        outputDir.mkdirs()
-    }
+// JFlex lexer generation task (via org.jetbrains.grammarkit)
+tasks.generateLexer {
+    sourceFile.set(file("src/main/flex/VJavaLexer.flex"))
+    targetOutputDir.set(file("src/main/gen/de/swfdtf/vjava/plugin/lang"))
+    purgeOldFiles.set(true)
 }
 
 // Alternative: use jflex plugin approach manually
@@ -84,7 +62,7 @@ sourceSets {
 }
 
 tasks.compileJava {
-    dependsOn(generateLexer)
+    dependsOn(tasks.generateLexer)
     sourceCompatibility = "21"
     targetCompatibility = "21"
 }

@@ -11,6 +11,7 @@ out/
 # Committed for convenience; re-generate with: ./gradlew generateLexer
 # src/main/gen/
 
-# IntelliJ sandbox
+# IntelliJ sandbox & platform cache
 .intellij-sandbox/
+.intellijPlatform/
 run/

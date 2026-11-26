@@ -225,7 +225,7 @@ LogicKW = "and" | "or" | "not"
     return VJavaTokenTypes.DOC_PREFIX;
   }
   /* Should not happen, but fall back */
-  [^\r\n]*             { yybegin(YYINITIAL); return VJavaTokenTypes.DOC_PREFIX; }
+  [^\r\n]+             { yybegin(YYINITIAL); return VJavaTokenTypes.DOC_PREFIX; }
   {LineTerminator}     { yybegin(YYINITIAL); return VJavaTokenTypes.WHITE_SPACE; }
 }
 
@@ -271,7 +271,7 @@ LogicKW = "and" | "or" | "not"
   [^{}\"\']+           { return VJavaTokenTypes.JAVA_BLOCK_CONTENT; }
 
   /* Fallback for single chars we haven't matched */
-  .|\n                 { return VJavaTokenTypes.JAVA_BLOCK_CONTENT; }
+  [^]                  { return VJavaTokenTypes.JAVA_BLOCK_CONTENT; }
 }
 
 /* ------------------------------------------------------------------ */
