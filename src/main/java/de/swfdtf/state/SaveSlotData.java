@@ -14,20 +14,54 @@ import java.util.Objects;
  * Immutable save-slot model persisted as GZIP-compressed JSON ({@code .ksav}) by {@link SaveManager}.
  *
  * <p>Stores slot metadata (including PNG thumbnail bytes), deep variable state, decoupled script
- * execution coordinates/stage snapshot, and dialogue history entries without importing
- * {@code de.swfdtf.parser}.</p>
+ * execution coordinates/stage snapshot, dialogue history entries, and optional voice playback
+ * bookmark offset without importing {@code de.swfdtf.parser}.</p>
  *
  * @param metadata       save-slot header metadata and optional PNG thumbnail
  * @param variables      saved {@link StateStore} variable map
  * @param scriptPosition saved script execution coordinates and {@link SceneController.StageSnapshot}
  * @param historyEntries saved dialogue backlog entries
+ * @param voiceBookmark  optional active voice bookmark state (nullable)
  */
 public record SaveSlotData(
         SaveMetadata metadata,
         Map<String, Object> variables,
         SavedScriptPosition scriptPosition,
-        List<HistoryLog.HistoryEntry> historyEntries
+        List<HistoryLog.HistoryEntry> historyEntries,
+        SavedVoiceBookmark voiceBookmark
 ) {
+
+    /**
+     * Serializable active voice playback bookmark stored in a save slot for monologue resume.
+     *
+     * @param assetPath     voice audio asset path
+     * @param offsetSeconds playback offset in seconds ({@code >= 0})
+     */
+    public record SavedVoiceBookmark(String assetPath, double offsetSeconds) {
+        /** Normalizes non-finite or negative offsets cleanly. */
+        public SavedVoiceBookmark {
+            if (!Double.isFinite(offsetSeconds) || offsetSeconds < 0.0) {
+                offsetSeconds = 0.0;
+            }
+        }
+    }
+
+    /**
+     * Backwards-compatible 4-argument constructor without a voice bookmark.
+     *
+     * @param metadata       save-slot header metadata
+     * @param variables      saved variable map
+     * @param scriptPosition saved script execution coordinates
+     * @param historyEntries saved dialogue history entries
+     */
+    public SaveSlotData(
+            SaveMetadata metadata,
+            Map<String, Object> variables,
+            SavedScriptPosition scriptPosition,
+            List<HistoryLog.HistoryEntry> historyEntries
+    ) {
+        this(metadata, variables, scriptPosition, historyEntries, null);
+    }
 
     /** Defensively normalizes variable and history collections. */
     public SaveSlotData {
@@ -44,7 +78,7 @@ public record SaveSlotData(
      * @return updated {@link SaveSlotData}
      */
     public SaveSlotData withMetadata(SaveMetadata updatedMetadata) {
-        return new SaveSlotData(updatedMetadata, variables, scriptPosition, historyEntries);
+        return new SaveSlotData(updatedMetadata, variables, scriptPosition, historyEntries, voiceBookmark);
     }
 
     /**

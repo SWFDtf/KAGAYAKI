@@ -59,9 +59,11 @@ public final class AudioChannel {
     private static final class TrackSlot {
         String assetPath;
         AudioDecoder.DecodedAudio audio;
+        OggVorbisStream stream;
         float[] unfilteredMono;
         float[] filteredMono;
         boolean loop;
+        double loopStartSeconds;
         float targetVolume;
         double playbackSeconds;
         boolean playing;
@@ -71,6 +73,7 @@ public final class AudioChannel {
         float fadeTargetGain;
         double fadeDurationSeconds;
         double fadeElapsedSeconds;
+        boolean equalPowerFade;
         boolean stopWhenFadeEnds;
 
         int alSourceId;
@@ -88,6 +91,8 @@ public final class AudioChannel {
 
     private volatile boolean openAlEnabled;
     private float channelMixGain = 1.0f;
+    private float duckGain = 1.0f;
+    private boolean equalPowerCrossfade = false;
     private AudioDsp.BiquadFilter filter;
 
     private TrackSlot primary;
@@ -135,22 +140,100 @@ public final class AudioChannel {
             double fadeInSeconds,
             float targetVolume
     ) {
+        play(assetPath, audio, loop, fadeInSeconds, targetVolume, 0.0);
+    }
+
+    /**
+     * Starts playing an audio clip with an explicit {@code loopStartSeconds} loop restart point.
+     *
+     * @param assetPath        logical asset identifier or path (nullable)
+     * @param audio            decoded audio payload (nullable for metadata-only headless fallback)
+     * @param loop             whether playback loops continuously
+     * @param fadeInSeconds    fade-in / crossfade duration in seconds ({@code <= 0} for immediate)
+     * @param targetVolume     per-clip target volume in {@code [0, 1]}
+     * @param loopStartSeconds loop restart offset in seconds ({@code >= 0})
+     */
+    public synchronized void play(
+            String assetPath,
+            AudioDecoder.DecodedAudio audio,
+            boolean loop,
+            double fadeInSeconds,
+            float targetVolume,
+            double loopStartSeconds
+    ) {
+        startSlot(assetPath, audio, null, loop, fadeInSeconds, targetVolume, loopStartSeconds, 0.0);
+    }
+
+    /**
+     * Starts playing a chunk-streamed {@link OggVorbisStream} without materializing full PCM in heap.
+     *
+     * @param assetPath        logical asset identifier or path (nullable)
+     * @param stream           open {@link OggVorbisStream} (ownership transferred to this channel)
+     * @param loop             whether playback loops continuously
+     * @param fadeInSeconds    fade-in / crossfade duration in seconds ({@code <= 0} for immediate)
+     * @param targetVolume     per-clip target volume in {@code [0, 1]}
+     * @param loopStartSeconds loop restart offset in seconds ({@code >= 0})
+     */
+    public synchronized void playStream(
+            String assetPath,
+            OggVorbisStream stream,
+            boolean loop,
+            double fadeInSeconds,
+            float targetVolume,
+            double loopStartSeconds
+    ) {
+        startSlot(assetPath, null, Objects.requireNonNull(stream, "stream must not be null"),
+                loop, fadeInSeconds, targetVolume, loopStartSeconds, 0.0);
+    }
+
+    /**
+     * Starts playing an audio clip immediately resumed at {@code startSeconds}.
+     *
+     * @param assetPath    logical asset identifier or path
+     * @param audio        decoded audio payload (nullable)
+     * @param loop         whether playback loops continuously
+     * @param targetVolume target volume in {@code [0, 1]}
+     * @param startSeconds resume cursor offset in seconds ({@code >= 0})
+     */
+    public synchronized void playAtOffset(
+            String assetPath,
+            AudioDecoder.DecodedAudio audio,
+            boolean loop,
+            float targetVolume,
+            double startSeconds
+    ) {
+        startSlot(assetPath, audio, null, loop, 0.0, targetVolume, 0.0, Math.max(0.0, startSeconds));
+    }
+
+    private void startSlot(
+            String assetPath,
+            AudioDecoder.DecodedAudio audio,
+            OggVorbisStream stream,
+            boolean loop,
+            double fadeInSeconds,
+            float targetVolume,
+            double loopStartSeconds,
+            double startSeconds
+    ) {
         if (!Double.isFinite(fadeInSeconds) || fadeInSeconds < 0.0) {
             throw new IllegalArgumentException("fadeInSeconds must be finite and >= 0, got: " + fadeInSeconds);
         }
         float clampedVolume = Float.isFinite(targetVolume) ? Math.clamp(targetVolume, 0.0f, 1.0f) : 1.0f;
+        double safeLoopStart = (Double.isFinite(loopStartSeconds) && loopStartSeconds > 0.0) ? loopStartSeconds : 0.0;
 
         if (assetPath != null && audio != null) {
             recentAudioCache.put(assetPath, audio);
         }
 
-        if (fadeInSeconds > 0.0 && primary != null && primary.playing) {
+        boolean crossfadeActive = fadeInSeconds > 0.0 && primary != null && primary.playing;
+        if (crossfadeActive) {
             releaseSlotOpenAl(outgoing);
             outgoing = primary;
             outgoing.fadeStartGain = outgoing.fadeGain;
             outgoing.fadeTargetGain = 0.0f;
             outgoing.fadeDurationSeconds = fadeInSeconds;
             outgoing.fadeElapsedSeconds = 0.0;
+            outgoing.equalPowerFade = equalPowerCrossfade;
             outgoing.stopWhenFadeEnds = true;
             primary = null;
         } else {
@@ -163,13 +246,29 @@ public final class AudioChannel {
         TrackSlot slot = new TrackSlot();
         slot.assetPath = assetPath;
         slot.audio = audio;
+        slot.stream = stream;
         slot.unfilteredMono = audio != null ? audio.toMonoFloat() : null;
         slot.filteredMono = computeFilteredMono(slot.unfilteredMono, this.filter);
         slot.loop = loop;
+        slot.loopStartSeconds = safeLoopStart;
         slot.targetVolume = clampedVolume;
-        slot.playbackSeconds = 0.0;
+        slot.playbackSeconds = Math.max(0.0, startSeconds);
         slot.playing = true;
+        slot.equalPowerFade = crossfadeActive && equalPowerCrossfade;
         slot.stopWhenFadeEnds = false;
+
+        if (audio != null && audio.durationSeconds() > 0.0 && slot.playbackSeconds >= audio.durationSeconds()) {
+            slot.playbackSeconds = loop ? (slot.playbackSeconds % audio.durationSeconds()) : audio.durationSeconds();
+        } else if (stream != null && stream.getDurationSeconds() > 0.0) {
+            if (slot.playbackSeconds >= stream.getDurationSeconds()) {
+                slot.playbackSeconds = loop
+                        ? (slot.playbackSeconds % stream.getDurationSeconds())
+                        : stream.getDurationSeconds();
+            }
+            if (slot.playbackSeconds > 0.0) {
+                stream.seekSeconds(slot.playbackSeconds);
+            }
+        }
 
         if (fadeInSeconds > 0.0) {
             slot.fadeGain = 0.0f;
@@ -186,7 +285,7 @@ public final class AudioChannel {
         }
 
         this.primary = slot;
-        uploadAndStartOpenAl(slot, 0.0);
+        uploadAndStartOpenAl(slot, slot.playbackSeconds);
     }
 
     /**
@@ -310,10 +409,33 @@ public final class AudioChannel {
         if (slot.fadeDurationSeconds > 0.0) {
             slot.fadeElapsedSeconds = Math.min(slot.fadeDurationSeconds, slot.fadeElapsedSeconds + dt);
             float t = (float) (slot.fadeElapsedSeconds / slot.fadeDurationSeconds);
-            slot.fadeGain = Math.clamp(slot.fadeStartGain + (slot.fadeTargetGain - slot.fadeStartGain) * t, 0.0f, 1.0f);
+            if (slot.equalPowerFade) {
+                if (slot.fadeTargetGain > slot.fadeStartGain) {
+                    float factor = (float) Math.sin(t * (Math.PI * 0.5));
+                    slot.fadeGain = Math.clamp(
+                            slot.fadeStartGain + (slot.fadeTargetGain - slot.fadeStartGain) * factor,
+                            0.0f,
+                            1.0f
+                    );
+                } else {
+                    float factor = (float) Math.cos(t * (Math.PI * 0.5));
+                    slot.fadeGain = Math.clamp(
+                            slot.fadeTargetGain + (slot.fadeStartGain - slot.fadeTargetGain) * factor,
+                            0.0f,
+                            1.0f
+                    );
+                }
+            } else {
+                slot.fadeGain = Math.clamp(
+                        slot.fadeStartGain + (slot.fadeTargetGain - slot.fadeStartGain) * t,
+                        0.0f,
+                        1.0f
+                );
+            }
             if (slot.fadeElapsedSeconds >= slot.fadeDurationSeconds) {
                 slot.fadeGain = slot.fadeTargetGain;
                 slot.fadeDurationSeconds = 0.0;
+                slot.equalPowerFade = false;
                 if (slot.stopWhenFadeEnds) {
                     slot.playing = false;
                     slot.playbackSeconds = 0.0;
@@ -323,10 +445,23 @@ public final class AudioChannel {
         }
 
         slot.playbackSeconds += dt;
-        if (slot.audio != null && slot.audio.durationSeconds() > 0.0) {
-            double duration = slot.audio.durationSeconds();
+        double duration = slot.audio != null
+                ? slot.audio.durationSeconds()
+                : (slot.stream != null ? slot.stream.getDurationSeconds() : 0.0);
+        if (duration > 0.0) {
             if (slot.loop) {
-                slot.playbackSeconds = slot.playbackSeconds % duration;
+                if (slot.playbackSeconds >= duration) {
+                    double effLoopStart = (Double.isFinite(slot.loopStartSeconds)
+                            && slot.loopStartSeconds > 0.0
+                            && slot.loopStartSeconds < duration - 1.0e-4)
+                            ? slot.loopStartSeconds
+                            : 0.0;
+                    double span = Math.max(1.0e-6, duration - effLoopStart);
+                    slot.playbackSeconds = effLoopStart + ((slot.playbackSeconds - effLoopStart) % span);
+                    if (slot.stream != null) {
+                        slot.stream.seekSeconds(slot.playbackSeconds);
+                    }
+                }
             } else if (slot.playbackSeconds >= duration) {
                 slot.playbackSeconds = duration;
                 slot.playing = false;
@@ -385,8 +520,16 @@ public final class AudioChannel {
      * @return current RMS amplitude in {@code [0, 1]}
      */
     public synchronized float getCurrentRms() {
-        if (primary == null || !primary.playing || primary.audio == null) {
+        if (primary == null || !primary.playing) {
             return 0.0f;
+        }
+        if (primary.audio == null) {
+            if (primary.stream == null) {
+                return 0.0f;
+            }
+            float[] streamMono = primary.stream.readMonoAnalysisWindow(ANALYSIS_WINDOW_SAMPLES);
+            float rawRms = AudioDsp.computeRms(streamMono, 0, streamMono.length);
+            return Math.clamp(rawRms * computeEffectiveGain(primary), 0.0f, 1.0f);
         }
         float[] mono = primary.filteredMono != null ? primary.filteredMono : primary.unfilteredMono;
         if (mono == null || mono.length == 0) {
@@ -410,8 +553,24 @@ public final class AudioChannel {
         if (bands <= 0) {
             throw new IllegalArgumentException("bands must be > 0, got: " + bands);
         }
-        if (primary == null || !primary.playing || primary.audio == null) {
+        if (primary == null || !primary.playing) {
             return new float[bands];
+        }
+        if (primary.audio == null) {
+            if (primary.stream == null) {
+                return new float[bands];
+            }
+            float[] streamMono = primary.stream.readMonoAnalysisWindow(ANALYSIS_WINDOW_SAMPLES);
+            float[] spectrum = AudioDsp.computeSpectrumBands(
+                    streamMono, 0, streamMono.length, bands, primary.stream.getSampleRate()
+            );
+            float gain = computeEffectiveGain(primary);
+            if (gain < 1.0f) {
+                for (int i = 0; i < spectrum.length; i++) {
+                    spectrum[i] = Math.clamp(spectrum[i] * gain, 0.0f, 1.0f);
+                }
+            }
+            return spectrum;
         }
         float[] mono = primary.filteredMono != null ? primary.filteredMono : primary.unfilteredMono;
         if (mono == null || mono.length == 0) {
@@ -625,6 +784,44 @@ public final class AudioChannel {
     }
 
     /**
+     * Updates the dynamic voice-ducking gain multiplier clamped to {@code [0, 1]}.
+     *
+     * @param duckGain ducking gain multiplier in {@code [0, 1]}
+     */
+    public synchronized void setDuckGain(float duckGain) {
+        this.duckGain = Float.isFinite(duckGain) ? Math.clamp(duckGain, 0.0f, 1.0f) : 1.0f;
+        syncOpenAlGain(primary);
+        syncOpenAlGain(outgoing);
+    }
+
+    /**
+     * Returns the current dynamic voice-ducking gain multiplier in {@code [0, 1]}.
+     *
+     * @return current ducking gain multiplier
+     */
+    public synchronized float getDuckGain() {
+        return duckGain;
+    }
+
+    /**
+     * Enables or disables equal-power sine/cosine crossfading on this channel.
+     *
+     * @param equalPowerCrossfade {@code true} for equal-power crossfade curves
+     */
+    public synchronized void setEqualPowerCrossfade(boolean equalPowerCrossfade) {
+        this.equalPowerCrossfade = equalPowerCrossfade;
+    }
+
+    /**
+     * Returns whether equal-power crossfading is enabled on this channel.
+     *
+     * @return {@code true} if equal-power crossfading is active
+     */
+    public synchronized boolean isEqualPowerCrossfade() {
+        return equalPowerCrossfade;
+    }
+
+    /**
      * Returns the current effective linear gain of the primary track
      * ({@code fadeGain * targetVolume * channelMixGain}), or {@code 0} if stopped.
      *
@@ -674,7 +871,7 @@ public final class AudioChannel {
     // ---- Internal Helpers ----
 
     private float computeEffectiveGain(TrackSlot slot) {
-        return Math.clamp(slot.fadeGain * slot.targetVolume * channelMixGain, 0.0f, 1.0f);
+        return Math.clamp(slot.fadeGain * slot.targetVolume * channelMixGain * duckGain, 0.0f, 1.0f);
     }
 
     private static float[] computeFilteredMono(float[] unfilteredMono, AudioDsp.BiquadFilter templateFilter) {
@@ -774,7 +971,14 @@ public final class AudioChannel {
     }
 
     private void releaseSlotOpenAl(TrackSlot slot) {
-        if (slot == null || (slot.alSourceId == 0 && slot.alBufferId == 0)) {
+        if (slot == null) {
+            return;
+        }
+        if (slot.stream != null) {
+            slot.stream.close();
+            slot.stream = null;
+        }
+        if (slot.alSourceId == 0 && slot.alBufferId == 0) {
             return;
         }
         if (isOpenAlContextUsable()) {

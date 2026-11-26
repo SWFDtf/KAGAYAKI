@@ -1,8 +1,13 @@
 package de.swfdtf.ui;
 
+import de.swfdtf.audio.AmbientCrossfadeMixer;
+import de.swfdtf.audio.AudioCueRegistry;
+import de.swfdtf.audio.AudioDuckingController;
 import de.swfdtf.audio.AudioEngine;
+import de.swfdtf.audio.ClosedCaptionQueue;
 import de.swfdtf.audio.LipSyncAnalyzer;
 import de.swfdtf.audio.TextToSpeechService;
+import de.swfdtf.audio.VoicePlaybackBookmark;
 import de.swfdtf.core.EngineAPI;
 import de.swfdtf.core.EngineApplication;
 import de.swfdtf.core.GameHost;
@@ -209,6 +214,11 @@ public final class GameRuntimeCoordinator implements GameHost {
         api.registerService(TextureManager.class, textureManager);
         api.registerService(FontManager.class, fontManager);
         api.registerService(AudioEngine.class, audioEngine);
+        api.registerService(AudioDuckingController.class, audioEngine.getDuckingController());
+        api.registerService(AmbientCrossfadeMixer.class, audioEngine.getAmbientCrossfadeMixer());
+        api.registerService(AudioCueRegistry.class, audioEngine.getCueRegistry());
+        api.registerService(ClosedCaptionQueue.class, audioEngine.getClosedCaptionQueue());
+        api.registerService(VoicePlaybackBookmark.class, audioEngine.getVoiceBookmark());
         api.registerService(LipSyncAnalyzer.class, lipSyncAnalyzer);
         api.registerService(TextToSpeechService.class, ttsService);
         api.registerService(AnimationEngine.class, animationEngine);

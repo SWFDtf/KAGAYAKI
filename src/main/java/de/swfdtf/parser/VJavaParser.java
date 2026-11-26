@@ -1150,6 +1150,7 @@ public final class VJavaParser {
         boolean loop = "music".equals(normalizedChan) || "ambient".equals(normalizedChan);
         double fadeInSeconds = 0.0;
         double volume = 1.0;
+        double loopStartSeconds = 0.0;
 
         int i = 2;
         while (i < parts.size()) {
@@ -1177,12 +1178,30 @@ public final class VJavaParser {
                     volume = parseDoubleStrict(parts.get(i + 1), token, "volume");
                     i += 2;
                 }
+                case "loop_start_sec" -> {
+                    if (i + 1 >= parts.size()) {
+                        throw error(token, "Expected duration in seconds after 'loop_start_sec'");
+                    }
+                    loopStartSeconds = parseDoubleStrict(parts.get(i + 1), token, "loop_start_sec");
+                    if (!Double.isFinite(loopStartSeconds) || loopStartSeconds < 0.0) {
+                        throw error(token, "Invalid negative 'loop_start_sec' value: " + loopStartSeconds);
+                    }
+                    i += 2;
+                }
                 default -> throw error(token, "Unknown option in 'play' statement: " + opt);
             }
         }
 
         return new PlayStatement(
-                channel, assetPath, loop, fadeInSeconds, volume, token.sourceFile(), token.lineNumber());
+                channel,
+                assetPath,
+                loop,
+                fadeInSeconds,
+                volume,
+                loopStartSeconds,
+                token.sourceFile(),
+                token.lineNumber()
+        );
     }
 
     private QueueStatement parseQueueStatement(Token token) {

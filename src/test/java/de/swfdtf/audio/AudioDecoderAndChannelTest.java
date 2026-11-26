@@ -179,7 +179,7 @@ class AudioDecoderAndChannelTest {
         return out;
     }
 
-    private static final String SAMPLE_OGG_440HZ_MONO_B64 =
+    static final String SAMPLE_OGG_440HZ_MONO_B64 =
             "T2dnUwACAAAAAAAAAABcUtg6AAAAAMkvl0EBHgF2b3JiaXMAAAAAAUSsAAAAAAAA8E8BAAAAAAC4AU9nZ1MAAAAAAAAAAAAA"
             + "XFLYOgEAAAAn21LhD4f/////////////////kQN2b3JiaXM0AAAAWGlwaC5PcmcgbGliVm9yYmlzIEkgMjAyMDA3MDQgKFJl"
             + "ZHVjaW5nIEVudmlyb25tZW50KQIAAAASAAAARU5DT0RFUj1saWJzbmRmaWxlKQAAAFNPRlRXQVJFPUxhdmY2Mi4xMi4xMDEg"

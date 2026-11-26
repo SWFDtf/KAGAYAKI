@@ -348,11 +348,24 @@ public final class ScriptSession {
                 pngBytes
         );
 
+        SaveSlotData.SavedVoiceBookmark voiceBookmark = null;
+        ScriptRuntime.AudioBridge bridge = runtime.getAudioBridge();
+        if (bridge != null) {
+            String voicePath = bridge.getActiveVoiceAssetPath();
+            if (voicePath != null && !voicePath.isBlank()) {
+                voiceBookmark = new SaveSlotData.SavedVoiceBookmark(
+                        voicePath,
+                        Math.max(0.0, bridge.getActiveVoicePlaybackSeconds())
+                );
+            }
+        }
+
         return new SaveSlotData(
                 metadata,
                 stateStore.snapshotMap(),
                 runtime.toSavedPosition(),
-                historyLog.snapshot()
+                historyLog.snapshot(),
+                voiceBookmark
         );
     }
 
@@ -428,6 +441,15 @@ public final class ScriptSession {
         stateStore.restoreMap(loaded.variables());
         historyLog.restore(loaded.historyEntries());
         runtime.restoreSavedPosition(loaded.scriptPosition());
+        if (loaded.voiceBookmark() != null
+                && loaded.voiceBookmark().assetPath() != null
+                && !loaded.voiceBookmark().assetPath().isBlank()
+                && runtime.getAudioBridge() != null) {
+            runtime.getAudioBridge().resumeVoiceAt(
+                    loaded.voiceBookmark().assetPath(),
+                    loaded.voiceBookmark().offsetSeconds()
+            );
+        }
         stateStore.recordCheckpoint(runtime.snapshotExecution(), buildCheckpointSummary());
         if (loaded.metadata() != null) {
             sessionState.setPlaytimeSeconds(loaded.metadata().playtimeSeconds());

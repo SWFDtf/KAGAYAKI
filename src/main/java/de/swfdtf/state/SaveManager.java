@@ -213,6 +213,9 @@ public final class SaveManager {
                 ? GSON.toJsonTree(data.scriptPosition())
                 : null);
         root.add("historyEntries", GSON.toJsonTree(data.historyEntries(), HISTORY_LIST_TYPE));
+        if (data.voiceBookmark() != null) {
+            root.add("voiceBookmark", GSON.toJsonTree(data.voiceBookmark()));
+        }
 
         Path tempFile = Files.createTempFile(savesDir, "save-", ".tmp");
         boolean moved = false;
@@ -283,7 +286,11 @@ public final class SaveManager {
                     root.has("historyEntries") && root.get("historyEntries").isJsonArray()
                             ? GSON.fromJson(root.get("historyEntries"), HISTORY_LIST_TYPE)
                             : List.of();
-            return new SaveSlotData(metadata, variables, scriptPos, history);
+            SaveSlotData.SavedVoiceBookmark voiceBookmark =
+                    root.has("voiceBookmark") && !root.get("voiceBookmark").isJsonNull()
+                            ? GSON.fromJson(root.get("voiceBookmark"), SaveSlotData.SavedVoiceBookmark.class)
+                            : null;
+            return new SaveSlotData(metadata, variables, scriptPos, history, voiceBookmark);
         } catch (RuntimeException e) {
             throw new IOException("Failed to deserialize save slot '" + slotId + "': " + e.getMessage(), e);
         }

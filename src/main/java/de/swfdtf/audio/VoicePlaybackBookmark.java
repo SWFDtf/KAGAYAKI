@@ -45,6 +45,8 @@ public final class VoicePlaybackBookmark {
 
     private final Deque<VoiceClipRecord> history = new ArrayDeque<>();
     private final int maxHistory;
+    private String activeAssetPath;
+    private double activeOffsetSeconds = 0.0;
 
     /**
      * Creates a {@code VoicePlaybackBookmark} with {@link #DEFAULT_MAX_HISTORY}.
@@ -141,10 +143,52 @@ public final class VoicePlaybackBookmark {
     }
 
     /**
-     * Clears all recorded voice clip history.
+     * Clears all recorded voice clip history and resets active playback tracking.
      */
     public synchronized void clear() {
         history.clear();
+        clearActivePlayback();
+    }
+
+    /**
+     * Updates the currently playing voice asset path and position offset for save-slot bookmarking.
+     *
+     * @param assetPath     voice audio asset path (nullable clears active tracking)
+     * @param offsetSeconds active playback cursor position in seconds ({@code >= 0})
+     */
+    public synchronized void updateActivePlayback(String assetPath, double offsetSeconds) {
+        if (assetPath == null || assetPath.isBlank()) {
+            clearActivePlayback();
+            return;
+        }
+        this.activeAssetPath = assetPath.trim();
+        this.activeOffsetSeconds = (Double.isFinite(offsetSeconds) && offsetSeconds > 0.0) ? offsetSeconds : 0.0;
+    }
+
+    /**
+     * Clears the active voice playback bookmark offset when voice playback finishes or stops.
+     */
+    public synchronized void clearActivePlayback() {
+        this.activeAssetPath = null;
+        this.activeOffsetSeconds = 0.0;
+    }
+
+    /**
+     * Returns the currently active voice asset path tracked for bookmarking, if any.
+     *
+     * @return optional active voice asset path
+     */
+    public synchronized Optional<String> getActiveAssetPath() {
+        return Optional.ofNullable(activeAssetPath);
+    }
+
+    /**
+     * Returns the latest tracked active voice playback offset in seconds.
+     *
+     * @return active voice playback offset in seconds ({@code >= 0})
+     */
+    public synchronized double getActiveOffsetSeconds() {
+        return activeOffsetSeconds;
     }
 
     /**

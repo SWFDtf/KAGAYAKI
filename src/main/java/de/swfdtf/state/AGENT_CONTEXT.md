@@ -31,7 +31,7 @@ Vollständige 4-Schichten-State-, Rollback-, Save/Load-, Verlaufs-, Meta-Progres
 | `HistoryLog` | `final class` | Kapazitätsbegrenzter (`DEFAULT_MAX_ENTRIES = 500`) chronologischer Dialogverlauf mit Checkpoint-Korrelation und `truncateAfterCheckpoint`. |
 | `HistoryLog.HistoryEntry` | `record` | Unveränderlicher Backlog-Eintrag (`entryId`, `checkpointId`, `lineId`, `speakerName`, `speakerColorHex`, `text`, `voicePath`, `timestamp`). |
 | `SaveValueCodec` | `final class` | Typerhaltender Gson-Codec für Primitive, `Long`/`Float`/`Short`/`Byte`/`Character`/`BigInteger`/`BigDecimal`, `Instant`, `UUID`, `Enum`, `Transform2D`, `ColorMatrix4f`, `Rect2f`, Collections, Arrays und beliebige `@->{ ... }<<`-Klassen (`__vjavaClass`). |
-| `SaveSlotData` | `record` | Unveränderliches Spielstandsmodell (`metadata`, `variables`, `scriptPosition`, `historyEntries`) für `.ksav`-Dateien. |
+| `SaveSlotData` | `record` | Unveränderliches Spielstandsmodell (`metadata`, `variables`, `scriptPosition`, `historyEntries`, optional `SavedVoiceBookmark`) für `.ksav`-Dateien. |
 | `SaveSlotData.SaveMetadata` | `record` | Leichtgewichtige Slot-Metadaten inklusive PNG-Thumbnail-Bytes (`slotId`, `customName`, `savedAt`, `currentLabel`, `dialoguePreview`, `playtimeSeconds`, `gameVersion`, `thumbnailWidth`, `thumbnailHeight`, `thumbnailPng`). |
 | `SaveSlotData.SavedStackFrame` | `record` | Von AST-Objekten entkoppelter Call-/Block-Frame (`labelName`, `statementIndex`, `isCallBoundary`). |
 | `SaveSlotData.SavedScriptPosition` | `record` | Entkoppelter Skript-Ausführungszustand inklusive NVL-Puffer, Voice-Pfad und `SceneController.StageSnapshot`. |

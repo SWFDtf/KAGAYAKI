@@ -97,7 +97,7 @@ public final class VJavaAst {
     public record JumpStatement(String targetLabel, boolean isExpression, String sourceFile, int lineNumber) implements Statement {}
     public record CallStatement(String targetLabel, List<String> args, String sourceFile, int lineNumber) implements Statement {}
     public record ReturnStatement(String expression, String sourceFile, int lineNumber) implements Statement {}
-    public record PlayStatement(String channel, String assetPath, boolean loop, double fadeInSeconds, double volume, String sourceFile, int lineNumber) implements Statement {}
+    public record PlayStatement(String channel, String assetPath, boolean loop, double fadeInSeconds, double volume, double loopStartSeconds, String sourceFile, int lineNumber) implements Statement {}
     public record QueueStatement(String channel, List<String> assetPaths, String sourceFile, int lineNumber) implements Statement {}
     public record StopStatement(String channel, double fadeOutSeconds, String sourceFile, int lineNumber) implements Statement {}
     public record VoiceStatement(String assetPath, String sourceFile, int lineNumber) implements Statement {}
@@ -260,6 +260,10 @@ public final class ScriptRuntime {
         void queue(String ch, List<String> paths);
         void stop(String ch, double fadeOut);
         void voice(String path);
+        default void play(String ch, String path, boolean loop, double fadeIn, double vol, double loopStartSeconds)
+        default String getActiveVoiceAssetPath()
+        default double getActiveVoicePlaybackSeconds()
+        default void resumeVoiceAt(String assetPath, double offsetSeconds)
     }
     public record AudioEvent(String action, String channel, String assetPath, List<String> queuedPaths, boolean loop, double fadeSeconds, double volume) {}
     public record StackFrame(String labelName, int statementIndex, List<VJavaAst.Statement> statements, List<VJavaAst.Statement> childStatements, boolean isCallBoundary) {
@@ -295,6 +299,7 @@ public final class ScriptRuntime {
     public VJavaAst.ProjectAst getProjectAst()
     public List<AudioEvent> getAudioEvents()
     public void setAudioBridge(AudioBridge audioBridge)
+    public AudioBridge getAudioBridge()
     public void setLocalizationManager(LocalizationManager localizationManager)
     public LocalizationManager getLocalizationManager()
     public void setCheckpointListener(Runnable checkpointListener)

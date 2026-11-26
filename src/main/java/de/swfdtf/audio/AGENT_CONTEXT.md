@@ -33,7 +33,8 @@ LWJGL-3-/OpenAL-Audio-, DSP-, Lip-Sync- und Accessibility-TTS-Subsystem von KAGA
 | `AmbientCrossfadeMixer` | `final class` | Mehrspur-Ambient-Soundscape-Mixer mit benannten Ebenen, Presets und sanfter Überblendung (`getActiveWeights`). |
 | `ClosedCaptionQueue` | `final class` | Barrierefreie Untertitel-/Closed-Caption-Warteschlange (`DIALOGUE`, `SFX`, `MUSIC`) mit Ablauf-Timer und Kategorie-Filter. |
 | `AudioCueRegistry` | `final class` | Logische `AudioCue`-Registry mit Kanal-Filterung, `Optional`-Lookup und Gson-JSON-Serialisierung. |
-| `VoicePlaybackBookmark` | `final class` | Begrenzter Verlauf zuletzt abgespielter Voice-Clips (`VoiceClipRecord`) mit Lookup nach `lineId` und Sprecher. |
+| `VoicePlaybackBookmark` | `final class` | Begrenzter Verlauf zuletzt abgespielter Voice-Clips (`VoiceClipRecord`) mit Lookup nach `lineId` und Sprecher sowie aktivem Playback-Offset-Tracking. |
+| `OggVorbisStream` | `final class` | Chunk-basierter Streaming-Decoder für Ogg Vorbis (`STBVorbis`) mit konstant kleinem Puffer, Seeking und Rolling-RMS-/Spektrumanalyse. |
 
 ## Öffentliche API-Signaturen
 
@@ -189,6 +190,26 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
     public synchronized void dispose()
     @Override public void close()
 }
+```
+
+### `OggVorbisStream` & Wave-2b-Erweiterungen
+```java
+public final class OggVorbisStream implements AutoCloseable {
+    public static final int DEFAULT_CHUNK_FRAMES = 4096;
+    public static boolean isOggFile(Path file)
+    public static OggVorbisStream open(Path file) throws IOException
+    public synchronized int readInterleavedPcm16(short[] dst, int maxFrames)
+    public synchronized float[] readMonoAnalysisWindow(int windowFrames)
+    public synchronized void seekSeconds(double seconds)
+    public Path getSourcePath() / public int getChannels() / public int getSampleRate()
+    public int getTotalFrames() / public double getDurationSeconds()
+    public synchronized boolean isClosed()
+    @Override public synchronized void close()
+}
+```
+- `AudioChannel`: ergänzt `play(..., loopStartSeconds)`, `playStream(...)`, `playAtOffset(...)`, `setDuckGain(float)`/`getDuckGain()`, `setEqualPowerCrossfade(boolean)`/`isEqualPowerCrossfade()`.
+- `AudioEngine`: integriert `OggVorbisStream`, `AudioDuckingController`, `AmbientCrossfadeMixer`, `AudioCueRegistry`, `ClosedCaptionQueue` und `VoicePlaybackBookmark` inklusive `AudioBridge`-Hooks (`play(..., loopStartSeconds)`, `getActiveVoiceAssetPath`, `getActiveVoicePlaybackSeconds`, `resumeVoiceAt`).
+- `VoicePlaybackBookmark`: ergänzt `updateActivePlayback`, `clearActivePlayback`, `getActiveAssetPath`, `getActiveOffsetSeconds`.
 ```
 
 ### `LipSyncAnalyzer`

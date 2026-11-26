@@ -102,11 +102,16 @@ class AudioEngineAndLipSyncTest {
             }
             assertTrue(maxBand > 0.3f, "Expected music spectrum bar peak > 0.3, got " + maxBand);
 
-            // PreferencesState scaling propagates immediately
+            // PreferencesState scaling propagates immediately (factoring in active voice ducking)
             prefs.setMasterVolume(0.5f);
             prefs.setMusicVolume(0.5f);
             engine.update(0.05);
-            assertEquals(0.25f, music.getCurrentEffectiveVolume(), 1e-5f);
+            assertEquals(0.25f, music.getChannelMixGain(), 1e-5f);
+            assertEquals(
+                    0.25f * engine.getDuckingController().getDuckMultiplier(),
+                    music.getCurrentEffectiveVolume(),
+                    1e-5f
+            );
 
             // Capture rollback snapshot before advancing queue & stop
             Map<String, AudioChannel.ChannelSnapshot> rollbackSnapshot = engine.snapshotAllChannels();

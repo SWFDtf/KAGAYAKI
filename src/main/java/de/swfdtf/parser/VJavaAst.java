@@ -507,13 +507,14 @@ public final class VJavaAst {
     /**
      * Plays an audio track or sound effect on a named channel.
      *
-     * @param channel       audio channel name
-     * @param assetPath     audio asset path
-     * @param loop          whether playback loops
-     * @param fadeInSeconds fade-in duration in seconds
-     * @param volume        target volume multiplier
-     * @param sourceFile    source script path
-     * @param lineNumber    1-based line number
+     * @param channel          audio channel name
+     * @param assetPath        audio asset path
+     * @param loop             whether playback loops
+     * @param fadeInSeconds    fade-in duration in seconds
+     * @param volume           target volume multiplier
+     * @param loopStartSeconds loop restart position in seconds when wrapping ({@code >= 0})
+     * @param sourceFile       source script path
+     * @param lineNumber       1-based line number
      */
     public record PlayStatement(
             String channel,
@@ -521,9 +522,32 @@ public final class VJavaAst {
             boolean loop,
             double fadeInSeconds,
             double volume,
+            double loopStartSeconds,
             String sourceFile,
             int lineNumber
     ) implements Statement {
+        /**
+         * Backwards-compatible constructor defaulting {@code loopStartSeconds} to {@code 0.0}.
+         *
+         * @param channel       audio channel name
+         * @param assetPath     audio asset path
+         * @param loop          whether playback loops
+         * @param fadeInSeconds fade-in duration in seconds
+         * @param volume        target volume multiplier
+         * @param sourceFile    source script path
+         * @param lineNumber    1-based line number
+         */
+        public PlayStatement(
+                String channel,
+                String assetPath,
+                boolean loop,
+                double fadeInSeconds,
+                double volume,
+                String sourceFile,
+                int lineNumber
+        ) {
+            this(channel, assetPath, loop, fadeInSeconds, volume, 0.0, sourceFile, lineNumber);
+        }
     }
 
     /**

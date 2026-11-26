@@ -64,6 +64,12 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
     private final Map<String, AudioDecoder.DecodedAudio> decodedFileCache = new LinkedHashMap<>();
     private final Map<String, AudioDecoder.DecodedAudio> registeredMemoryAudio = new LinkedHashMap<>();
     private final Map<String, AudioDecoder.DecodedAudio> bleepCache = new LinkedHashMap<>();
+    private final AudioDuckingController duckingController = new AudioDuckingController();
+    private final AmbientCrossfadeMixer ambientCrossfadeMixer = new AmbientCrossfadeMixer();
+    private AudioCueRegistry cueRegistry = new AudioCueRegistry();
+    private ClosedCaptionQueue closedCaptionQueue = new ClosedCaptionQueue();
+    private VoicePlaybackBookmark voiceBookmark = new VoicePlaybackBookmark();
+    private long voiceSequence = 1L;
 
     private Path projectRoot;
     private PreferencesState preferencesState;
@@ -122,7 +128,9 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
         channels.put(CHANNEL_MUSIC, new AudioChannel(CHANNEL_MUSIC, false));
         channels.put(CHANNEL_SOUND, new AudioChannel(CHANNEL_SOUND, false));
         channels.put(CHANNEL_VOICE, new AudioChannel(CHANNEL_VOICE, false));
-        channels.put(CHANNEL_AMBIENT, new AudioChannel(CHANNEL_AMBIENT, false));
+        AudioChannel ambient = new AudioChannel(CHANNEL_AMBIENT, false);
+        ambient.setEqualPowerCrossfade(true);
+        channels.put(CHANNEL_AMBIENT, ambient);
     }
 
     /**
@@ -347,15 +355,49 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
      */
     @Override
     public synchronized void play(String ch, String path, boolean loop, double fadeIn, double vol) {
-        if (disposed) {
+        play(ch, path, loop, fadeIn, vol, 0.0);
+    }
+
+    @Override
+    public synchronized void play(
+            String ch,
+            String path,
+            boolean loop,
+            double fadeIn,
+            double vol,
+            double loopStartSeconds
+    ) {
+        if (disposed || path == null || path.isBlank()) {
             return;
         }
         syncVolumesFromPreferences();
+
+        String effectivePath = path.trim();
         String targetChannel = (ch == null || ch.isBlank()) ? CHANNEL_SOUND : ch;
+        boolean effectiveLoop = loop;
+        double effectiveVol = vol;
+
+        if (cueRegistry != null) {
+            Optional<AudioCueRegistry.AudioCue> cueOpt = cueRegistry.findCue(effectivePath);
+            if (cueOpt.isPresent()) {
+                AudioCueRegistry.AudioCue cue = cueOpt.get();
+                effectivePath = cue.assetPath();
+                if (ch == null || ch.isBlank()) {
+                    targetChannel = cue.channel();
+                }
+                effectiveLoop = loop || cue.loop();
+                if (Double.compare(vol, 1.0) == 0) {
+                    effectiveVol = cue.defaultVolume();
+                }
+            }
+        }
+
         AudioChannel channel = getChannel(targetChannel);
         channel.clearQueue();
-        AudioDecoder.DecodedAudio decoded = loadOrResolveAudio(path);
-        channel.play(path, decoded, loop, Math.max(0.0, fadeIn), (float) vol);
+        startAssetOnChannel(channel, effectivePath, effectiveLoop, fadeIn, (float) effectiveVol, loopStartSeconds);
+        if (channel.isPlaying()) {
+            pushAudioCaption(targetChannel, path);
+        }
     }
 
     /**
@@ -389,9 +431,20 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
             for (AudioChannel channel : channels.values()) {
                 channel.stop(safeFadeOut);
             }
+            duckingController.setVoiceActive(false);
+            if (safeFadeOut <= 0.0) {
+                voiceBookmark.clearActivePlayback();
+            }
             return;
         }
-        getChannel(ch).stop(safeFadeOut);
+        String normalized = ch.trim().toLowerCase(Locale.ROOT);
+        getChannel(normalized).stop(safeFadeOut);
+        if (CHANNEL_VOICE.equals(normalized)) {
+            duckingController.setVoiceActive(false);
+            if (safeFadeOut <= 0.0) {
+                voiceBookmark.clearActivePlayback();
+            }
+        }
     }
 
     /**
@@ -401,14 +454,72 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
      */
     @Override
     public synchronized void voice(String path) {
-        if (disposed) {
+        if (disposed || path == null || path.isBlank()) {
             return;
         }
         syncVolumesFromPreferences();
         AudioChannel voiceChannel = getChannel(CHANNEL_VOICE);
         voiceChannel.clearQueue();
-        AudioDecoder.DecodedAudio decoded = loadOrResolveAudio(path);
-        voiceChannel.play(path, decoded, false, 0.0, 1.0f);
+        startAssetOnChannel(voiceChannel, path.trim(), false, 0.0, 1.0f, 0.0);
+        if (voiceChannel.isPlaying()) {
+            duckingController.setVoiceActive(true);
+            voiceBookmark.record("voice-" + voiceSequence++, CHANNEL_VOICE, path.trim());
+            voiceBookmark.updateActivePlayback(path.trim(), 0.0);
+            pushAudioCaption(CHANNEL_VOICE, path);
+        } else {
+            duckingController.setVoiceActive(false);
+            voiceBookmark.clearActivePlayback();
+        }
+    }
+
+    @Override
+    public synchronized String getActiveVoiceAssetPath() {
+        AudioChannel voiceChannel = channels.get(CHANNEL_VOICE);
+        return (voiceChannel != null && voiceChannel.isPlaying()) ? voiceChannel.getAssetPath() : null;
+    }
+
+    @Override
+    public synchronized double getActiveVoicePlaybackSeconds() {
+        AudioChannel voiceChannel = channels.get(CHANNEL_VOICE);
+        return (voiceChannel != null && voiceChannel.isPlaying()) ? voiceChannel.getPlaybackSeconds() : 0.0;
+    }
+
+    @Override
+    public synchronized void resumeVoiceAt(String assetPath, double offsetSeconds) {
+        if (disposed || assetPath == null || assetPath.isBlank()) {
+            return;
+        }
+        syncVolumesFromPreferences();
+        AudioChannel voiceChannel = getChannel(CHANNEL_VOICE);
+        voiceChannel.clearQueue();
+        String trimmed = assetPath.trim();
+        double safeOffset = (Double.isFinite(offsetSeconds) && offsetSeconds > 0.0) ? offsetSeconds : 0.0;
+
+        Path resolved = !isInMemoryAudio(trimmed) ? resolveAudioPath(trimmed) : null;
+        if (resolved != null && OggVorbisStream.isOggFile(resolved)) {
+            try {
+                OggVorbisStream stream = OggVorbisStream.open(resolved);
+                stream.seekSeconds(safeOffset);
+                voiceChannel.playStream(trimmed, stream, false, 0.0, 1.0f, 0.0);
+                voiceChannel.update(0.0);
+                duckingController.setVoiceActive(true);
+                voiceBookmark.updateActivePlayback(trimmed, voiceChannel.getPlaybackSeconds());
+                return;
+            } catch (IOException ex) {
+                logger.warn(LOG_CATEGORY, "Failed to stream bookmarked voice '" + trimmed + "': " + ex.getMessage());
+                return;
+            }
+        }
+
+        AudioDecoder.DecodedAudio decoded = loadOrResolveAudio(trimmed);
+        if (decoded == null) {
+            logger.warn(LOG_CATEGORY,
+                    "Bookmarked voice asset unavailable; skipping voice resume for '" + trimmed + "'");
+            return;
+        }
+        voiceChannel.playAtOffset(trimmed, decoded, false, 1.0f, safeOffset);
+        duckingController.setVoiceActive(true);
+        voiceBookmark.updateActivePlayback(trimmed, voiceChannel.getPlaybackSeconds());
     }
 
     /**
@@ -531,12 +642,106 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
             if (!channel.isPlaying()) {
                 Optional<String> nextQueued = channel.pollNextQueued();
                 if (nextQueued.isPresent()) {
-                    String nextPath = nextQueued.get();
-                    AudioDecoder.DecodedAudio nextAudio = loadOrResolveAudio(nextPath);
-                    channel.play(nextPath, nextAudio, false, 0.0, 1.0f);
+                    startAssetOnChannel(channel, nextQueued.get(), false, 0.0, 1.0f, 0.0);
                 }
             }
         }
+
+        ambientCrossfadeMixer.update(dt);
+        closedCaptionQueue.update(dt);
+
+        AudioChannel voiceChannel = channels.get(CHANNEL_VOICE);
+        boolean voiceActive = voiceChannel != null && voiceChannel.isPlaying();
+        duckingController.setVoiceActive(voiceActive);
+        duckingController.update(dt);
+        float duckMult = duckingController.getDuckMultiplier();
+
+        AudioChannel music = channels.get(CHANNEL_MUSIC);
+        if (music != null) {
+            music.setDuckGain(duckMult);
+        }
+        AudioChannel ambient = channels.get(CHANNEL_AMBIENT);
+        if (ambient != null) {
+            ambient.setDuckGain(duckMult);
+        }
+
+        if (voiceActive && voiceChannel.getAssetPath() != null) {
+            voiceBookmark.updateActivePlayback(voiceChannel.getAssetPath(), voiceChannel.getPlaybackSeconds());
+        } else {
+            voiceBookmark.clearActivePlayback();
+        }
+    }
+
+    /**
+     * Returns the {@link AudioDuckingController} managing automatic voice ducking on music and ambient.
+     *
+     * @return {@link AudioDuckingController} instance
+     */
+    public AudioDuckingController getDuckingController() {
+        return duckingController;
+    }
+
+    /**
+     * Returns the {@link AmbientCrossfadeMixer} attached to this {@code AudioEngine}.
+     *
+     * @return {@link AmbientCrossfadeMixer} instance
+     */
+    public AmbientCrossfadeMixer getAmbientCrossfadeMixer() {
+        return ambientCrossfadeMixer;
+    }
+
+    /**
+     * Returns the attached {@link AudioCueRegistry} used to resolve cue IDs on {@code play}.
+     *
+     * @return active {@link AudioCueRegistry}
+     */
+    public synchronized AudioCueRegistry getCueRegistry() {
+        return cueRegistry;
+    }
+
+    /**
+     * Sets the active {@link AudioCueRegistry} (defaults to a fresh registry if {@code null}).
+     *
+     * @param cueRegistry cue registry instance (nullable)
+     */
+    public synchronized void setCueRegistry(AudioCueRegistry cueRegistry) {
+        this.cueRegistry = cueRegistry != null ? cueRegistry : new AudioCueRegistry();
+    }
+
+    /**
+     * Returns the live {@link ClosedCaptionQueue} updated on audio and voice events.
+     *
+     * @return active {@link ClosedCaptionQueue}
+     */
+    public synchronized ClosedCaptionQueue getClosedCaptionQueue() {
+        return closedCaptionQueue;
+    }
+
+    /**
+     * Sets the active {@link ClosedCaptionQueue} (defaults to a fresh queue if {@code null}).
+     *
+     * @param closedCaptionQueue closed-caption queue instance (nullable)
+     */
+    public synchronized void setClosedCaptionQueue(ClosedCaptionQueue closedCaptionQueue) {
+        this.closedCaptionQueue = closedCaptionQueue != null ? closedCaptionQueue : new ClosedCaptionQueue();
+    }
+
+    /**
+     * Returns the {@link VoicePlaybackBookmark} history and active playback offset tracker.
+     *
+     * @return active {@link VoicePlaybackBookmark}
+     */
+    public synchronized VoicePlaybackBookmark getVoiceBookmark() {
+        return voiceBookmark;
+    }
+
+    /**
+     * Sets the active {@link VoicePlaybackBookmark} (defaults to a fresh instance if {@code null}).
+     *
+     * @param voiceBookmark voice bookmark tracker (nullable)
+     */
+    public synchronized void setVoiceBookmark(VoicePlaybackBookmark voiceBookmark) {
+        this.voiceBookmark = voiceBookmark != null ? voiceBookmark : new VoicePlaybackBookmark();
     }
 
     /**
@@ -698,6 +903,62 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
             default -> preferencesState.getSoundVolume();
         };
         return Math.clamp(master * chanVol, 0.0f, 1.0f);
+    }
+
+    private void startAssetOnChannel(
+            AudioChannel channel,
+            String assetPath,
+            boolean loop,
+            double fadeInSeconds,
+            float targetVolume,
+            double loopStartSeconds
+    ) {
+        if (channel == null || assetPath == null || assetPath.isBlank()) {
+            return;
+        }
+        String trimmed = assetPath.trim();
+        if (!isInMemoryAudio(trimmed)) {
+            Path resolved = resolveAudioPath(trimmed);
+            if (resolved != null && OggVorbisStream.isOggFile(resolved)) {
+                try {
+                    OggVorbisStream stream = OggVorbisStream.open(resolved);
+                    channel.playStream(trimmed, stream, loop, Math.max(0.0, fadeInSeconds), targetVolume,
+                            loopStartSeconds);
+                    return;
+                } catch (IOException ex) {
+                    logger.warn(LOG_CATEGORY, "Failed to open OGG stream '" + resolved + "': " + ex.getMessage());
+                    return;
+                }
+            }
+        }
+
+        AudioDecoder.DecodedAudio decoded = loadOrResolveAudio(trimmed);
+        if (decoded == null) {
+            return;
+        }
+        channel.play(trimmed, decoded, loop, Math.max(0.0, fadeInSeconds), targetVolume, loopStartSeconds);
+    }
+
+    private boolean isInMemoryAudio(String trimmedPath) {
+        return trimmedPath.startsWith(BLEEP_PREFIX) || registeredMemoryAudio.containsKey(trimmedPath);
+    }
+
+    private void pushAudioCaption(String channelName, String sourcePath) {
+        if (closedCaptionQueue == null || sourcePath == null || sourcePath.isBlank()) {
+            return;
+        }
+        String normalizedChannel = channelName != null ? channelName.trim().toLowerCase(Locale.ROOT) : CHANNEL_SOUND;
+        ClosedCaptionQueue.CaptionCategory category = switch (normalizedChannel) {
+            case CHANNEL_VOICE -> ClosedCaptionQueue.CaptionCategory.DIALOGUE;
+            case CHANNEL_MUSIC, CHANNEL_AMBIENT -> ClosedCaptionQueue.CaptionCategory.MUSIC;
+            default -> ClosedCaptionQueue.CaptionCategory.SFX;
+        };
+        String displayName = sourcePath.trim();
+        int slash = Math.max(displayName.lastIndexOf('/'), displayName.lastIndexOf('\\'));
+        if (slash >= 0 && slash + 1 < displayName.length()) {
+            displayName = displayName.substring(slash + 1);
+        }
+        closedCaptionQueue.push(category, normalizedChannel, displayName, 4.0);
     }
 
     private AudioDecoder.DecodedAudio loadOrResolveAudio(String assetPath) {

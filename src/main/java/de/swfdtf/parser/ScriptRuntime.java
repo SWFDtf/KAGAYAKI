@@ -174,6 +174,54 @@ public final class ScriptRuntime {
          * @param path voice audio asset path
          */
         void voice(String path);
+
+        /**
+         * Starts playback on an audio channel with a seamless {@code loop_start_sec} offset.
+         *
+         * @param ch               channel name
+         * @param path             audio asset path
+         * @param loop             whether playback loops
+         * @param fadeIn           fade-in duration in seconds
+         * @param vol              target volume multiplier
+         * @param loopStartSeconds loop restart offset in seconds
+         */
+        default void play(
+                String ch,
+                String path,
+                boolean loop,
+                double fadeIn,
+                double vol,
+                double loopStartSeconds
+        ) {
+            play(ch, path, loop, fadeIn, vol);
+        }
+
+        /**
+         * Returns the active voice track asset path if voice playback is currently active.
+         *
+         * @return active voice asset path, or {@code null}
+         */
+        default String getActiveVoiceAssetPath() {
+            return null;
+        }
+
+        /**
+         * Returns the active voice track playback position in seconds.
+         *
+         * @return active voice playback offset in seconds
+         */
+        default double getActiveVoicePlaybackSeconds() {
+            return 0.0;
+        }
+
+        /**
+         * Resumes voice playback at {@code offsetSeconds} after loading a saved bookmark.
+         *
+         * @param assetPath     voice asset path
+         * @param offsetSeconds target playback position in seconds
+         */
+        default void resumeVoiceAt(String assetPath, double offsetSeconds) {
+        }
     }
 
     /**
@@ -946,7 +994,14 @@ public final class ScriptRuntime {
                 persistentAccess.unlockTrack(play.assetPath());
             }
             if (audioBridge != null) {
-                audioBridge.play(play.channel(), play.assetPath(), play.loop(), play.fadeInSeconds(), play.volume());
+                audioBridge.play(
+                        play.channel(),
+                        play.assetPath(),
+                        play.loop(),
+                        play.fadeInSeconds(),
+                        play.volume(),
+                        play.loopStartSeconds()
+                );
             }
             statementIndex++;
             return false;
@@ -1559,6 +1614,15 @@ public final class ScriptRuntime {
      */
     public void setAudioBridge(AudioBridge audioBridge) {
         this.audioBridge = audioBridge;
+    }
+
+    /**
+     * Returns the currently attached {@link AudioBridge}, or {@code null}.
+     *
+     * @return attached {@link AudioBridge}, or {@code null}
+     */
+    public AudioBridge getAudioBridge() {
+        return audioBridge;
     }
 
     /**
