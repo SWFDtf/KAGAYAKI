@@ -139,6 +139,65 @@ public final class CameraDirectorPresets {
     }
 
     /**
+     * Focuses and zooms the camera onto a logical world point {@code (focusX, focusY)} within a viewport
+     * of size {@code (logicalWidth, logicalHeight)}.
+     *
+     * @param focusX          target logical X focal point
+     * @param focusY          target logical Y focal point
+     * @param zoom            target zoom multiplier ({@code > 0.0f})
+     * @param durationSeconds transition duration in seconds ({@code >= 0.0})
+     * @param logicalWidth    logical viewport width ({@code > 0.0f})
+     * @param logicalHeight   logical viewport height ({@code > 0.0f})
+     */
+    public void zoomTo(
+            float focusX,
+            float focusY,
+            float zoom,
+            double durationSeconds,
+            float logicalWidth,
+            float logicalHeight
+    ) {
+        if (!Float.isFinite(focusX) || !Float.isFinite(focusY)) {
+            throw new IllegalArgumentException("Focus point must be finite");
+        }
+        if (!Float.isFinite(logicalWidth) || logicalWidth <= 0.0f
+                || !Float.isFinite(logicalHeight) || logicalHeight <= 0.0f) {
+            throw new IllegalArgumentException("Logical viewport dimensions must be finite and positive");
+        }
+        float offsetX = (focusX - logicalWidth * 0.5f) * zoom;
+        float offsetY = (focusY - logicalHeight * 0.5f) * zoom;
+        transitionTo(new CameraState(offsetX, offsetY, zoom, 0.0f), durationSeconds);
+    }
+
+    /**
+     * Focuses and zooms smoothly onto the center (or portrait focus point) of a {@link SceneNode}.
+     *
+     * @param node            target scene node (must not be {@code null})
+     * @param zoom            target zoom multiplier ({@code > 0.0f})
+     * @param durationSeconds transition duration in seconds ({@code >= 0.0})
+     * @param logicalWidth    logical viewport width ({@code > 0.0f})
+     * @param logicalHeight   logical viewport height ({@code > 0.0f})
+     */
+    public void zoomToNode(
+            SceneNode node,
+            float zoom,
+            double durationSeconds,
+            float logicalWidth,
+            float logicalHeight
+    ) {
+        Objects.requireNonNull(node, "node must not be null");
+        var bounds = node.getTransform().resolveBounds(
+                node.getWidth(),
+                node.getHeight(),
+                logicalWidth,
+                logicalHeight
+        );
+        float targetX = bounds.x() + bounds.width() * 0.5f;
+        float targetY = bounds.y() + bounds.height() * 0.35f;
+        zoomTo(targetX, targetY, zoom, durationSeconds, logicalWidth, logicalHeight);
+    }
+
+    /**
      * Advances any active camera transition by {@code deltaSeconds}.
      *
      * @param deltaSeconds elapsed frame time in seconds ({@code >= 0.0})

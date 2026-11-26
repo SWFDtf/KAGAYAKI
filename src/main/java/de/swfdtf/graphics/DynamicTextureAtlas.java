@@ -328,6 +328,93 @@ public final class DynamicTextureAtlas implements AutoCloseable {
     }
 
     /**
+     * Auto-cropped RGBA sprite buffer storing tight opaque bounds plus offsets relative to the original canvas
+     * so packed atlas quads render pixel-for-pixel aligned with untrimmed sprites while saving VRAM.
+     *
+     * @param originalWidth  untrimmed image width in pixels
+     * @param originalHeight untrimmed image height in pixels
+     * @param trimOffsetX    X pixel offset of trimmed box within original canvas
+     * @param trimOffsetY    Y pixel offset of trimmed box within original canvas
+     * @param trimmedWidth   trimmed box width ({@code >= 1})
+     * @param trimmedHeight  trimmed box height ({@code >= 1})
+     * @param trimmedRgba    tightly packed straight RGBA8 pixels of size {@code trimmedWidth * trimmedHeight * 4}
+     */
+    public record TrimmedRgba(
+            int originalWidth,
+            int originalHeight,
+            int trimOffsetX,
+            int trimOffsetY,
+            int trimmedWidth,
+            int trimmedHeight,
+            byte[] trimmedRgba
+    ) {
+        /** Computes byte savings relative to the untrimmed RGBA buffer.
+         *
+         * @return bytes saved by auto-cropping transparent margins
+         */
+        public long savedBytes() {
+            return Math.max(0L, ((long) originalWidth * originalHeight - (long) trimmedWidth * trimmedHeight) * 4L);
+        }
+    }
+
+    /**
+     * Trims fully transparent borders ({@code alpha == 0}) from an RGBA8 sprite while preserving exact
+     * {@code (trimOffsetX, trimOffsetY)} so final rendered placement differs 0 px from the untrimmed source.
+     *
+     * @param width        original width ({@code > 0})
+     * @param height       original height ({@code > 0})
+     * @param straightRgba tightly packed RGBA8 buffer
+     * @return {@link TrimmedRgba} preserving exact spatial offset
+     */
+    public static TrimmedRgba trimTransparentBorders(int width, int height, byte[] straightRgba) {
+        Objects.requireNonNull(straightRgba, "straightRgba must not be null");
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Dimensions must be positive");
+        }
+        int expected = Math.multiplyExact(Math.multiplyExact(width, height), 4);
+        if (straightRgba.length != expected) {
+            throw new IllegalArgumentException("Buffer size mismatch for " + width + "x" + height);
+        }
+
+        int minX = width;
+        int minY = height;
+        int maxX = -1;
+        int maxY = -1;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int alpha = straightRgba[(y * width + x) * 4 + 3] & 0xFF;
+                if (alpha > 0) {
+                    if (x < minX) {
+                        minX = x;
+                    }
+                    if (x > maxX) {
+                        maxX = x;
+                    }
+                    if (y < minY) {
+                        minY = y;
+                    }
+                    if (y > maxY) {
+                        maxY = y;
+                    }
+                }
+            }
+        }
+        if (maxX < minX || maxY < minY) {
+            return new TrimmedRgba(width, height, 0, 0, 1, 1, new byte[4]);
+        }
+
+        int trimmedW = maxX - minX + 1;
+        int trimmedH = maxY - minY + 1;
+        byte[] cropped = new byte[trimmedW * trimmedH * 4];
+        for (int row = 0; row < trimmedH; row++) {
+            int srcOff = ((minY + row) * width + minX) * 4;
+            int dstOff = row * trimmedW * 4;
+            System.arraycopy(straightRgba, srcOff, cropped, dstOff, trimmedW * 4);
+        }
+        return new TrimmedRgba(width, height, minX, minY, trimmedW, trimmedH, cropped);
+    }
+
+    /**
      * Releases OpenGL texture resources and clears packed regions. Safe to call repeatedly.
      */
     public void dispose() {

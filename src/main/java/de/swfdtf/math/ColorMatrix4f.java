@@ -179,6 +179,20 @@ public final class ColorMatrix4f {
     }
 
     /**
+     * Time-of-day atmospheric color-grading presets.
+     */
+    public enum TimeOfDayPreset {
+        /** Crisp warm-golden sunrise tone. */
+        MORNING,
+        /** Clear neutral daylight tone. */
+        NOON,
+        /** Rich amber-peach sunset tone. */
+        EVENING,
+        /** Cool moonlit indigo night tone. */
+        NIGHT
+    }
+
+    /**
      * Creates an opacity scaling matrix for premultiplied alpha, scaling {@code (R_pre, G_pre, B_pre, A)} by {@code a}.
      *
      * @param a alpha multiplier
@@ -191,6 +205,74 @@ public final class ColorMatrix4f {
             0.0f, 0.0f, a,    0.0f,
             0.0f, 0.0f, 0.0f, a
         });
+    }
+
+    /**
+     * Creates a classic warm sepia tone matrix matching standard W3C CSS sepia coefficients.
+     *
+     * @return sepia color matrix
+     */
+    public static ColorMatrix4f sepia() {
+        return new ColorMatrix4f(new float[]{
+            0.393f, 0.349f, 0.272f, 0.0f,
+            0.769f, 0.686f, 0.534f, 0.0f,
+            0.189f, 0.168f, 0.131f, 0.0f,
+            0.0f,   0.0f,   0.0f,   1.0f
+        });
+    }
+
+    /**
+     * Creates a grayscale matrix using Rec. 709 luminance weights ({@code saturation(0.0f)}).
+     *
+     * @return grayscale color matrix
+     */
+    public static ColorMatrix4f grayscale() {
+        return saturation(0.0f);
+    }
+
+    /**
+     * Approximates white-balance color temperature tinting from warm candlelight ({@code 2000K}) to cool sky
+     * ({@code 12000K}), normalized around daylight {@code 6500K}.
+     *
+     * @param kelvin temperature in Kelvin (clamped to {@code [1500, 15000]})
+     * @return color temperature tint matrix
+     */
+    public static ColorMatrix4f colorTemperature(float kelvin) {
+        float clampedK = Float.isFinite(kelvin) ? Math.clamp(kelvin, 1500.0f, 15000.0f) : 6500.0f;
+        float temp = clampedK / 100.0f;
+        float r;
+        float g;
+        float b;
+        if (temp <= 66.0f) {
+            r = 255.0f;
+            g = Math.clamp((float) (99.4708025861 * Math.log(temp) - 161.1195681661), 0.0f, 255.0f);
+            b = temp <= 19.0f
+                    ? 0.0f
+                    : Math.clamp((float) (138.5177312231 * Math.log(temp - 10.0) - 305.0447927307), 0.0f, 255.0f);
+        } else {
+            r = Math.clamp((float) (329.698727446 * Math.pow(temp - 60.0, -0.1332047592)), 0.0f, 255.0f);
+            g = Math.clamp((float) (288.1221695283 * Math.pow(temp - 60.0, -0.0755148492)), 0.0f, 255.0f);
+            b = 255.0f;
+        }
+        return tint(r / 255.0f, g / 255.0f, b / 255.0f);
+    }
+
+    /**
+     * Returns a curated atmospheric {@link ColorMatrix4f} for a {@link TimeOfDayPreset}.
+     *
+     * @param preset time-of-day preset (must not be {@code null})
+     * @return atmospheric grading matrix
+     */
+    public static ColorMatrix4f timeOfDay(TimeOfDayPreset preset) {
+        Objects.requireNonNull(preset, "preset must not be null");
+        return switch (preset) {
+            case MORNING -> tint(1.04f, 0.98f, 0.90f).multiply(brightness(0.03f));
+            case NOON -> identity();
+            case EVENING -> tint(1.08f, 0.84f, 0.68f).multiply(saturation(1.08f));
+            case NIGHT -> tint(0.58f, 0.68f, 0.96f)
+                    .multiply(saturation(0.75f))
+                    .multiply(brightness(-0.08f));
+        };
     }
 
     /**

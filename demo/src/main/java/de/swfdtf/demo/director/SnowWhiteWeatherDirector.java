@@ -162,6 +162,7 @@ public final class SnowWhiteWeatherDirector {
             case CLEAR -> "Klar (CLEAR)";
             case RAIN -> "Regen (RAIN)";
             case SNOW -> "Schneefall (SNOW)";
+            case SAKURA -> "Kirschblüten (SAKURA)";
             case FOG -> "Nebel (FOG)";
             case EMBERS -> "Funkenflug (EMBERS)";
         };

@@ -1,7 +1,11 @@
 package de.swfdtf.graphics;
 
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.system.MemoryUtil;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -145,6 +149,129 @@ public final class ScreenshotCaptureService {
                     .sorted(Comparator.comparing(path -> path.getFileName().toString()))
                     .toList();
         }
+    }
+
+    /**
+     * Vertically flips tightly packed RGBA8 pixels in-place/copy so bottom-left OpenGL origin buffers
+     * convert cleanly into top-to-bottom image scanline order.
+     *
+     * @param rgba   source RGBA8 buffer ({@code width * height * 4} bytes)
+     * @param width  image width in pixels ({@code > 0})
+     * @param height image height in pixels ({@code > 0})
+     * @return vertically flipped top-to-bottom RGBA8 buffer
+     */
+    public static byte[] flipVerticalRgba(byte[] rgba, int width, int height) {
+        Objects.requireNonNull(rgba, "rgba must not be null");
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Dimensions must be positive");
+        }
+        int stride = Math.multiplyExact(width, 4);
+        if (rgba.length != Math.multiplyExact(stride, height)) {
+            throw new IllegalArgumentException("Unexpected buffer size for " + width + "x" + height);
+        }
+        byte[] out = new byte[rgba.length];
+        for (int row = 0; row < height; row++) {
+            int srcOff = (height - 1 - row) * stride;
+            int dstOff = row * stride;
+            System.arraycopy(rgba, srcOff, out, dstOff, stride);
+        }
+        return out;
+    }
+
+    /**
+     * Bilinearly downscales (or resizes) a top-to-bottom RGBA8 buffer to target dimensions, e.g.
+     * {@code 320x180} save-slot thumbnails.
+     *
+     * @param srcRgba source top-to-bottom RGBA8 buffer
+     * @param srcW    source width ({@code > 0})
+     * @param srcH    source height ({@code > 0})
+     * @param dstW    target width ({@code > 0})
+     * @param dstH    target height ({@code > 0})
+     * @return resized RGBA8 buffer
+     */
+    public static byte[] resizeBilinearRgba(byte[] srcRgba, int srcW, int srcH, int dstW, int dstH) {
+        Objects.requireNonNull(srcRgba, "srcRgba must not be null");
+        if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) {
+            throw new IllegalArgumentException("Dimensions must be positive");
+        }
+        if (srcRgba.length != Math.multiplyExact(Math.multiplyExact(srcW, srcH), 4)) {
+            throw new IllegalArgumentException("Source buffer length mismatch");
+        }
+        byte[] dst = new byte[Math.multiplyExact(Math.multiplyExact(dstW, dstH), 4)];
+        for (int dy = 0; dy < dstH; dy++) {
+            float sy = ((dy + 0.5f) * srcH / (float) dstH) - 0.5f;
+            int y0 = Math.clamp((int) Math.floor(sy), 0, srcH - 1);
+            int y1 = Math.clamp(y0 + 1, 0, srcH - 1);
+            float fy = Math.clamp(sy - y0, 0.0f, 1.0f);
+            for (int dx = 0; dx < dstW; dx++) {
+                float sx = ((dx + 0.5f) * srcW / (float) dstW) - 0.5f;
+                int x0 = Math.clamp((int) Math.floor(sx), 0, srcW - 1);
+                int x1 = Math.clamp(x0 + 1, 0, srcW - 1);
+                float fx = Math.clamp(sx - x0, 0.0f, 1.0f);
+
+                int idx00 = (y0 * srcW + x0) * 4;
+                int idx10 = (y0 * srcW + x1) * 4;
+                int idx01 = (y1 * srcW + x0) * 4;
+                int idx11 = (y1 * srcW + x1) * 4;
+                int outIdx = (dy * dstW + dx) * 4;
+                for (int c = 0; c < 4; c++) {
+                    float c00 = srcRgba[idx00 + c] & 0xFF;
+                    float c10 = srcRgba[idx10 + c] & 0xFF;
+                    float c01 = srcRgba[idx01 + c] & 0xFF;
+                    float c11 = srcRgba[idx11 + c] & 0xFF;
+                    float top = c00 + (c10 - c00) * fx;
+                    float bot = c01 + (c11 - c01) * fx;
+                    dst[outIdx + c] = (byte) Math.clamp(Math.round(top + (bot - top) * fy), 0, 255);
+                }
+            }
+        }
+        return dst;
+    }
+
+    /**
+     * Reads pixels from an offscreen OpenGL {@link Framebuffer} and writes a PNG screenshot without
+     * {@code java.awt}.
+     *
+     * @param fbo       initialized framebuffer (must not be {@code null})
+     * @param outputDir target output directory
+     * @param baseName  desired screenshot base name
+     * @return path to the written PNG file
+     * @throws IOException if writing fails
+     */
+    public Path captureFramebufferPng(Framebuffer fbo, Path outputDir, String baseName) throws IOException {
+        Objects.requireNonNull(fbo, "fbo must not be null");
+        byte[] topDown = fbo.readPixelsRgba();
+        return captureRgba(outputDir, baseName, fbo.getWidth(), fbo.getHeight(), topDown);
+    }
+
+    /**
+     * Reads pixels from the currently bound OpenGL backbuffer using {@code glReadPixels}, flips vertically
+     * into top-to-bottom scanline order, and saves as PNG via {@link TextureManager#writePng}.
+     *
+     * @param outputDir target directory
+     * @param baseName  desired base filename
+     * @param width     framebuffer width in pixels ({@code > 0})
+     * @param height    framebuffer height in pixels ({@code > 0})
+     * @return path to the written PNG file
+     * @throws IOException if writing fails
+     */
+    public Path captureActiveBackbufferPng(Path outputDir, String baseName, int width, int height)
+            throws IOException {
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Dimensions must be positive");
+        }
+        int total = Math.multiplyExact(Math.multiplyExact(width, height), 4);
+        byte[] bottomUp = new byte[total];
+        ByteBuffer nativeBuf = MemoryUtil.memAlloc(total);
+        try {
+            GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, 1);
+            GL11.glReadPixels(0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, nativeBuf);
+            nativeBuf.get(bottomUp);
+        } finally {
+            MemoryUtil.memFree(nativeBuf);
+        }
+        byte[] topDown = flipVerticalRgba(bottomUp, width, height);
+        return captureRgba(outputDir, baseName, width, height, topDown);
     }
 
     private static String stripPngExtension(String sanitized) {

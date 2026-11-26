@@ -5,6 +5,7 @@ import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.system.MemoryUtil;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -191,12 +192,82 @@ public final class WindowManager {
     }
 
     /**
+     * Descriptor for an available OS display monitor connected to GLFW.
+     *
+     * @param index       zero-based monitor index
+     * @param name        human-readable monitor name
+     * @param width       native mode width in pixels
+     * @param height      native mode height in pixels
+     * @param refreshRate native vertical refresh rate in Hz
+     * @param primary     whether this monitor is the primary desktop display
+     */
+    public record MonitorInfo(
+            int index,
+            String name,
+            int width,
+            int height,
+            int refreshRate,
+            boolean primary
+    ) {
+    }
+
+    /**
      * Returns whether GLFW has been initialized by this manager.
      *
      * @return {@code true} if GLFW has been initialized by this manager
      */
     public boolean isGlfwInitialized() {
         return glfwInitialized;
+    }
+
+    /**
+     * Enumerates available monitors when GLFW is initialized (returning empty list in headless environments
+     * without GLFW active).
+     *
+     * @return immutable list of {@link MonitorInfo} entries
+     */
+    public List<MonitorInfo> enumerateMonitors() {
+        if (!glfwInitialized) {
+            return List.of();
+        }
+        var monitors = GLFW.glfwGetMonitors();
+        if (monitors == null || monitors.limit() == 0) {
+            return List.of();
+        }
+        long primaryHandle = GLFW.glfwGetPrimaryMonitor();
+        java.util.ArrayList<MonitorInfo> result = new java.util.ArrayList<>(monitors.limit());
+        for (int i = 0; i < monitors.limit(); i++) {
+            long m = monitors.get(i);
+            var mode = GLFW.glfwGetVideoMode(m);
+            String name = GLFW.glfwGetMonitorName(m);
+            int w = mode != null ? mode.width() : 1920;
+            int h = mode != null ? mode.height() : 1080;
+            int hz = mode != null ? mode.refreshRate() : 60;
+            result.add(new MonitorInfo(
+                    i,
+                    name != null ? name : ("Monitor " + i),
+                    w,
+                    h,
+                    hz,
+                    m == primaryHandle
+            ));
+        }
+        return List.copyOf(result);
+    }
+
+    /**
+     * Resolves a GLFW monitor handle by clamped zero-based index, falling back to the primary monitor.
+     *
+     * @param monitorIndex zero-based monitor index
+     * @return native monitor handle or {@link MemoryUtil#NULL} if unavailable
+     */
+    public static long resolveMonitorHandle(int monitorIndex) {
+        var monitors = GLFW.glfwGetMonitors();
+        if (monitors == null || monitors.limit() == 0) {
+            return GLFW.glfwGetPrimaryMonitor();
+        }
+        int clamped = Math.clamp(monitorIndex, 0, monitors.limit() - 1);
+        return monitors.get(clamped);
     }
 
     /**

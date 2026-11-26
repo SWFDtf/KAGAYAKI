@@ -54,6 +54,7 @@ public final class FontManager implements AutoCloseable {
 
     private final Map<String, byte[]> registeredFontBytes = new HashMap<>();
     private final Map<AtlasKey, FontAtlas> atlasCache = new HashMap<>();
+    private final List<String> fallbackFontChain = new ArrayList<>();
 
     private Path assetRoot;
     private String defaultFontPath;
@@ -329,6 +330,69 @@ public final class FontManager implements AutoCloseable {
         FontAtlas created = createAtlasForKey(effectiveKey, quantizedPx, uploadGl);
         atlasCache.put(cacheKey, created);
         return created;
+    }
+
+    /**
+     * Appends a secondary fallback font path/key (e.g. {@code NotoSansCJK} or an Emoji font) to the
+     * glyph fallback chain consulted when the primary font lacks a codepoint.
+     *
+     * @param fontKey font key or path (non-blank)
+     * @return {@code this} for fluent chaining
+     */
+    public FontManager addFallbackFont(String fontKey) {
+        if (fontKey != null && !fontKey.isBlank()) {
+            String normalized = normalizeFontKey(fontKey);
+            if (!fallbackFontChain.contains(normalized)) {
+                fallbackFontChain.add(normalized);
+            }
+        }
+        return this;
+    }
+
+    /**
+     * Returns an unmodifiable view of configured secondary fallback font keys in priority order.
+     *
+     * @return ordered fallback font keys
+     */
+    public List<String> getFallbackFontChain() {
+        return List.copyOf(fallbackFontChain);
+    }
+
+    /**
+     * Clears the secondary fallback font chain.
+     */
+    public void clearFallbackFonts() {
+        fallbackFontChain.clear();
+    }
+
+    /**
+     * Resolves the first {@link FontAtlas} (primary font, then configured fallback chain) containing a real
+     * glyph for {@code codepoint}, avoiding replacement tofu boxes ({@code U+25A1}) when a fallback font covers
+     * CJK, symbol, or Emoji codepoints.
+     *
+     * @param primaryFontKey optional primary font key
+     * @param sizePx         target pixel height
+     * @param codepoint      Unicode codepoint
+     * @param uploadGl       whether to ensure GL texture upload
+     * @return primary or fallback {@link FontAtlas}
+     */
+    public FontAtlas resolveAtlasForCodepoint(String primaryFontKey, float sizePx, int codepoint, boolean uploadGl) {
+        FontAtlas primary = getAtlas(primaryFontKey, sizePx, uploadGl);
+        if (primary.hasGlyph(codepoint)) {
+            return primary;
+        }
+        primary.getGlyph(codepoint);
+        if (!primary.isBuiltinFallback() || codepoint < 0x80) {
+            return primary;
+        }
+        for (String fallbackKey : fallbackFontChain) {
+            FontAtlas candidate = getAtlas(fallbackKey, sizePx, uploadGl);
+            candidate.getGlyph(codepoint);
+            if (candidate.hasGlyph(codepoint)) {
+                return candidate;
+            }
+        }
+        return primary;
     }
 
     /**

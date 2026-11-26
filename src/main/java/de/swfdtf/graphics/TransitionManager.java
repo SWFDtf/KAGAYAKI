@@ -42,6 +42,10 @@ public final class TransitionManager {
     private static final int MODE_BLINDS = 14;
     private static final int MODE_SQUARES = 15;
     private static final int MODE_IMAGE_DISSOLVE = 16;
+    private static final int MODE_FLASH_WHITE = 17;
+    private static final int MODE_PUSH_UP = 18;
+    private static final int MODE_SHATTER = 19;
+    private static final int MODE_DISSOLVE_CURVE = 20;
 
     private static final String COMPOSITE_VERTEX_SHADER = """
             #version 330 core
@@ -74,6 +78,8 @@ public final class TransitionManager {
             uniform int uReverseMask;
             uniform int uSliceCount;
             uniform int uHasMask;
+            uniform vec2 uIrisCenter;
+            uniform float uCurveBias;
 
             out vec4 fragColor;
 
@@ -186,8 +192,12 @@ public final class TransitionManager {
                 if (uMode == 12 || uMode == 13) { // IRIS_IN / IRIS_OUT
                     vec2 res = max(uResolution, vec2(1.0));
                     vec2 aspect = vec2(res.x / res.y, 1.0);
-                    float maxDist = length(vec2(0.5) * aspect);
-                    float dist = length((uv - vec2(0.5)) * aspect);
+                    vec2 center = clamp(uIrisCenter, vec2(0.0), vec2(1.0));
+                    float maxDist = max(
+                        max(length((vec2(0.0, 0.0) - center) * aspect), length((vec2(1.0, 0.0) - center) * aspect)),
+                        max(length((vec2(0.0, 1.0) - center) * aspect), length((vec2(1.0, 1.0) - center) * aspect))
+                    );
+                    float dist = length((uv - center) * aspect);
                     if (uMode == 12) { // IRIS_IN: shrinking 'from' circle revealing 'to'
                         float radius = (1.0 - p) * maxDist;
                         float mask = smoothstep(radius - 0.01, radius + 0.01, dist);
@@ -235,6 +245,59 @@ public final class TransitionManager {
                     float threshold = p * (1.0 + ramp);
                     float mask = clamp((threshold - lum) / ramp, 0.0, 1.0);
                     fragColor = mix(sampleFbo(uFromTex, uv), sampleFbo(uToTex, uv), mask);
+                    return;
+                }
+
+                if (uMode == 17) { // FLASH_WHITE (peak white at t=0.15)
+                    vec4 white = vec4(1.0, 1.0, 1.0, 1.0);
+                    if (p <= 0.15) {
+                        fragColor = mix(sampleFbo(uFromTex, uv), white, p / 0.15);
+                    } else {
+                        float decay = (p - 0.15) / 0.85;
+                        float flashAmt = max(0.0, 1.0 - decay * 1.4);
+                        vec4 toC = sampleFbo(uToTex, uv);
+                        fragColor = mix(toC, white, flashAmt);
+                    }
+                    return;
+                }
+
+                if (uMode == 18) { // PUSH_UP
+                    float split = 1.0 - p;
+                    if (uv.y >= split) {
+                        fragColor = sampleFbo(uToTex, vec2(uv.x, uv.y - split));
+                    } else {
+                        fragColor = sampleFbo(uFromTex, vec2(uv.x, uv.y + p));
+                    }
+                    return;
+                }
+
+                if (uMode == 19) { // SHATTER (broken mirror shard tiles)
+                    float cols = float(max(uSliceCount, 2));
+                    vec2 grid = vec2(cols, max(2.0, floor(cols * 0.5625)));
+                    vec2 cell = floor(uv * grid);
+                    vec2 local = fract(uv * grid) - 0.5;
+                    float seed = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+                    float angle = p * (seed >= 0.5 ? 1.0 : -1.0) * (1.2 + seed * 1.4);
+                    float c = cos(angle);
+                    float s = sin(angle);
+                    vec2 rotLocal = mat2(c, -s, s, c) * local;
+                    vec2 dropUv = clamp(
+                        uv - vec2(0.0, p * p * (0.4 + seed * 0.4)) + (rotLocal - local) / grid,
+                        0.0, 1.0
+                    );
+                    float shardAlpha = clamp(1.0 - p, 0.0, 1.0);
+                    vec4 fromShard = sampleFbo(uFromTex, dropUv) * shardAlpha;
+                    vec4 toScene = sampleFbo(uToTex, uv);
+                    fragColor = mix(toScene, fromShard + toScene * (1.0 - fromShard.a), shardAlpha);
+                    return;
+                }
+
+                if (uMode == 20) { // DISSOLVE_CURVE
+                    float s = p * p * (3.0 - 2.0 * p);
+                    float boost = uCurveBias * 4.0 * s * (1.0 - s);
+                    vec4 f = sampleFbo(uFromTex, uv);
+                    vec4 t = sampleFbo(uToTex, uv);
+                    fragColor = clamp(f * (1.0 - s + boost * 0.5) + t * (s + boost * 0.5), 0.0, 1.0);
                     return;
                 }
 
@@ -594,6 +657,9 @@ public final class TransitionManager {
         int sliceCount = Transition.DEFAULT_SLICE_COUNT;
         int maskTexId = 0;
 
+        float focusX = 0.5f;
+        float focusY = 0.5f;
+        float curveBias = 0.0f;
         if (effective != null && effective.getKind() != Transition.Kind.NONE) {
             shaderMode = mapKindToShaderMode(effective.getKind());
             float rawProgress = Math.clamp(activeStepProgress, 0.0f, 1.0f);
@@ -605,6 +671,9 @@ public final class TransitionManager {
             rampLen = effective.getRampLength();
             reverseMask = effective.isReverseMask() ? 1 : 0;
             sliceCount = effective.getSliceCount();
+            focusX = effective.getFocusX();
+            focusY = effective.getFocusY();
+            curveBias = effective.getCurveBias();
             if (effective.getKind() == Transition.Kind.IMAGE_DISSOLVE
                     && texMgr != null
                     && effective.getMaskImagePath() != null) {
@@ -629,6 +698,8 @@ public final class TransitionManager {
         compositeShader.setUniformInt("uReverseMask", reverseMask);
         compositeShader.setUniformInt("uSliceCount", sliceCount);
         compositeShader.setUniformInt("uHasMask", maskTexId != 0 ? 1 : 0);
+        compositeShader.setUniformVec2("uIrisCenter", focusX, focusY);
+        compositeShader.setUniformFloat("uCurveBias", curveBias);
 
         GL13.glActiveTexture(GL13.GL_TEXTURE0);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, fromFbo.getTextureId());
@@ -712,11 +783,15 @@ public final class TransitionManager {
             case SLIDE_RIGHT -> MODE_SLIDE_RIGHT;
             case PUSH_LEFT -> MODE_PUSH_LEFT;
             case PUSH_RIGHT -> MODE_PUSH_RIGHT;
+            case PUSH_UP -> MODE_PUSH_UP;
             case IRIS_IN -> MODE_IRIS_IN;
             case IRIS_OUT -> MODE_IRIS_OUT;
             case BLINDS -> MODE_BLINDS;
             case SQUARES -> MODE_SQUARES;
             case IMAGE_DISSOLVE -> MODE_IMAGE_DISSOLVE;
+            case FLASH_WHITE -> MODE_FLASH_WHITE;
+            case SHATTER -> MODE_SHATTER;
+            case DISSOLVE_CURVE -> MODE_DISSOLVE_CURVE;
         };
     }
 }

@@ -20,6 +20,20 @@ import java.util.function.BiConsumer;
  */
 public class SceneNode {
 
+    /**
+     * Per-node OpenGL blend mode controlling how fragment colors combine with the destination framebuffer.
+     */
+    public enum BlendMode {
+        /** Standard premultiplied alpha blending ({@code GL_ONE, GL_ONE_MINUS_SRC_ALPHA}). */
+        NORMAL,
+        /** Bright additive glow ({@code GL_ONE, GL_ONE}). */
+        ADDITIVE,
+        /** Darkening multiplicative shading ({@code GL_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA}). */
+        MULTIPLY,
+        /** Soft photographic screen lightening ({@code GL_ONE, GL_ONE_MINUS_SRC_COLOR}). */
+        SCREEN
+    }
+
     private String id;
     private String tag;
     private int zOrder = 0;
@@ -39,6 +53,19 @@ public class SceneNode {
     private float shadowOffsetY = 0.0f;
     private float shadowRadius = 0.0f;
     private final float[] shadowColorRgba = new float[]{0.0f, 0.0f, 0.0f, 0.45f};
+    private BlendMode blendMode = BlendMode.NORMAL;
+    private boolean silhouetteEnabled = false;
+    private final float[] silhouetteColorRgba = new float[]{0.04f, 0.055f, 0.10f, 1.0f};
+    private boolean hovered = false;
+    private float outlineThickness = 0.0f;
+    private final float[] outlineColorRgba = new float[]{1.0f, 0.85f, 0.35f, 1.0f};
+    private float uvScrollSpeedU = 0.0f;
+    private float uvScrollSpeedV = 0.0f;
+    private float uvScrollOffsetU = 0.0f;
+    private float uvScrollOffsetV = 0.0f;
+    private boolean pixelArtSampling = false;
+    private boolean ghostEffectEnabled = false;
+    private float ghostAmplitudePx = 6.0f;
     private Object userData;
     private SceneNode parent;
     private final List<SceneNode> children = new ArrayList<>();
@@ -786,6 +813,231 @@ public class SceneNode {
      */
     protected boolean shouldDrawStandardQuad() {
         return true;
+    }
+
+    /**
+     * Returns the per-node OpenGL blend mode ({@link BlendMode#NORMAL} by default).
+     *
+     * @return active {@link BlendMode}
+     */
+    public BlendMode getBlendMode() {
+        return blendMode;
+    }
+
+    /**
+     * Sets the per-node OpenGL blend mode ({@code NORMAL}, {@code ADDITIVE}, {@code MULTIPLY}, or {@code SCREEN}).
+     *
+     * @param blendMode blend mode (must not be {@code null})
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode setBlendMode(BlendMode blendMode) {
+        this.blendMode = Objects.requireNonNull(blendMode, "blendMode must not be null");
+        return this;
+    }
+
+    /**
+     * Returns whether solid silhouette mode ({@code tint_solid}) is enabled.
+     *
+     * @return {@code true} if solid silhouette mode is enabled
+     */
+    public boolean isSilhouetteEnabled() {
+        return silhouetteEnabled;
+    }
+
+    /**
+     * Enables solid-color silhouette rendering using {@code hexColor} while preserving sprite alpha contours.
+     *
+     * @param hexColor hex color string (e.g. {@code "#0a0e1a"})
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode setTintSolid(String hexColor) {
+        float[] rgba = parseHexRgba(hexColor);
+        System.arraycopy(rgba, 0, this.silhouetteColorRgba, 0, 4);
+        this.silhouetteEnabled = true;
+        return this;
+    }
+
+    /**
+     * Disables solid-color silhouette mode so original sprite texels render normally.
+     *
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode clearTintSolid() {
+        this.silhouetteEnabled = false;
+        return this;
+    }
+
+    /**
+     * Returns a defensive copy of the silhouette RGBA color.
+     *
+     * @return 4-element RGBA array
+     */
+    public float[] getSilhouetteColorRgba() {
+        return silhouetteColorRgba.clone();
+    }
+
+    /**
+     * Returns whether hotspot hover outline highlighting is active on this node.
+     *
+     * @return {@code true} when hovered
+     */
+    public boolean isHovered() {
+        return hovered;
+    }
+
+    /**
+     * Marks whether this hotspot node is currently hovered by the cursor.
+     *
+     * @param hovered {@code true} to activate hover highlight outline
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode setHovered(boolean hovered) {
+        this.hovered = hovered;
+        return this;
+    }
+
+    /**
+     * Returns configured outline highlight thickness in pixels ({@code 0} = disabled).
+     *
+     * @return outline thickness in pixels
+     */
+    public float getOutlineThickness() {
+        return outlineThickness;
+    }
+
+    /**
+     * Configures hover/selection outline thickness and color for interactive stage hotspots.
+     *
+     * @param thicknessPx outline thickness in logical pixels ({@code >= 0})
+     * @param hexColor    highlight color hex string
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode setOutlineHighlight(float thicknessPx, String hexColor) {
+        this.outlineThickness = Float.isFinite(thicknessPx) ? Math.max(0.0f, thicknessPx) : 0.0f;
+        if (hexColor != null) {
+            System.arraycopy(parseHexRgba(hexColor), 0, this.outlineColorRgba, 0, 4);
+        }
+        return this;
+    }
+
+    /**
+     * Returns a defensive copy of the highlight outline RGBA color.
+     *
+     * @return 4-element RGBA color
+     */
+    public float[] getOutlineColorRgba() {
+        return outlineColorRgba.clone();
+    }
+
+    /**
+     * Configures continuous UV scrolling velocity in UV units per second (seamless tiling backgrounds).
+     *
+     * @param speedU horizontal UV scroll speed
+     * @param speedV vertical UV scroll speed
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode setUvScrollSpeed(float speedU, float speedV) {
+        this.uvScrollSpeedU = Float.isFinite(speedU) ? speedU : 0.0f;
+        this.uvScrollSpeedV = Float.isFinite(speedV) ? speedV : 0.0f;
+        return this;
+    }
+
+    /**
+     * Advances continuous UV scroll offsets by {@code dt} seconds, wrapping cleanly in {@code [0, 1)}.
+     *
+     * @param dt elapsed frame delta in seconds
+     */
+    public void updateUvScroll(double dt) {
+        if (!Double.isFinite(dt) || dt <= 0.0) {
+            return;
+        }
+        if (uvScrollSpeedU != 0.0f) {
+            uvScrollOffsetU = wrapUnitFloat(uvScrollOffsetU + uvScrollSpeedU * (float) dt);
+        }
+        if (uvScrollSpeedV != 0.0f) {
+            uvScrollOffsetV = wrapUnitFloat(uvScrollOffsetV + uvScrollSpeedV * (float) dt);
+        }
+    }
+
+    /**
+     * Returns current horizontal UV scroll offset wrapped in {@code [0, 1)}.
+     *
+     * @return horizontal UV scroll offset
+     */
+    public float getUvScrollOffsetU() {
+        return uvScrollOffsetU;
+    }
+
+    /**
+     * Returns current vertical UV scroll offset wrapped in {@code [0, 1)}.
+     *
+     * @return vertical UV scroll offset
+     */
+    public float getUvScrollOffsetV() {
+        return uvScrollOffsetV;
+    }
+
+    /**
+     * Returns whether crisp pixel-art nearest sampling is requested for this node.
+     *
+     * @return {@code true} if pixel-art nearest filtering is requested
+     */
+    public boolean isPixelArtSampling() {
+        return pixelArtSampling;
+    }
+
+    /**
+     * Enables or disables pixel-art nearest-neighbor sampling on this node.
+     *
+     * @param pixelArtSampling {@code true} for crisp pixel-art edges
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode setPixelArtSampling(boolean pixelArtSampling) {
+        this.pixelArtSampling = pixelArtSampling;
+        return this;
+    }
+
+    /**
+     * Returns whether additive floating ghost/dream effect metadata is enabled.
+     *
+     * @return {@code true} if ghost effect is enabled
+     */
+    public boolean isGhostEffectEnabled() {
+        return ghostEffectEnabled;
+    }
+
+    /**
+     * Configures the additive dream/ghost floating effect ({@link BlendMode#ADDITIVE} + vertical sine bobbing).
+     *
+     * @param enabled     whether ghost effect is active
+     * @param amplitudePx vertical sine-wave bobbing amplitude in pixels
+     * @return {@code this} for fluent chaining
+     */
+    public SceneNode setGhostEffect(boolean enabled, float amplitudePx) {
+        this.ghostEffectEnabled = enabled;
+        this.ghostAmplitudePx = Float.isFinite(amplitudePx) ? Math.max(0.0f, amplitudePx) : 6.0f;
+        if (enabled) {
+            this.blendMode = BlendMode.ADDITIVE;
+        }
+        return this;
+    }
+
+    /**
+     * Evaluates deterministic vertical bobbing offset in pixels at {@code timeSeconds} when ghost effect is active.
+     *
+     * @param timeSeconds elapsed time in seconds
+     * @return vertical pixel offset
+     */
+    public float computeGhostBobOffsetY(double timeSeconds) {
+        if (!ghostEffectEnabled || !Double.isFinite(timeSeconds)) {
+            return 0.0f;
+        }
+        return (float) (Math.sin(timeSeconds * 2.2) * ghostAmplitudePx);
+    }
+
+    private static float wrapUnitFloat(float val) {
+        float mod = val % 1.0f;
+        return mod < 0.0f ? mod + 1.0f : mod;
     }
 
     /**

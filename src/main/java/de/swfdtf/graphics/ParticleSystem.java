@@ -240,6 +240,9 @@ public final class ParticleSystem implements CustomDisplayable {
         private float speed;
         private Texture texture;
         private boolean active = true;
+        private Float collisionFloorY = null;
+        private boolean collisionBounce = false;
+        private float collisionRestitution = 0.35f;
 
         /**
          * Creates an emitter with explicit particle list and bounds.
@@ -271,8 +274,31 @@ public final class ParticleSystem implements CustomDisplayable {
         }
 
         /**
+         * Configures an optional horizontal surface Y coordinate (such as the top edge of the ADV dialogue box)
+         * where snow, rain, or blossom particles either bounce slightly or melt/respawn on impact.
+         *
+         * @param floorY      surface Y coordinate in logical pixels, or {@code null} to disable
+         * @param bounce      {@code true} to bounce briefly, {@code false} to melt/respawn immediately
+         * @param restitution vertical bounce damping factor in {@code [0, 1]}
+         */
+        public void setCollisionFloorY(Float floorY, boolean bounce, float restitution) {
+            this.collisionFloorY = (floorY != null && Float.isFinite(floorY)) ? floorY : null;
+            this.collisionBounce = bounce;
+            this.collisionRestitution = Float.isFinite(restitution) ? Math.clamp(restitution, 0.0f, 1.0f) : 0.35f;
+        }
+
+        /**
+         * Returns the configured collision floor Y coordinate, or {@code null} if disabled.
+         *
+         * @return collision floor Y coordinate or {@code null}
+         */
+        public Float getCollisionFloorY() {
+            return collisionFloorY;
+        }
+
+        /**
          * Advances all particles in this emitter by {@code dt} seconds, applying velocity, wind,
-         * sinusoidal sway, angular rotation, lifetime respawn, and canvas wrap-around.
+         * sinusoidal sway, angular rotation, optional floor-surface collision, lifetime respawn, and wrap-around.
          *
          * @param dt elapsed frame delta in seconds
          */
@@ -289,6 +315,18 @@ public final class ParticleSystem implements CustomDisplayable {
                 p.x += (p.vx + windX + swayVx) * fdt;
                 p.y += p.vy * fdt;
                 p.rotation = (p.rotation + p.angularVelocity * fdt) % 360.0f;
+
+                if (collisionFloorY != null && p.vy > 0.0f && p.y >= collisionFloorY) {
+                    p.y = collisionFloorY;
+                    if (collisionBounce) {
+                        p.vy = -Math.abs(p.vy) * collisionRestitution;
+                        p.alpha *= 0.65f;
+                    } else {
+                        p.x = random.nextFloat() * boundsWidth;
+                        p.y = 0.0f;
+                        continue;
+                    }
+                }
 
                 if (p.maxLife > 0.0f) {
                     p.life -= fdt;

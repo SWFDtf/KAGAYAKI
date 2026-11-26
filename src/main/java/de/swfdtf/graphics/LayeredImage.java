@@ -545,6 +545,179 @@ public class LayeredImage implements CustomDisplayable {
         return true;
     }
 
+    private boolean eyeBlinkEnabled = false;
+    private String eyesGroupName = "eyes";
+    private String openEyesAttribute = "open";
+    private String closedEyesAttribute = "closed";
+    private double blinkIntervalSeconds = 3.8;
+    private double blinkDurationSeconds = 0.14;
+    private double blinkClockSeconds = 0.0;
+    private boolean currentlyBlinking = false;
+    private boolean breathingEnabled = false;
+    private float breathingAmplitudeYZoom = 0.015f;
+    private float breathingFrequencyHz = 0.35f;
+    private double breathingClockSeconds = 0.0;
+    private boolean automationPaused = false;
+
+    /**
+     * Enables automatic periodic eye-blinking by toggling the {@code eyes} attribute group cleanly between
+     * open and closed states.
+     *
+     * @param eyesGroupName        attribute group name (defaults to {@code "eyes"})
+     * @param openAttr             open-eye attribute name (defaults to {@code "open"})
+     * @param closedAttr           closed-eye attribute name (defaults to {@code "closed"})
+     * @param intervalSeconds      period between blinks in seconds ({@code >= 0.5})
+     * @param blinkDurationSeconds duration the eyes remain closed per blink in seconds ({@code > 0})
+     */
+    public void enableEyeBlink(
+            String eyesGroupName,
+            String openAttr,
+            String closedAttr,
+            double intervalSeconds,
+            double blinkDurationSeconds
+    ) {
+        this.eyesGroupName = (eyesGroupName == null || eyesGroupName.isBlank()) ? "eyes" : eyesGroupName.trim();
+        this.openEyesAttribute = (openAttr == null || openAttr.isBlank()) ? "open" : openAttr.trim();
+        this.closedEyesAttribute = (closedAttr == null || closedAttr.isBlank()) ? "closed" : closedAttr.trim();
+        this.blinkIntervalSeconds = Double.isFinite(intervalSeconds) ? Math.max(0.5, intervalSeconds) : 3.8;
+        this.blinkDurationSeconds = Double.isFinite(blinkDurationSeconds)
+                ? Math.clamp(blinkDurationSeconds, 0.05, 0.6)
+                : 0.14;
+        this.eyeBlinkEnabled = true;
+    }
+
+    /**
+     * Enables subtle sinusoidal {@code yzoom} breathing animation around 1.0.
+     *
+     * @param amplitudeYZoom breathing amplitude added to {@code 1.0f} (e.g. {@code 0.015f})
+     * @param frequencyHz    breathing cycles per second (e.g. {@code 0.35f})
+     */
+    public void enableBreathing(float amplitudeYZoom, float frequencyHz) {
+        this.breathingAmplitudeYZoom = Float.isFinite(amplitudeYZoom) ? Math.max(0.0f, amplitudeYZoom) : 0.015f;
+        this.breathingFrequencyHz = Float.isFinite(frequencyHz) ? Math.max(0.05f, frequencyHz) : 0.35f;
+        this.breathingEnabled = true;
+    }
+
+    /**
+     * Pauses or resumes eye-blink and breathing automation without losing accumulated phase.
+     *
+     * @param paused {@code true} to freeze automation
+     */
+    public void setAutomationPaused(boolean paused) {
+        this.automationPaused = paused;
+    }
+
+    /**
+     * Returns whether eye-blink and breathing automation is currently paused.
+     *
+     * @return {@code true} when paused
+     */
+    public boolean isAutomationPaused() {
+        return automationPaused;
+    }
+
+    /**
+     * Returns whether an eye blink is currently mid-blink ({@code closed}).
+     *
+     * @return {@code true} while blinking
+     */
+    public boolean isCurrentlyBlinking() {
+        return currentlyBlinking;
+    }
+
+    /**
+     * Computes current vertical breathing {@code yzoom} factor ({@code 1.0f} when breathing is disabled).
+     *
+     * @return vertical zoom multiplier around {@code 1.0f}
+     */
+    public float getCurrentBreathingYZoom() {
+        if (!breathingEnabled) {
+            return 1.0f;
+        }
+        return 1.0f + (float) Math.sin(breathingClockSeconds * Math.PI * 2.0 * breathingFrequencyHz)
+                * breathingAmplitudeYZoom;
+    }
+
+    /**
+     * Headless-capable offline compositing of all currently active layers onto a premultiplied or straight
+     * RGBA8 canvas using provided layer pixel buffers (or files decoded via {@link TextureManager}).
+     *
+     * @param width           output image width ({@code > 0})
+     * @param height          output image height ({@code > 0})
+     * @param assetResolver   optional explicit asset path to straight RGBA8 pixel buffer map (width x height x 4)
+     * @return composited straight RGBA8 byte buffer ready for {@link TextureManager#writePng}
+     */
+    public byte[] compositeOfflineRgba(
+            int width,
+            int height,
+            Map<String, byte[]> assetResolver
+    ) {
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("Composite dimensions must be positive");
+        }
+        int totalBytes = Math.multiplyExact(Math.multiplyExact(width, height), 4);
+        float[] accumR = new float[width * height];
+        float[] accumG = new float[width * height];
+        float[] accumB = new float[width * height];
+        float[] accumA = new float[width * height];
+
+        for (LayerRenderInfo layer : getActiveRenderLayers()) {
+            float layerAlpha = Math.clamp(layer.alpha(), 0.0f, 1.0f);
+            if (layerAlpha <= 0.0f) {
+                continue;
+            }
+            byte[] src = assetResolver != null ? assetResolver.get(layer.assetPath()) : null;
+            if (src == null || src.length != totalBytes) {
+                continue;
+            }
+            for (int i = 0; i < width * height; i++) {
+                int off = i * 4;
+                float sr = (src[off] & 0xFF) / 255.0f;
+                float sg = (src[off + 1] & 0xFF) / 255.0f;
+                float sb = (src[off + 2] & 0xFF) / 255.0f;
+                float sa = ((src[off + 3] & 0xFF) / 255.0f) * layerAlpha;
+                float invA = 1.0f - sa;
+                accumR[i] = sr * sa + accumR[i] * invA;
+                accumG[i] = sg * sa + accumG[i] * invA;
+                accumB[i] = sb * sa + accumB[i] * invA;
+                accumA[i] = sa + accumA[i] * invA;
+            }
+        }
+
+        byte[] out = new byte[totalBytes];
+        for (int i = 0; i < width * height; i++) {
+            int off = i * 4;
+            float a = Math.clamp(accumA[i], 0.0f, 1.0f);
+            if (a > 0.0001f) {
+                out[off] = (byte) Math.clamp(Math.round((accumR[i] / a) * 255.0f), 0, 255);
+                out[off + 1] = (byte) Math.clamp(Math.round((accumG[i] / a) * 255.0f), 0, 255);
+                out[off + 2] = (byte) Math.clamp(Math.round((accumB[i] / a) * 255.0f), 0, 255);
+                out[off + 3] = (byte) Math.clamp(Math.round(a * 255.0f), 0, 255);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Composites active layers and writes a flat PNG snapshot directly to disk without needing an OpenGL context.
+     *
+     * @param destination   target PNG path
+     * @param width         output width ({@code > 0})
+     * @param height        output height ({@code > 0})
+     * @param assetResolver map of layer asset paths to straight RGBA8 pixel buffers
+     * @throws java.io.IOException if PNG encoding fails
+     */
+    public void exportCompositedPng(
+            java.nio.file.Path destination,
+            int width,
+            int height,
+            Map<String, byte[]> assetResolver
+    ) throws java.io.IOException {
+        Objects.requireNonNull(destination, "destination must not be null");
+        byte[] straight = compositeOfflineRgba(width, height, assetResolver);
+        TextureManager.writePng(destination, width, height, straight);
+    }
+
     private void rebuildResolvedAssetsFromCurrentState() {
         List<String> resolved = new ArrayList<>();
         for (VJavaAst.LayeredEntry entry : entries) {
@@ -574,6 +747,31 @@ public class LayeredImage implements CustomDisplayable {
     public void update(double dt) {
         if (boundLipSync != null) {
             applyMouthShape(boundLipSync.getMouthShape());
+        }
+        if (!automationPaused && Double.isFinite(dt) && dt > 0.0) {
+            if (breathingEnabled) {
+                breathingClockSeconds += dt;
+            }
+            if (eyeBlinkEnabled && groupsByName.containsKey(eyesGroupName)) {
+                blinkClockSeconds += dt;
+                double cycle = blinkIntervalSeconds + blinkDurationSeconds;
+                double pos = blinkClockSeconds % cycle;
+                boolean shouldBlink = pos >= blinkIntervalSeconds;
+                if (shouldBlink != currentlyBlinking) {
+                    currentlyBlinking = shouldBlink;
+                    VJavaAst.GroupLayerEntry group = groupsByName.get(eyesGroupName);
+                    String targetAttr = shouldBlink ? closedEyesAttribute : openEyesAttribute;
+                    for (VJavaAst.AttributeEntry attr : group.attributes()) {
+                        if (attr.name().equalsIgnoreCase(targetAttr)) {
+                            GroupCrossfadeState st = groupStates.get(eyesGroupName);
+                            String asset = resolveAssetExpression(attr.assetOrExpr(), lastState, lastPersistent);
+                            st.transitionTo(attr.name(), asset, 0.0f);
+                            rebuildResolvedAssetsFromCurrentState();
+                            break;
+                        }
+                    }
+                }
+            }
         }
         for (GroupCrossfadeState st : groupStates.values()) {
             st.update(dt, crossfadeDurationSeconds);

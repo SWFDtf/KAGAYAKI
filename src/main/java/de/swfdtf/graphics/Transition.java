@@ -63,7 +63,15 @@ public final class Transition {
         /** Image Dissolve option. */
         IMAGE_DISSOLVE,
         /** Multiple option. */
-        MULTIPLE
+        MULTIPLE,
+        /** Two-part dissolve with peak white flash at {@code t = 0.15}. */
+        FLASH_WHITE,
+        /** Vertical scene push upward. */
+        PUSH_UP,
+        /** Shattered mirror tile dissolve effect. */
+        SHATTER,
+        /** Non-linear parametric dissolve curve without mid-fade darkening dip. */
+        DISSOLVE_CURVE
     }
 
     /** Default transition duration in seconds when omitted from a script expression. */
@@ -99,6 +107,9 @@ public final class Transition {
     private final int sliceCount;
     private final List<Transition> subTransitions;
     private final Easing.EaseType easeType;
+    private final float focusX;
+    private final float focusY;
+    private final float curveBias;
 
     private Transition(
             Kind kind,
@@ -110,6 +121,36 @@ public final class Transition {
             int sliceCount,
             List<Transition> subTransitions,
             Easing.EaseType easeType
+    ) {
+        this(
+                kind,
+                durationSeconds,
+                fadeColorHex,
+                maskImagePath,
+                rampLength,
+                reverseMask,
+                sliceCount,
+                subTransitions,
+                easeType,
+                0.5f,
+                0.5f,
+                0.0f
+        );
+    }
+
+    private Transition(
+            Kind kind,
+            float durationSeconds,
+            String fadeColorHex,
+            String maskImagePath,
+            float rampLength,
+            boolean reverseMask,
+            int sliceCount,
+            List<Transition> subTransitions,
+            Easing.EaseType easeType,
+            float focusX,
+            float focusY,
+            float curveBias
     ) {
         this.kind = Objects.requireNonNull(kind, "kind must not be null");
         this.durationSeconds = Math.max(0.0f, durationSeconds);
@@ -126,6 +167,9 @@ public final class Transition {
                 ? Collections.unmodifiableList(new ArrayList<>(subTransitions))
                 : List.of();
         this.easeType = easeType != null ? easeType : Easing.EaseType.EASE;
+        this.focusX = Float.isFinite(focusX) ? Math.clamp(focusX, 0.0f, 1.0f) : 0.5f;
+        this.focusY = Float.isFinite(focusY) ? Math.clamp(focusY, 0.0f, 1.0f) : 0.5f;
+        this.curveBias = Float.isFinite(curveBias) ? Math.clamp(curveBias, -1.0f, 1.0f) : 0.0f;
     }
 
     // ---- Factory Methods ----
@@ -329,7 +373,23 @@ public final class Transition {
      * @return the resulting value
      */
     public static Transition irisIn(float durationSeconds) {
-        return simple(Kind.IRIS_IN, durationSeconds);
+        return irisIn(durationSeconds, 0.5f, 0.5f);
+    }
+
+    /**
+     * Creates an iris-in circular reveal closing around a normalized focal point {@code (focusX, focusY)}.
+     *
+     * @param durationSeconds duration in seconds
+     * @param focusX          normalized center X in {@code [0, 1]}
+     * @param focusY          normalized center Y in {@code [0, 1]}
+     * @return configured {@link Transition}
+     */
+    public static Transition irisIn(float durationSeconds, float focusX, float focusY) {
+        return new Transition(
+                Kind.IRIS_IN, durationSeconds, DEFAULT_FADE_COLOR_HEX, null,
+                DEFAULT_RAMP_LENGTH, false, DEFAULT_SLICE_COUNT, List.of(), Easing.EaseType.LINEAR,
+                focusX, focusY, 0.0f
+        );
     }
 
     /**
@@ -339,7 +399,178 @@ public final class Transition {
      * @return the resulting value
      */
     public static Transition irisOut(float durationSeconds) {
-        return simple(Kind.IRIS_OUT, durationSeconds);
+        return irisOut(durationSeconds, 0.5f, 0.5f);
+    }
+
+    /**
+     * Creates an iris-out circular reveal expanding from a normalized focal point {@code (focusX, focusY)}.
+     *
+     * @param durationSeconds duration in seconds
+     * @param focusX          normalized center X in {@code [0, 1]}
+     * @param focusY          normalized center Y in {@code [0, 1]}
+     * @return configured {@link Transition}
+     */
+    public static Transition irisOut(float durationSeconds, float focusX, float focusY) {
+        return new Transition(
+                Kind.IRIS_OUT, durationSeconds, DEFAULT_FADE_COLOR_HEX, null,
+                DEFAULT_RAMP_LENGTH, false, DEFAULT_SLICE_COUNT, List.of(), Easing.EaseType.LINEAR,
+                focusX, focusY, 0.0f
+        );
+    }
+
+    /**
+     * Two-part dissolve with a brief bright white flash peaking at {@code t = 0.15} ({@code #FFFFFF})
+     * and smoothly resolving to the destination scene by {@code t = 1.0}.
+     *
+     * @param durationSeconds duration in seconds
+     * @return configured {@link Transition}
+     */
+    public static Transition flashWhite(float durationSeconds) {
+        return new Transition(
+                Kind.FLASH_WHITE, durationSeconds, "#ffffff", null,
+                DEFAULT_RAMP_LENGTH, false, DEFAULT_SLICE_COUNT, List.of(), Easing.EaseType.EASE_OUT
+        );
+    }
+
+    /**
+     * Pushes the old scene upward off screen while sliding the new scene in seamlessly from below.
+     *
+     * @param durationSeconds duration in seconds
+     * @return configured {@link Transition}
+     */
+    public static Transition pushUp(float durationSeconds) {
+        return simple(Kind.PUSH_UP, durationSeconds);
+    }
+
+    /**
+     * Shatters the outgoing scene into {@code tileCols} rotating and fading mirror shards.
+     *
+     * @param durationSeconds duration in seconds
+     * @param tileCols        horizontal shard grid density ({@code >= 2})
+     * @return configured {@link Transition}
+     */
+    public static Transition shatter(float durationSeconds, int tileCols) {
+        return new Transition(
+                Kind.SHATTER, durationSeconds, DEFAULT_FADE_COLOR_HEX, null,
+                DEFAULT_RAMP_LENGTH, false, Math.max(2, tileCols), List.of(), Easing.EaseType.EASE_IN_OUT
+        );
+    }
+
+    /**
+     * Creates a non-linear filmic dissolve curve whose blend weights avoid any mid-transition brightness dip.
+     *
+     * @param durationSeconds duration in seconds
+     * @param curveBias       exposure/midtone lift bias in {@code [-1, 1]} (e.g. {@code 0.25f})
+     * @return configured {@link Transition}
+     */
+    public static Transition dissolveCurve(float durationSeconds, float curveBias) {
+        return new Transition(
+                Kind.DISSOLVE_CURVE, durationSeconds, DEFAULT_FADE_COLOR_HEX, null,
+                DEFAULT_RAMP_LENGTH, false, DEFAULT_SLICE_COUNT, List.of(), Easing.EaseType.EASE_IN_OUT,
+                0.5f, 0.5f, curveBias
+        );
+    }
+
+    /**
+     * Immutable deterministic shard state produced by {@link #computeShatterShards(float, int)}.
+     *
+     * @param col             grid column
+     * @param row             grid row
+     * @param offsetX         horizontal normalized displacement
+     * @param offsetY         vertical normalized displacement (downward drop)
+     * @param rotationDegrees shard rotation in degrees
+     * @param alpha           remaining shard opacity in {@code [0, 1]}
+     */
+    public record ShatterShard(
+            int col,
+            int row,
+            float offsetX,
+            float offsetY,
+            float rotationDegrees,
+            float alpha
+    ) {
+    }
+
+    /**
+     * Computes deterministic outgoing/incoming/flash weights {@code [fromWeight, toWeight, flashAlpha]}
+     * for normalized progress {@code t in [0, 1]}, supporting {@link Kind#FLASH_WHITE} and
+     * {@link Kind#DISSOLVE_CURVE} cleanly.
+     *
+     * @param progress normalized progress {@code t in [0, 1]}
+     * @return 3-element array {@code [fromWeight, toWeight, flashWeight]}
+     */
+    public float[] evaluateBlendWeights(float progress) {
+        float t = Float.isFinite(progress) ? Math.clamp(progress, 0.0f, 1.0f) : 1.0f;
+        if (kind == Kind.FLASH_WHITE) {
+            if (t <= 0.15f) {
+                float flash = t / 0.15f;
+                return new float[]{1.0f - flash, 0.0f, flash};
+            }
+            float decay = (t - 0.15f) / 0.85f;
+            float toW = Math.clamp(decay, 0.0f, 1.0f);
+            float flash = Math.max(0.0f, 1.0f - decay * 1.4f);
+            return new float[]{0.0f, toW, flash};
+        }
+        if (kind == Kind.DISSOLVE_CURVE) {
+            float smooth = Easing.smoothstep(t);
+            float boost = curveBias * 4.0f * smooth * (1.0f - smooth);
+            float fromW = Math.clamp(1.0f - smooth + boost * 0.5f, 0.0f, 1.0f);
+            float toW = Math.clamp(smooth + boost * 0.5f, 0.0f, 1.0f);
+            return new float[]{fromW, toW, 0.0f};
+        }
+        return new float[]{1.0f - t, t, 0.0f};
+    }
+
+    /**
+     * Computes deterministic mirror shard transforms for {@link Kind#SHATTER} at normalized progress {@code t}.
+     *
+     * @param progress normalized progress {@code t in [0, 1]}
+     * @param tileRows number of grid rows ({@code >= 1})
+     * @return list of {@link ShatterShard} transforms
+     */
+    public List<ShatterShard> computeShatterShards(float progress, int tileRows) {
+        float t = Float.isFinite(progress) ? Math.clamp(progress, 0.0f, 1.0f) : 1.0f;
+        int cols = Math.max(1, sliceCount);
+        int rows = Math.max(1, tileRows);
+        List<ShatterShard> shards = new ArrayList<>(cols * rows);
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                float seed = ((c * 73856093 ^ r * 19349663) & 0xFF) / 255.0f;
+                float dirX = (seed - 0.5f) * 0.45f;
+                float dropY = t * t * (0.65f + seed * 0.5f);
+                float rot = t * (seed >= 0.5f ? 1.0f : -1.0f) * (65.0f + seed * 95.0f);
+                float alpha = Math.max(0.0f, 1.0f - t);
+                shards.add(new ShatterShard(c, r, dirX * t, dropY, rot, alpha));
+            }
+        }
+        return Collections.unmodifiableList(shards);
+    }
+
+    /**
+     * Returns the normalized iris focal X coordinate in {@code [0, 1]}.
+     *
+     * @return iris focal X coordinate
+     */
+    public float getFocusX() {
+        return focusX;
+    }
+
+    /**
+     * Returns the normalized iris focal Y coordinate in {@code [0, 1]}.
+     *
+     * @return iris focal Y coordinate
+     */
+    public float getFocusY() {
+        return focusY;
+    }
+
+    /**
+     * Returns the parametric dissolve curve brightness bias in {@code [-1, 1]}.
+     *
+     * @return curve bias
+     */
+    public float getCurveBias() {
+        return curveBias;
     }
 
     /**
@@ -532,6 +763,10 @@ public final class Transition {
             case "slideright" -> slideRight(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr));
             case "pushleft" -> pushLeft(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr));
             case "pushright" -> pushRight(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr));
+            case "pushup" -> pushUp(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr));
+            case "flashwhite" -> flashWhite(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr));
+            case "shatter" -> shatter(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr), 8);
+            case "dissolvecurve" -> dissolveCurve(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr), 0.25f);
             case "irisin" -> irisIn(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr));
             case "irisout" -> irisOut(extractDuration(rawArgs, 0, DEFAULT_DURATION_SECONDS, expr));
             case "blinds" -> parseSliced(Kind.BLINDS, rawArgs, expr);

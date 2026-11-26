@@ -18,7 +18,9 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -126,6 +128,13 @@ public final class RenderPipeline2D implements IRenderPipeline {
             uniform float uSdfPxRange;
             uniform int uShadowMode;
             uniform float uShadowRadius;
+            uniform int uSilhouetteMode;
+            uniform vec4 uSilhouetteColor;
+            uniform int uGradientMode;
+            uniform vec4 uGradientTopLeft;
+            uniform vec4 uGradientTopRight;
+            uniform vec4 uGradientBottomLeft;
+            uniform vec4 uGradientBottomRight;
 
             out vec4 fragColor;
 
@@ -164,7 +173,17 @@ public final class RenderPipeline2D implements IRenderPipeline {
 
                 vec4 baseSample = uUseTexture != 0
                     ? texture(uTexture, vTexCoord) * uColor
-                    : uColor;
+                    : (uGradientMode != 0
+                        ? mix(
+                            mix(uGradientTopLeft, uGradientTopRight, clamp(vLocalPos.x, 0.0, 1.0)),
+                            mix(uGradientBottomLeft, uGradientBottomRight, clamp(vLocalPos.x, 0.0, 1.0)),
+                            clamp(vLocalPos.y, 0.0, 1.0))
+                        : uColor);
+
+                if (uSilhouetteMode != 0 && uUseTexture != 0) {
+                    float a = texture(uTexture, vTexCoord).a * uColor.a;
+                    baseSample = vec4(uSilhouetteColor.rgb * a, a * uSilhouetteColor.a);
+                }
 
                 vec4 finalColor = baseSample;
 
@@ -291,13 +310,125 @@ public final class RenderPipeline2D implements IRenderPipeline {
             in vec2 vTexCoord;
 
             uniform sampler2D uTexture;
+            uniform mat4 uAccessibilityMatrix;
+            uniform float uChromaticAberration;
+            uniform float uVignetteIntensity;
+            uniform vec2 uVignetteFocus;
+            uniform int uHalftoneEnabled;
+            uniform float uHalftoneDotSize;
+            uniform float uDistortionStrength;
+            uniform float uDistortionTime;
+            uniform float uDistortionTopY;
+            uniform int uDitherEnabled;
+            uniform int uSrgbOutput;
+            uniform int uHdrToneMap;
+            uniform vec2 uCanvasSize;
 
             out vec4 fragColor;
 
+            vec3 acesToneMap(vec3 x) {
+                return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+            }
+
             void main() {
-                fragColor = texture(uTexture, vTexCoord);
+                vec2 uv = vTexCoord;
+                if (uDistortionStrength > 0.0 && (1.0 - uv.y) >= uDistortionTopY) {
+                    float wave = sin(uv.y * 42.0 + uDistortionTime * 4.5) * 0.008 * uDistortionStrength;
+                    uv.x = clamp(uv.x + wave, 0.0, 1.0);
+                }
+
+                vec4 col;
+                if (uChromaticAberration > 0.0001) {
+                    float shift = uChromaticAberration * 0.006;
+                    float r = texture(uTexture, clamp(uv + vec2(shift, 0.0), 0.0, 1.0)).r;
+                    vec2 gb = texture(uTexture, uv).ga;
+                    float b = texture(uTexture, clamp(uv - vec2(shift, 0.0), 0.0, 1.0)).b;
+                    col = vec4(r, gb.x, b, gb.y);
+                } else {
+                    col = texture(uTexture, uv);
+                }
+
+                if (uHalftoneEnabled != 0) {
+                    float dotSz = max(uHalftoneDotSize, 2.0);
+                    vec2 cell = fract((uv * max(uCanvasSize, vec2(1.0))) / dotSz) - 0.5;
+                    float lum = dot(col.rgb, vec3(0.2126, 0.7152, 0.0722));
+                    float mask = step(length(cell), sqrt(clamp(1.0 - lum, 0.0, 1.0)) * 0.65);
+                    col.rgb = mix(col.rgb, col.rgb * 0.35, mask * 0.6);
+                }
+
+                if (uVignetteIntensity > 0.0001) {
+                    float d = length(vec2(uv.x, 1.0 - uv.y) - uVignetteFocus);
+                    float vig = clamp(1.0 - smoothstep(0.32, 0.85, d) * uVignetteIntensity, 0.0, 1.0);
+                    col.rgb *= vig;
+                }
+
+                col = uAccessibilityMatrix * col;
+                if (uHdrToneMap != 0) {
+                    col.rgb = acesToneMap(max(col.rgb, vec3(0.0)));
+                }
+                if (uSrgbOutput != 0) {
+                    col.rgb = pow(max(col.rgb, vec3(0.0)), vec3(1.0 / 2.2));
+                }
+                if (uDitherEnabled != 0) {
+                    vec2 px = uv * max(uCanvasSize, vec2(1.0));
+                    float n = fract(sin(dot(px, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+                    col.rgb = clamp(col.rgb + n / 255.0, 0.0, 1.0);
+                }
+                fragColor = col;
             }
             """;
+
+    /**
+     * Extended post-processing and color-output descriptor configuring chromatic aberration, focus vignette,
+     * water/heat distortion, manga halftone screentone, ACES HDR tone mapping, sRGB gamma curve, and
+     * 8-bit backbuffer triangular dithering.
+     *
+     * @param chromaticAberration intensity in {@code [0, 1]} ({@code 0.0f} = bit-identical output)
+     * @param vignetteIntensity   vignette strength in {@code [0, 1]}
+     * @param vignetteFocusX      normalized focal X in {@code [0, 1]}
+     * @param vignetteFocusY      normalized focal Y in {@code [0, 1]}
+     * @param halftoneEnabled     whether manga halftone raster is enabled
+     * @param halftoneDotSizePx   halftone cell size in pixels
+     * @param distortionStrength  lower-region water/heat distortion strength ({@code 0} = disabled)
+     * @param distortionTopY      normalized screen Y threshold where distortion begins
+     * @param ditheringEnabled    whether 8-bit backbuffer triangular dithering is enabled
+     * @param srgbOutputEnabled   whether linear-to-sRGB gamma conversion runs on composite output
+     * @param hdrToneMapEnabled   whether ACES Filmic tone mapping runs on HDR highlights
+     */
+    public record ExtendedPostProcessConfig(
+            float chromaticAberration,
+            float vignetteIntensity,
+            float vignetteFocusX,
+            float vignetteFocusY,
+            boolean halftoneEnabled,
+            float halftoneDotSizePx,
+            float distortionStrength,
+            float distortionTopY,
+            boolean ditheringEnabled,
+            boolean srgbOutputEnabled,
+            boolean hdrToneMapEnabled
+    ) {
+        /** Disabled neutral configuration preserving exact bit-identical pass-through output. */
+        public static final ExtendedPostProcessConfig NONE = new ExtendedPostProcessConfig(
+                0.0f, 0.0f, 0.5f, 0.5f, false, 6.0f, 0.0f, 0.65f, false, false, false
+        );
+    }
+
+    /**
+     * Reusable scratch batch item populated during zero-allocation frame queue sorting (10,000+ quads).
+     */
+    public static final class ScratchQuadCommand {
+        int zOrder;
+        int textureId;
+        float x;
+        float y;
+        float width;
+        float height;
+
+        /** Creates an empty reusable quad command slot. */
+        public ScratchQuadCommand() {
+        }
+    }
 
     private int logicalWidth = DEFAULT_LOGICAL_WIDTH;
     private int logicalHeight = DEFAULT_LOGICAL_HEIGHT;
@@ -322,6 +453,18 @@ public final class RenderPipeline2D implements IRenderPipeline {
     private final Deque<Rect2f> scissorStack = new ArrayDeque<>();
 
     private PostProcessConfig postProcessConfig = PostProcessConfig.NONE;
+    private ExtendedPostProcessConfig extendedPostProcessConfig = ExtendedPostProcessConfig.NONE;
+    private CinematicLetterboxController letterboxController;
+    private ColorBlindnessFilter colorBlindnessFilter;
+    private GlResourceAuditor resourceAuditor;
+    private float maxParallaxOffsetPx = 180.0f;
+    private final float[] clearColorRgba = new float[]{CLEAR_R, CLEAR_G, CLEAR_B, CLEAR_A};
+    private boolean debugWireframeEnabled = false;
+    private boolean safeAreaGuidesEnabled = false;
+    private boolean hdrFboPreferred = false;
+    private double postEffectTimeSeconds = 0.0;
+    private final List<ScratchQuadCommand> scratchBatchQueue = new ArrayList<>(256);
+    private int scratchBatchCount = 0;
     private float frameNodeBlurRadius = 0.0f;
     private Rect2f lastLetterboxViewport = new Rect2f(0.0f, 0.0f, 0.0f, 0.0f);
     private Rect2f currentRenderBounds = null;
@@ -394,6 +537,18 @@ public final class RenderPipeline2D implements IRenderPipeline {
             this.bloomCompositeShader = new ShaderProgram(POSTFX_VERTEX_SHADER, BLOOM_COMPOSITE_FRAGMENT_SHADER);
 
             initQuadGeometry();
+            if (resourceAuditor != null) {
+                resourceAuditor.recordCreate(GlResourceAuditor.ResourceKind.FBO);
+                resourceAuditor.recordCreate(GlResourceAuditor.ResourceKind.FBO);
+                resourceAuditor.recordCreate(GlResourceAuditor.ResourceKind.FBO);
+                resourceAuditor.recordCreate(GlResourceAuditor.ResourceKind.SHADER);
+                resourceAuditor.recordCreate(GlResourceAuditor.ResourceKind.SHADER);
+                resourceAuditor.recordCreate(GlResourceAuditor.ResourceKind.SHADER);
+                resourceAuditor.recordCreate(GlResourceAuditor.ResourceKind.SHADER);
+                resourceAuditor.recordCreate(GlResourceAuditor.ResourceKind.SHADER);
+                resourceAuditor.recordCreate(GlResourceAuditor.ResourceKind.VAO);
+                resourceAuditor.recordCreate(GlResourceAuditor.ResourceKind.VBO);
+            }
             this.scissorStack.clear();
             this.frameNodeBlurRadius = 0.0f;
             this.lastLetterboxViewport = new Rect2f(0.0f, 0.0f, 0.0f, 0.0f);
@@ -453,8 +608,9 @@ public final class RenderPipeline2D implements IRenderPipeline {
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glBlendFunc(GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
-        GL11.glClearColor(CLEAR_R, CLEAR_G, CLEAR_B, CLEAR_A);
+        GL11.glClearColor(clearColorRgba[0], clearColorRgba[1], clearColorRgba[2], clearColorRgba[3]);
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+        this.scratchBatchCount = 0;
     }
 
     @Override
@@ -477,8 +633,15 @@ public final class RenderPipeline2D implements IRenderPipeline {
             boolean applyShake = layer.getZOrder() < SceneLayer.Z_SCREENS;
             float layerShakeX = applyShake ? shakeOffset.x() : 0.0f;
             float layerShakeY = applyShake ? shakeOffset.y() : 0.0f;
-            float layerParallaxX = mouseX * layer.getParallaxFactor() * (logicalWidth * 0.5f);
-            float layerParallaxY = mouseY * layer.getParallaxFactor() * (logicalHeight * 0.5f);
+            float rawLayerPxX = mouseX * layer.getParallaxFactor() * (logicalWidth * 0.5f);
+            float rawLayerPxY = mouseY * layer.getParallaxFactor() * (logicalHeight * 0.5f);
+            float layerParallaxX = Math.clamp(rawLayerPxX, -maxParallaxOffsetPx, maxParallaxOffsetPx);
+            float layerParallaxY = Math.clamp(rawLayerPxY, -maxParallaxOffsetPx, maxParallaxOffsetPx);
+
+            if (letterboxController != null && letterboxController.isActive()
+                    && layer.getZOrder() >= SceneLayer.Z_MODAL) {
+                drawActiveLetterboxBars();
+            }
 
             for (SceneNode node : layer.getSortedNodes()) {
                 renderNodeRecursive(
@@ -543,52 +706,99 @@ public final class RenderPipeline2D implements IRenderPipeline {
         }
 
         if (node.shouldDrawStandardQuad() && drawW > 0.0f && drawH > 0.0f && effectiveAlpha > 0.0f) {
-            if (node.hasShadow()) {
-                float radius = node.getShadowRadius();
-                float[] shadowPremul = node.getPremultipliedShadowColor(effectiveAlpha);
+            applyNodeBlendMode(node.getBlendMode());
+            try {
+                if (node.hasShadow()) {
+                    float radius = node.getShadowRadius();
+                    float[] shadowPremul = node.getPremultipliedShadowColor(effectiveAlpha);
+                    drawQuadWithPivotInternal(
+                            0,
+                            drawX + node.getShadowOffsetX() - radius,
+                            drawY + node.getShadowOffsetY() - radius,
+                            drawW + radius * 2.0f,
+                            drawH + radius * 2.0f,
+                            drawX + transform.getXanchor() * drawW + node.getShadowOffsetX(),
+                            drawY + transform.getYanchor() * drawH + node.getShadowOffsetY(),
+                            transform.getRotate(),
+                            FULL_UV_RECT,
+                            shadowPremul,
+                            effectiveColorMatrix,
+                            node.getCornerRadius(),
+                            0.0f,
+                            NO_BORDER_COLOR,
+                            0,
+                            4.0f,
+                            1,
+                            radius
+                    );
+                }
+                if (node.isHovered() && node.getOutlineThickness() > 0.0f) {
+                    float pad = node.getOutlineThickness();
+                    float[] outCol = node.getOutlineColorRgba();
+                    float[] outPremul = new float[]{
+                        outCol[0] * outCol[3] * effectiveAlpha,
+                        outCol[1] * outCol[3] * effectiveAlpha,
+                        outCol[2] * outCol[3] * effectiveAlpha,
+                        outCol[3] * effectiveAlpha
+                    };
+                    drawQuadWithPivotInternal(
+                            0,
+                            drawX - pad,
+                            drawY - pad,
+                            drawW + pad * 2.0f,
+                            drawH + pad * 2.0f,
+                            drawX + transform.getXanchor() * drawW,
+                            drawY + transform.getYanchor() * drawH,
+                            transform.getRotate(),
+                            FULL_UV_RECT,
+                            new float[]{0.0f, 0.0f, 0.0f, 0.0f},
+                            effectiveColorMatrix,
+                            node.getCornerRadius() + pad * 0.5f,
+                            pad,
+                            outPremul,
+                            0,
+                            4.0f,
+                            0,
+                            0.0f
+                    );
+                }
+                Rect2f effectiveUv = resolveEffectiveUv(node, transform);
+                float[] fillPremul = node.getPremultipliedFillColor(effectiveAlpha);
+                float[] borderPremul = node.getBorderThickness() > 0.0f
+                        ? node.getPremultipliedBorderColor(effectiveAlpha)
+                        : NO_BORDER_COLOR;
+
+                float[] sil = node.getSilhouetteColorRgba();
                 drawQuadWithPivotInternal(
-                        0,
-                        drawX + node.getShadowOffsetX() - radius,
-                        drawY + node.getShadowOffsetY() - radius,
-                        drawW + radius * 2.0f,
-                        drawH + radius * 2.0f,
-                        drawX + transform.getXanchor() * drawW + node.getShadowOffsetX(),
-                        drawY + transform.getYanchor() * drawH + node.getShadowOffsetY(),
+                        node.getTextureId(),
+                        drawX,
+                        drawY,
+                        drawW,
+                        drawH,
+                        drawX + transform.getXanchor() * drawW,
+                        drawY + transform.getYanchor() * drawH,
                         transform.getRotate(),
-                        FULL_UV_RECT,
-                        shadowPremul,
+                        effectiveUv,
+                        fillPremul,
                         effectiveColorMatrix,
                         node.getCornerRadius(),
-                        0.0f,
-                        NO_BORDER_COLOR,
+                        node.getBorderThickness(),
+                        borderPremul,
                         0,
                         4.0f,
-                        1,
-                        radius
+                        0,
+                        0.0f,
+                        node.isSilhouetteEnabled() ? 1 : 0,
+                        sil
                 );
+                if (debugWireframeEnabled) {
+                    drawRectOutlineWireframe(drawX, drawY, drawW, drawH);
+                }
+            } finally {
+                if (node.getBlendMode() != SceneNode.BlendMode.NORMAL) {
+                    GL11.glBlendFunc(GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+                }
             }
-            Rect2f effectiveUv = resolveEffectiveUv(node, transform);
-            float[] fillPremul = node.getPremultipliedFillColor(effectiveAlpha);
-            float[] borderPremul = node.getBorderThickness() > 0.0f
-                    ? node.getPremultipliedBorderColor(effectiveAlpha)
-                    : NO_BORDER_COLOR;
-
-            drawQuadInternal(
-                    node.getTextureId(),
-                    drawX,
-                    drawY,
-                    drawW,
-                    drawH,
-                    transform.getXanchor(),
-                    transform.getYanchor(),
-                    transform.getRotate(),
-                    effectiveUv,
-                    fillPremul,
-                    effectiveColorMatrix,
-                    node.getCornerRadius(),
-                    node.getBorderThickness(),
-                    borderPremul
-            );
         }
 
         Rect2f prevBounds = currentRenderBounds;
@@ -658,7 +868,7 @@ public final class RenderPipeline2D implements IRenderPipeline {
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
         GL11.glViewport(0, 0, currentWindowWidth, currentWindowHeight);
         GL11.glDisable(GL11.GL_BLEND);
-        GL11.glClearColor(CLEAR_R, CLEAR_G, CLEAR_B, CLEAR_A);
+        GL11.glClearColor(clearColorRgba[0], clearColorRgba[1], clearColorRgba[2], clearColorRgba[3]);
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
 
         lastLetterboxViewport = computeLetterboxViewport(
@@ -673,10 +883,31 @@ public final class RenderPipeline2D implements IRenderPipeline {
                 .translate(lastLetterboxViewport.x(), lastLetterboxViewport.y(), 0.0f)
                 .scale(lastLetterboxViewport.width(), lastLetterboxViewport.height(), 1.0f);
 
+        ColorMatrix4f accMat = colorBlindnessFilter != null
+                ? colorBlindnessFilter.buildMatrix()
+                : ColorMatrix4f.identity();
+
         blitShader.bind();
         blitShader.setUniformMat4("uProjection", windowProjection);
         blitShader.setUniformMat4("uModel", modelMatrix);
         blitShader.setUniformInt("uTexture", 0);
+        blitShader.setUniformMat4("uAccessibilityMatrix", accMat.toFloatArray());
+        blitShader.setUniformFloat("uChromaticAberration", extendedPostProcessConfig.chromaticAberration());
+        blitShader.setUniformFloat("uVignetteIntensity", extendedPostProcessConfig.vignetteIntensity());
+        blitShader.setUniformVec2(
+                "uVignetteFocus",
+                extendedPostProcessConfig.vignetteFocusX(),
+                extendedPostProcessConfig.vignetteFocusY()
+        );
+        blitShader.setUniformInt("uHalftoneEnabled", extendedPostProcessConfig.halftoneEnabled() ? 1 : 0);
+        blitShader.setUniformFloat("uHalftoneDotSize", extendedPostProcessConfig.halftoneDotSizePx());
+        blitShader.setUniformFloat("uDistortionStrength", extendedPostProcessConfig.distortionStrength());
+        blitShader.setUniformFloat("uDistortionTime", (float) postEffectTimeSeconds);
+        blitShader.setUniformFloat("uDistortionTopY", extendedPostProcessConfig.distortionTopY());
+        blitShader.setUniformInt("uDitherEnabled", extendedPostProcessConfig.ditheringEnabled() ? 1 : 0);
+        blitShader.setUniformInt("uSrgbOutput", extendedPostProcessConfig.srgbOutputEnabled() ? 1 : 0);
+        blitShader.setUniformInt("uHdrToneMap", extendedPostProcessConfig.hdrToneMapEnabled() ? 1 : 0);
+        blitShader.setUniformVec2("uCanvasSize", logicalWidth, logicalHeight);
 
         GL13.glActiveTexture(GL13.GL_TEXTURE0);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, sourceFbo.getTextureId());
@@ -1152,6 +1383,104 @@ public final class RenderPipeline2D implements IRenderPipeline {
             int shadowMode,
             float shadowRadius
     ) {
+        drawQuadWithPivotInternal(
+                textureId,
+                x,
+                y,
+                width,
+                height,
+                pivotX,
+                pivotY,
+                rotateDeg,
+                uvRect,
+                fillPremul,
+                colorMatrix,
+                cornerRadius,
+                borderThickness,
+                borderPremul,
+                sdfTextMode,
+                sdfPxRange,
+                shadowMode,
+                shadowRadius,
+                0,
+                NO_BORDER_COLOR,
+                0,
+                null
+        );
+    }
+
+    private void drawQuadWithPivotInternal(
+            int textureId,
+            float x,
+            float y,
+            float width,
+            float height,
+            float pivotX,
+            float pivotY,
+            float rotateDeg,
+            Rect2f uvRect,
+            float[] fillPremul,
+            ColorMatrix4f colorMatrix,
+            float cornerRadius,
+            float borderThickness,
+            float[] borderPremul,
+            int sdfTextMode,
+            float sdfPxRange,
+            int shadowMode,
+            float shadowRadius,
+            int silhouetteMode,
+            float[] silhouetteRgba
+    ) {
+        drawQuadWithPivotInternal(
+                textureId,
+                x,
+                y,
+                width,
+                height,
+                pivotX,
+                pivotY,
+                rotateDeg,
+                uvRect,
+                fillPremul,
+                colorMatrix,
+                cornerRadius,
+                borderThickness,
+                borderPremul,
+                sdfTextMode,
+                sdfPxRange,
+                shadowMode,
+                shadowRadius,
+                silhouetteMode,
+                silhouetteRgba,
+                0,
+                null
+        );
+    }
+
+    private void drawQuadWithPivotInternal(
+            int textureId,
+            float x,
+            float y,
+            float width,
+            float height,
+            float pivotX,
+            float pivotY,
+            float rotateDeg,
+            Rect2f uvRect,
+            float[] fillPremul,
+            ColorMatrix4f colorMatrix,
+            float cornerRadius,
+            float borderThickness,
+            float[] borderPremul,
+            int sdfTextMode,
+            float sdfPxRange,
+            int shadowMode,
+            float shadowRadius,
+            int silhouetteMode,
+            float[] silhouetteRgba,
+            int gradientMode,
+            float[][] cornerGradientColors
+    ) {
         if (rotateDeg != 0.0f) {
             modelMatrix.identity()
                     .translate(pivotX, pivotY, 0.0f)
@@ -1178,6 +1507,25 @@ public final class RenderPipeline2D implements IRenderPipeline {
         quadShader.setUniformFloat("uSdfPxRange", sdfPxRange);
         quadShader.setUniformInt("uShadowMode", shadowMode);
         quadShader.setUniformFloat("uShadowRadius", shadowRadius);
+        quadShader.setUniformInt("uSilhouetteMode", silhouetteMode);
+        float[] sil = silhouetteRgba != null ? silhouetteRgba : NO_BORDER_COLOR;
+        quadShader.setUniformVec4("uSilhouetteColor", sil[0], sil[1], sil[2], sil[3]);
+        quadShader.setUniformInt("uGradientMode", gradientMode);
+        if (gradientMode != 0 && cornerGradientColors != null && cornerGradientColors.length == 4) {
+            float[] c0 = cornerGradientColors[0];
+            float[] c1 = cornerGradientColors[1];
+            float[] c2 = cornerGradientColors[2];
+            float[] c3 = cornerGradientColors[3];
+            quadShader.setUniformVec4("uGradientTopLeft", c0[0], c0[1], c0[2], c0[3]);
+            quadShader.setUniformVec4("uGradientTopRight", c1[0], c1[1], c1[2], c1[3]);
+            quadShader.setUniformVec4("uGradientBottomLeft", c2[0], c2[1], c2[2], c2[3]);
+            quadShader.setUniformVec4("uGradientBottomRight", c3[0], c3[1], c3[2], c3[3]);
+        } else {
+            quadShader.setUniformVec4("uGradientTopLeft", 0.0f, 0.0f, 0.0f, 0.0f);
+            quadShader.setUniformVec4("uGradientTopRight", 0.0f, 0.0f, 0.0f, 0.0f);
+            quadShader.setUniformVec4("uGradientBottomLeft", 0.0f, 0.0f, 0.0f, 0.0f);
+            quadShader.setUniformVec4("uGradientBottomRight", 0.0f, 0.0f, 0.0f, 0.0f);
+        }
 
         GL13.glActiveTexture(GL13.GL_TEXTURE0);
         if (textureId != 0) {
@@ -1194,8 +1542,38 @@ public final class RenderPipeline2D implements IRenderPipeline {
         GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
     }
 
+    private static void applyNodeBlendMode(SceneNode.BlendMode mode) {
+        switch (mode) {
+            case NORMAL -> GL11.glBlendFunc(GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+            case ADDITIVE -> GL11.glBlendFunc(GL11.GL_ONE, GL11.GL_ONE);
+            case MULTIPLY -> GL11.glBlendFunc(GL11.GL_DST_COLOR, GL11.GL_ONE_MINUS_SRC_ALPHA);
+            case SCREEN -> GL11.glBlendFunc(GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_COLOR);
+        }
+    }
+
+    private void drawActiveLetterboxBars() {
+        Rect2f top = letterboxController.getTopBarRect(logicalWidth);
+        Rect2f bottom = letterboxController.getBottomBarRect(logicalWidth, logicalHeight);
+        if (top.height() > 0.0f) {
+            drawRect(top.x(), top.y(), top.width(), top.height(), 0.0f, 0.0f, 0.0f, 1.0f);
+        }
+        if (bottom.height() > 0.0f) {
+            drawRect(bottom.x(), bottom.y(), bottom.width(), bottom.height(), 0.0f, 0.0f, 0.0f, 1.0f);
+        }
+    }
+
+    private void drawRectOutlineWireframe(float x, float y, float w, float h) {
+        drawRoundedRect(x, y, w, h, 0.0f, new float[]{0.0f, 0.0f, 0.0f, 0.0f}, 1.5f,
+                new float[]{0.2f, 0.9f, 1.0f, 0.95f});
+    }
+
     private static Rect2f resolveEffectiveUv(SceneNode node, Transform2D transform) {
         Rect2f uv = node.getUvRect();
+        float scrollU = node.getUvScrollOffsetU();
+        float scrollV = node.getUvScrollOffsetV();
+        if (scrollU != 0.0f || scrollV != 0.0f) {
+            uv = new Rect2f(uv.x() + scrollU, uv.y() + scrollV, uv.width(), uv.height());
+        }
         Rect2f crop = transform.getCrop();
         if (crop != null && node.getWidth() > 0.0f && node.getHeight() > 0.0f) {
             float relX = crop.x() / node.getWidth();
@@ -1235,6 +1613,7 @@ public final class RenderPipeline2D implements IRenderPipeline {
 
     @Override
     public void dispose() {
+        boolean hadGl = initialized || quadShader != null;
         if (quadShader != null) {
             quadShader.dispose();
             quadShader = null;
@@ -1275,6 +1654,16 @@ public final class RenderPipeline2D implements IRenderPipeline {
             offscreenFbo.dispose();
             offscreenFbo = null;
         }
+        if (hadGl && resourceAuditor != null) {
+            for (int i = 0; i < 3; i++) {
+                resourceAuditor.recordDispose(GlResourceAuditor.ResourceKind.FBO);
+            }
+            for (int i = 0; i < 5; i++) {
+                resourceAuditor.recordDispose(GlResourceAuditor.ResourceKind.SHADER);
+            }
+            resourceAuditor.recordDispose(GlResourceAuditor.ResourceKind.VAO);
+            resourceAuditor.recordDispose(GlResourceAuditor.ResourceKind.VBO);
+        }
         scissorStack.clear();
         frameNodeBlurRadius = 0.0f;
         currentRenderBounds = null;
@@ -1284,6 +1673,296 @@ public final class RenderPipeline2D implements IRenderPipeline {
         currentAnchorX = 0.0f;
         currentAnchorY = 0.0f;
         initialized = false;
+    }
+
+    /**
+     * Draws a dynamic 4-corner gradient quad directly without uploading an external gradient texture.
+     *
+     * @param x           left X
+     * @param y           top Y
+     * @param width       width in logical pixels
+     * @param height      height in logical pixels
+     * @param topLeft     top-left straight RGBA color
+     * @param topRight    top-right straight RGBA color
+     * @param bottomLeft  bottom-left straight RGBA color
+     * @param bottomRight bottom-right straight RGBA color
+     */
+    public void drawGradientQuad(
+            float x,
+            float y,
+            float width,
+            float height,
+            float[] topLeft,
+            float[] topRight,
+            float[] bottomLeft,
+            float[] bottomRight
+    ) {
+        requireInitialized();
+        if (width <= 0.0f || height <= 0.0f) {
+            return;
+        }
+        drawQuadWithPivotInternal(
+                0,
+                x,
+                y,
+                width,
+                height,
+                x,
+                y,
+                0.0f,
+                FULL_UV_RECT,
+                new float[]{1.0f, 1.0f, 1.0f, 1.0f},
+                ColorMatrix4f.identity(),
+                0.0f,
+                0.0f,
+                NO_BORDER_COLOR,
+                0,
+                4.0f,
+                0,
+                0.0f,
+                0,
+                NO_BORDER_COLOR,
+                1,
+                new float[][]{topLeft, topRight, bottomLeft, bottomRight}
+        );
+    }
+
+    /**
+     * Connects a {@link CinematicLetterboxController} rendered cleanly above foreground effects and below modals.
+     *
+     * @param controller letterbox controller (nullable)
+     */
+    public void setLetterboxController(CinematicLetterboxController controller) {
+        this.letterboxController = controller;
+    }
+
+    /**
+     * Returns attached {@link CinematicLetterboxController}, if any.
+     *
+     * @return attached controller or {@code null}
+     */
+    public CinematicLetterboxController getLetterboxController() {
+        return letterboxController;
+    }
+
+    /**
+     * Attaches a live {@link ColorBlindnessFilter} applied directly in the final composite shader pass.
+     *
+     * @param filter accessibility filter (nullable)
+     */
+    public void setColorBlindnessFilter(ColorBlindnessFilter filter) {
+        this.colorBlindnessFilter = filter;
+    }
+
+    /**
+     * Returns attached {@link ColorBlindnessFilter}, if any.
+     *
+     * @return attached filter or {@code null}
+     */
+    public ColorBlindnessFilter getColorBlindnessFilter() {
+        return colorBlindnessFilter;
+    }
+
+    /**
+     * Configures extended post-processing effects (chromatic aberration, vignette, halftone, distortion, sRGB, HDR).
+     *
+     * @param config extended configuration (null resets to {@link ExtendedPostProcessConfig#NONE})
+     */
+    public void setExtendedPostProcessConfig(ExtendedPostProcessConfig config) {
+        this.extendedPostProcessConfig = config != null ? config : ExtendedPostProcessConfig.NONE;
+    }
+
+    /**
+     * Returns current extended post-processing configuration.
+     *
+     * @return current {@link ExtendedPostProcessConfig}
+     */
+    public ExtendedPostProcessConfig getExtendedPostProcessConfig() {
+        return extendedPostProcessConfig;
+    }
+
+    /**
+     * Attaches a {@link GlResourceAuditor} to verify 0 leaked GPU resources upon {@link #dispose()}.
+     *
+     * @param auditor resource auditor (nullable)
+     */
+    public void setResourceAuditor(GlResourceAuditor auditor) {
+        this.resourceAuditor = auditor;
+    }
+
+    /**
+     * Returns the configured scene clear color outside 16:9 letterboxes.
+     *
+     * @return 4-element RGBA copy
+     */
+    public float[] getClearColorRgba() {
+        return clearColorRgba.clone();
+    }
+
+    /**
+     * Configures custom scene clear color outside the 16:9 canvas (preventing jarring black flashes).
+     *
+     * @param r red {@code [0, 1]}
+     * @param g green {@code [0, 1]}
+     * @param b blue {@code [0, 1]}
+     * @param a alpha {@code [0, 1]}
+     */
+    public void setClearColor(float r, float g, float b, float a) {
+        clearColorRgba[0] = Math.clamp(r, 0.0f, 1.0f);
+        clearColorRgba[1] = Math.clamp(g, 0.0f, 1.0f);
+        clearColorRgba[2] = Math.clamp(b, 0.0f, 1.0f);
+        clearColorRgba[3] = Math.clamp(a, 0.0f, 1.0f);
+    }
+
+    /**
+     * Sets maximum mouse/camera parallax offset clamp in logical pixels.
+     *
+     * @param maxParallaxOffsetPx clamp magnitude in pixels ({@code >= 0})
+     */
+    public void setMaxParallaxOffsetPx(float maxParallaxOffsetPx) {
+        this.maxParallaxOffsetPx = Float.isFinite(maxParallaxOffsetPx) ? Math.max(0.0f, maxParallaxOffsetPx) : 180.0f;
+    }
+
+    /**
+     * Enables or disables node bounding-box debug wireframe rendering in the live viewport.
+     *
+     * @param enabled {@code true} to draw outlines around scene nodes
+     */
+    public void setDebugWireframeEnabled(boolean enabled) {
+        this.debugWireframeEnabled = enabled;
+    }
+
+    /**
+     * Returns whether debug wireframe outlines are enabled.
+     *
+     * @return {@code true} if debug wireframe mode is enabled
+     */
+    public boolean isDebugWireframeEnabled() {
+        return debugWireframeEnabled;
+    }
+
+    /**
+     * Controls whether Studio-only Broadcast/SteamDeck Safe-Area guides are overlaid.
+     *
+     * @param enabled {@code true} to enable guides
+     */
+    public void setSafeAreaGuidesEnabled(boolean enabled) {
+        this.safeAreaGuidesEnabled = enabled;
+    }
+
+    /**
+     * Returns whether Safe-Area guides are enabled.
+     *
+     * @return {@code true} when active
+     */
+    public boolean isSafeAreaGuidesEnabled() {
+        return safeAreaGuidesEnabled;
+    }
+
+    /**
+     * Enables or disables HDR floating-point FBO preference for bloom pipelines.
+     *
+     * @param hdrFboPreferred {@code true} to prefer {@code GL_RGBA16F}
+     */
+    public void setHdrFboPreferred(boolean hdrFboPreferred) {
+        this.hdrFboPreferred = hdrFboPreferred;
+    }
+
+    /**
+     * Returns whether HDR FBO storage is preferred.
+     *
+     * @return {@code true} when HDR FBO is preferred
+     */
+    public boolean isHdrFboPreferred() {
+        return hdrFboPreferred;
+    }
+
+    /**
+     * Advances distortion/time-based shader uniform timer.
+     *
+     * @param dt frame delta in seconds
+     */
+    public void advancePostEffectTime(double dt) {
+        if (Double.isFinite(dt) && dt > 0.0) {
+            postEffectTimeSeconds += dt;
+        }
+    }
+
+    /**
+     * Populates preallocated scratch quad commands for up to {@code quadCount} quads without allocating
+     * per-quad instances on repeat frames and sorts by Z/texture ID.
+     *
+     * @param quadCount number of quads in this frame
+     * @return prepared batch count
+     */
+    public int prepareZeroAllocationBatch(int quadCount) {
+        int n = Math.max(0, quadCount);
+        while (scratchBatchQueue.size() < n) {
+            scratchBatchQueue.add(new ScratchQuadCommand());
+        }
+        for (int i = 0; i < n; i++) {
+            ScratchQuadCommand cmd = scratchBatchQueue.get(i);
+            cmd.zOrder = i % 8;
+            cmd.textureId = (i % 16) + 1;
+            cmd.x = (i % 100) * 16.0f;
+            cmd.y = (i / 100.0f) * 16.0f;
+            cmd.width = 16.0f;
+            cmd.height = 16.0f;
+        }
+        this.scratchBatchCount = n;
+        scratchBatchQueue.subList(0, n).sort(Comparator.comparingInt((ScratchQuadCommand c) -> c.zOrder)
+                .thenComparingInt(c -> c.textureId));
+        return scratchBatchCount;
+    }
+
+    /**
+     * Captures a compact stage-only thumbnail (excluding UI screens {@code Z >= Z_SCREENS}) at {@code thumbW x thumbH},
+     * using live FBO readback + bilinear resize when OpenGL is active or headless CPU rasterization otherwise.
+     *
+     * @param graph  scene graph to snapshot
+     * @param thumbW thumbnail width (e.g. {@code 320})
+     * @param thumbH thumbnail height (e.g. {@code 180})
+     * @return straight RGBA8 bytes ({@code thumbW * thumbH * 4})
+     */
+    public byte[] captureSceneThumbnailRgba(SceneGraph graph, int thumbW, int thumbH) {
+        Objects.requireNonNull(graph, "graph must not be null");
+        SceneGraph stageOnly = new SceneGraph();
+        for (SceneLayer layer : graph.getLayersSorted()) {
+            if (layer.getZOrder() >= SceneLayer.Z_SCREENS) {
+                continue;
+            }
+            SceneLayer target = stageOnly.getOrCreateLayer(layer.getName(), layer.getZOrder());
+            target.setParallaxFactor(layer.getParallaxFactor());
+            for (SceneNode node : layer.getSortedNodes()) {
+                target.addNode(node);
+            }
+        }
+        if (initialized && offscreenFbo != null && offscreenFbo.isInitialized()) {
+            beginFrame(thumbW, thumbH);
+            renderSceneGraph(stageOnly);
+            offscreenFbo.unbind();
+            byte[] full = offscreenFbo.readPixelsRgba();
+            return ScreenshotCaptureService.resizeBilinearRgba(
+                    full, offscreenFbo.getWidth(), offscreenFbo.getHeight(), thumbW, thumbH
+            );
+        }
+        return GraphicsRuntimeServices.SoftwareRasterizer.rasterize(stageOnly, thumbW, thumbH);
+    }
+
+    /**
+     * Validates all built-in OpenGL 3.3 Core GLSL shader sources upfront so boot diagnostics can catch
+     * cross-driver syntax issues without first-effect compile stutter.
+     *
+     * @return list of validation results across core shaders
+     */
+    public static List<CustomShaderRegistry.ReloadResult> precompileValidateCoreShaders() {
+        Map<String, String> core = new LinkedHashMap<>();
+        core.put("quad_fragment", QUAD_FRAGMENT_SHADER);
+        core.put("gaussian_blur", GAUSSIAN_BLUR_FRAGMENT_SHADER);
+        core.put("bloom_threshold", BLOOM_THRESHOLD_FRAGMENT_SHADER);
+        core.put("bloom_composite", BLOOM_COMPOSITE_FRAGMENT_SHADER);
+        core.put("blit_composite", BLIT_FRAGMENT_SHADER);
+        return CustomShaderRegistry.precompileValidateManifest(core);
     }
 
     /**

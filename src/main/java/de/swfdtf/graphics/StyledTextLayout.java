@@ -933,11 +933,16 @@ public final class StyledTextLayout {
                     outlineColorRgba[2],
                     outlineColorRgba[3] * fg[3]
             };
-            float d = outlineThickness;
+            float d = Math.clamp(outlineThickness, 0.5f, 3.0f);
+            float diag = d * 0.70710677f;
             drawStyledGlyph(pipeline, texId, baseX - d, baseY, quad, outColor);
             drawStyledGlyph(pipeline, texId, baseX + d, baseY, quad, outColor);
             drawStyledGlyph(pipeline, texId, baseX, baseY - d, quad, outColor);
             drawStyledGlyph(pipeline, texId, baseX, baseY + d, quad, outColor);
+            drawStyledGlyph(pipeline, texId, baseX - diag, baseY - diag, quad, outColor);
+            drawStyledGlyph(pipeline, texId, baseX + diag, baseY - diag, quad, outColor);
+            drawStyledGlyph(pipeline, texId, baseX - diag, baseY + diag, quad, outColor);
+            drawStyledGlyph(pipeline, texId, baseX + diag, baseY + diag, quad, outColor);
         }
 
         if ((shadowOffsetX != 0.0f || shadowOffsetY != 0.0f) && shadowColorRgba[3] > 0.0f) {

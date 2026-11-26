@@ -44,6 +44,7 @@ public final class NineSliceDrawable {
     private final float top;
     private final float right;
     private final float bottom;
+    private final boolean halfTexelInset;
 
     /**
      * Creates a {@code NineSliceDrawable} with uniform border inset on all four sides.
@@ -52,7 +53,7 @@ public final class NineSliceDrawable {
      * @param inset   border inset in source texels ({@code >= 0})
      */
     public NineSliceDrawable(Texture texture, float inset) {
-        this(texture, inset, inset, inset, inset);
+        this(texture, inset, inset, inset, inset, false);
     }
 
     /**
@@ -65,6 +66,27 @@ public final class NineSliceDrawable {
      * @param bottom  bottom border height in source texels ({@code >= 0})
      */
     public NineSliceDrawable(Texture texture, float left, float top, float right, float bottom) {
+        this(texture, left, top, right, bottom, false);
+    }
+
+    /**
+     * Creates a {@code NineSliceDrawable} backed by a {@link Texture} with explicit edge-bleed clamping control.
+     *
+     * @param texture        source texture (must not be {@code null})
+     * @param left           left border width in source texels ({@code >= 0})
+     * @param top            top border height in source texels ({@code >= 0})
+     * @param right          right border width in source texels ({@code >= 0})
+     * @param bottom         bottom border height in source texels ({@code >= 0})
+     * @param halfTexelInset whether to inset tile UVs by half a texel to avoid bilinear edge bleeding
+     */
+    public NineSliceDrawable(
+            Texture texture,
+            float left,
+            float top,
+            float right,
+            float bottom,
+            boolean halfTexelInset
+    ) {
         Objects.requireNonNull(texture, "texture must not be null");
         validateParams(texture.getTextureId(), texture.getWidth(), texture.getHeight(), left, top, right, bottom);
         this.texture = texture;
@@ -75,6 +97,7 @@ public final class NineSliceDrawable {
         this.top = top;
         this.right = right;
         this.bottom = bottom;
+        this.halfTexelInset = halfTexelInset;
     }
 
     /**
@@ -97,6 +120,31 @@ public final class NineSliceDrawable {
             float right,
             float bottom
     ) {
+        this(textureId, texWidth, texHeight, left, top, right, bottom, false);
+    }
+
+    /**
+     * Creates a {@code NineSliceDrawable} from a raw OpenGL texture handle with explicit half-texel inset control.
+     *
+     * @param textureId      OpenGL texture ID ({@code >= 0})
+     * @param texWidth       source texture width in texels ({@code > 0})
+     * @param texHeight      source texture height in texels ({@code > 0})
+     * @param left           left border width in source texels ({@code >= 0})
+     * @param top            top border height in source texels ({@code >= 0})
+     * @param right          right border width in source texels ({@code >= 0})
+     * @param bottom         bottom border height in source texels ({@code >= 0})
+     * @param halfTexelInset whether to inset tile UVs by half a texel to avoid bilinear edge bleeding
+     */
+    public NineSliceDrawable(
+            int textureId,
+            float texWidth,
+            float texHeight,
+            float left,
+            float top,
+            float right,
+            float bottom,
+            boolean halfTexelInset
+    ) {
         validateParams(textureId, texWidth, texHeight, left, top, right, bottom);
         this.texture = null;
         this.textureId = textureId;
@@ -106,6 +154,7 @@ public final class NineSliceDrawable {
         this.top = top;
         this.right = right;
         this.bottom = bottom;
+        this.halfTexelInset = halfTexelInset;
     }
 
     private static void validateParams(
@@ -198,34 +247,34 @@ public final class NineSliceDrawable {
             h2 = Math.max(0.0f, height - h0);
         }
 
+        float halfU = halfTexelInset ? (0.5f / texWidth) : 0.0f;
+        float halfV = halfTexelInset ? (0.5f / texHeight) : 0.0f;
+
         float u1 = left / texWidth;
         float u2 = (texWidth - right) / texWidth;
-        float uw0 = u1;
-        float uw1 = Math.max(0.0f, u2 - u1);
-        float uw2 = 1.0f - u2;
-
         float v1 = top / texHeight;
         float v2 = (texHeight - bottom) / texHeight;
-        float vh0 = v1;
-        float vh1 = Math.max(0.0f, v2 - v1);
-        float vh2 = 1.0f - v2;
 
         float[] xs = {x, x + w0, x + w0 + w1};
         float[] ws = {w0, w1, w2};
         float[] ys = {y, y + h0, y + h0 + h1};
         float[] hs = {h0, h1, h2};
 
-        float[] us = {0.0f, u1, u2};
-        float[] uws = {uw0, uw1, uw2};
-        float[] vs = {0.0f, v1, v2};
-        float[] vhs = {vh0, vh1, vh2};
+        float[] uStart = {halfU, Math.min(u2, u1 + halfU), Math.min(1.0f, u2 + halfU)};
+        float[] uEnd = {Math.max(halfU, u1 - halfU), Math.max(u1, u2 - halfU), Math.max(0.0f, 1.0f - halfU)};
+        float[] vStart = {halfV, Math.min(v2, v1 + halfV), Math.min(1.0f, v2 + halfV)};
+        float[] vEnd = {Math.max(halfV, v1 - halfV), Math.max(v1, v2 - halfV), Math.max(0.0f, 1.0f - halfV)};
 
         List<SliceQuad> slices = new ArrayList<>(9);
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 3; col++) {
+                float u0 = uStart[col];
+                float uw = Math.max(0.0f, uEnd[col] - u0);
+                float v0 = vStart[row];
+                float vh = Math.max(0.0f, vEnd[row] - v0);
                 slices.add(new SliceQuad(
                         new Rect2f(xs[col], ys[row], ws[col], hs[row]),
-                        new Rect2f(us[col], vs[row], uws[col], vhs[row])
+                        new Rect2f(u0, v0, uw, vh)
                 ));
             }
         }

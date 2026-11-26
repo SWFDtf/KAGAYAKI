@@ -56,6 +56,12 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- 
 | `DynamicTextureAtlas` | `final class` | Dynamischer Shelf-Packer für Sprite-/Icon-Atlanten (`AtlasRegion`, `BatchStats`) im Premultiplied-`RGBA8`-Format zur Minimierung von Textur-Binds. |
 | `AnimatedSpriteNode` | `class` | Animierter Sprite-Sheet-`SpriteNode` (`PlayMode`: `LOOP`, `PING_PONG`, `ONCE`) mit automatischer Grid-UV-Fortschaltung über `update(dt)`. |
 | `WebpVp8lDecoder` | `final class` | Reiner Java-Decoder für verlustfreie `RIFF/WEBP/VP8L`-Bilder (`DecodedRgba`) ohne `java.awt`. |
+| `ParticleEmitterNode` | `class` | Szenengraph-Knoten (`extends SpriteNode`) für Schnee-, Regen-, Glühwürmchen-, Sakura- und Funken-Partikel inklusive Dialogbox-Kollision und Intensitäts-Fade. |
+| `Lighting2DSystem` | `final class` | 2D-Punktlicht- und Normal-Map-(`*_n.png`)-Beleuchtungssystem mit Flacker-Modulation sowie CPU-/Shader-Auswertung. |
+| `CustomShaderRegistry` | `final class` | Sicherer GLSL-Loader (`assets/shaders/`, `define shader`), Syntax-Validator mit Zeilennummer, Hot-Reload mit Fallback auf vorherigen gültigen Shader und Core-Shader-Manifestprüfung. |
+| `RenderCacheNode` | `class` | Statischer UI-Unterbaum-Cache (`extends SceneNode`), der unveränderte UI-Hierarchien auf einen einzelnen Draw-Call reduziert bis Kinder oder Zustand invalidieren. |
+| `GlResourceAuditor` | `final class` | OpenGL-Lebenszyklus-Auditor (`VAO`, `VBO`, `FBO`, `TEXTURE`, `SHADER`) zur Leck-Prüfung bei `dispose()` sowie Pass-Timer-Speicher mit `0.0 ms`-Headless-Fallback. |
+| `GraphicsRuntimeServices` | `final class` | Gebündelte P2-Grafik-Services: `FramePacer` (FPS-Cap + `15 FPS` Idle-Throttle), `SoftwareRasterizer`, `AnimatedImageDecoder` (`stbi_load_gif_from_memory`), `VectorDebugRenderer`, `SpeechBubblePointer`, `ColorMatrixKeyframeTimeline`, `SplitViewConfig`, `SafeAreaGuides`, `AdaptiveContrastAdvisor`, `ColorLut`, `HdrToneMapper`, `FocusVignetteController`, `ReflectionZone`, `MotionTrailTracker`, `GradientSpec`, `SoftwareCursorRenderer` und `MaskConfig`. |
 
 ## Öffentliche API-Signaturen
 

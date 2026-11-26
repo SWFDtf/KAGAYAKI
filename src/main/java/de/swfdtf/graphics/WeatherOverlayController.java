@@ -32,6 +32,8 @@ public final class WeatherOverlayController {
         RAIN,
         /** Gentle drifting snow with crisp cool-white tint. */
         SNOW,
+        /** Falling cherry blossoms with soft spring-pink ambient tint. */
+        SAKURA,
         /** Dense hazy mist with lifted brightness, reduced contrast, and floating motes. */
         FOG,
         /** Warm glowing rising embers with amber-orange color grading. */
@@ -294,6 +296,7 @@ public final class WeatherOverlayController {
             case CLEAR -> null;
             case RAIN -> ParticleSystem.EmitterKind.RAIN;
             case SNOW -> ParticleSystem.EmitterKind.SNOW_BLOSSOM;
+            case SAKURA -> ParticleSystem.EmitterKind.CHERRY_BLOSSOM;
             case FOG -> ParticleSystem.EmitterKind.DUST;
             case EMBERS -> ParticleSystem.EmitterKind.SPARKS;
         };
@@ -306,6 +309,13 @@ public final class WeatherOverlayController {
             case RAIN -> ParticleSystem.rain(Math.round(DEFAULT_RAIN_PARTICLES * scale), DEFAULT_RAIN_SPEED, windX);
             case SNOW -> ParticleSystem.snowBlossom(
                     Math.round(DEFAULT_SNOW_PARTICLES * scale), DEFAULT_SNOW_SPEED, windX);
+            case SAKURA -> {
+                ParticleSystem.ParticleEmitter sakura = ParticleSystem.cherryBlossoms(
+                        Math.round(DEFAULT_SNOW_PARTICLES * scale)
+                );
+                sakura.setWindX(windX);
+                yield sakura;
+            }
             case FOG -> ParticleSystem.dust(Math.round(DEFAULT_FOG_PARTICLES * scale));
             case EMBERS -> ParticleSystem.sparks(Math.round(DEFAULT_EMBER_PARTICLES * scale));
         };
@@ -321,6 +331,8 @@ public final class WeatherOverlayController {
                     .multiply(ColorMatrix4f.saturation(0.75f));
             case SNOW -> ColorMatrix4f.tint(0.92f, 0.96f, 1.0f)
                     .multiply(ColorMatrix4f.brightness(0.06f));
+            case SAKURA -> ColorMatrix4f.tint(1.04f, 0.94f, 0.98f)
+                    .multiply(ColorMatrix4f.saturation(1.06f));
             case FOG -> ColorMatrix4f.brightness(0.14f)
                     .multiply(ColorMatrix4f.contrast(0.72f))
                     .multiply(ColorMatrix4f.saturation(0.45f))

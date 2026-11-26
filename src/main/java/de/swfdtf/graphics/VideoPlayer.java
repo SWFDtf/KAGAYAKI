@@ -815,6 +815,23 @@ public final class VideoPlayer implements AutoCloseable {
     }
 
     /**
+     * Immediately skips/cancels active video playback, transitions to {@link State#ENDED},
+     * releases any buffered pixel array and GPU texture handle, and resets the stream.
+     */
+    public void skip() {
+        this.state = State.ENDED;
+        this.frameAccumulator = 0.0;
+        this.latestFrameRgba = null;
+        if (currentTexture != null) {
+            currentTexture.dispose();
+            currentTexture = null;
+        }
+        if (frameSource != null) {
+            frameSource.reset();
+        }
+    }
+
+    /**
      * Returns current playback {@link State}.
      *
      * @return current playback {@link State}

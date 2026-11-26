@@ -1,8 +1,10 @@
 package de.swfdtf.graphics;
 
+import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -12,10 +14,20 @@ import java.util.Objects;
  * Immutable-metadata OpenGL 2D texture handle storing pixel data in premultiplied RGBA8 format.
  *
  * <p>All textures uploaded via {@link #createFromRgba(int, int, byte[], boolean, String)} use
- * {@code GL_LINEAR} min/mag filtering and {@code GL_CLAMP_TO_EDGE} wrapping to avoid dark halo
+ * {@code GL_LINEAR} min/mag filtering by default and {@code GL_CLAMP_TO_EDGE} wrapping to avoid dark halo
  * fringes and edge bleeding under {@code GL_ONE, GL_ONE_MINUS_SRC_ALPHA} blending.</p>
  */
 public final class Texture {
+
+    /**
+     * Texture magnification/minification filtering mode.
+     */
+    public enum SamplingMode {
+        /** Smooth bilinear interpolation suitable for illustrated art and UI. */
+        LINEAR,
+        /** Crisp nearest-neighbor sampling suitable for pixel art. */
+        NEAREST
+    }
 
     private int textureId;
     private final int width;
@@ -23,6 +35,9 @@ public final class Texture {
     private final String name;
     private final boolean premultiplied;
     private final boolean fallback;
+    private SamplingMode samplingMode = SamplingMode.LINEAR;
+    private boolean mipmapsEnabled = false;
+    private float anisotropyLevel = 1.0f;
     private boolean disposed = false;
 
     /**
@@ -96,6 +111,67 @@ public final class Texture {
             premul[i + 3] = (byte) a;
         }
         return premul;
+    }
+
+    /**
+     * Verifies whether a tightly packed RGBA8 buffer satisfies the premultiplied-alpha invariant
+     * ({@code R <= A}, {@code G <= A}, {@code B <= A} for every texel) so bilinear downscaling does not
+     * introduce dark fringe halos.
+     *
+     * @param rgbaBytes RGBA8 buffer to verify (length divisible by 4)
+     * @return {@code true} if every texel has {@code max(R, G, B) <= A}
+     */
+    public static boolean verifyPremultipliedBuffer(byte[] rgbaBytes) {
+        Objects.requireNonNull(rgbaBytes, "rgbaBytes must not be null");
+        if (rgbaBytes.length % 4 != 0) {
+            throw new IllegalArgumentException(
+                    "RGBA byte array length must be a multiple of 4, got " + rgbaBytes.length
+            );
+        }
+        for (int i = 0; i < rgbaBytes.length; i += 4) {
+            int r = rgbaBytes[i] & 0xFF;
+            int g = rgbaBytes[i + 1] & 0xFF;
+            int b = rgbaBytes[i + 2] & 0xFF;
+            int a = rgbaBytes[i + 3] & 0xFF;
+            if (r > a || g > a || b > a) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Converts a premultiplied RGBA8 buffer back to straight RGBA8 bytes (zeroing RGB where {@code A == 0}).
+     *
+     * @param premulRgba premultiplied RGBA8 buffer (length divisible by 4)
+     * @return newly allocated straight RGBA8 buffer
+     */
+    public static byte[] unpremultiplyRgba(byte[] premulRgba) {
+        Objects.requireNonNull(premulRgba, "premulRgba must not be null");
+        if (premulRgba.length % 4 != 0) {
+            throw new IllegalArgumentException(
+                    "RGBA byte array length must be a multiple of 4, got " + premulRgba.length
+            );
+        }
+        byte[] straight = new byte[premulRgba.length];
+        for (int i = 0; i < premulRgba.length; i += 4) {
+            int r = premulRgba[i] & 0xFF;
+            int g = premulRgba[i + 1] & 0xFF;
+            int b = premulRgba[i + 2] & 0xFF;
+            int a = premulRgba[i + 3] & 0xFF;
+            if (a == 0) {
+                straight[i] = 0;
+                straight[i + 1] = 0;
+                straight[i + 2] = 0;
+                straight[i + 3] = 0;
+            } else {
+                straight[i] = (byte) Math.min(255, (r * 255 + (a / 2)) / a);
+                straight[i + 1] = (byte) Math.min(255, (g * 255 + (a / 2)) / a);
+                straight[i + 2] = (byte) Math.min(255, (b * 255 + (a / 2)) / a);
+                straight[i + 3] = (byte) a;
+            }
+        }
+        return straight;
     }
 
     /**
@@ -213,14 +289,24 @@ public final class Texture {
     }
 
     /**
-     * Releases the underlying OpenGL texture object. Safe to invoke multiple times.
+     * Releases the underlying OpenGL texture object. Safe to invoke multiple times or headlessly.
      */
     public void dispose() {
         if (textureId != 0) {
-            GL11.glDeleteTextures(textureId);
+            if (hasActiveGlContext()) {
+                GL11.glDeleteTextures(textureId);
+            }
             textureId = 0;
         }
         disposed = true;
+    }
+
+    private static boolean hasActiveGlContext() {
+        try {
+            return GL.getCapabilities() != null;
+        } catch (IllegalStateException ignored) {
+            return false;
+        }
     }
 
     /**
@@ -275,6 +361,90 @@ public final class Texture {
      */
     public boolean isFallback() {
         return fallback;
+    }
+
+    /**
+     * Returns the estimated RGBA8 VRAM footprint of this texture in bytes.
+     *
+     * @return {@code (long) width * height * 4L} (plus ~33% when mipmaps are enabled)
+     */
+    public long getEstimatedMemoryBytes() {
+        long base = (long) width * (long) height * 4L;
+        return mipmapsEnabled ? (base * 4L) / 3L : base;
+    }
+
+    /**
+     * Returns the configured {@link SamplingMode}.
+     *
+     * @return configured {@link SamplingMode}
+     */
+    public SamplingMode getSamplingMode() {
+        return samplingMode;
+    }
+
+    /**
+     * Sets the texture sampling mode ({@link SamplingMode#LINEAR} or {@link SamplingMode#NEAREST}) and updates
+     * OpenGL texture parameters if a live texture handle is present and {@code applyGlParameters} is {@code true}.
+     *
+     * @param samplingMode      sampling mode (must not be {@code null})
+     * @param applyGlParameters whether to issue {@code glTexParameteri} immediately on the current GL context
+     */
+    public void setSamplingMode(SamplingMode samplingMode, boolean applyGlParameters) {
+        this.samplingMode = Objects.requireNonNull(samplingMode, "samplingMode must not be null");
+        if (applyGlParameters && textureId != 0 && !disposed && hasActiveGlContext()) {
+            int magFilter = samplingMode == SamplingMode.NEAREST ? GL11.GL_NEAREST : GL11.GL_LINEAR;
+            int minFilter;
+            if (mipmapsEnabled) {
+                minFilter = samplingMode == SamplingMode.NEAREST
+                        ? GL11.GL_NEAREST_MIPMAP_NEAREST
+                        : GL11.GL_LINEAR_MIPMAP_LINEAR;
+            } else {
+                minFilter = magFilter;
+            }
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, minFilter);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, magFilter);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        }
+    }
+
+    /**
+     * Returns whether mipmap generation is enabled for downscaled CG rendering.
+     *
+     * @return {@code true} if mipmaps are enabled
+     */
+    public boolean isMipmapsEnabled() {
+        return mipmapsEnabled;
+    }
+
+    /**
+     * Configures mipmap generation and anisotropic filtering level metadata, optionally generating OpenGL
+     * mipmaps immediately when a GL context is current.
+     *
+     * @param enabled           whether mipmaps are enabled
+     * @param anisotropyLevel   requested anisotropy factor ({@code >= 1.0f})
+     * @param applyGlParameters whether to generate mipmaps and apply filters immediately in OpenGL
+     */
+    public void configureMipmaps(boolean enabled, float anisotropyLevel, boolean applyGlParameters) {
+        this.mipmapsEnabled = enabled;
+        this.anisotropyLevel = Float.isFinite(anisotropyLevel) ? Math.max(1.0f, anisotropyLevel) : 1.0f;
+        if (applyGlParameters && textureId != 0 && !disposed && hasActiveGlContext()) {
+            if (enabled) {
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+                GL30.glGenerateMipmap(GL11.GL_TEXTURE_2D);
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+            }
+            setSamplingMode(this.samplingMode, true);
+        }
+    }
+
+    /**
+     * Returns the configured anisotropic filtering level.
+     *
+     * @return anisotropy level ({@code >= 1.0f})
+     */
+    public float getAnisotropyLevel() {
+        return anisotropyLevel;
     }
 
     /**

@@ -16,10 +16,13 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -78,13 +81,24 @@ public final class TextureManager {
         }
     }
 
+    /** Default texture VRAM budget in bytes (512 MiB). */
+    public static final long DEFAULT_MEMORY_BUDGET_BYTES = 512L * 1024L * 1024L;
+
+    /** Default cap on deferred texture uploads per frame to prevent GPU stalls. */
+    public static final int DEFAULT_MAX_UPLOADS_PER_FRAME = 2;
+
     private final EngineLogger logger;
     private volatile Path assetRoot;
     private volatile ResourceProvider resourceProvider;
-    private final Map<String, Texture> cache = new LinkedHashMap<>();
+    private final Map<String, Texture> cache = new LinkedHashMap<>(16, 0.75f, true);
+    private final Set<String> persistentPinnedKeys = new LinkedHashSet<>();
     private final Map<String, DecodedImage> preloadedImages = new ConcurrentHashMap<>();
     private final Map<String, CompletableFuture<Boolean>> inFlightPreloads = new ConcurrentHashMap<>();
     private final ExecutorService preloadExecutor;
+    private long maxMemoryBudgetBytes = DEFAULT_MEMORY_BUDGET_BYTES;
+    private long cacheHitCount = 0L;
+    private long cacheMissCount = 0L;
+    private Texture.SamplingMode defaultSamplingMode = Texture.SamplingMode.LINEAR;
     private Texture fallbackTexture;
 
     /**
@@ -394,15 +408,19 @@ public final class TextureManager {
         String cacheKey = toCanonicalKey(resolved);
         Texture cached = cache.get(cacheKey);
         if (cached != null && !cached.isDisposed()) {
+            cacheHitCount++;
             return cached;
         }
+        cacheMissCount++;
 
         DecodedImage preloaded = preloadedImages.remove(cacheKey);
         if (preloaded != null) {
             Texture uploadedPreloaded = Texture.createFromRgba(
                     preloaded.width(), preloaded.height(), preloaded.straightRgba(), false, cacheKey
             );
+            uploadedPreloaded.setSamplingMode(defaultSamplingMode, true);
             cache.put(cacheKey, uploadedPreloaded);
+            evictToBudget();
             return uploadedPreloaded;
         }
 
@@ -430,7 +448,9 @@ public final class TextureManager {
         }
 
         Texture uploaded = Texture.createFromRgba(size[0], size[1], straightRgba, false, cacheKey);
+        uploaded.setSamplingMode(defaultSamplingMode, true);
         cache.put(cacheKey, uploaded);
+        evictToBudget();
         return uploaded;
     }
 
@@ -692,18 +712,32 @@ public final class TextureManager {
     }
 
     /**
-     * Uploads all CPU-preloaded images to OpenGL on the active render thread and caches the
-     * resulting GPU {@link Texture} handles.
+     * Uploads up to {@link Integer#MAX_VALUE} CPU-preloaded images to OpenGL on the active render thread
+     * and caches the resulting GPU {@link Texture} handles.
      *
      * @return number of newly uploaded OpenGL textures
      */
     public int uploadPreloadedTextures() {
-        if (preloadedImages.isEmpty()) {
+        return uploadPreloadedTextures(Integer.MAX_VALUE);
+    }
+
+    /**
+     * Uploads at most {@code maxUploadsPerFrame} CPU-preloaded images to OpenGL on the active render thread,
+     * keeping per-frame upload stalls bounded during fast gallery/CG scrolling.
+     *
+     * @param maxUploadsPerFrame maximum textures to upload in this call ({@code >= 0})
+     * @return number of newly uploaded OpenGL textures
+     */
+    public int uploadPreloadedTextures(int maxUploadsPerFrame) {
+        if (preloadedImages.isEmpty() || maxUploadsPerFrame <= 0) {
             return 0;
         }
         int uploaded = 0;
         List<String> keys = new ArrayList<>(preloadedImages.keySet());
         for (String key : keys) {
+            if (uploaded >= maxUploadsPerFrame) {
+                break;
+            }
             DecodedImage img = preloadedImages.remove(key);
             if (img == null) {
                 continue;
@@ -713,10 +747,215 @@ public final class TextureManager {
                 continue;
             }
             Texture tex = Texture.createFromRgba(img.width(), img.height(), img.straightRgba(), false, key);
+            tex.setSamplingMode(defaultSamplingMode, true);
             cache.put(key, tex);
+            evictToBudget();
             uploaded++;
         }
         return uploaded;
+    }
+
+    /**
+     * Sets the maximum LRU VRAM memory budget in bytes ({@code <= 0} disables automatic eviction).
+     * Immediately evicts least-recently-used unpinned entries if current usage exceeds the budget.
+     *
+     * @param maxMemoryBudgetBytes target memory ceiling in bytes
+     */
+    public void setMaxMemoryBudgetBytes(long maxMemoryBudgetBytes) {
+        this.maxMemoryBudgetBytes = Math.max(0L, maxMemoryBudgetBytes);
+        evictToBudget();
+    }
+
+    /**
+     * Returns the configured LRU VRAM memory budget in bytes.
+     *
+     * @return memory budget in bytes ({@code 0} means unbounded)
+     */
+    public long getMaxMemoryBudgetBytes() {
+        return maxMemoryBudgetBytes;
+    }
+
+    /**
+     * Computes total estimated RGBA8 VRAM footprint across all live cached textures.
+     *
+     * @return estimated bytes held in texture cache
+     */
+    public long getCurrentMemoryBytes() {
+        long sum = 0L;
+        for (Texture tex : cache.values()) {
+            if (tex != null && !tex.isDisposed()) {
+                sum += tex.getEstimatedMemoryBytes();
+            }
+        }
+        return sum;
+    }
+
+    /**
+     * Pins an asset key in the unified persistent texture registry so scene transitions and LRU
+     * eviction never unload shared UI frames or recurring character base textures.
+     *
+     * @param assetPath asset path or canonical cache key
+     */
+    public void pinPersistent(String assetPath) {
+        if (assetPath == null || assetPath.isBlank()) {
+            return;
+        }
+        persistentPinnedKeys.add(canonicalKeyForLookup(assetPath));
+    }
+
+    /**
+     * Unpins a previously pinned persistent texture key.
+     *
+     * @param assetPath asset path or canonical cache key
+     */
+    public void unpinPersistent(String assetPath) {
+        if (assetPath == null || assetPath.isBlank()) {
+            return;
+        }
+        persistentPinnedKeys.remove(canonicalKeyForLookup(assetPath));
+    }
+
+    /**
+     * Returns whether an asset key is pinned in the persistent registry or present live in the cache.
+     *
+     * @param assetPath asset path
+     * @return {@code true} if pinned persistently
+     */
+    public boolean isPersistentPinned(String assetPath) {
+        if (assetPath == null || assetPath.isBlank()) {
+            return false;
+        }
+        return persistentPinnedKeys.contains(canonicalKeyForLookup(assetPath));
+    }
+
+    /**
+     * Registers or updates a texture directly under {@code cacheKey} (useful for testing or shared runtime atlases)
+     * and enforces the LRU memory budget.
+     *
+     * @param cacheKey unique lookup key
+     * @param texture  texture handle
+     */
+    public void putCachedTexture(String cacheKey, Texture texture) {
+        Objects.requireNonNull(cacheKey, "cacheKey must not be null");
+        Objects.requireNonNull(texture, "texture must not be null");
+        String resolvedKey = canonicalKeyForLookup(cacheKey);
+        cache.put(resolvedKey, texture);
+        evictToBudget();
+    }
+
+    /**
+     * Evicts non-pinned scene textures while preserving persistent pinned textures on scene changes.
+     *
+     * @return number of evicted textures
+     */
+    public int clearTransientSceneTextures() {
+        int removed = 0;
+        Iterator<Map.Entry<String, Texture>> it = cache.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, Texture> entry = it.next();
+            if (!persistentPinnedKeys.contains(entry.getKey())) {
+                Texture tex = entry.getValue();
+                if (tex != null && !tex.isDisposed()) {
+                    tex.dispose();
+                }
+                it.remove();
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    /**
+     * Evicts least-recently-used unpinned textures until total cache bytes fit within {@link #maxMemoryBudgetBytes}.
+     *
+     * @return number of evicted entries
+     */
+    public int evictToBudget() {
+        if (maxMemoryBudgetBytes <= 0L) {
+            return 0;
+        }
+        long current = getCurrentMemoryBytes();
+        int evicted = 0;
+        Iterator<Map.Entry<String, Texture>> it = cache.entrySet().iterator();
+        while (current > maxMemoryBudgetBytes && it.hasNext()) {
+            Map.Entry<String, Texture> oldest = it.next();
+            if (persistentPinnedKeys.contains(oldest.getKey())) {
+                continue;
+            }
+            Texture tex = oldest.getValue();
+            if (tex != null) {
+                current -= tex.getEstimatedMemoryBytes();
+                if (!tex.isDisposed()) {
+                    tex.dispose();
+                }
+            }
+            it.remove();
+            evicted++;
+        }
+        return evicted;
+    }
+
+    /**
+     * Returns whether an asset currently resolves as an active cache hit (or pinned lookup).
+     *
+     * @param assetPath asset path string
+     * @return {@code true} if present and non-disposed in cache
+     */
+    public boolean isCacheHit(String assetPath) {
+        if (assetPath == null || assetPath.isBlank()) {
+            return false;
+        }
+        String key = canonicalKeyForLookup(assetPath);
+        Texture direct = cache.get(key);
+        if (direct != null && !direct.isDisposed()) {
+            cacheHitCount++;
+            return true;
+        }
+        return getCached(assetPath) != null;
+    }
+
+    /**
+     * Sets the default {@link Texture.SamplingMode} applied to newly loaded textures.
+     *
+     * @param samplingMode sampling mode (must not be {@code null})
+     */
+    public void setDefaultSamplingMode(Texture.SamplingMode samplingMode) {
+        this.defaultSamplingMode = Objects.requireNonNull(samplingMode, "samplingMode must not be null");
+    }
+
+    /**
+     * Returns the default {@link Texture.SamplingMode}.
+     *
+     * @return default {@link Texture.SamplingMode}
+     */
+    public Texture.SamplingMode getDefaultSamplingMode() {
+        return defaultSamplingMode;
+    }
+
+    /**
+     * Returns total texture cache hits recorded.
+     *
+     * @return cache hit count
+     */
+    public long getCacheHitCount() {
+        return cacheHitCount;
+    }
+
+    /**
+     * Returns total texture cache misses recorded.
+     *
+     * @return cache miss count
+     */
+    public long getCacheMissCount() {
+        return cacheMissCount;
+    }
+
+    private String canonicalKeyForLookup(String assetPath) {
+        try {
+            return toCanonicalKey(resolvePath(Path.of(assetPath)));
+        } catch (InvalidPathException ignored) {
+            return assetPath;
+        }
     }
 
     private Path resolvePath(Path path) {

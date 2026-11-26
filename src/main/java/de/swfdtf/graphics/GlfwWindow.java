@@ -20,12 +20,26 @@ import java.util.Objects;
  */
 public final class GlfwWindow {
 
+    /**
+     * Display presentation mode for a native GLFW window.
+     */
+    public enum WindowMode {
+        /** Standard decorated resizable desktop window. */
+        WINDOWED,
+        /** Borderless full-screen window matching the monitor's video mode resolution for fast task switching. */
+        BORDERLESS_FULLSCREEN,
+        /** Exclusive full-screen mode bound to a specific GLFW monitor handle. */
+        EXCLUSIVE_FULLSCREEN
+    }
+
     private long handle;
     private String title;
     private int windowWidth;
     private int windowHeight;
     private int framebufferWidth;
     private int framebufferHeight;
+    private WindowMode windowMode = WindowMode.WINDOWED;
+    private int monitorIndex = 0;
     private GLCapabilities glCapabilities;
     private boolean vsync;
 
@@ -270,6 +284,81 @@ public final class GlfwWindow {
      */
     public boolean isVsync() {
         return vsync;
+    }
+
+    /**
+     * Switches this window between {@link WindowMode#WINDOWED}, {@link WindowMode#BORDERLESS_FULLSCREEN},
+     * and {@link WindowMode#EXCLUSIVE_FULLSCREEN} on the selected monitor index.
+     *
+     * @param mode         target {@link WindowMode} (must not be {@code null})
+     * @param monitorIndex zero-based monitor index (clamped safely to connected monitors)
+     * @param windowedW    fallback width when restoring {@link WindowMode#WINDOWED}
+     * @param windowedH    fallback height when restoring {@link WindowMode#WINDOWED}
+     */
+    public void setWindowMode(WindowMode mode, int monitorIndex, int windowedW, int windowedH) {
+        ensureAlive();
+        Objects.requireNonNull(mode, "mode must not be null");
+        long monitor = WindowManager.resolveMonitorHandle(monitorIndex);
+        this.monitorIndex = Math.max(0, monitorIndex);
+        this.windowMode = mode;
+
+        if (monitor == MemoryUtil.NULL) {
+            if (mode == WindowMode.WINDOWED && windowedW > 0 && windowedH > 0) {
+                GLFW.glfwSetWindowAttrib(handle, GLFW.GLFW_DECORATED, GLFW.GLFW_TRUE);
+                GLFW.glfwSetWindowMonitor(handle, MemoryUtil.NULL, 100, 100, windowedW, windowedH, 0);
+            }
+            pollFramebufferSize();
+            return;
+        }
+
+        var vidMode = GLFW.glfwGetVideoMode(monitor);
+        if (vidMode == null) {
+            pollFramebufferSize();
+            return;
+        }
+        int monW = vidMode.width();
+        int monH = vidMode.height();
+        int monHz = vidMode.refreshRate();
+
+        switch (mode) {
+            case WINDOWED -> {
+                GLFW.glfwSetWindowAttrib(handle, GLFW.GLFW_DECORATED, GLFW.GLFW_TRUE);
+                int w = windowedW > 0 ? windowedW : Math.max(640, monW * 2 / 3);
+                int h = windowedH > 0 ? windowedH : Math.max(360, monH * 2 / 3);
+                GLFW.glfwSetWindowMonitor(handle, MemoryUtil.NULL, 80, 80, w, h, 0);
+            }
+            case BORDERLESS_FULLSCREEN -> {
+                GLFW.glfwSetWindowAttrib(handle, GLFW.GLFW_DECORATED, GLFW.GLFW_FALSE);
+                try (MemoryStack stack = MemoryStack.stackPush()) {
+                    IntBuffer mx = stack.mallocInt(1);
+                    IntBuffer my = stack.mallocInt(1);
+                    GLFW.glfwGetMonitorPos(monitor, mx, my);
+                    GLFW.glfwSetWindowMonitor(handle, MemoryUtil.NULL, mx.get(0), my.get(0), monW, monH, 0);
+                }
+            }
+            case EXCLUSIVE_FULLSCREEN -> {
+                GLFW.glfwSetWindowMonitor(handle, monitor, 0, 0, monW, monH, monHz);
+            }
+        }
+        pollFramebufferSize();
+    }
+
+    /**
+     * Returns the current {@link WindowMode}.
+     *
+     * @return current {@link WindowMode}
+     */
+    public WindowMode getWindowMode() {
+        return windowMode;
+    }
+
+    /**
+     * Returns the target monitor index configured for fullscreen modes.
+     *
+     * @return zero-based monitor index
+     */
+    public int getMonitorIndex() {
+        return monitorIndex;
     }
 
     /**
