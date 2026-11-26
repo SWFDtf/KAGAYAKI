@@ -223,10 +223,11 @@ public final class StudioWindowController implements StudioBridge {
 
 
 ### Erweiterungen Studio Main Menu & Template-Vorlagen (`StudioWindowController`, `ProjectTemplateGenerator`, `VJavaLinter`)
-- `ProjectTemplateGenerator.TemplateType { FULL_DEMO, STARTER, MINIMAL }`:
+- `ProjectTemplateGenerator.TemplateType { FULL_DEMO, STARTER, MINIMAL, ACTION_ADVENTURE_2D }`:
   - `FULL_DEMO`: Standard im Studio-Hub / „Neues Projekt“-Button; enthält `template_main_menu` (inkl. `EngineVersion`), `template_save_screen`, `template_load_screen`, `template_preferences_screen`, verzweigte Story, DE/EN-Übersetzung sowie spielbare `wasd_arena` (`player.png`, `goal_star.png`, `chime.wav`) mit `0 Errors, 0 Warnings`.
   - `STARTER`: Kompakte klassische Starter-Vorlage (Default für abwärtskompatible `generate(Path)`-Signaturen).
   - `MINIMAL`: Schlankes Grundgerüst.
+  - `ACTION_ADVENTURE_2D`: Begehbare 2D-Räume mit Plattformen, NPCs, Dialogzonen (`on_collide`) und Schlüssel-Rätsel mit `0 Errors, 0 Warnings`.
 - `StudioWindowController`:
   - `StudioView { MAIN_MENU, WORKSPACE }` (`MAIN_MENU_SCREEN_NAME = "studio_main_menu"`, `WORKSPACE_SCREEN_NAME = "studio_workspace"`).
   - Neue Methoden: `createNewProject(Path, String, TemplateType)`, `showMainMenu()`, `showWorkspace()`, `getActiveView()`, `getSelectedTemplateType()`, `setSelectedTemplateType(TemplateType)`, `getEngineVersionBanner()`, `getActiveProjectVersion()`, `getActiveProjectRoot()`, `getRecentProjects()`, `getStudioInput()`.

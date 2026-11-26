@@ -39,7 +39,9 @@ public final class ProjectTemplateGenerator {
         /** Classic compact visual-novel starter template (3 labels, layeredimage, HUD, EN translation). */
         STARTER,
         /** Lightweight minimal project skeleton with entry label and HUD badge. */
-        MINIMAL
+        MINIMAL,
+        /** Walkable 2D action-adventure template with platforms, NPCs, dialog zones, and key puzzle. */
+        ACTION_ADVENTURE_2D
     }
 
     private ProjectTemplateGenerator() {
@@ -154,6 +156,13 @@ public final class ProjectTemplateGenerator {
                 writeUtf8(root.resolve("tl/english/translations.vjava"), buildEnglishTranslationScript(true));
                 generateProceduralImages(root, true);
                 generateProceduralAudio(root, true);
+            }
+            case ACTION_ADVENTURE_2D -> {
+                writeUtf8(root.resolve("main.vjava"), buildActionAdventureMainScript());
+                writeUtf8(root.resolve("ui/screens.vjava"), buildActionAdventureScreensScript(effectiveTitle));
+                writeUtf8(root.resolve("tl/english/translations.vjava"), buildActionAdventureEnglishScript());
+                generateActionAdventureImages(root);
+                generateActionAdventureAudio(root);
             }
         }
 
@@ -309,6 +318,117 @@ public final class ProjectTemplateGenerator {
                     narrator "Minimal-Projekt bereit. Ergänze weitere Labels, Sprites und UI-Screens."
                     stop music fadeout 1.0
                     return
+                """;
+    }
+
+    private static String buildActionAdventureMainScript() {
+        return """
+                // Datei: main.vjava (Action-Adventure 2D Vorlage)
+                define hero = Character("Aria", color="#58a6ff")
+                define guardian = Character("Wächter der Ruine", color="#f0883e")
+
+                default has_vault_key = false
+                default room_name = "Ruinenhalle"
+                default quest_done = false
+
+                image bg_ruins = "assets/images/bg/bg_ruins.png"
+                image bg_vault = "assets/images/bg/bg_vault.png"
+                image player = "assets/images/sprites/player.png"
+                image npc_guardian = "assets/images/sprites/npc_guardian.png"
+                image golden_key = "assets/images/sprites/golden_key.png"
+                image vault_gate = "assets/images/sprites/vault_gate.png"
+                image platform_stone = "assets/images/sprites/platform_stone.png"
+
+                label start:
+                    jump hall_room
+
+                label hall_room:
+                    $ room_name = "Ruinenhalle"
+                    scene bg_ruins with dissolve(0.5)
+                    play music "assets/audio/quest_theme.wav" fadein 1.0
+                    show player
+                    show platform_stone
+                    show npc_guardian
+                    show golden_key
+                    show vault_gate
+                    move player to 240 780
+                    move platform_stone to 780 650 duration 0.4 ease ease_out
+                    move golden_key to 820 560 duration 0.4 ease ease_in_out
+                    move npc_guardian to 540 780 duration 0.3 ease ease_out
+                    move vault_gate to 1560 760 duration 0.3 ease ease_out
+                    wasd_init player speed 280 bounds 80 120 1840 940 diagonal_norm true
+                    physics_init player gravity 900 jump_force 440 ground_y 780
+                    on_collide player golden_key jump key_collected
+                    on_collide player npc_guardian jump npc_talk
+                    on_collide player vault_gate jump vault_door
+                    hero "Finde den goldenen Schlüssel auf der Plattform, sprich mit dem Wächter und öffne das Tor!"
+                    return
+
+                label key_collected:
+                    $ has_vault_key = true
+                    hide golden_key with dissolve(0.2)
+                    play sound "assets/audio/key_chime.wav"
+                    hero "Der goldene Schlüssel gehört mir! Jetzt weiter zum Schatzgewölbe-Tor."
+                    jump vault_door
+
+                label npc_talk:
+                    guardian "Die Plattform führt dich hoch zum alten Schlüssel. Ohne ihn bleibt das Tor verschlossen."
+                    jump vault_door
+
+                label vault_door:
+                    if has_vault_key:
+                        jump quest_complete
+                    else:
+                        hero "Das Tor ist verschlossen! Hole zuerst den Schlüssel."
+                        return
+
+                label quest_complete:
+                    $ quest_done = true
+                    $ room_name = "Schatzkammer"
+                    wasd_stop player
+                    physics_stop player
+                    hide platform_stone with fade(0.3)
+                    hide npc_guardian with fade(0.3)
+                    hide vault_gate with fade(0.3)
+                    scene bg_vault with fade(0.6)
+                    play sound "assets/audio/key_chime.wav"
+                    hero "Das Tor der Schatzkammer steht offen! Rätsel der Ruine gelöst."
+                    stop music fadeout 1.0
+                    return
+                """;
+    }
+
+    private static String buildActionAdventureScreensScript(String projectTitle) {
+        String escapedTitle = projectTitle.replace("\"", "'");
+        return """
+                // Datei: ui/screens.vjava (Action-Adventure 2D)
+                screen action_hud():
+                    zorder 50
+                    frame:
+                        xalign 0.02
+                        yalign 0.02
+                        background "assets/images/ui/dialog_frame.png"
+                        vbox:
+                            spacing 6
+                            text "%s" size 20
+                            text "Raum: [room_name] | Schlüssel: [has_vault_key]" size 16
+                """.formatted(escapedTitle);
+    }
+
+    private static String buildActionAdventureEnglishScript() {
+        return """
+                // Datei: tl/english/translations.vjava (Action-Adventure 2D)
+                translate english strings:
+                    old "Finde den goldenen Schlüssel auf der Plattform, sprich mit dem Wächter und öffne das Tor!"
+                    new "Find the golden key on the platform, speak with the guardian, and open the gate!"
+                    old "Der goldene Schlüssel gehört mir! Jetzt weiter zum Schatzgewölbe-Tor."
+                    new "I got the golden key! Now on to the vault gate."
+                    old "Die Plattform führt dich hoch zum alten Schlüssel. Ohne ihn bleibt das Tor verschlossen."
+                    new "The platform leads up to the ancient key. Without it the gate remains locked."
+                    old "Das Tor ist verschlossen! Hole zuerst den Schlüssel."
+                    new "The gate is locked! Collect the key first."
+                    old "Das Tor der Schatzkammer steht offen! Rätsel der Ruine gelöst."
+                    new "The vault gate stands open! Ruins puzzle solved."
                 """;
     }
 
@@ -617,6 +737,104 @@ public final class ProjectTemplateGenerator {
             Files.createDirectories(chimePath.getParent());
             Files.write(chimePath, chimeWav);
         }
+    }
+
+    private static void generateActionAdventureImages(Path root) {
+        TextureManager.writePng(
+                root.resolve("assets/images/bg/bg_ruins.png"),
+                BG_WIDTH,
+                BG_HEIGHT,
+                renderNightAcademyBg(BG_WIDTH, BG_HEIGHT)
+        );
+        TextureManager.writePng(
+                root.resolve("assets/images/bg/bg_vault.png"),
+                BG_WIDTH,
+                BG_HEIGHT,
+                renderLibraryBg(BG_WIDTH, BG_HEIGHT)
+        );
+        TextureManager.writePng(
+                root.resolve("assets/images/sprites/player.png"),
+                SPRITE_SIZE,
+                SPRITE_SIZE,
+                renderPlayerBadgeSprite(SPRITE_SIZE, SPRITE_SIZE)
+        );
+        TextureManager.writePng(
+                root.resolve("assets/images/sprites/npc_guardian.png"),
+                SPRITE_SIZE,
+                SPRITE_SIZE,
+                renderGuardianSprite(SPRITE_SIZE, SPRITE_SIZE)
+        );
+        TextureManager.writePng(
+                root.resolve("assets/images/sprites/golden_key.png"),
+                SPRITE_SIZE,
+                SPRITE_SIZE,
+                renderGoalStarSprite(SPRITE_SIZE, SPRITE_SIZE)
+        );
+        TextureManager.writePng(
+                root.resolve("assets/images/sprites/vault_gate.png"),
+                SPRITE_SIZE,
+                SPRITE_SIZE,
+                renderVaultGateSprite(SPRITE_SIZE, SPRITE_SIZE)
+        );
+        TextureManager.writePng(
+                root.resolve("assets/images/sprites/platform_stone.png"),
+                SPRITE_SIZE,
+                SPRITE_SIZE,
+                renderPlatformSprite(SPRITE_SIZE, SPRITE_SIZE)
+        );
+        TextureManager.writePng(
+                root.resolve("assets/images/ui/dialog_frame.png"),
+                UI_FRAME_WIDTH,
+                UI_FRAME_HEIGHT,
+                renderDialogFrame(UI_FRAME_WIDTH, UI_FRAME_HEIGHT)
+        );
+    }
+
+    private static void generateActionAdventureAudio(Path root) throws IOException {
+        AudioDecoder.DecodedAudio theme = AudioDecoder.synthesizeChord(
+                new double[]{220.0, 261.63, 329.63},
+                1.0,
+                AUDIO_SAMPLE_RATE,
+                0.24f
+        );
+        byte[] themeWav = AudioDecoder.encodeWav(theme.pcm16(), theme.channels(), theme.sampleRate());
+        Path themePath = root.resolve("assets/audio/quest_theme.wav");
+        Files.createDirectories(themePath.getParent());
+        Files.write(themePath, themeWav);
+
+        AudioDecoder.DecodedAudio chimeTone = AudioDecoder.synthesizeTone(
+                880.0,
+                0.25,
+                AUDIO_SAMPLE_RATE,
+                0.30f
+        );
+        byte[] chimeWav = AudioDecoder.encodeWav(chimeTone.pcm16(), chimeTone.channels(), chimeTone.sampleRate());
+        Path chimePath = root.resolve("assets/audio/key_chime.wav");
+        Files.createDirectories(chimePath.getParent());
+        Files.write(chimePath, chimeWav);
+    }
+
+    private static byte[] renderGuardianSprite(int w, int h) {
+        byte[] rgba = new byte[w * h * 4];
+        fillEllipse(rgba, w, h, w / 2, h / 2, w / 2 - 6, h / 2 - 6, 210, 128, 56, 255);
+        fillEllipse(rgba, w, h, w / 2, h / 2 - 8, 15, 15, 240, 215, 195, 255);
+        fillRect(rgba, w, h, w / 2 - 16, h / 2 + 8, w / 2 + 16, h - 10, 88, 54, 34, 255);
+        return rgba;
+    }
+
+    private static byte[] renderVaultGateSprite(int w, int h) {
+        byte[] rgba = new byte[w * h * 4];
+        fillRect(rgba, w, h, 8, 6, w - 8, h - 4, 62, 74, 96, 255);
+        fillRect(rgba, w, h, 18, 18, w - 18, h - 8, 28, 36, 52, 255);
+        fillEllipse(rgba, w, h, w / 2, h / 2, 10, 10, 232, 186, 68, 255);
+        return rgba;
+    }
+
+    private static byte[] renderPlatformSprite(int w, int h) {
+        byte[] rgba = new byte[w * h * 4];
+        fillRect(rgba, w, h, 4, h / 3, w - 4, (2 * h) / 3, 98, 110, 134, 255);
+        fillRect(rgba, w, h, 4, h / 3, w - 4, h / 3 + 6, 152, 168, 198, 255);
+        return rgba;
     }
 
     private enum FaceMood {

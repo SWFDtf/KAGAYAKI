@@ -113,6 +113,16 @@ public final class SnowWhiteAssetGenerator {
         // Bedingtes Overlay bei Anschlag 3
         writePngIfMissing(root.resolve("assets/images/char/sw_apfel_aura.png"),
                 CHAR_WIDTH, CHAR_HEIGHT, renderAuraOverlay(CHAR_WIDTH, CHAR_HEIGHT, 232, 48, 64));
+
+        // Interaktive Requisiten für Wald-Flucht (WASD) & Zwergenhütten-Sammelspiel (#0851, #0852)
+        writePngIfMissing(root.resolve("assets/images/char/wald_ast.png"),
+                128, 96, renderBranchObstacle(128, 96));
+        writePngIfMissing(root.resolve("assets/images/char/teller_item.png"),
+                96, 96, renderCollectibleIcon(96, 96, 230, 236, 245));
+        writePngIfMissing(root.resolve("assets/images/char/kerze_item.png"),
+                96, 96, renderCollectibleIcon(96, 96, 250, 204, 88));
+        writePngIfMissing(root.resolve("assets/images/char/brot_item.png"),
+                96, 96, renderCollectibleIcon(96, 96, 206, 146, 82));
     }
 
     private static void generateAudioAssets(Path root) throws IOException {
@@ -137,6 +147,10 @@ public final class SnowWhiteAssetGenerator {
         writeToneWavIfMissing(root.resolve("assets/audio/voice/sw_hallo.wav"), 587.33, 0.35, 0.30f);
         writeToneWavIfMissing(root.resolve("assets/audio/voice/sw_bitte.wav"), 523.25, 0.40, 0.30f);
         writeToneWavIfMissing(root.resolve("assets/audio/voice/sw_erwacht.wav"), 659.25, 0.38, 0.32f);
+        writeToneWavIfMissing(root.resolve("assets/audio/voice/koenigin_wunsch.wav"), 440.00, 0.42, 0.30f);
+        writeToneWavIfMissing(root.resolve("assets/audio/voice/spiegel_spruch.wav"), 293.66, 0.45, 0.30f);
+        writeToneWavIfMissing(root.resolve("assets/audio/voice/stiefmutter_neid.wav"), 369.99, 0.40, 0.32f);
+        writeToneWavIfMissing(root.resolve("assets/audio/voice/jaeger_gnade.wav"), 246.94, 0.40, 0.30f);
     }
 
     private static void writePngIfMissing(Path path, int w, int h, byte[] rgba) throws IOException {
@@ -254,6 +268,20 @@ public final class SnowWhiteAssetGenerator {
     private static byte[] renderAuraOverlay(int w, int h, int r, int g, int b) {
         byte[] rgba = new byte[w * h * 4];
         fillEllipse(rgba, w, h, w / 2, (int) (h * 0.45), 96, 150, r, g, b, 72);
+        return rgba;
+    }
+
+    private static byte[] renderBranchObstacle(int w, int h) {
+        byte[] rgba = new byte[w * h * 4];
+        fillRect(rgba, w, h, 8, h / 2 - 10, w - 8, h / 2 + 10, 74, 48, 28, 255);
+        fillEllipse(rgba, w, h, w / 3, h / 2 - 14, 18, 10, 38, 92, 46, 255);
+        return rgba;
+    }
+
+    private static byte[] renderCollectibleIcon(int w, int h, int r, int g, int b) {
+        byte[] rgba = new byte[w * h * 4];
+        fillEllipse(rgba, w, h, w / 2, h / 2, w / 2 - 10, h / 2 - 10, r, g, b, 255);
+        fillEllipse(rgba, w, h, w / 2 - 6, h / 2 - 6, w / 4, h / 4, 255, 255, 255, 110);
         return rgba;
     }
 

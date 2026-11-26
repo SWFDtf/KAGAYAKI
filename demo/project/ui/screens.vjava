@@ -14,4 +14,19 @@ screen maerchen_hud:
             text "[kapitel_titel]" size 16 color "#8b949e"
             text "Zustand: [schneewittchen_status]" size 17 color "#58a6ff"
             text "Überstandene Anschläge: [anschlags_zaehler]/3" size 15 color "#f0883e"
+            text "Wetter: [wetter_profil] | Kamera: [kamera_preset] | Affinität: [zwergen_affinitaet]" size 14 color "#3fb950"
             bar value VariableValue("fortschritt", 7)
+
+screen accessibility_profile:
+    modal true
+    zorder 60
+    frame xpos 460 ypos 220:
+        background "#161822eb"
+        border_color "#58a6ff"
+        padding 24
+        vbox spacing 12:
+            text "Barrierefreiheit beim Erststart (SnowWhiteAccessibilityProfile)" size 24 color "#f0f6fc"
+            text "Aktives Profil: [accessibility_profil]" size 16 color "#8b949e"
+            textbutton "Standard" action "Hide(\"accessibility_profile\")"
+            textbutton "Hochkontrast & Großschrift" action "Hide(\"accessibility_profile\")"
+            textbutton "Screenreader & Untertitel" action "Hide(\"accessibility_profile\")"

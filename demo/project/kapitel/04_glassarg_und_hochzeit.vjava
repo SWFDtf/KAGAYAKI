@@ -12,11 +12,11 @@ label kapitel_6_glassarg_und_erloesung:
     show glassarg at center with dissolve(0.6)
     show schneewittchen prinzessin vergiftet at center with dissolve(0.5)
     show zwerge at left with dissolve(0.4)
-    "Sie ließen einen durchsichtigen {color=#58a6ff}Sarg aus Glas{/color} fertigen, schrieben in goldenen Buchstaben darauf, dass es eine Königstochter war, und trugen ihn hinaus auf den Berg."
+    "Sie ließen einen durchsichtigen {a=codex:glassarg}{color=#58a6ff}Sarg aus Glas{/color}{/a} fertigen, schrieben in goldenen Buchstaben darauf, dass es eine Königstochter war, und trugen ihn hinaus auf den Berg."
     "Immer hielt einer der sieben Zwerge Wache. Lange, lange Zeit lag Schneewittchen im Sarg und veränderte sich nicht."
 
     show prinz at right with easein(0.6)
-    "Eines Tages verirrte sich ein {b}Königssohn{/b} in den Wald und kam zu dem Berg. Als er Schneewittchen im gläsernen Sarg erblickte, verliebte er sich sogleich."
+    "Eines Tages verirrte sich ein {a=codex:koenigssohn}{b}Königssohn{/b}{/a} in den Wald und kam zu dem Berg. Als er Schneewittchen im gläsernen Sarg erblickte, verliebte er sich sogleich."
     prinz "Ich kann nicht leben, ohne Schneewittchen zu sehen! Überlasst mir den Sarg, ich will es ehren und hochachten als mein Liebstes."
     zwerg_meister "Die sieben Zwerge hatten Mitleid mit dem Prinzen und schenkten ihm den Glassarg."
 
@@ -46,6 +46,9 @@ label kapitel_7_hochzeit_und_ende:
     $ kapitel_nr = 7
     $ kapitel_titel = "Hochzeit & Strafe der bösen Königin"
     $ fortschritt = 7
+    $ wetter_profil = "PETALS"
+    $ kamera_preset = "WIDE"
+    $ ambient_profil = "FINALE_AMBIENT_DUCKING"
 
     // Unumkehrbare Schicksalswende: Ab hier greift die Rollback-Barriere von KAGAYAKI!
     block_rollback
@@ -72,10 +75,16 @@ label kapitel_7_hochzeit_und_ende:
         state.set("stiefmutter_status", maerchen.stiefmutterZustand.name());
         persistent.unlockEnding("ending_hochzeit");
         persistent.unlockAchievement("ach_happy_end");
+        state.set("epilog_stats_aktiv", true);
+        state.set("gallery_screenshots", 7);
         engine.logInfo("Finale abgeschlossen: Schneewittchen und der Prinz leben glücklich.");
     }<<
 
+    if zwergen_affinitaet >= 3:
+        $ secret_ending_unlocked = true
+        zwerge "Geheime Bonus-Szene: Durch dein großes Vertrauen feiern alle sieben Zwerge als Ehrengäste das Glücksende!"
+
     hide stiefmutter with irisout(0.7)
-    "{wave}Und Schneewittchen und der Prinz regierten lange in Frieden und Glück.{/wave} — {b}Ende des Märchens.{/b}"
+    "{wave}Und Schneewittchen und der Prinz regierten lange in Frieden und Glück.{/wave} — {b}Ende des Märchens.{/b} (Epilog-Lesestatistik & Screenshot-Galerie freigeschaltet.)"
     stop music fadeout 1.5
     return

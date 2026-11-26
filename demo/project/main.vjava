@@ -25,6 +25,18 @@ default spiegel_antwort = "Ihr seid die Schönste hier"
 default spiegel_abfragen = 0
 default vorsicht_bonus = false
 default hat_schutzversprechen = false
+default gesammelte_objekte = 0
+default gesammelt_teller = false
+default gesammelt_kerze = false
+default gesammelt_brot = false
+default zwergen_affinitaet = 0
+default secret_ending_unlocked = false
+default wetter_profil = "SNOW"
+default kamera_preset = "WIDE"
+default ambient_profil = "WINTER_WIND"
+default accessibility_profil = "STANDARD"
+default gallery_screenshots = 0
+default epilog_stats_aktiv = false
 
 // --- 3. Bühnen-Bilder (Hintergründe & Figuren) ---
 image bg_schloss_winter = "assets/images/bg/bg_schloss_winter.png"
@@ -44,6 +56,10 @@ image jaeger = "assets/images/char/jaeger.png"
 image zwerge = "assets/images/char/zwerge.png"
 image prinz = "assets/images/char/prinz.png"
 image glassarg = "assets/images/char/glassarg.png"
+image wald_ast = "assets/images/char/wald_ast.png"
+image teller_item = "assets/images/char/teller_item.png"
+image kerze_item = "assets/images/char/kerze_item.png"
+image brot_item = "assets/images/char/brot_item.png"
 
 // --- 4. Mehrstufiges LayeredImage für Schneewittchen (inkl. Lip-Sync-Gruppe) ---
 layeredimage schneewittchen:

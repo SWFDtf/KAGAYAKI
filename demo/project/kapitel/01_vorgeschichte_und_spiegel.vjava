@@ -6,6 +6,10 @@ label kapitel_1_vorgeschichte:
     $ kapitel_nr = 1
     $ kapitel_titel = "Vorgeschichte & Wunsch der Königin"
     $ fortschritt = 1
+    $ wetter_profil = "SNOW"
+    $ kamera_preset = "WIDE"
+    $ ambient_profil = "WINTER_WIND_CROSSFADE"
+    $ accessibility_profil = "STANDARD"
     scene bg_schloss_winter with dissolve(0.8)
     play music "assets/audio/music/winter_prolog.wav" fadein 1.5
 
@@ -15,6 +19,7 @@ label kapitel_1_vorgeschichte:
     play sound "assets/audio/sfx/stich.wav"
     "Dabei stach sie sich mit der Nadel in den Finger, und drei Tropfen rotes Blut fielen in den weißen Schnee." with vpunch
 
+    voice "assets/audio/voice/koenigin_wunsch.wav"
     koenigin_mutter "Ach, hätte ich doch ein Kind, so weiß wie Schnee, so rot wie Blut und so schwarz wie Ebenholz!"
 
     :: Kode für VN: Geburt Schneewittchens und CG freischalten @->{
@@ -26,7 +31,7 @@ label kapitel_1_vorgeschichte:
         engine.logInfo("Kapitel 1 abgeschlossen: Schneewittchen wurde geboren.");
     }<<
 
-    "Bald darauf bekam sie ein Töchterlein, das {b}Schneewittchen{/b} genannt wurde. Doch kaum war das Kind geboren, starb die Königin."
+    "Bald darauf bekam sie ein Töchterlein, das {a=codex:schneewittchen}{b}Schneewittchen{/b}{/a} genannt wurde. Doch kaum war das Kind geboren, starb die Königin."
     hide koenigin_mutter with fade(0.6)
     jump kapitel_2_stiefmutter_spiegel
 
@@ -34,14 +39,19 @@ label kapitel_2_stiefmutter_spiegel:
     $ kapitel_nr = 2
     $ kapitel_titel = "Die böse Stiefmutter & der Zauberspiegel"
     $ fortschritt = 2
+    $ wetter_profil = "FOG"
+    $ kamera_preset = "DRAMATIC_ZOOM"
+    $ ambient_profil = "MIRROR_AMBIENT_DUCKING"
     scene bg_spiegel_saal with fade(0.7)
     play music "assets/audio/music/spiegel_thema.wav" fadein 1.0
 
     "Über ein Jahr nahm sich der König eine neue Gemahlin. Sie war wunderschön, aber stolz, eitel und übermütig."
     show stiefmutter normal at left with easein(0.4)
     show spiegel at spiegel_erscheinen with dissolve(0.6)
+    move spiegel to 960 440 duration 0.8 ease ease_in_out
+    move stiefmutter to 480 540 duration 0.5 ease ease_out
 
-    "Sie besaß einen {color=#a371f7}wunderbaren Zauberspiegel{/color}. Wenn sie vor ihn trat, fragte sie ihn stets:"
+    "Sie besaß einen {a=codex:zauberspiegel}{color=#a371f7}wunderbaren Zauberspiegel{/color}{/a}. Wenn sie vor ihn trat, fragte sie ihn stets:"
     $ spiegel_abfragen = 1
     $ spiegel_antwort = "Frau Königin, Ihr seid die Schönste im Land!"
     call zauberspiegel_befragen
@@ -56,7 +66,9 @@ label kapitel_2_stiefmutter_spiegel:
     $ spiegel_antwort = "Frau Königin, Ihr seid die Schönste hier, aber Schneewittchen ist tausendmal schöner als Ihr!"
     call zauberspiegel_befragen
 
+    $ kamera_preset = "CLOSE_UP"
     show stiefmutter wuetend at left with hpunch
+    voice "assets/audio/voice/stiefmutter_neid.wav"
     stiefmutter "{shake}Was?!{/shake} Schneewittchen schöner als ich?! Mein Herz dreht sich vor Neid und Hass!"
 
     :: Kode für VN: Spiegel-Verrat protokollieren @->{
@@ -70,6 +82,7 @@ label kapitel_2_stiefmutter_spiegel:
 label zauberspiegel_befragen:
     play sound "assets/audio/sfx/spiegel_klang.wav"
     stiefmutter "Spieglein, Spieglein an der Wand, wer ist die Schönste im ganzen Land?"
+    voice "assets/audio/voice/spiegel_spruch.wav"
     if spiegel_abfragen == 1:
         spiegel "[spiegel_antwort]"
     elif spiegel_abfragen == 2:

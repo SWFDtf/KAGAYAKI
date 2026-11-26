@@ -6,6 +6,9 @@ label kapitel_3_flucht_in_den_wald:
     $ kapitel_nr = 3
     $ kapitel_titel = "Die Flucht in den tiefen Wald"
     $ fortschritt = 3
+    $ wetter_profil = "FOG"
+    $ kamera_preset = "CLOSE_UP"
+    $ ambient_profil = "FOREST_AMBIENT_CROSSFADE"
     scene bg_wald with wipeleft(0.7)
     play music "assets/audio/music/wald_thema.wav" fadein 1.2
 
@@ -19,6 +22,7 @@ label kapitel_3_flucht_in_den_wald:
     voice "assets/audio/voice/sw_bitte.wav"
     schneewittchen "Ach, lieber Jäger, lass mir mein Leben! Ich will in den wilden Wald laufen und nimmermehr wieder heimkommen."
 
+    voice "assets/audio/voice/jaeger_gnade.wav"
     jaeger "So lauf hin, du armes Kind! Die wilden Tiere werden dich ohnehin bald verschlingen — ich bringe der Königin stattdessen Lunge und Leber eines jungen Frischlings."
     hide jaeger with easeout(0.5)
 
@@ -30,16 +34,81 @@ label kapitel_3_flucht_in_den_wald:
     }<<
 
     "Und die böse Königin glaubte dem Jäger, als er ihr die Organe des Frischlings überbrachte."
+
+    // #0851: Begehbares WASD-Minispiel "Flucht durch den dunklen Wald"
+    show wald_ast at right with easein(0.3)
+    move wald_ast to 1320 760 duration 0.6 ease ease_in_out
+    wasd_init schneewittchen speed 260 bounds 80 120 1840 940 diagonal_norm true
+    physics_init schneewittchen gravity 850 jump_force 420 ground_y 780
+    on_collide schneewittchen wald_ast jump wald_ast_ausweichen
+    "Flucht durch den dunklen Wald: Steuere Schneewittchen mit WASD und weiche dem gefallenen Ast aus!"
+    wasd_stop schneewittchen
+    physics_stop schneewittchen
+    hide wald_ast with dissolve(0.2)
+    jump kapitel_4_haus_der_zwerge
+
+label wald_ast_ausweichen:
+    wasd_stop schneewittchen
+    physics_stop schneewittchen
+    hide wald_ast with dissolve(0.2)
+    schneewittchen "Geschickt ausgewichen! Hinter den Bäumen schimmert ein kleines Licht."
     jump kapitel_4_haus_der_zwerge
 
 label kapitel_4_haus_der_zwerge:
     $ kapitel_nr = 4
     $ kapitel_titel = "Das Haus der sieben Zwerge"
     $ fortschritt = 4
+    $ wetter_profil = "CLEAR"
+    $ kamera_preset = "WIDE"
+    $ ambient_profil = "COTTAGE_AMBIENT_CROSSFADE"
     scene bg_zwergenhaus with dissolve(0.8)
 
     show schneewittchen alltag gesund at center with easein(0.4)
     "Schneewittchen irrte allein durch den großen Wald, bis es am Abend zu einem kleinen Häuschen gelangte."
+
+    // #0852: Interaktive 3-Objekt-Sammelsequenz in der Zwergenhütte (on_collide Demo)
+    show teller_item at left with dissolve(0.2)
+    show kerze_item at center with dissolve(0.2)
+    show brot_item at right with dissolve(0.2)
+    wasd_init schneewittchen speed 240 bounds 100 140 1820 920 diagonal_norm true
+    on_collide schneewittchen teller_item jump sammle_teller
+    on_collide schneewittchen kerze_item jump sammle_kerze
+    on_collide schneewittchen brot_item jump sammle_brot
+    "Sammle in der Zwergenhütte Teller, Kerze und Brot mit WASD, bevor der Abend hereinbricht."
+    jump zwergenhaus_abend
+
+label sammle_teller:
+    if gesammelt_teller == false:
+        $ gesammelt_teller = true
+        $ gesammelte_objekte = gesammelte_objekte + 1
+        $ zwergen_affinitaet = zwergen_affinitaet + 1
+        hide teller_item with dissolve(0.2)
+        schneewittchen "Ein sauberes Tellerchen eingesammelt ([gesammelte_objekte]/3)."
+    jump zwergenhaus_abend
+
+label sammle_kerze:
+    if gesammelt_kerze == false:
+        $ gesammelt_kerze = true
+        $ gesammelte_objekte = gesammelte_objekte + 1
+        $ zwergen_affinitaet = zwergen_affinitaet + 1
+        hide kerze_item with dissolve(0.2)
+        schneewittchen "Die kleine Kerze spendet warmes Licht ([gesammelte_objekte]/3)."
+    jump zwergenhaus_abend
+
+label sammle_brot:
+    if gesammelt_brot == false:
+        $ gesammelt_brot = true
+        $ gesammelte_objekte = gesammelte_objekte + 1
+        $ zwergen_affinitaet = zwergen_affinitaet + 1
+        hide brot_item with dissolve(0.2)
+        schneewittchen "Frisches Brot auf dem Tisch entdeckt ([gesammelte_objekte]/3)."
+    jump zwergenhaus_abend
+
+label zwergenhaus_abend:
+    wasd_stop schneewittchen
+    hide teller_item
+    hide kerze_item
+    hide brot_item
     "Dort war alles winzig, aber überaus reinlich: ein Tischchen mit sieben kleinen Tellern, sieben Löffelchen, sieben Messerlein und sieben Becherlein, und an der Wand sieben Bettchen."
     "Hungrig und durstig aß Schneewittchen von jedem Teller ein wenig Gemüse und Brot und trank aus jedem Becher ein Tröpfchen Wein."
 
@@ -53,7 +122,7 @@ label kapitel_4_haus_der_zwerge:
     "Danach versuchte es ein Bettchen nach dem anderen, bis endlich das siebte genau passte — und dort schlief es ein (Status: {color=#58a6ff}[schneewittchen_status]{/color})."
 
     show zwerge at right with easein(0.5)
-    "Als es dunkel war, kehrten die sieben Zwerge zurück, die in den Bergen nach Erz hackten und gruben."
+    "Als es dunkel war, kehrten die {a=codex:sieben_zwerge}sieben Zwerge{/a} zurück, die in den Bergen nach Erz hackten und gruben."
     zwerg_meister "Wer hat auf meinem Stühlchen gesessen? Wer hat von meinem Tellerchen gegessen? Und schaut dort — wer liegt in meinem Bettchen?!"
     zwerge "{gradient=#f0883e,#f0f6fc}Ei du mein Gott! Was ist das Kind so wunderschön!{/gradient}"
 
@@ -72,10 +141,12 @@ label kapitel_4_haus_der_zwerge:
         "Vorsichtig bleiben und niemanden leichtfertig einlassen":
             $ vorsicht_bonus = true
             $ wald_mut = 2
+            $ zwergen_affinitaet = zwergen_affinitaet + 3
             schneewittchen "Ich verspreche es fest: Solange ihr im Bergwerk arbeitet, öffne ich keinem Fremden die Tür!"
             jump kapitel_5_mordversuche
         "Den sieben Zwergen dankbar das Versprechen geben":
             $ hat_schutzversprechen = true
             $ wald_mut = 1
+            $ zwergen_affinitaet = zwergen_affinitaet + 1
             schneewittchen "Habt tausend Dank, ihr lieben Zwerge! Ich will euer kleines Haus treu behüten."
             jump kapitel_5_mordversuche

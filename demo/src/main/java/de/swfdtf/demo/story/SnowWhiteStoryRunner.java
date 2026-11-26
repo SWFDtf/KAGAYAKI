@@ -1,5 +1,8 @@
 package de.swfdtf.demo.story;
 
+import de.swfdtf.demo.features.SnowWhiteChapterCatalog;
+import de.swfdtf.demo.features.SnowWhiteCodexCatalog;
+import de.swfdtf.demo.features.SnowWhiteReadingStats;
 import de.swfdtf.demo.model.CharacterStatus;
 import de.swfdtf.demo.model.StoryCheckpointSummary;
 import de.swfdtf.demo.service.SnowWhiteConsoleNarrator;
@@ -70,6 +73,9 @@ public final class SnowWhiteStoryRunner {
             }
 
             List<StoryCheckpointSummary> history = new ArrayList<>();
+            SnowWhiteChapterCatalog chapterCatalog = new SnowWhiteChapterCatalog(session.getPersistentState());
+            SnowWhiteCodexCatalog codexCatalog = new SnowWhiteCodexCatalog(session.getPersistentState());
+            SnowWhiteReadingStats readingStats = new SnowWhiteReadingStats();
             boolean localizationShown = false;
             boolean rollbackShown = false;
             boolean quickSaveShown = false;
@@ -83,6 +89,14 @@ public final class SnowWhiteStoryRunner {
 
                 narrator.printCurrentStep(session, step);
                 history.add(captureSummary(session, step));
+                String currentLabel = runtime.getCurrentLabel();
+                if (currentLabel != null && !currentLabel.isBlank()) {
+                    chapterCatalog.unlockForLabel(currentLabel);
+                    codexCatalog.unlockForLabel(currentLabel);
+                    if (runtime.getStatus() == ScriptRuntime.Status.WAITING_DIALOGUE) {
+                        readingStats.recordDialogueLine(currentLabel, session.getStateStore().getInt("kapitel_nr", 1));
+                    }
+                }
 
                 // 1. Live-Lokalisierung am berühmten Zauberspiegel-Satz demonstrieren
                 if (!localizationShown
@@ -149,6 +163,8 @@ public final class SnowWhiteStoryRunner {
             }
 
             session.saveMetaState();
+            narrator.printFeatureDemo("SnowWhiteMeta", chapterCatalog.formatChapterOverview());
+            narrator.printFeatureDemo("SnowWhiteReadingStats", readingStats.formatSummary(ctx.projectAst()));
             narrator.printFinalSummary(session);
             return List.copyOf(history);
         }

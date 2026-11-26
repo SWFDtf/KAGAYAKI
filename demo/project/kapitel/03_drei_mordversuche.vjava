@@ -23,7 +23,7 @@ label anschlag_1_schnuerriemen:
     show schneewittchen alltag gesund at left with dissolve(0.3)
     show stiefmutter kraemerin at right with easein(0.5)
 
-    "Verkleidet als alte Krämerin klopfte die Königin an das Zwergenhäuschen und rief: ‚Schöne Ware feil! Schöne bunte Schnürriemen!‘"
+    "Verkleidet als alte Krämerin klopfte die Königin an das Zwergenhäuschen und rief: ‚Schöne Ware feil! Schöne bunte {a=codex:schnuerriemen}Schnürriemen{/a}!‘"
     if vorsicht_bonus:
         schneewittchen "Eigentlich darf ich niemanden einlassen... Aber eine alte Krämerin mit bunten Schnürriemen scheint doch harmlos."
     else:
@@ -61,7 +61,7 @@ label anschlag_1_schnuerriemen:
 
 label anschlag_2_giftkamm:
     hide zwerge with dissolve(0.3)
-    "Da der Zauberspiegel der Königin verriet, dass Schneewittchen wieder lebte, schuf sie mit Hexenkünsten einen {color=#a371f7}vergifteten Kamm{/color}."
+    "Da der Zauberspiegel der Königin verriet, dass Schneewittchen wieder lebte, schuf sie mit Hexenkünsten einen {a=codex:giftkamm}{color=#a371f7}vergifteten Kamm{/color}{/a}."
     show stiefmutter kraemerin at right with easein(0.4)
     stiefmutter "Gute Ware feil! Schau nur diesen herrlichen Kamm, mein liebes Kind!"
     play sound "assets/audio/sfx/fall.wav"
@@ -94,7 +94,7 @@ label anschlag_2_giftkamm:
 
 label anschlag_3_apfel:
     hide zwerge with dissolve(0.3)
-    "Voller Wut zog sich die Königin in ihre geheimste Kammer zurück und fertigte einen wunderschönen, halb weißen und halb roten {color=#f85149}Giftapfel{/color}."
+    "Voller Wut zog sich die Königin in ihre geheimste Kammer zurück und fertigte einen wunderschönen, halb weißen und halb roten {a=codex:giftapfel}{color=#f85149}Giftapfel{/color}{/a}."
     "Nur die rote Wange war tödlich vergiftet. Als Bäuerin verkleidet trat sie ein drittes Mal vor das Häuschen."
     show stiefmutter baeuerin at right with easein(0.4)
 
