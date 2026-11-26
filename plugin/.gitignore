@@ -1,0 +1,16 @@
+# Generated files
+build/
+.gradle/
+out/
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# JFlex-generated lexer (overwritten by generateLexer task)
+# Committed for convenience; re-generate with: ./gradlew generateLexer
+# src/main/gen/
+
+# IntelliJ sandbox
+.intellij-sandbox/
+run/

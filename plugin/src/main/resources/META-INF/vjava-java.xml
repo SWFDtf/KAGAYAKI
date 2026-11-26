@@ -1,0 +1,12 @@
+<idea-plugin>
+    <!-- This file is loaded only when the Java plugin is present -->
+    <extensions defaultExtensionNs="com.intellij">
+
+        <!-- ============================================================ -->
+        <!--  Language Injection: Java inside @->{ … }<<                 -->
+        <!-- ============================================================ -->
+        <multiHostInjector
+            implementation="de.swfdtf.vjava.plugin.injection.VJavaJavaInjector"/>
+
+    </extensions>
+</idea-plugin>

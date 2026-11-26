@@ -1,0 +1,64 @@
+<idea-plugin>
+    <id>de.swfdtf.vjava.plugin</id>
+    <name>vjava Language Support</name>
+    <vendor email="dev@swfdtf.de" url="https://github.com/swfdtf/KAGAYAKI">swfdtf</vendor>
+    <description><![CDATA[
+        <b>vjava Language Support</b> for the KAGAYAKI Visual Novel Engine.<br/>
+        Provides full Syntax Highlighting, Color Settings, and Language Injection
+        (Java 21) for <code>.vjava</code> script files.
+
+        <h3>Features</h3>
+        <ul>
+          <li>Syntax highlighting for all keywords, strings, numbers, operators and special tokens</li>
+          <li>Sub-highlighting of <code>[variable]</code> interpolation and <code>{markup}</code> tags inside strings</li>
+          <li>Java 21 language injection inside <code>@->{ … }<<</code> blocks</li>
+          <li>Customisable colour scheme via <i>Settings &gt; Editor &gt; Color Scheme &gt; vjava</i></li>
+        </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <!-- Java plugin is optional – the injector checks at runtime -->
+    <depends optional="true" config-file="vjava-java.xml">com.intellij.java</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+
+        <!-- ============================================================ -->
+        <!--  File Type                                                    -->
+        <!-- ============================================================ -->
+        <fileType
+            name="vjava"
+            implementationClass="de.swfdtf.vjava.plugin.lang.VJavaFileType"
+            fieldName="INSTANCE"
+            language="vjava"
+            extensions="vjava"/>
+
+        <!-- ============================================================ -->
+        <!--  Syntax Highlighter                                           -->
+        <!-- ============================================================ -->
+        <lang.syntaxHighlighterFactory
+            language="vjava"
+            implementationClass="de.swfdtf.vjava.plugin.highlighting.VJavaSyntaxHighlighterFactory"/>
+
+        <!-- ============================================================ -->
+        <!--  Color Settings Page                                          -->
+        <!-- ============================================================ -->
+        <colorSettingsPage
+            implementation="de.swfdtf.vjava.plugin.highlighting.VJavaColorSettingsPage"/>
+
+        <!-- ============================================================ -->
+        <!--  Annotator (sub-highlights inside strings)                   -->
+        <!-- ============================================================ -->
+        <annotator
+            language="vjava"
+            implementationClass="de.swfdtf.vjava.plugin.annotator.VJavaStringAnnotator"/>
+
+        <!-- ============================================================ -->
+        <!--  Parser Definition (needed for PSI tree & injection host)    -->
+        <!-- ============================================================ -->
+        <lang.parserDefinition
+            language="vjava"
+            implementationClass="de.swfdtf.vjava.plugin.lang.VJavaParserDefinition"/>
+
+    </extensions>
+
+</idea-plugin>
