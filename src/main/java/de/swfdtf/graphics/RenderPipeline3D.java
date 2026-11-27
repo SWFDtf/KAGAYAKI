@@ -142,6 +142,7 @@ public final class RenderPipeline3D implements IRenderPipeline {
     private boolean initialized = false;
     private boolean fallbackTo2dBackdrop = false;
     private boolean khrDebugEnabled = false;
+    private boolean debugMarkersEnabled = false;
     private boolean depthPrepassEnabled = false;
     private int msaaSamples = 4;
     private float renderResolutionScale = 1.0f;
@@ -151,6 +152,7 @@ public final class RenderPipeline3D implements IRenderPipeline {
     private DebugViewMode debugViewMode = DebugViewMode.SHADED;
     private int lastSubmittedDrawCalls = 0;
     private int lastCulledMeshCount = 0;
+    private final List<String> lastRecordedDebugGroups = new java.util.ArrayList<>();
 
     /** Creates a {@code RenderPipeline3D} with default logger. */
     public RenderPipeline3D() {
@@ -201,24 +203,88 @@ public final class RenderPipeline3D implements IRenderPipeline {
 
     @Override
     public void renderSceneGraph(SceneGraph graph) {
+        lastRecordedDebugGroups.clear();
         if (fallbackTo2dBackdrop) {
             return;
         }
         float aspect = logicalWidth / (float) Math.max(1, logicalHeight);
+        boolean emitMarkers = debugMarkersEnabled && khrDebugEnabled;
+
         List<Scene3DWorld.Node3D> sorted = world.getSortedDrawNodes(camera.getPosition());
         int submitted = 0;
         int culled = 0;
-        for (Scene3DWorld.Node3D node : sorted) {
-            if (camera.isAabbInFrustum(node.computeWorldAabb(), aspect)) {
-                float dist = node.getPosition().distance(camera.getPosition());
-                node.selectLod(dist);
-                submitted += node.getActiveMesh().getSubMeshes().size();
-            } else {
-                culled++;
+
+        try (var worldScope = openDebugMarker(1, "World3D", emitMarkers)) {
+            for (Scene3DWorld.Node3D node : sorted) {
+                if (node.isBillboard2d()) {
+                    continue;
+                }
+                if (camera.isAabbInFrustum(node.computeWorldAabb(), aspect)) {
+                    float dist = node.getPosition().distance(camera.getPosition());
+                    node.selectLod(dist);
+                    submitted += node.getActiveMesh().getSubMeshes().size();
+                } else {
+                    culled++;
+                }
             }
         }
+        try (var billboardScope = openDebugMarker(2, "Billboards", emitMarkers)) {
+            for (Scene3DWorld.Node3D node : sorted) {
+                if (!node.isBillboard2d()) {
+                    continue;
+                }
+                if (camera.isAabbInFrustum(node.computeWorldAabb(), aspect)) {
+                    submitted += node.getActiveMesh().getSubMeshes().size();
+                } else {
+                    culled++;
+                }
+            }
+        }
+        try (var postScope = openDebugMarker(3, "PostFX", emitMarkers)) {
+            // PostFX pass hook (SSAO / DoF / GodRays)
+        }
+        try (var uiScope = openDebugMarker(4, "UI", emitMarkers)) {
+            // 2D UI compositing stage marker
+        }
+
         this.lastSubmittedDrawCalls = submitted;
         this.lastCulledMeshCount = culled;
+    }
+
+    private Advanced3DRenderingServices.RenderDocMarkerScope openDebugMarker(
+            int id,
+            String groupName,
+            boolean emitGlCall
+    ) {
+        lastRecordedDebugGroups.add(groupName);
+        return new Advanced3DRenderingServices.RenderDocMarkerScope(id, groupName, emitGlCall);
+    }
+
+    /**
+     * Enables or disables RenderDoc {@code GL_KHR_debug} marker emission ({@code #0339}).
+     *
+     * @param enabled {@code true} to emit GL debug group markers when supported
+     */
+    public void setDebugMarkersEnabled(boolean enabled) {
+        this.debugMarkersEnabled = enabled;
+    }
+
+    /**
+     * Returns whether RenderDoc debug marker emission is requested.
+     *
+     * @return {@code true} if enabled
+     */
+    public boolean isDebugMarkersEnabled() {
+        return debugMarkersEnabled;
+    }
+
+    /**
+     * Returns the RenderDoc pass group names recorded during the latest {@link #renderSceneGraph}.
+     *
+     * @return immutable list of recorded pass names ({@code World3D}, {@code Billboards}, {@code PostFX}, {@code UI})
+     */
+    public List<String> getLastRecordedDebugGroups() {
+        return List.copyOf(lastRecordedDebugGroups);
     }
 
     @Override

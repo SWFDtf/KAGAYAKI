@@ -72,6 +72,7 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- 
 | `GridPathfinder2D` | `final class` | Deterministischer 2D-A*-Gitter-Pfadfinder (`GridMap`, `GridCell`) mit Eckenschneide-Schutz für Begleitfiguren in Top-Down-Räumen (`#0056`). |
 | `Skeletal2DAdapter` | `interface` | Modulares 2D-Skeletal-/Bone-Plugin-Interface (Spine/DragonBones-kompatibel) inklusive eingebauter `SimpleRigAdapter`-Implementierung (`#0213`). |
 | `Skeletal2DDisplayable` | `final class` | `CustomDisplayable`-Brücke zur nahtlosen Einbindung beliebiger `Skeletal2DAdapter`-Rigs in `SpriteNode` (`#0213`). |
+| `Advanced3DRenderingServices` | `final class` | Wave-P3-2-3D-Render-Dienste: `IblEnvironment3D` (HDR Skybox/Irradiance), `SsaoPass`, `DepthOfField3D`, `VolumetricGodRaysPass`, `AmbientLightProbeGrid`, `SubsurfaceScatteringModel`, `Scene3DPanoramaBaker` und `RenderDocMarkerScope` (`#0268`–`#0339`). |
 
 ## Öffentliche API-Signaturen
 
