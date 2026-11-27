@@ -67,6 +67,7 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- 
 | `Camera3D` | `final class` | JOML-`Matrix4f`-3D-Kamera mit Perspektiv-/Orthoprojektion, FOV-Clamping `[50°, 110°]`, Keyframe-`moveTo`, `wasd3d`-Steuerung (`±89°` Pitch-Clamp), SpringArm-Kollision, `CameraRail`, `ShotPreset`, Trauma-Shake, Stereo-Matrizen, Frustum-Culling und `screenPointToRay`. |
 | `Scene3DWorld` | `final class` | 3D-Weltgraph mit `Node3D` (LOD-Hysterese, 2.5D-Billboards, Collider, 2D-Surface-Attach), Top-8-Lichtselektion, `Fog3DConfig`, `Skydome3D`, planarer Spiegelungsmatrix, `InspectItemOverlay`, `Minimap3DProjector`, `Scene3DSnapshot` und `Scene3DPreloader`. |
 | `RenderPipeline3D` | `final class` | OpenGL-3.3-Core-3D-Render-Pipeline (`implements IRenderPipeline`) mit Composite-Reihenfolge (`Sky2D -> World3D -> Billboards -> Foreground2D -> UI`), std140-Kamera-UBO (`176 B`), Tiefen-Prepass, MSAA, Auflösungs-Skalierung und nahtlosem 2D-Backdrop-Fallback. |
+| `TypographyAndLayoutServices` | `final class` | Kapitel-9-Typografie-Suite: BiDi/RTL-Visual-Reordering, Ruby-Shorthand (`{ruby=...}`), Sprach-Font-Map, Auto-Shrink, Soft-Hyphens (`\u00AD`), WCAG-Kontrastprüfung, Tategaki-Spaltenlayout, Typewriter-Span-Splicing, binäre Cursor-Suche und On-Demand-Glyph-Atlas-DPI-Tracking. |
 
 ## Öffentliche API-Signaturen
 

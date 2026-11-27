@@ -74,6 +74,10 @@ public final class PreferencesState {
     private boolean hideCursorOnGamepad = true;
     private int minClickIntervalMs = 0;
     private boolean disableBackspaceTrigger = false;
+    private float lineSpacing = 1.25f;
+    private float letterSpacing = 0.0f;
+    private boolean textCharFadeInEnabled = true;
+    private boolean sharedReadLinesAcrossLanguages = true;
 
     /**
      * Creates a {@code PreferencesState} initialized with engine defaults.
@@ -212,6 +216,16 @@ public final class PreferencesState {
             rightClickBehavior = "ROLLBACK".equals(upper) ? "ROLLBACK" : "MENU";
         }
         minClickIntervalMs = Math.clamp(minClickIntervalMs, 0, 80);
+        if (!Float.isFinite(lineSpacing) || lineSpacing < 1.0f) {
+            lineSpacing = Float.isFinite(lineSpacing) ? 1.0f : 1.25f;
+        } else if (lineSpacing > 2.2f) {
+            lineSpacing = 2.2f;
+        }
+        if (!Float.isFinite(letterSpacing) || letterSpacing < 0.0f) {
+            letterSpacing = 0.0f;
+        } else if (letterSpacing > 8.0f) {
+            letterSpacing = 8.0f;
+        }
     }
 
     /**
@@ -261,6 +275,10 @@ public final class PreferencesState {
         hideCursorOnGamepad = defaults.hideCursorOnGamepad;
         minClickIntervalMs = defaults.minClickIntervalMs;
         disableBackspaceTrigger = defaults.disableBackspaceTrigger;
+        lineSpacing = defaults.lineSpacing;
+        letterSpacing = defaults.letterSpacing;
+        textCharFadeInEnabled = defaults.textCharFadeInEnabled;
+        sharedReadLinesAcrossLanguages = defaults.sharedReadLinesAcrossLanguages;
     }
 
     /**
@@ -1091,6 +1109,86 @@ public final class PreferencesState {
         this.disableBackspaceTrigger = disableBackspaceTrigger;
     }
 
+    /**
+     * Returns typography line-height multiplier in {@code [1.0, 2.2]} ({@code #0693}).
+     *
+     * @return line spacing factor
+     */
+    public synchronized float getLineSpacing() {
+        return lineSpacing;
+    }
+
+    /**
+     * Sets typography line-height multiplier clamped to {@code [1.0, 2.2]}.
+     *
+     * @param lineSpacing line spacing factor
+     */
+    public synchronized void setLineSpacing(float lineSpacing) {
+        if (!Float.isFinite(lineSpacing)) {
+            this.lineSpacing = 1.25f;
+        } else {
+            this.lineSpacing = Math.max(1.0f, Math.min(2.2f, lineSpacing));
+        }
+    }
+
+    /**
+     * Returns extra per-character horizontal tracking in pixels {@code [0.0, 8.0]} ({@code #0693}).
+     *
+     * @return letter spacing in px
+     */
+    public synchronized float getLetterSpacing() {
+        return letterSpacing;
+    }
+
+    /**
+     * Sets extra per-character horizontal tracking clamped to {@code [0.0, 8.0]} pixels.
+     *
+     * @param letterSpacing letter spacing in px
+     */
+    public synchronized void setLetterSpacing(float letterSpacing) {
+        if (!Float.isFinite(letterSpacing)) {
+            this.letterSpacing = 0.0f;
+        } else {
+            this.letterSpacing = Math.max(0.0f, Math.min(8.0f, letterSpacing));
+        }
+    }
+
+    /**
+     * Returns whether smooth 80 ms per-character typewriter fade-in is enabled ({@code #0744}).
+     *
+     * @return {@code true} if character fade-in is enabled
+     */
+    public synchronized boolean isTextCharFadeInEnabled() {
+        return textCharFadeInEnabled;
+    }
+
+    /**
+     * Enables or disables smooth per-character typewriter fade-in.
+     *
+     * @param textCharFadeInEnabled fade-in toggle
+     */
+    public synchronized void setTextCharFadeInEnabled(boolean textCharFadeInEnabled) {
+        this.textCharFadeInEnabled = textCharFadeInEnabled;
+    }
+
+    /**
+     * Returns whether seen dialogue line history is shared across language switches ({@code #0760}).
+     *
+     * @return {@code true} when shared via stable {@code lineId}
+     */
+    public synchronized boolean isSharedReadLinesAcrossLanguages() {
+        return sharedReadLinesAcrossLanguages;
+    }
+
+    /**
+     * Sets whether seen dialogue history is shared across languages or separated per language.
+     *
+     * @param sharedReadLinesAcrossLanguages share toggle
+     */
+    public synchronized void setSharedReadLinesAcrossLanguages(boolean sharedReadLinesAcrossLanguages) {
+        this.sharedReadLinesAcrossLanguages = sharedReadLinesAcrossLanguages;
+    }
+
     @Override
     public synchronized boolean equals(Object obj) {
         if (this == obj) {
@@ -1134,6 +1232,10 @@ public final class PreferencesState {
                 && hideCursorOnGamepad == other.hideCursorOnGamepad
                 && minClickIntervalMs == other.minClickIntervalMs
                 && disableBackspaceTrigger == other.disableBackspaceTrigger
+                && Float.compare(lineSpacing, other.lineSpacing) == 0
+                && Float.compare(letterSpacing, other.letterSpacing) == 0
+                && textCharFadeInEnabled == other.textCharFadeInEnabled
+                && sharedReadLinesAcrossLanguages == other.sharedReadLinesAcrossLanguages
                 && Objects.equals(saveSlotSortMode, other.saveSlotSortMode)
                 && Objects.equals(rightClickBehavior, other.rightClickBehavior)
                 && Objects.equals(renderMode, other.renderMode)
@@ -1157,7 +1259,8 @@ public final class PreferencesState {
                 autosaveOnQuit, autoReadVoiceWaitSeconds, saveSlotSortMode,
                 invertCameraY, cameraSensitivity, scrollWheelRollbackEnabled, rightClickBehavior,
                 touchControlsEnabled, simplifyHoldInputs, toggleSkipSprintMode,
-                hideCursorOnGamepad, minClickIntervalMs, disableBackspaceTrigger
+                hideCursorOnGamepad, minClickIntervalMs, disableBackspaceTrigger,
+                lineSpacing, letterSpacing, textCharFadeInEnabled, sharedReadLinesAcrossLanguages
         );
     }
 }

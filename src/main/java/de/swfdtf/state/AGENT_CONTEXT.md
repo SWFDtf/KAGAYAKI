@@ -58,6 +58,7 @@ Vollständige 4-Schichten-State-, Rollback-, Save/Load-, Verlaufs-, Meta-Progres
 | `SaveRepository` | `interface` | Storage-SPI-Interface (ohne `I`-Präfix) für `.ksav`-Persistenz (`InMemorySaveRepository`, `FileSaveRepository` mit `validateSlotId`, `.tmp`-Cleanup und `.bak`-Rotation). |
 | `StateCoreEnhancements` | `final class` | Enthält `TypeSafeStateView`, `ObservableStateBus` (mit Audit-Verlauf), `DeltaRollbackBuffer` (Delta-Replay & `history_clear`) und `ChapterEntryCheckpointService`. |
 | `SaveWorkflowServices` | `final class` | Enthält `SaveIntegrityAndCodec` (HMAC-SHA256, GZIP-Magie-Erkennung, `.vsave`-Pakete, `.corrupt`-Repair, Snapshot-Diff), `CloudSyncAndProfileManager` und `SaveWorkflowController`. |
+| `LocalizationAdvancedServices` | `final class` | Regionale Fallback-Ketten (`de_AT -> de -> default`), kulturabhängige Zeitstempel-Formatierung, Drop-In-`tl/<lang>/`-Packs, lokalisierte Asset-Swaps, idempotente Kontext-Extraktion, BOM/Windows-1252-Decode, Glossary-Consistency-Audit und `LocalizedMetadataRegistry`. |
 
 ## Öffentliche API-Signaturen
 
@@ -363,8 +364,8 @@ public class LocalizationManager {
 }
 ```
 
-### Erweiterte Wave P2-5..P2-8 State- & Save-APIs
-- `PreferencesState`: Wave P2-5/6/7 Optionen sowie Wave P2-8 Input-/Kamera-/Barrierefreiheits-Felder (`invertCameraY`, `cameraSensitivity` `[0.2, 3.0]`, `scrollWheelRollbackEnabled`, `rightClickBehavior` `MENU`/`ROLLBACK`, `touchControlsEnabled`, `simplifyHoldInputs`, `toggleSkipSprintMode`, `hideCursorOnGamepad`, `minClickIntervalMs` `[0, 80]`, `disableBackspaceTrigger`).
+### Erweiterte Wave P2-5..P2-9 State- & Save-APIs
+- `PreferencesState`: Wave P2-5/6/7/8 Optionen sowie Wave P2-9 Typografie- & Lokalisierungs-Felder (`lineSpacing` `[1.0, 2.2]`, `letterSpacing` `[0.0, 8.0]`, `textCharFadeInEnabled`, `sharedReadLinesAcrossLanguages`).
 - `StateStore`: atomare `transaction(Consumer<StateStore>)`-Methode; `RelationshipAffinityTracker.setBounds(min, max)` und `addTierThresholdListener`.
 - `AchievementBackend` (`OfflineAchievementBackend`) sowie `SaveRepository` (`InMemorySaveRepository`, `FileSaveRepository` mit `cleanupOrphanedTempFiles` & `validateSlotId`).
 - `StateCoreEnhancements` & `SaveWorkflowServices`: Typsichere Nested Views, `BigDecimal`-Währungsarithmetik, `ObservableStateBus`, `DeltaRollbackBuffer`, HMAC-SHA256-Integrität, `.vsave`-Pakete, Cloud-Sync-Union-Merge, Profil-Trennung, Quick-Save-Ring `quick-1..quick-3`, Trash-Undo, Batch-Migration-QA sowie JSON-Schema in `docs/SAVE_SCHEMA.md`.

@@ -62,6 +62,7 @@ Entwickler-Werkzeuge, Dual-Window-Studio-UI und Standalone-Build-Pipeline von KA
 | `UserTemplateRepository` | `final class` | Verwaltet benutzerdefinierte Projektvorlagen und `TemplatePreviewCard`-Vorschaukarten für den Projekt-Hub. |
 | `StudioCliRunner` | `final class` | Headless CI/CD CLI-Runner für `lint`, `preflight`, `flow-graph`, `standalone-build`, `release-check` und `html-report` mit Exit-Codes. |
 | `Studio3DInspectorService` | `final class` | Studio-exklusiver 3D-Autoring-Inspektor für Live-`Camera3D`-Parameter, X/Y/Z-Achsen-Gizmo-Drag mit Snap & `.vjava`-Snippet, Laufzeit-`Material3D`-JSON-Export und Studio-only-Nav-Pfad-Visualisierung. |
+| `LocalizationToolingServices` | `final class` | Pseudo-Lokalisierungs-Generator, kapitelweise Übersetzer-Worklists, fehlende Quellwort-Statistik (Dialog vs. UI), 130%-Längen-Ampel, `## LQA Note:`-Extraktion, statischer Tag-/Escape-Validator, zweisprachige Suche und DE/EN-Komplettheitsaudit. |
 
 ## Öffentliche API-Signaturen
 
