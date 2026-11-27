@@ -31,7 +31,7 @@ import java.util.Objects;
  */
 public final class ScriptSession {
 
-    private final VJavaAst.ProjectAst projectAst;
+    private VJavaAst.ProjectAst projectAst;
     private final EngineAPI engineApi;
     private final RevertableStateStore stateStore;
     private final PersistentState persistentState;
@@ -228,6 +228,20 @@ public final class ScriptSession {
         historyLog.clear();
         sessionState.reset();
         runtime.start();
+    }
+
+    /**
+     * Hot-swaps updated labels from {@code updatedProject} during an active session while preserving
+     * {@link RevertableStateStore} variables and re-indexing localization entries ({@code #0079}).
+     *
+     * @param updatedProject updated project AST (must not be {@code null})
+     * @return hot-swap summary reported by {@link ScriptRuntime#hotSwapProject}
+     */
+    public ScriptRuntime.HotSwapResult hotSwapProject(VJavaAst.ProjectAst updatedProject) {
+        Objects.requireNonNull(updatedProject, "updatedProject must not be null");
+        this.projectAst = updatedProject;
+        VJavaLocalizationBridge.indexProject(localizationManager, updatedProject);
+        return runtime.hotSwapProject(updatedProject);
     }
 
     /**

@@ -289,6 +289,82 @@ public final class JavaBlockCompiler {
     }
 
     /**
+     * Serializable snapshot of compiled JVM bytecode and block-to-class mappings for
+     * runtime-compiler-free release startup ({@code #0080}).
+     *
+     * @param hasUserTypes          whether shared user types exist in {@code VJavaUserTypes}
+     * @param classBytecode         ordered map of binary class name to JVM class bytes
+     * @param snippetClassByBlockId mapping from {@code @->{ ... }<<} block ID to snippet class name
+     * @param emptyBlockIds         block IDs whose body contained only declarations/imports
+     */
+    public record CompiledBytecodePackage(
+            boolean hasUserTypes,
+            Map<String, byte[]> classBytecode,
+            Map<String, String> snippetClassByBlockId,
+            Set<String> emptyBlockIds
+    ) {
+        /** Enforces non-null fields and deep immutable copies of byte arrays and collections. */
+        public CompiledBytecodePackage {
+            Map<String, byte[]> copiedBytes = new LinkedHashMap<>();
+            if (classBytecode != null) {
+                for (Map.Entry<String, byte[]> entry : classBytecode.entrySet()) {
+                    copiedBytes.put(entry.getKey(), entry.getValue().clone());
+                }
+            }
+            classBytecode = Collections.unmodifiableMap(copiedBytes);
+            snippetClassByBlockId = snippetClassByBlockId != null
+                    ? Collections.unmodifiableMap(new LinkedHashMap<>(snippetClassByBlockId))
+                    : Map.of();
+            emptyBlockIds = emptyBlockIds != null
+                    ? Collections.unmodifiableSet(new LinkedHashSet<>(emptyBlockIds))
+                    : Set.of();
+        }
+    }
+
+    /**
+     * Compiles all {@link VJavaAst.JavaBlockNode} instances in {@code project} and returns the raw
+     * JVM class bytecode package suitable for {@link CompiledScriptBundle} serialization ({@code #0080}).
+     *
+     * @param project unified project AST (must not be {@code null})
+     * @return immutable {@link CompiledBytecodePackage}
+     * @throws VJavaCompileException if any block fails Java compilation
+     */
+    public CompiledBytecodePackage compileToBytecode(VJavaAst.ProjectAst project) throws VJavaCompileException {
+        Objects.requireNonNull(project, "project must not be null");
+        CachedProjectArtifact artifact = compileToArtifact(
+                collectJavaBlocks(project),
+                project.projectRoot(),
+                false
+        );
+        return new CompiledBytecodePackage(
+                artifact.hasUserTypes(),
+                artifact.bytecode(),
+                artifact.snippetClassByBlockId(),
+                artifact.emptyBlockIds()
+        );
+    }
+
+    /**
+     * Instantiates {@link CompiledProjectBlocks} directly from precompiled JVM bytecode without
+     * invoking {@code ToolProvider.getSystemJavaCompiler()} ({@code #0080}).
+     *
+     * @param pkg precompiled bytecode package (must not be {@code null})
+     * @return ready-to-run {@link CompiledProjectBlocks}
+     */
+    public static CompiledProjectBlocks loadFromBytecode(CompiledBytecodePackage pkg) {
+        Objects.requireNonNull(pkg, "pkg must not be null");
+        return instantiateArtifact(
+                new CachedProjectArtifact(
+                        pkg.hasUserTypes(),
+                        pkg.classBytecode(),
+                        pkg.snippetClassByBlockId(),
+                        pkg.emptyBlockIds()
+                ),
+                resolveParentClassLoader()
+        );
+    }
+
+    /**
      * Compiles all {@link VJavaAst.JavaBlockNode} instances in {@code project}
      * (top-level blocks as well as blocks nested inside labels, conditionals, and menu choices).
      *
@@ -327,11 +403,22 @@ public final class JavaBlockCompiler {
         if (blocks.isEmpty()) {
             return new CompiledProjectBlocks(Map.of(), resolveParentClassLoader(), false);
         }
+        CachedProjectArtifact artifact = compileToArtifact(blocks, projectRoot, true);
+        return instantiateArtifact(artifact, resolveParentClassLoader());
+    }
+
+    private CachedProjectArtifact compileToArtifact(
+            List<VJavaAst.JavaBlockNode> blocks,
+            Path projectRoot,
+            boolean writeDiskCache
+    ) throws VJavaCompileException {
+        if (blocks.isEmpty()) {
+            return new CachedProjectArtifact(false, Map.of(), Map.of(), Set.of());
+        }
         if (sandboxEnabled) {
             enforceSandboxAllowlist(blocks);
         }
 
-        ClassLoader parentLoader = resolveParentClassLoader();
         Path cacheFile = projectRoot != null
                 ? projectRoot.resolve("build").resolve(CACHE_DIR_RELATIVE)
                         .resolve(computeBlocksDigest(blocks) + ".vjc")
@@ -340,7 +427,7 @@ public final class JavaBlockCompiler {
         if (cacheFile != null) {
             CachedProjectArtifact cached = tryLoadCachedArtifact(cacheFile);
             if (cached != null) {
-                return instantiateFromCache(cached, parentLoader);
+                return cached;
             }
         }
 
@@ -390,7 +477,6 @@ public final class JavaBlockCompiler {
             compileUserTypes(compiler, classpath, scriptImports, importOrigins, userTypeMembers, compiledBytecode);
         }
 
-        Map<String, VJavaExecutable> executableMap = new LinkedHashMap<>();
         Map<String, String> snippetClassByBlockId = new LinkedHashMap<>();
         Set<String> emptyBlockIds = new LinkedHashSet<>();
         List<SnippetUnit> snippetUnits = new ArrayList<>();
@@ -400,9 +486,6 @@ public final class JavaBlockCompiler {
         for (ParsedBlock parsed : parsedBlocks) {
             if (parsed.executableStatements().isEmpty()) {
                 emptyBlockIds.add(parsed.block().id());
-                executableMap.put(parsed.block().id(), (state, persistent, engine, scene) -> {
-                    // Declaration/import-only Java block
-                });
                 continue;
             }
             String className = "VJavaSnippet_" + (snippetIndex++);
@@ -419,41 +502,12 @@ public final class JavaBlockCompiler {
             compileSnippets(compiler, classpath, snippetUnits, unitByFileUri, compiledBytecode);
         }
 
-        InMemoryClassLoader classLoader = new InMemoryClassLoader(parentLoader, compiledBytecode);
-        if (hasUserTypes) {
-            try {
-                Class.forName(USER_TYPES_BINARY_NAME, true, classLoader);
-            } catch (ClassNotFoundException e) {
-                throw new VJavaCompileException("Compiled VJavaUserTypes could not be loaded", e);
-            }
-        }
-
-        for (SnippetUnit unit : snippetUnits) {
-            try {
-                Class<?> snippetClass = Class.forName(unit.binaryName(), true, classLoader);
-                Object instance = snippetClass.getDeclaredConstructor().newInstance();
-                executableMap.put(unit.parsed().block().id(), (VJavaExecutable) instance);
-            } catch (Exception e) {
-                VJavaAst.JavaBlockNode block = unit.parsed().block();
-                throw new VJavaCompileException(
-                        "Failed to instantiate compiled snippet '" + unit.binaryName() + "': " + e.getMessage(),
-                        block.id(),
-                        block.sourceFile(),
-                        block.lineNumber(),
-                        List.of(),
-                        unit.built().source(),
-                        e
-                );
-            }
-        }
-
-        if (cacheFile != null) {
-            CachedProjectArtifact artifact = new CachedProjectArtifact(
-                    hasUserTypes, compiledBytecode, snippetClassByBlockId, emptyBlockIds);
+        CachedProjectArtifact artifact = new CachedProjectArtifact(
+                hasUserTypes, compiledBytecode, snippetClassByBlockId, emptyBlockIds);
+        if (writeDiskCache && cacheFile != null) {
             storeCachedArtifact(cacheFile, artifact);
         }
-
-        return new CompiledProjectBlocks(executableMap, classLoader, hasUserTypes);
+        return artifact;
     }
 
     private static String computeBlocksDigest(List<VJavaAst.JavaBlockNode> blocks) {
@@ -567,7 +621,13 @@ public final class JavaBlockCompiler {
         }
     }
 
-    private CompiledProjectBlocks instantiateFromCache(CachedProjectArtifact cached, ClassLoader parentLoader) {
+    private static CompiledProjectBlocks instantiateArtifact(
+            CachedProjectArtifact cached,
+            ClassLoader parentLoader
+    ) {
+        if (cached.bytecode().isEmpty() && !cached.hasUserTypes() && cached.emptyBlockIds().isEmpty()) {
+            return new CompiledProjectBlocks(Map.of(), parentLoader, false);
+        }
         InMemoryClassLoader classLoader = new InMemoryClassLoader(parentLoader, cached.bytecode());
         if (cached.hasUserTypes()) {
             try {

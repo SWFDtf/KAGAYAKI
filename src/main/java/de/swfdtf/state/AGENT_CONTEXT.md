@@ -59,6 +59,7 @@ Vollständige 4-Schichten-State-, Rollback-, Save/Load-, Verlaufs-, Meta-Progres
 | `StateCoreEnhancements` | `final class` | Enthält `TypeSafeStateView`, `ObservableStateBus` (mit Audit-Verlauf), `DeltaRollbackBuffer` (Delta-Replay & `history_clear`) und `ChapterEntryCheckpointService`. |
 | `SaveWorkflowServices` | `final class` | Enthält `SaveIntegrityAndCodec` (HMAC-SHA256, GZIP-Magie-Erkennung, `.vsave`-Pakete, `.corrupt`-Repair, Snapshot-Diff), `CloudSyncAndProfileManager`, `SaveWorkflowController`, `formatWasdArenaBadge` und `SessionResetCoordinator`. |
 | `LocalizationAdvancedServices` | `final class` | Regionale Fallback-Ketten (`de_AT -> de -> default`), kulturabhängige Zeitstempel-Formatierung, Drop-In-`tl/<lang>/`-Packs, lokalisierte Asset-Swaps, idempotente Kontext-Extraktion, BOM/Windows-1252-Decode, Glossary-Consistency-Audit und `LocalizedMetadataRegistry`. |
+| `CloudSyncManifest` | `final class` | Deterministische plattformübergreifende Cloud-Sync-Manifeste mit relativen Unix-Pfaden, UTF-8-JSON, SHA-256-Prüfsummen und UTC-ISO-8601-Zeitstempeln (`#0530`). |
 
 ## Öffentliche API-Signaturen
 

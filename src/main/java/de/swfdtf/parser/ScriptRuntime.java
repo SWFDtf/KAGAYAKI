@@ -458,7 +458,7 @@ public final class ScriptRuntime {
     /** Maximum supported nested {@code call} stack depth before aborting infinite recursion ({@code #0960}). */
     public static final int MAX_CALL_STACK_DEPTH = 128;
 
-    private final VJavaAst.ProjectAst projectAst;
+    private VJavaAst.ProjectAst projectAst;
     private final EngineAPI engineApi;
     private final StateStore stateStore;
     private final PersistentAccess persistentAccess;
@@ -576,6 +576,142 @@ public final class ScriptRuntime {
         engineApi.registerService(PersistentAccess.class, persistentAccess);
         engineApi.registerService(SceneController.class, sceneController);
         engineApi.registerService(ScriptRuntime.class, this);
+    }
+
+    /**
+     * Summary returned after hot-swapping updated labels without resetting untouched variables ({@code #0079}).
+     *
+     * @param updatedLabels           existing labels whose statements changed
+     * @param addedLabels             newly added label names
+     * @param removedLabels           removed label names
+     * @param activeDialogueRefreshed {@code true} if the currently visible dialogue line was updated live
+     * @param javaBlocksRecompiled    {@code true} if embedded Java blocks required recompilation
+     */
+    public record HotSwapResult(
+            Set<String> updatedLabels,
+            Set<String> addedLabels,
+            Set<String> removedLabels,
+            boolean activeDialogueRefreshed,
+            boolean javaBlocksRecompiled
+    ) {
+        /** Enforces immutable sets. */
+        public HotSwapResult {
+            updatedLabels = updatedLabels != null ? Collections.unmodifiableSet(new LinkedHashSet<>(updatedLabels))
+                    : Set.of();
+            addedLabels = addedLabels != null ? Collections.unmodifiableSet(new LinkedHashSet<>(addedLabels))
+                    : Set.of();
+            removedLabels = removedLabels != null ? Collections.unmodifiableSet(new LinkedHashSet<>(removedLabels))
+                    : Set.of();
+        }
+    }
+
+    /**
+     * Supplies precompiled JVM bytecode blocks (e.g. loaded from a {@code .vpak} release bundle)
+     * so {@link #start()} boots immediately without runtime {@code javac} ({@code #0080}).
+     *
+     * @param precompiled precompiled block registry (must not be {@code null})
+     */
+    public void setPrecompiledBlocks(JavaBlockCompiler.CompiledProjectBlocks precompiled) {
+        this.compiledBlocks = Objects.requireNonNull(precompiled, "precompiled must not be null");
+    }
+
+    /**
+     * Hot-swaps changed/added labels from {@code updatedProject} into this running interpreter
+     * without clearing untouched variables in {@link StateStore} ({@code #0079}).
+     *
+     * <p>If execution is currently paused on {@link Status#WAITING_DIALOGUE} inside an updated label,
+     * the displayed {@link DialoguePrompt} text and speaker metadata are re-evaluated live against the
+     * preserved {@link StateStore}.</p>
+     *
+     * @param updatedProject updated project AST (must not be {@code null})
+     * @return summary of label changes and live dialogue refresh
+     */
+    public HotSwapResult hotSwapProject(VJavaAst.ProjectAst updatedProject) {
+        Objects.requireNonNull(updatedProject, "updatedProject must not be null");
+
+        Set<String> updatedLabels = new LinkedHashSet<>();
+        Set<String> addedLabels = new LinkedHashSet<>();
+        Set<String> removedLabels = new LinkedHashSet<>();
+
+        Map<String, VJavaAst.LabelNode> oldLabels = projectAst.labels();
+        Map<String, VJavaAst.LabelNode> newLabels = updatedProject.labels();
+
+        for (Map.Entry<String, VJavaAst.LabelNode> entry : newLabels.entrySet()) {
+            VJavaAst.LabelNode previous = oldLabels.get(entry.getKey());
+            if (previous == null) {
+                addedLabels.add(entry.getKey());
+            } else if (!previous.statements().equals(entry.getValue().statements())) {
+                updatedLabels.add(entry.getKey());
+            }
+        }
+        for (String oldName : oldLabels.keySet()) {
+            if (!newLabels.containsKey(oldName)) {
+                removedLabels.add(oldName);
+            }
+        }
+
+        List<VJavaAst.JavaBlockNode> oldBlocks = JavaBlockCompiler.collectJavaBlocks(projectAst);
+        List<VJavaAst.JavaBlockNode> newBlocks = JavaBlockCompiler.collectJavaBlocks(updatedProject);
+        boolean recompileNeeded = compiledBlocks == null || !oldBlocks.equals(newBlocks);
+        if (recompileNeeded) {
+            this.compiledBlocks = javaBlockCompiler.compile(updatedProject);
+        }
+
+        this.projectAst = updatedProject;
+        registerAssetsAndTransforms();
+
+        boolean topLevelCurrent = callStack.isEmpty()
+                || callStack.get(callStack.size() - 1).isCallBoundary();
+        if (topLevelCurrent && currentLabel != null && newLabels.containsKey(currentLabel)) {
+            this.currentStatements = newLabels.get(currentLabel).statements();
+            if (statementIndex >= currentStatements.size()) {
+                statementIndex = Math.max(0, currentStatements.size() - 1);
+            }
+        }
+
+        boolean dialogueRefreshed = false;
+        if (status == Status.WAITING_DIALOGUE && currentLabel != null && newLabels.containsKey(currentLabel)) {
+            VJavaAst.Statement stmt = statementIndex >= 0 && statementIndex < currentStatements.size()
+                    ? currentStatements.get(statementIndex)
+                    : null;
+            if (stmt instanceof VJavaAst.SayStatement say) {
+                refreshActiveDialogueLive(say);
+                dialogueRefreshed = true;
+            }
+        }
+
+        return new HotSwapResult(
+                updatedLabels,
+                addedLabels,
+                removedLabels,
+                dialogueRefreshed,
+                recompileNeeded
+        );
+    }
+
+    private void refreshActiveDialogueLive(VJavaAst.SayStatement say) {
+        String speakerId = (say.speakerId() != null && !say.speakerId().isBlank())
+                ? say.speakerId().trim()
+                : null;
+        VJavaAst.CharacterDef charDef = speakerId != null ? projectAst.characters().get(speakerId) : null;
+        String speakerName = charDef != null ? interpolateText(charDef.displayName()) : speakerId;
+        String speakerColor = charDef != null ? charDef.colorHex() : null;
+        String rawText = say.text() != null ? say.text() : "";
+        String localizedText = resolveLocalizedDialogue(say, rawText);
+        String interpolated = interpolateText(localizedText);
+        String lineId = buildLineId(say);
+        this.activeDialogue = new DialoguePrompt(
+                lineId,
+                speakerId,
+                speakerName,
+                speakerColor,
+                rawText,
+                interpolated,
+                activeVoicePath,
+                say.transitionExpr(),
+                persistentAccess.isLineRead(lineId),
+                nvlMode
+        );
     }
 
     /**

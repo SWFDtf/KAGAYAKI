@@ -1,6 +1,10 @@
 package de.swfdtf.tools;
 
 import de.swfdtf.core.ProjectDescriptor;
+import de.swfdtf.parser.CompiledScriptBundle;
+import de.swfdtf.parser.JavaBlockCompiler;
+import de.swfdtf.parser.ProjectScanner;
+import de.swfdtf.parser.VJavaAst;
 
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
@@ -51,6 +55,9 @@ public final class VpakArchiver {
 
     /** AES-CTR encrypted binary container format version. */
     public static final int FORMAT_VERSION_ENCRYPTED = 2;
+
+    /** Virtual archive path holding precompiled {@code .vjava} label indices and bytecode ({@code #0080}). */
+    public static final String PRECOMPILED_SCRIPTS_ENTRY = "META-INF/compiled-scripts.vjc";
 
     private static final byte[] MAGIC_BYTES = MAGIC.getBytes(StandardCharsets.US_ASCII);
     private static final byte[] ENCRYPTED_TOC_MAGIC = "VPAKTOC2".getBytes(StandardCharsets.US_ASCII);
@@ -115,6 +122,41 @@ public final class VpakArchiver {
             Path outputVpak,
             String encryptionKey
     ) throws IOException {
+        return pack(projectDir, outputVpak, encryptionKey, Map.of());
+    }
+
+    /**
+     * Scans and precompiles all {@code .vjava} scripts in {@code projectDir} into JVM bytecode and
+     * packs the serialized {@link CompiledScriptBundle} at {@link #PRECOMPILED_SCRIPTS_ENTRY} inside
+     * the resulting {@code .vpak} archive for instant release boot without runtime {@code javac}
+     * ({@code #0080}).
+     *
+     * @param projectDir    project root directory
+     * @param outputVpak    destination {@code .vpak} file path
+     * @param encryptionKey optional passphrase to enable {@link #FORMAT_VERSION_ENCRYPTED} (nullable/blank = v1)
+     * @return immutable list of packed entry descriptors including {@link #PRECOMPILED_SCRIPTS_ENTRY}
+     * @throws IOException if scanning, compiling, or writing the archive fails
+     */
+    public static List<VpakEntryInfo> packWithPrecompiledScripts(
+            Path projectDir,
+            Path outputVpak,
+            String encryptionKey
+    ) throws IOException {
+        Objects.requireNonNull(projectDir, "projectDir must not be null");
+        Path normalizedProject = projectDir.toAbsolutePath().normalize();
+        VJavaAst.ProjectAst ast = ProjectScanner.scan(normalizedProject);
+        JavaBlockCompiler compiler = new JavaBlockCompiler();
+        JavaBlockCompiler.CompiledBytecodePackage bytecode = compiler.compileToBytecode(ast);
+        byte[] bundleBytes = CompiledScriptBundle.serialize(ast, bytecode);
+        return pack(projectDir, outputVpak, encryptionKey, Map.of(PRECOMPILED_SCRIPTS_ENTRY, bundleBytes));
+    }
+
+    private static List<VpakEntryInfo> pack(
+            Path projectDir,
+            Path outputVpak,
+            String encryptionKey,
+            Map<String, byte[]> syntheticEntries
+    ) throws IOException {
         Objects.requireNonNull(projectDir, "projectDir must not be null");
         Objects.requireNonNull(outputVpak, "outputVpak must not be null");
 
@@ -132,11 +174,12 @@ public final class VpakArchiver {
         boolean encrypted = encryptionKey != null && !encryptionKey.isBlank();
         byte[] aesKey = encrypted ? deriveAesKey(encryptionKey) : null;
         List<Path> filesToPack = collectPackableFiles(normalizedProject, normalizedOutput);
-        byte[] salt = encrypted ? deriveSalt(encryptionKey, filesToPack.size()) : null;
+        int totalEntries = filesToPack.size() + syntheticEntries.size();
+        byte[] salt = encrypted ? deriveSalt(encryptionKey, totalEntries) : null;
         int version = encrypted ? FORMAT_VERSION_ENCRYPTED : FORMAT_VERSION;
         long preambleSize = encrypted ? HEADER_SIZE + SALT_SIZE : HEADER_SIZE;
 
-        List<StoredEntry> toc = new ArrayList<>(filesToPack.size());
+        List<StoredEntry> toc = new ArrayList<>(totalEntries);
 
         try (FileChannel channel = FileChannel.open(
                 normalizedOutput,
@@ -149,17 +192,13 @@ public final class VpakArchiver {
 
             for (Path file : filesToPack) {
                 String relPath = toUnixRelativePath(normalizedProject, file);
-                byte[] rawBytes = Files.readAllBytes(file);
-                long crc = computeCrc32(rawBytes);
-                byte[] compressed = deflate(rawBytes);
-                byte[] storedPayload = encrypted
-                        ? aesCtrTransform(compressed, aesKey, deriveEntryIv(salt, relPath))
-                        : compressed;
-
-                writeFully(channel, ByteBuffer.wrap(storedPayload));
-                VpakEntryInfo info = new VpakEntryInfo(relPath, rawBytes.length, storedPayload.length, crc);
-                toc.add(new StoredEntry(info, currentOffset));
-                currentOffset += storedPayload.length;
+                currentOffset = writeArchiveEntry(
+                        channel, toc, currentOffset, relPath, Files.readAllBytes(file), encrypted, aesKey, salt);
+            }
+            for (Map.Entry<String, byte[]> synthetic : syntheticEntries.entrySet()) {
+                String relPath = normalizeArchivePath(synthetic.getKey());
+                currentOffset = writeArchiveEntry(
+                        channel, toc, currentOffset, relPath, synthetic.getValue(), encrypted, aesKey, salt);
             }
 
             long tocOffset = currentOffset;
@@ -190,6 +229,27 @@ public final class VpakArchiver {
         }
 
         return toc.stream().map(StoredEntry::info).toList();
+    }
+
+    private static long writeArchiveEntry(
+            FileChannel channel,
+            List<StoredEntry> toc,
+            long currentOffset,
+            String relPath,
+            byte[] rawBytes,
+            boolean encrypted,
+            byte[] aesKey,
+            byte[] salt
+    ) throws IOException {
+        long crc = computeCrc32(rawBytes);
+        byte[] compressed = deflate(rawBytes);
+        byte[] storedPayload = encrypted
+                ? aesCtrTransform(compressed, aesKey, deriveEntryIv(salt, relPath))
+                : compressed;
+        writeFully(channel, ByteBuffer.wrap(storedPayload));
+        VpakEntryInfo info = new VpakEntryInfo(relPath, rawBytes.length, storedPayload.length, crc);
+        toc.add(new StoredEntry(info, currentOffset));
+        return currentOffset + storedPayload.length;
     }
 
     /**

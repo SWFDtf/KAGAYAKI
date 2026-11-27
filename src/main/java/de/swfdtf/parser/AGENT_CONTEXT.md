@@ -60,6 +60,7 @@ Vollständige `.vjava`-Skript-Pipeline von KAGAYAKI (Meilenstein M3 + M4): einr�
 | `VJavaReplEvaluator` | `final class` | Interaktiver Einzelzeilen-REPL-Evaluator für Live-`.vjava`-Befehle und `?`-Ausdrücke in `ScriptRuntime`. |
 | `ScriptCoverageTracker` | `final class` | Laufzeit-Coverage-Tracker für Statement- und Branch-Abdeckung je `.vjava`-Datei. |
 | `VJavaDslReferenceGenerator` | `final class` | Automatischer Markdown-Referenz-Generator inklusive Parse-Verifikation für jedes `VJavaAst.Statement`. |
+| `CompiledScriptBundle` | `final class` | CRC32-geschützte Binärserialisierung voraufgelöster Labels und vorkompilierter JVM-Bytecode-Pakete für `.vpak`-Sofortstart ohne `javac` (`#0080`). |
 
 ## Öffentliche API-Signaturen
 

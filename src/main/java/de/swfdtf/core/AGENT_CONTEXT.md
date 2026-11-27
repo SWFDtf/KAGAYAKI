@@ -44,6 +44,7 @@ Zentrales Laufzeit-Fundament von KAGAYAKI: Ausführungsmodi (`STUDIO_DUAL_WINDOW
 | `KagayakiException` | `class` | Gemeinsame ungeprüfte Engine-Basisklasse mit Fehlercode für UI-Crash-Grenzen und Subsystem-Ausnahmen. |
 | `SaveCorruptionException` | `class` | Spezialisierte `KagayakiException` bei defekten oder schema-inkompatiblen Speicherständen. |
 | `RuntimeQualityAndDiagnosticsServices` | `final class` | OpenGL-3.3-Treiber-Diagnose (`NativeDriverDiagnostics`), `--smoke-test`-Watchdog (`SmokeTestWatchdog`), statische Menü-Idle-Wait-Policy, `GameClock`-Modal-Pause-Schutz und SemVer-Deprecation-Policy. |
+| `WebAssemblyFeasibilityAnalyzer` | `final class` | Statische WebAssembly-/TeaVM-Portabilitätsprüfung für den headless Kernel inklusive Erfassung aller Abhängigkeiten jenseits LWJGL (`#1018`). |
 
 ## Öffentliche API-Signaturen
 

@@ -69,6 +69,9 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- 
 | `Scene3DWorld` | `final class` | 3D-Weltgraph mit `Node3D` (LOD-Hysterese, 2.5D-Billboards, Collider, 2D-Surface-Attach), Top-8-Lichtselektion, `Fog3DConfig`, `Skydome3D`, planarer Spiegelungsmatrix, `InspectItemOverlay`, `Minimap3DProjector`, `Scene3DSnapshot` und `Scene3DPreloader`. |
 | `RenderPipeline3D` | `final class` | OpenGL-3.3-Core-3D-Render-Pipeline (`implements IRenderPipeline`) mit Composite-Reihenfolge (`Sky2D -> World3D -> Billboards -> Foreground2D -> UI`), std140-Kamera-UBO (`176 B`), Tiefen-Prepass, MSAA, Auflösungs-Skalierung und nahtlosem 2D-Backdrop-Fallback. |
 | `TypographyAndLayoutServices` | `final class` | Kapitel-9-Typografie-Suite: BiDi/RTL-Visual-Reordering, Ruby-Shorthand (`{ruby=...}`), Sprach-Font-Map, Auto-Shrink, Soft-Hyphens (`\u00AD`), WCAG-Kontrastprüfung, Tategaki-Spaltenlayout, Typewriter-Span-Splicing, binäre Cursor-Suche und On-Demand-Glyph-Atlas-DPI-Tracking. |
+| `GridPathfinder2D` | `final class` | Deterministischer 2D-A*-Gitter-Pfadfinder (`GridMap`, `GridCell`) mit Eckenschneide-Schutz für Begleitfiguren in Top-Down-Räumen (`#0056`). |
+| `Skeletal2DAdapter` | `interface` | Modulares 2D-Skeletal-/Bone-Plugin-Interface (Spine/DragonBones-kompatibel) inklusive eingebauter `SimpleRigAdapter`-Implementierung (`#0213`). |
+| `Skeletal2DDisplayable` | `final class` | `CustomDisplayable`-Brücke zur nahtlosen Einbindung beliebiger `Skeletal2DAdapter`-Rigs in `SpriteNode` (`#0213`). |
 
 ## Öffentliche API-Signaturen
 
