@@ -382,3 +382,11 @@ public final class VJavaLocalizationBridge {
     public static String extractTranslationTemplate(VJavaAst.ProjectAst project, String targetLanguage)
 }
 ```
+
+### Wave P2-4 3D-DSL-Statements (`VJavaAst`, `VJavaParser`, `ScriptRuntime`, `VJavaDslReferenceGenerator`)
+- `Scene3DStatement(String prefabOrAsset, String sourceFile, int lineNumber)` (`scene3d <prefabOrAsset>`)
+- `Spawn3DStatement(String id, String meshAsset, double x, double y, double z, String sourceFile, int lineNumber)` (`spawn3d [<id>] <mesh> at <x> <y> <z>`)
+- `Camera3DStatement(String mode, double x, double y, double z, double durationSeconds, String sourceFile, int lineNumber)` (`camera3d <move|look_at> <x> <y> <z> [duration <s>]`)
+- `Wasd3DInitStatement(double speed, double fovDegrees, String sourceFile, int lineNumber)` (`wasd3d_init [speed <s>] [fov <f>]`)
+- `Fog3DStatement(String colorHex, double density, double heightFalloff, String sourceFile, int lineNumber)` (`fog3d <hexColor> [density <d>] [falloff <f>]`)
+- `Material3DStatement(String targetId, String tintHex, double roughness, double metallic, String sourceFile, int lineNumber)` (`material3d <id> tint <hex> [roughness <r>] [metallic <m>]`)

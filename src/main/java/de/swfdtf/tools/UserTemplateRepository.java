@@ -89,6 +89,7 @@ public final class UserTemplateRepository {
         List<TemplatePreviewCard> cards = new ArrayList<>();
         cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.FULL_DEMO));
         cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.ACTION_ADVENTURE_2D));
+        cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.HYBRID_3D_EXPLORATION));
         cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.STARTER));
         cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.MINIMAL));
 
@@ -133,6 +134,14 @@ public final class UserTemplateRepository {
                     "WASD-Steuerung, bewegliche Plattformen, Trigger-Zonen & Java-Inventar.",
                     List.of("WASD", "Plattformen", "Trigger-Zonen", "DE/EN"),
                     "#3fb950",
+                    false
+            );
+            case HYBRID_3D_EXPLORATION -> new TemplatePreviewCard(
+                    "HYBRID_3D_EXPLORATION",
+                    "3D-Erkundung Hybrid",
+                    "3D-Kamera & WASD3D, OBJ-Halle, Material-Styles, Nebel & 2D-Dialog-Overlay.",
+                    List.of("3D Pipeline", "WASD3D", "OBJ + PBR/Toon", "Hybrid HUD"),
+                    "#a371f7",
                     false
             );
             case STARTER -> new TemplatePreviewCard(

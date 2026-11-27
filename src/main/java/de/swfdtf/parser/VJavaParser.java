@@ -9,6 +9,7 @@ import de.swfdtf.parser.VJavaAst.AttractStatement;
 import de.swfdtf.parser.VJavaAst.AttributeEntry;
 import de.swfdtf.parser.VJavaAst.BlockRollbackStatement;
 import de.swfdtf.parser.VJavaAst.CallStatement;
+import de.swfdtf.parser.VJavaAst.Camera3DStatement;
 import de.swfdtf.parser.VJavaAst.CameraClampStatement;
 import de.swfdtf.parser.VJavaAst.CameraFollowStatement;
 import de.swfdtf.parser.VJavaAst.CharacterDef;
@@ -18,6 +19,7 @@ import de.swfdtf.parser.VJavaAst.ColliderWallStatement;
 import de.swfdtf.parser.VJavaAst.CollisionMaskStatement;
 import de.swfdtf.parser.VJavaAst.ConditionalLayerEntry;
 import de.swfdtf.parser.VJavaAst.DespawnStatement;
+import de.swfdtf.parser.VJavaAst.Fog3DStatement;
 import de.swfdtf.parser.VJavaAst.FollowStatement;
 import de.swfdtf.parser.VJavaAst.GroupLayerEntry;
 import de.swfdtf.parser.VJavaAst.HideStatement;
@@ -37,6 +39,7 @@ import de.swfdtf.parser.VJavaAst.LayeredImageDef;
 import de.swfdtf.parser.VJavaAst.LocalVarStatement;
 import de.swfdtf.parser.VJavaAst.MatchCase;
 import de.swfdtf.parser.VJavaAst.MatchStatement;
+import de.swfdtf.parser.VJavaAst.Material3DStatement;
 import de.swfdtf.parser.VJavaAst.MenuChoice;
 import de.swfdtf.parser.VJavaAst.MenuStatement;
 import de.swfdtf.parser.VJavaAst.MovePathStatement;
@@ -63,6 +66,7 @@ import de.swfdtf.parser.VJavaAst.ReturnStatement;
 import de.swfdtf.parser.VJavaAst.RotateStatement;
 import de.swfdtf.parser.VJavaAst.SayStatement;
 import de.swfdtf.parser.VJavaAst.ScaleStatement;
+import de.swfdtf.parser.VJavaAst.Scene3DStatement;
 import de.swfdtf.parser.VJavaAst.SceneStatement;
 import de.swfdtf.parser.VJavaAst.ScreenDef;
 import de.swfdtf.parser.VJavaAst.ScreenItem;
@@ -72,6 +76,7 @@ import de.swfdtf.parser.VJavaAst.SetVarStatement;
 import de.swfdtf.parser.VJavaAst.ShakeLayerStatement;
 import de.swfdtf.parser.VJavaAst.ShowStatement;
 import de.swfdtf.parser.VJavaAst.SolidPlatformStatement;
+import de.swfdtf.parser.VJavaAst.Spawn3DStatement;
 import de.swfdtf.parser.VJavaAst.SpawnCutsceneStatement;
 import de.swfdtf.parser.VJavaAst.SpawnStatement;
 import de.swfdtf.parser.VJavaAst.Statement;
@@ -84,6 +89,7 @@ import de.swfdtf.parser.VJavaAst.TranslateEntry;
 import de.swfdtf.parser.VJavaAst.TriggerZoneStatement;
 import de.swfdtf.parser.VJavaAst.VoiceStatement;
 import de.swfdtf.parser.VJavaAst.WaitMoveStatement;
+import de.swfdtf.parser.VJavaAst.Wasd3DInitStatement;
 import de.swfdtf.parser.VJavaAst.WasdInitStatement;
 import de.swfdtf.parser.VJavaAst.WasdStopStatement;
 import de.swfdtf.parser.VJavaAst.WhileStatement;
@@ -1152,6 +1158,12 @@ public final class VJavaParser {
                     case "point_click_init" -> statements.add(parsePointClickInitStatement(curr));
                     case "surface_friction" -> statements.add(parseSurfaceFrictionStatement(curr));
                     case "impulse" -> statements.add(parseImpulseStatement(curr));
+                    case "scene3d" -> statements.add(parseScene3DStatement(curr));
+                    case "spawn3d" -> statements.add(parseSpawn3DStatement(curr));
+                    case "camera3d" -> statements.add(parseCamera3DStatement(curr));
+                    case "wasd3d_init" -> statements.add(parseWasd3DInitStatement(curr));
+                    case "fog3d" -> statements.add(parseFog3DStatement(curr));
+                    case "material3d" -> statements.add(parseMaterial3DStatement(curr));
                     case "match" -> statements.add(parseMatchStatement(curr));
                     case "case", "default" -> throw error(curr, "Orphaned '" + keyword + "' outside 'match' block");
                     case "if" -> statements.add(parseIfStatement(curr));
@@ -2405,6 +2417,132 @@ public final class VJavaParser {
             i += 2;
         }
         return new ImpulseStatement(tag, vx, vy, token.sourceFile(), token.lineNumber());
+    }
+
+    private Scene3DStatement parseScene3DStatement(Token token) {
+        String rest = stripKeyword(token.text(), "scene3d", token).trim();
+        if (rest.isEmpty()) {
+            throw error(token, "Expected 'scene3d <prefabOrAsset>'");
+        }
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        return new Scene3DStatement(
+                unquoteIfSingleStringLiteral(parts.get(0), token),
+                token.sourceFile(),
+                token.lineNumber()
+        );
+    }
+
+    private Spawn3DStatement parseSpawn3DStatement(Token token) {
+        String rest = stripKeyword(token.text(), "spawn3d", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        int atIdx = -1;
+        for (int i = 0; i < parts.size(); i++) {
+            if ("at".equalsIgnoreCase(parts.get(i))) {
+                atIdx = i;
+                break;
+            }
+        }
+        if (atIdx < 1 || atIdx + 3 >= parts.size()) {
+            throw error(token, "Expected 'spawn3d [<id>] <mesh> at <x> <y> <z>'");
+        }
+        String id = atIdx >= 2
+                ? parts.get(0)
+                : unquoteIfSingleStringLiteral(parts.get(0), token);
+        String mesh = atIdx >= 2
+                ? unquoteIfSingleStringLiteral(parts.get(1), token)
+                : unquoteIfSingleStringLiteral(parts.get(0), token);
+        double x = parseDoubleStrict(parts.get(atIdx + 1), token, "spawn3d x");
+        double y = parseDoubleStrict(parts.get(atIdx + 2), token, "spawn3d y");
+        double z = parseDoubleStrict(parts.get(atIdx + 3), token, "spawn3d z");
+        return new Spawn3DStatement(id, mesh, x, y, z, token.sourceFile(), token.lineNumber());
+    }
+
+    private Camera3DStatement parseCamera3DStatement(Token token) {
+        String rest = stripKeyword(token.text(), "camera3d", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.size() < 4) {
+            throw error(token, "Expected 'camera3d <move|look_at> <x> <y> <z> [duration <s>]'");
+        }
+        String mode = parts.get(0).toLowerCase(Locale.ROOT);
+        if (!"move".equals(mode) && !"look_at".equals(mode)) {
+            throw error(token, "Unknown camera3d mode '" + parts.get(0) + "', expected 'move' or 'look_at'");
+        }
+        double x = parseDoubleStrict(parts.get(1), token, "camera3d x");
+        double y = parseDoubleStrict(parts.get(2), token, "camera3d y");
+        double z = parseDoubleStrict(parts.get(3), token, "camera3d z");
+        double duration = 0.0;
+        int i = 4;
+        while (i + 1 < parts.size()) {
+            if ("duration".equalsIgnoreCase(parts.get(i))) {
+                duration = parseDoubleStrict(parts.get(i + 1), token, "camera3d duration");
+            }
+            i += 2;
+        }
+        return new Camera3DStatement(mode, x, y, z, duration, token.sourceFile(), token.lineNumber());
+    }
+
+    private Wasd3DInitStatement parseWasd3DInitStatement(Token token) {
+        String rest = stripKeyword(token.text(), "wasd3d_init", token);
+        List<String> parts = rest.isEmpty() ? List.of() : splitWhitespaceTopLevel(rest);
+        double speed = 5.0;
+        double fov = 70.0;
+        int i = 0;
+        while (i + 1 < parts.size()) {
+            String k = parts.get(i).toLowerCase(Locale.ROOT);
+            if ("speed".equals(k)) {
+                speed = parseDoubleStrict(parts.get(i + 1), token, "wasd3d_init speed");
+            } else if ("fov".equals(k)) {
+                fov = parseDoubleStrict(parts.get(i + 1), token, "wasd3d_init fov");
+            }
+            i += 2;
+        }
+        return new Wasd3DInitStatement(speed, fov, token.sourceFile(), token.lineNumber());
+    }
+
+    private Fog3DStatement parseFog3DStatement(Token token) {
+        String rest = stripKeyword(token.text(), "fog3d", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.isEmpty()) {
+            throw error(token, "Expected 'fog3d <hexColor> [density <d>] [falloff <f>]'");
+        }
+        String colorHex = unquoteIfSingleStringLiteral(parts.get(0), token);
+        double density = 0.03;
+        double falloff = 0.1;
+        int i = 1;
+        while (i + 1 < parts.size()) {
+            String k = parts.get(i).toLowerCase(Locale.ROOT);
+            if ("density".equals(k)) {
+                density = parseDoubleStrict(parts.get(i + 1), token, "fog3d density");
+            } else if ("falloff".equals(k)) {
+                falloff = parseDoubleStrict(parts.get(i + 1), token, "fog3d falloff");
+            }
+            i += 2;
+        }
+        return new Fog3DStatement(colorHex, density, falloff, token.sourceFile(), token.lineNumber());
+    }
+
+    private Material3DStatement parseMaterial3DStatement(Token token) {
+        String rest = stripKeyword(token.text(), "material3d", token);
+        List<String> parts = splitWhitespaceTopLevel(rest);
+        if (parts.size() < 3) {
+            throw error(token, "Expected 'material3d <id> tint <hex> [roughness <r>] [metallic <m>]'");
+        }
+        String id = parts.get(0);
+        String tintHex = "#ffffff";
+        double roughness = -1.0;
+        double metallic = -1.0;
+        int i = 1;
+        while (i + 1 < parts.size()) {
+            String k = parts.get(i).toLowerCase(Locale.ROOT);
+            switch (k) {
+                case "tint" -> tintHex = unquoteIfSingleStringLiteral(parts.get(i + 1), token);
+                case "roughness" -> roughness = parseDoubleStrict(parts.get(i + 1), token, "material3d roughness");
+                case "metallic" -> metallic = parseDoubleStrict(parts.get(i + 1), token, "material3d metallic");
+                default -> throw error(token, "Unknown option in 'material3d': " + parts.get(i));
+            }
+            i += 2;
+        }
+        return new Material3DStatement(id, tintHex, roughness, metallic, token.sourceFile(), token.lineNumber());
     }
 
     private TriggerZoneStatement parseTriggerZoneStatement(Token token) {

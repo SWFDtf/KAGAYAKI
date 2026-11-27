@@ -1953,6 +1953,37 @@ public final class ScriptRuntime {
             statementIndex++;
             return false;
         }
+        if (stmt instanceof VJavaAst.Scene3DStatement s3d) {
+            stateStore.set("scene3d.active", s3d.prefabOrAsset());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.Spawn3DStatement sp3d) {
+            stateStore.set("scene3d.spawn." + sp3d.id(), sp3d.meshAsset());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.Camera3DStatement cam3d) {
+            stateStore.set("scene3d.camera." + cam3d.mode(), cam3d.x() + "," + cam3d.y() + "," + cam3d.z());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.Wasd3DInitStatement wasd3d) {
+            stateStore.set("scene3d.wasd.speed", wasd3d.speed());
+            stateStore.set("scene3d.wasd.fov", wasd3d.fovDegrees());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.Fog3DStatement fog3d) {
+            stateStore.set("scene3d.fog", fog3d.colorHex() + ":" + fog3d.density());
+            statementIndex++;
+            return false;
+        }
+        if (stmt instanceof VJavaAst.Material3DStatement mat3d) {
+            stateStore.set("scene3d.material." + mat3d.targetId(), mat3d.tintHex());
+            statementIndex++;
+            return false;
+        }
 
         throw new IllegalStateException("Unsupported AST statement type: " + stmt.getClass().getName());
     }

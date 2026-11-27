@@ -62,6 +62,11 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- 
 | `RenderCacheNode` | `class` | Statischer UI-Unterbaum-Cache (`extends SceneNode`), der unveränderte UI-Hierarchien auf einen einzelnen Draw-Call reduziert bis Kinder oder Zustand invalidieren. |
 | `GlResourceAuditor` | `final class` | OpenGL-Lebenszyklus-Auditor (`VAO`, `VBO`, `FBO`, `TEXTURE`, `SHADER`) zur Leck-Prüfung bei `dispose()` sowie Pass-Timer-Speicher mit `0.0 ms`-Headless-Fallback. |
 | `GraphicsRuntimeServices` | `final class` | Gebündelte P2-Grafik-Services: `FramePacer` (FPS-Cap + `15 FPS` Idle-Throttle), `SoftwareRasterizer`, `AnimatedImageDecoder` (`stbi_load_gif_from_memory`), `VectorDebugRenderer`, `SpeechBubblePointer`, `ColorMatrixKeyframeTimeline`, `SplitViewConfig`, `SafeAreaGuides`, `AdaptiveContrastAdvisor`, `ColorLut`, `HdrToneMapper`, `FocusVignetteController`, `ReflectionZone`, `MotionTrailTracker`, `GradientSpec`, `SoftwareCursorRenderer` und `MaskConfig`. |
+| `Mesh3D` | `final class` | 3D-Mesh-Container & Importer mit prozeduralen Primitiven (`Plane`, `Cube`, `Sphere`, `Cylinder`), Wavefront `.obj`/`.mtl`- & binärem `.glb`-Parser, `BoundingBox3D`/`BoundingSphere3D`, Tangenten, glatten Normalen und frame-budgetierter `MeshUploadQueue`. |
+| `Material3D` | `final class` | 3D-Material-Deskriptor für PBR-Cook-Torrance-GGX, Toon-Shading, Wasser, Cutout und Decal (`ShaderStyle`) inklusive Uniform-Overrides und gemeinsamer Albedo-Textur-Auflösung. |
+| `Camera3D` | `final class` | JOML-`Matrix4f`-3D-Kamera mit Perspektiv-/Orthoprojektion, FOV-Clamping `[50°, 110°]`, Keyframe-`moveTo`, `wasd3d`-Steuerung (`±89°` Pitch-Clamp), SpringArm-Kollision, `CameraRail`, `ShotPreset`, Trauma-Shake, Stereo-Matrizen, Frustum-Culling und `screenPointToRay`. |
+| `Scene3DWorld` | `final class` | 3D-Weltgraph mit `Node3D` (LOD-Hysterese, 2.5D-Billboards, Collider, 2D-Surface-Attach), Top-8-Lichtselektion, `Fog3DConfig`, `Skydome3D`, planarer Spiegelungsmatrix, `InspectItemOverlay`, `Minimap3DProjector`, `Scene3DSnapshot` und `Scene3DPreloader`. |
+| `RenderPipeline3D` | `final class` | OpenGL-3.3-Core-3D-Render-Pipeline (`implements IRenderPipeline`) mit Composite-Reihenfolge (`Sky2D -> World3D -> Billboards -> Foreground2D -> UI`), std140-Kamera-UBO (`176 B`), Tiefen-Prepass, MSAA, Auflösungs-Skalierung und nahtlosem 2D-Backdrop-Fallback. |
 
 ## Öffentliche API-Signaturen
 
@@ -1087,3 +1092,10 @@ public final class WebpVp8lDecoder {
 - `TextureManager`: `DecodedImage`, `preloadAsync`, `preloadAllAsync`, `isPreloaded`, `getPreloadedCount`, `uploadPreloadedTextures` sowie WebP/VP8L-Dispatch in `readImageFileRgba`
 - `FontAtlas`: `GlyphFieldMode`, `createSdfBuiltinFallback`, `fromTrueTypeBytesSdf`, `computeSdfFromCoverage`, `evaluateMsdfMedian`, `evaluateSdfCoverage`, `getFieldMode`, `getSdfSpreadPx`
 - `StyledTextLayout`: Japanische Kinsoku-Shori-Umbruchregeln in `wrapAtoms` (`KINSOKU_NO_START` / `KINSOKU_NO_END`)
+
+### Wave P2-4 3D-Pipeline & Hybrid-2D/3D-Klassen
+- `Mesh3D`: Prozedurale Primitiven (`createPlane`, `createCube`, `createSphere`, `createCylinder`), `.obj`/`.mtl`-Parser (`parseObj`, `loadObj`), binärer `.glb`-Parser (`parseGlb`, `loadGlb`), `BoundingBox3D`, `BoundingSphere3D`, `SubMesh`, `computeTangents`, `computeSmoothNormals`, `MeshUploadQueue`.
+- `Material3D`: `ShaderStyle { PBR, TOON, WATER, CUTOUT, DECAL }`, `defaultPbr`, `withOverrides`, `evaluateCookTorranceGgxNdf`, `evaluateToonQuantization`, `evaluateFresnelSchlick`, `resolveSharedAlbedoTexture`.
+- `Camera3D`: `ProjectionMode { PERSPECTIVE, ORTHOGRAPHIC }`, `Ray3D`, `CameraRail`, `ShotPreset`, FOV `[50°, 110°]`, `moveTo`, `applyWasdInput` (`±89°` Pitch-Clamp, Strafe-Tilt-Toggle), Dialog-Fokus-Blend, quadratisches Trauma-Decay, `resolveSpringArmPosition`, Stereo-Eye-Matrizen, Frustum-AABB-Culling, `screenPointToRay`, `rayIntersectsAabbDistance`.
+- `Scene3DWorld`: `Node3D` (inkl. LOD-Hysterese, Billboards, Collider, 2D-Surface-Attach), `Light3D`, `Fog3DConfig`, `Skydome3D`, `InspectItemOverlay`, `Minimap3DProjector`, `Scene3DSnapshot`, `Scene3DPreloader`, `selectTopNearestLights`, `getSortedDrawNodes`, `pickNode`, `moveWithWallCollision`, `computePlanarReflectionMatrix`, `getNode`, `reset`.
+- `RenderPipeline3D`: OpenGL 3.3 Core (`implements IRenderPipeline`), `ShadowQuality`, `DebugViewMode`, `COMPOSITE_PASS_ORDER`, `GLOBAL_CAMERA_UBO_STD140_BYTES = 176`, `verifyStd140UboAlignment`, `validateCore3DShaders`, `computeInternalRenderSize`, `setFallbackTo2dBackdrop`, `getMode` -> `RenderMode.MODE_3D`.

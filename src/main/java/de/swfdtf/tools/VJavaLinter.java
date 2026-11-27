@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import de.swfdtf.core.ProjectDescriptor;
+import de.swfdtf.graphics.Mesh3D;
 import de.swfdtf.graphics.ObjectMotionController;
 import de.swfdtf.graphics.Transition;
 import de.swfdtf.parser.JavaBlockCompiler;
@@ -863,8 +864,92 @@ public final class VJavaLinter {
                             phys.lineNumber()
                     ));
                 }
+            } else if (stmt instanceof VJavaAst.Scene3DStatement scene3d) {
+                verifyMeshAssetAndPolyBudget(
+                        project,
+                        knownAssets,
+                        scene3d.prefabOrAsset(),
+                        true,
+                        scene3d.sourceFile(),
+                        scene3d.lineNumber(),
+                        issues
+                );
+            } else if (stmt instanceof VJavaAst.Spawn3DStatement spawn3d) {
+                verifyMeshAssetAndPolyBudget(
+                        project,
+                        knownAssets,
+                        spawn3d.meshAsset(),
+                        true,
+                        spawn3d.sourceFile(),
+                        spawn3d.lineNumber(),
+                        issues
+                );
             }
         }
+    }
+
+    private static final int HIGH_POLY_VERTEX_THRESHOLD = 100_000;
+    private static final Set<String> BUILTIN_3D_PREFAB_KEYWORDS = Set.of(
+            "cube", "sphere", "plane", "cylinder", "hall", "courtyard", "arena", "default", "empty"
+    );
+
+    private static void verifyMeshAssetAndPolyBudget(
+            VJavaAst.ProjectAst project,
+            Set<String> knownAssets,
+            String rawMeshRef,
+            boolean checkVertexBudget,
+            String sourceFile,
+            int lineNumber,
+            List<LintIssue> issues
+    ) {
+        if (rawMeshRef == null || rawMeshRef.isBlank()) {
+            return;
+        }
+        String stripped = stripQuotes(rawMeshRef);
+        String lower = stripped.toLowerCase(Locale.ROOT);
+        if (!stripped.contains("/") && BUILTIN_3D_PREFAB_KEYWORDS.contains(lower)) {
+            return;
+        }
+        verifyAssetExists(project, knownAssets, stripped, sourceFile, lineNumber, issues);
+        if (!checkVertexBudget || project.projectRoot() == null) {
+            return;
+        }
+        String normalized = normalizeAssetPath(stripped);
+        try {
+            Path meshFile = project.projectRoot().resolve(normalized).normalize();
+            if (!Files.isRegularFile(meshFile)) {
+                return;
+            }
+            int vertexCount = 0;
+            if (lower.endsWith(".obj")) {
+                vertexCount = countObjVertices(meshFile);
+            } else if (lower.endsWith(".glb")) {
+                Mesh3D mesh = Mesh3D.loadGlb(meshFile);
+                vertexCount = mesh.getVertexCount();
+            }
+            if (vertexCount > HIGH_POLY_VERTEX_THRESHOLD) {
+                issues.add(new LintIssue(
+                        Severity.WARNING,
+                        "HIGH_POLY_MESH",
+                        "3D mesh '" + normalized + "' has " + vertexCount
+                                + " vertices (exceeds " + HIGH_POLY_VERTEX_THRESHOLD + ").",
+                        sourceFile,
+                        lineNumber
+                ));
+            }
+        } catch (IOException | IllegalArgumentException ignored) {
+            // Invalid or non-mesh files are reported by missing asset or runtime loader checks.
+        }
+    }
+
+    private static int countObjVertices(Path objFile) throws IOException {
+        int rawPositions = 0;
+        for (String line : Files.readAllLines(objFile, StandardCharsets.UTF_8)) {
+            if (line.startsWith("v ")) {
+                rawPositions++;
+            }
+        }
+        return rawPositions;
     }
 
     private static void checkUnreachableLabels(
@@ -1518,7 +1603,11 @@ public final class VJavaLinter {
                 || lower.endsWith(".jpeg")
                 || lower.endsWith(".webp")
                 || lower.endsWith(".bmp")
-                || lower.endsWith(".tga");
+                || lower.endsWith(".tga")
+                || lower.endsWith(".obj")
+                || lower.endsWith(".glb")
+                || lower.endsWith(".gltf")
+                || lower.endsWith(".mtl");
     }
 
     private static boolean isLiteralAssetPath(String value) {
@@ -1540,7 +1629,11 @@ public final class VJavaLinter {
                 || lower.endsWith(".ogg")
                 || lower.endsWith(".oga")
                 || lower.endsWith(".wav")
-                || lower.endsWith(".wave");
+                || lower.endsWith(".wave")
+                || lower.endsWith(".obj")
+                || lower.endsWith(".glb")
+                || lower.endsWith(".gltf")
+                || lower.endsWith(".mtl");
     }
 
     private static String normalizeAssetPath(String raw) {

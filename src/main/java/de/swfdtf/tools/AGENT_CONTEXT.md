@@ -61,6 +61,7 @@ Entwickler-Werkzeuge, Dual-Window-Studio-UI und Standalone-Build-Pipeline von KA
 | `StudioWorkspaceAutoRecovery` | `final class` | Crash-sichere 30s-Auto-Recovery für ungesicherte Editor-Puffer unter `.studio_autosave`. |
 | `UserTemplateRepository` | `final class` | Verwaltet benutzerdefinierte Projektvorlagen und `TemplatePreviewCard`-Vorschaukarten für den Projekt-Hub. |
 | `StudioCliRunner` | `final class` | Headless CI/CD CLI-Runner für `lint`, `preflight`, `flow-graph`, `standalone-build`, `release-check` und `html-report` mit Exit-Codes. |
+| `Studio3DInspectorService` | `final class` | Studio-exklusiver 3D-Autoring-Inspektor für Live-`Camera3D`-Parameter, X/Y/Z-Achsen-Gizmo-Drag mit Snap & `.vjava`-Snippet, Laufzeit-`Material3D`-JSON-Export und Studio-only-Nav-Pfad-Visualisierung. |
 
 ## Öffentliche API-Signaturen
 
@@ -240,3 +241,8 @@ public final class StudioWindowController implements StudioBridge {
   - `StudioView { MAIN_MENU, WORKSPACE }` (`MAIN_MENU_SCREEN_NAME = "studio_main_menu"`, `WORKSPACE_SCREEN_NAME = "studio_workspace"`).
   - Neue Methoden: `createNewProject(Path, String, TemplateType)`, `showMainMenu()`, `showWorkspace()`, `getActiveView()`, `getSelectedTemplateType()`, `setSelectedTemplateType(TemplateType)`, `getEngineVersionBanner()`, `getActiveProjectVersion()`, `getActiveProjectRoot()`, `getRecentProjects()`, `getStudioInput()`.
 - `VJavaLinter`: Prüft zusätzlich `OnCollideStatement` (`MISSING_COLLIDE_TARGET`), `MoveStatement` (`INVALID_MOVE_DURATION`, `UNKNOWN_EASING`), `WasdInitStatement` (`INVALID_WASD_SPEED`, `INVALID_WASD_BOUNDS`) und `PhysicsInitStatement` (`INVALID_PHYSICS_CONFIG`).
+
+### Wave P2-4 3D-Studio-Werkzeuge & Template
+- `Studio3DInspectorService`: Studio-exklusiver 3D-Inspektor (`GizmoAxis { X, Y, Z }`, `CameraSnapshot`, `PropDragResult`, `DebugLine3D`, `inspectCamera`, `applyCameraEdit`, `dragNodeAlongAxis`, `updateNodeMaterial`, `exportMaterialsJson`, `buildNavPathLines`).
+- `ProjectTemplateGenerator.TemplateType.HYBRID_3D_EXPLORATION`: Generiert 3D-Erkundungs-Projekt (`renderMode = "3D"`, `hall.obj`/`hall.mtl`/`pillar.obj`, `bg_hall_2d.png`, `WASD3D`, Material & Nebel).
+- `VJavaLinter`: Prüft `Scene3DStatement` und `Spawn3DStatement` auf `MISSING_ASSET` sowie `.obj`/`.glb`-Meshes > 100.000 Vertices auf `HIGH_POLY_MESH`-Warnung.

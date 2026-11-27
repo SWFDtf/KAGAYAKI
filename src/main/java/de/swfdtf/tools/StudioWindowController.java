@@ -898,7 +898,8 @@ public final class StudioWindowController implements StudioBridge {
             case FULL_DEMO -> ProjectTemplateGenerator.TemplateType.STARTER;
             case STARTER -> ProjectTemplateGenerator.TemplateType.MINIMAL;
             case MINIMAL -> ProjectTemplateGenerator.TemplateType.ACTION_ADVENTURE_2D;
-            case ACTION_ADVENTURE_2D -> ProjectTemplateGenerator.TemplateType.FULL_DEMO;
+            case ACTION_ADVENTURE_2D -> ProjectTemplateGenerator.TemplateType.HYBRID_3D_EXPLORATION;
+            case HYBRID_3D_EXPLORATION -> ProjectTemplateGenerator.TemplateType.FULL_DEMO;
         };
         if (templateToggleButton != null) {
             templateToggleButton.setText(formatTemplateButtonText());
@@ -911,6 +912,7 @@ public final class StudioWindowController implements StudioBridge {
             case STARTER -> "Vorlage: Klassischer Starter";
             case MINIMAL -> "Vorlage: Minimal (Grundgerüst)";
             case ACTION_ADVENTURE_2D -> "Vorlage: Action-Adventure 2D (WASD, Plattformen, Rätsel)";
+            case HYBRID_3D_EXPLORATION -> "Vorlage: 3D-Erkundung Hybrid (Kamera3D, OBJ, Nebel)";
         };
     }
 

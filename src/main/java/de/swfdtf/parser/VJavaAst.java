@@ -92,7 +92,13 @@ public final class VJavaAst {
             YSortStatement,
             PointClickInitStatement,
             SurfaceFrictionStatement,
-            ImpulseStatement {
+            ImpulseStatement,
+            Scene3DStatement,
+            Spawn3DStatement,
+            Camera3DStatement,
+            Wasd3DInitStatement,
+            Fog3DStatement,
+            Material3DStatement {
 
         /**
          * Returns the source file path where this statement appears.
@@ -1821,6 +1827,119 @@ public final class VJavaAst {
             String tag,
             double vx,
             double vy,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Switches or initializes a 3D scene prefab or backdrop ({@code scene3d <prefab>}).
+     *
+     * @param prefabOrAsset 3D scene prefab ID or mesh asset path
+     * @param sourceFile    source script path
+     * @param lineNumber    1-based line number
+     */
+    public record Scene3DStatement(
+            String prefabOrAsset,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Spawns a 3D mesh node into the active stage ({@code spawn3d [<id>] <mesh> at <x> <y> <z>}).
+     *
+     * @param id         optional node identifier
+     * @param meshAsset  asset path to {@code .glb} or {@code .obj}
+     * @param x          world X position
+     * @param y          world Y position
+     * @param z          world Z position
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record Spawn3DStatement(
+            String id,
+            String meshAsset,
+            double x,
+            double y,
+            double z,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Moves or points the 3D camera ({@code camera3d move|look_at <x> <y> <z> [duration <d>]}).
+     *
+     * @param mode            subcommand ({@code move} or {@code look_at})
+     * @param x               target X
+     * @param y               target Y
+     * @param z               target Z
+     * @param durationSeconds interpolation duration in seconds
+     * @param sourceFile      source script path
+     * @param lineNumber      1-based line number
+     */
+    public record Camera3DStatement(
+            String mode,
+            double x,
+            double y,
+            double z,
+            double durationSeconds,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Initializes first-person/orbit WASD 3D camera exploration ({@code wasd3d_init [speed <s>] [fov <deg>]}).
+     *
+     * @param speed      movement speed in world units per second
+     * @param fovDegrees perspective field of view in degrees
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record Wasd3DInitStatement(
+            double speed,
+            double fovDegrees,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Configures 3D exponential distance &amp; height fog ({@code fog3d <hexColor> density <d> [falloff <f>]}).
+     *
+     * @param colorHex      fog hex tint
+     * @param density       fog density
+     * @param heightFalloff vertical falloff
+     * @param sourceFile    source script path
+     * @param lineNumber    1-based line number
+     */
+    public record Fog3DStatement(
+            String colorHex,
+            double density,
+            double heightFalloff,
+            String sourceFile,
+            int lineNumber
+    ) implements Statement {
+    }
+
+    /**
+     * Overrides PBR/Toon material properties on a spawned 3D node
+     * ({@code material3d <id> tint <hex> [roughness <r>] [metallic <m>]}).
+     *
+     * @param targetId   target 3D node ID
+     * @param tintHex    hex albedo override
+     * @param roughness  surface roughness {@code [0, 1]}
+     * @param metallic   metallic factor {@code [0, 1]}
+     * @param sourceFile source script path
+     * @param lineNumber 1-based line number
+     */
+    public record Material3DStatement(
+            String targetId,
+            String tintHex,
+            double roughness,
+            double metallic,
             String sourceFile,
             int lineNumber
     ) implements Statement {

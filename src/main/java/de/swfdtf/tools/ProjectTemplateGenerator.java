@@ -41,7 +41,9 @@ public final class ProjectTemplateGenerator {
         /** Lightweight minimal project skeleton with entry label and HUD badge. */
         MINIMAL,
         /** Walkable 2D action-adventure template with platforms, NPCs, dialog zones, and key puzzle. */
-        ACTION_ADVENTURE_2D
+        ACTION_ADVENTURE_2D,
+        /** Hybrid 3D exploration template with 3D hall/pillar meshes, WASD3D camera, fog, and 2D backdrop fallback. */
+        HYBRID_3D_EXPLORATION
     }
 
     private ProjectTemplateGenerator() {
@@ -131,6 +133,9 @@ public final class ProjectTemplateGenerator {
         if (renderMode != null && !renderMode.isBlank()) {
             descriptor.setRenderMode(renderMode);
         }
+        if (effectiveType == TemplateType.HYBRID_3D_EXPLORATION) {
+            descriptor.setRenderMode("3D");
+        }
         descriptor.setAuthor(effectiveAuthor);
         descriptor.setVersion(EngineVersion.VERSION);
         descriptor.normalizeDefaults();
@@ -163,6 +168,12 @@ public final class ProjectTemplateGenerator {
                 writeUtf8(root.resolve("tl/english/translations.vjava"), buildActionAdventureEnglishScript());
                 generateActionAdventureImages(root);
                 generateActionAdventureAudio(root);
+            }
+            case HYBRID_3D_EXPLORATION -> {
+                writeUtf8(root.resolve("main.vjava"), buildHybrid3dMainScript());
+                writeUtf8(root.resolve("ui/screens.vjava"), buildHybrid3dScreensScript(effectiveTitle));
+                writeUtf8(root.resolve("tl/english/translations.vjava"), buildHybrid3dEnglishScript());
+                generateHybrid3dAssets(root);
             }
         }
 
@@ -810,6 +821,150 @@ public final class ProjectTemplateGenerator {
         );
         byte[] chimeWav = AudioDecoder.encodeWav(chimeTone.pcm16(), chimeTone.channels(), chimeTone.sampleRate());
         Path chimePath = root.resolve("assets/audio/key_chime.wav");
+        Files.createDirectories(chimePath.getParent());
+        Files.write(chimePath, chimeWav);
+    }
+
+    private static String buildHybrid3dMainScript() {
+        return """
+                // Datei: main.vjava (3D-Erkundung Hybrid Vorlage)
+                define hero = Character("Kira", color="#58a6ff")
+
+                default area_name = "Astral-Halle"
+
+                image bg_hall_2d = "assets/images/bg/bg_hall_2d.png"
+
+                label start:
+                    jump hall_3d
+
+                label hall_3d:
+                    $ area_name = "Astral-Halle (3D)"
+                    scene3d "assets/models/hall.obj"
+                    spawn3d pillar "assets/models/pillar.obj" at 2.0 0.0 -4.0
+                    material3d pillar tint "#c8a878" roughness 0.45 metallic 0.10
+                    fog3d "#1b2842" density 0.025 falloff 0.15
+                    camera3d look_at 0.0 1.4 -4.0 duration 0.5
+                    wasd3d_init speed 4.5 fov 72.0
+                    play sound "assets/audio/chime.wav"
+                    hero "Willkommen in der hybriden 3D-Astral-Halle! Nutze WASD3D zur Erkundung."
+                    menu:
+                        "3D-Pfeiler weiter erkunden":
+                            hero "Das Material des Pfeilers glänzt im Nebel der Astral-Halle."
+                            return
+                        "Auf 2D-Ansicht umschalten":
+                            jump hall_2d_fallback
+
+                label hall_2d_fallback:
+                    $ area_name = "Astral-Halle (2D-Backdrop)"
+                    scene bg_hall_2d with fade(0.4)
+                    play sound "assets/audio/chime.wav"
+                    hero "Der nahtlose Fallback auf den 2D-Backdrop funktioniert!"
+                    return
+                """;
+    }
+
+    private static String buildHybrid3dScreensScript(String projectTitle) {
+        String escapedTitle = projectTitle.replace("\"", "'");
+        return """
+                // Datei: ui/screens.vjava (3D-Erkundung Hybrid)
+                screen hybrid3d_hud():
+                    zorder 50
+                    frame:
+                        xalign 0.02
+                        yalign 0.02
+                        background "assets/images/ui/dialog_frame.png"
+                        vbox:
+                            spacing 6
+                            text "%s" size 20
+                            text "Zone: [area_name]" size 16
+                """.formatted(escapedTitle);
+    }
+
+    private static String buildHybrid3dEnglishScript() {
+        return """
+                // Datei: tl/english/translations.vjava (3D-Erkundung Hybrid)
+                translate english strings:
+                    old "Willkommen in der hybriden 3D-Astral-Halle! Nutze WASD3D zur Erkundung."
+                    new "Welcome to the hybrid 3D Astral Hall! Use WASD3D to explore."
+                    old "Das Material des Pfeilers glänzt im Nebel der Astral-Halle."
+                    new "The pillar material gleams inside the Astral Hall mist."
+                    old "Der nahtlose Fallback auf den 2D-Backdrop funktioniert!"
+                    new "Seamless fallback to the 2D backdrop works!"
+                """;
+    }
+
+    private static void generateHybrid3dAssets(Path root) throws IOException {
+        writeUtf8(root.resolve("assets/models/hall.mtl"), """
+                # KAGAYAKI 3D Hall Material
+                newmtl hall_stone
+                Kd 0.62 0.68 0.78
+                Ks 0.25 0.25 0.25
+                Ns 32.0
+                d 1.0
+                """);
+        writeUtf8(root.resolve("assets/models/hall.obj"), """
+                # KAGAYAKI Hybrid 3D Hall Floor
+                mtllib hall.mtl
+                usemtl hall_stone
+                v -8.0 0.0 -8.0
+                v 8.0 0.0 -8.0
+                v 8.0 0.0 8.0
+                v -8.0 0.0 8.0
+                vt 0.0 0.0
+                vt 1.0 0.0
+                vt 1.0 1.0
+                vt 0.0 1.0
+                vn 0.0 1.0 0.0
+                f 1/1/1 2/2/1 3/3/1
+                f 1/1/1 3/3/1 4/4/1
+                """);
+        writeUtf8(root.resolve("assets/models/pillar.obj"), """
+                # KAGAYAKI Hybrid 3D Pillar Box
+                v -0.5 0.0 -0.5
+                v 0.5 0.0 -0.5
+                v 0.5 2.5 -0.5
+                v -0.5 2.5 -0.5
+                v -0.5 0.0 0.5
+                v 0.5 0.0 0.5
+                v 0.5 2.5 0.5
+                v -0.5 2.5 0.5
+                vt 0.0 0.0
+                vt 1.0 0.0
+                vt 1.0 1.0
+                vt 0.0 1.0
+                vn 0.0 0.0 1.0
+                vn 0.0 0.0 -1.0
+                vn 1.0 0.0 0.0
+                vn -1.0 0.0 0.0
+                f 5/1/1 6/2/1 7/3/1
+                f 5/1/1 7/3/1 8/4/1
+                f 1/1/2 4/4/2 3/3/2
+                f 1/1/2 3/3/2 2/2/2
+                f 2/1/3 3/4/3 7/3/3
+                f 2/1/3 7/3/3 6/2/3
+                f 1/1/4 5/2/4 8/3/4
+                f 1/1/4 8/3/4 4/4/4
+                """);
+        TextureManager.writePng(
+                root.resolve("assets/images/bg/bg_hall_2d.png"),
+                BG_WIDTH,
+                BG_HEIGHT,
+                renderNightAcademyBg(BG_WIDTH, BG_HEIGHT)
+        );
+        TextureManager.writePng(
+                root.resolve("assets/images/ui/dialog_frame.png"),
+                UI_FRAME_WIDTH,
+                UI_FRAME_HEIGHT,
+                renderDialogFrame(UI_FRAME_WIDTH, UI_FRAME_HEIGHT)
+        );
+        AudioDecoder.DecodedAudio chimeTone = AudioDecoder.synthesizeTone(
+                783.99,
+                0.28,
+                AUDIO_SAMPLE_RATE,
+                0.32f
+        );
+        byte[] chimeWav = AudioDecoder.encodeWav(chimeTone.pcm16(), chimeTone.channels(), chimeTone.sampleRate());
+        Path chimePath = root.resolve("assets/audio/chime.wav");
         Files.createDirectories(chimePath.getParent());
         Files.write(chimePath, chimeWav);
     }

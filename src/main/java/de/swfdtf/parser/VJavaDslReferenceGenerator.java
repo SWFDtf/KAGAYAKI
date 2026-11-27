@@ -265,6 +265,24 @@ public final class VJavaDslReferenceGenerator {
         reg(m, VJavaAst.ImpulseStatement.class, "impulse <tag> vx <x> vy <y>",
                 "Applies an instantaneous launch velocity impulse.",
                 "impulse player vx 0 vy -820");
+        reg(m, VJavaAst.Scene3DStatement.class, "scene3d <prefab>",
+                "Loads or activates a 3D stage scene prefab.",
+                "scene3d throne_room");
+        reg(m, VJavaAst.Spawn3DStatement.class, "spawn3d [<id>] <mesh> at <x> <y> <z>",
+                "Places a .glb or .obj 3D mesh prop in the scene.",
+                "spawn3d desk \"assets/models/desk.obj\" at 0 0 -4");
+        reg(m, VJavaAst.Camera3DStatement.class, "camera3d move|look_at <x> <y> <z> [duration <s>]",
+                "Interpolates 3D camera position or look-at target.",
+                "camera3d move 0 2 6 duration 1.0");
+        reg(m, VJavaAst.Wasd3DInitStatement.class, "wasd3d_init [speed <s>] [fov <deg>]",
+                "Activates 3D free-exploration WASD and mouse look controls.",
+                "wasd3d_init speed 5.0 fov 75");
+        reg(m, VJavaAst.Fog3DStatement.class, "fog3d <hex> [density <d>] [falloff <f>]",
+                "Configures exponential distance and height fog.",
+                "fog3d \"#1a2438\" density 0.04");
+        reg(m, VJavaAst.Material3DStatement.class, "material3d <id> tint <hex> [roughness <r>] [metallic <m>]",
+                "Overrides material properties on a spawned 3D node.",
+                "material3d statue tint \"#ffd700\" roughness 0.25 metallic 0.9");
         return java.util.Collections.unmodifiableMap(m);
     }
 }
