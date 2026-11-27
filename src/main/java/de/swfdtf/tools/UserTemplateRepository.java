@@ -90,6 +90,10 @@ public final class UserTemplateRepository {
         cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.FULL_DEMO));
         cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.ACTION_ADVENTURE_2D));
         cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.HYBRID_3D_EXPLORATION));
+        cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.HYBRID_3D_MYSTERY));
+        cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.NVL_LITERARY));
+        cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.TUTORIAL_5_MIN));
+        cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.SANDBOX_2D_LAB));
         cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.STARTER));
         cards.add(builtInPreview(ProjectTemplateGenerator.TemplateType.MINIMAL));
 
@@ -150,6 +154,38 @@ public final class UserTemplateRepository {
                     "Ausgewogene Visual-Novel-Vorlage mit Dialogverzweigung und Sound-Cues.",
                     List.of("Visual Novel", "Choices", "Audio"),
                     "#58a6ff",
+                    false
+            );
+            case HYBRID_3D_MYSTERY -> new TemplatePreviewCard(
+                    "HYBRID_3D_MYSTERY",
+                    "3D-Mystery & Verhör",
+                    "Begehbare 3D-Szene mit Indizien-Untersuchung und ADV-Verhören.",
+                    List.of("3D", "Mystery", "WASD3D", "Choices"),
+                    "#d29922",
+                    false
+            );
+            case NVL_LITERARY -> new TemplatePreviewCard(
+                    "NVL_LITERARY",
+                    "Literarische NVL-Vorlage",
+                    "Vollbild-NVL-Erzählung mit Epigraphen und ruhiger Text-Inszenierung.",
+                    List.of("NVL", "Literatur", "Epigraph"),
+                    "#bc8cff",
+                    false
+            );
+            case TUTORIAL_5_MIN -> new TemplatePreviewCard(
+                    "TUTORIAL_5_MIN",
+                    "vJava in 5 Minuten",
+                    "Interaktives Einsteiger-Tutorial für say, show, move, WASD & Java-Blöcke.",
+                    List.of("Tutorial", "WASD", "Java"),
+                    "#58a6ff",
+                    false
+            );
+            case SANDBOX_2D_LAB -> new TemplatePreviewCard(
+                    "SANDBOX_2D_LAB",
+                    "2D-Sandbox-Labor",
+                    "Offener 2D-Raum mit Spieler-Sprite, Physik und Trigger-Stern für DSL-Tests.",
+                    List.of("Sandbox", "WASD", "Physik"),
+                    "#3fb950",
                     false
             );
             case MINIMAL -> new TemplatePreviewCard(

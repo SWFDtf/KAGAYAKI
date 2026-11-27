@@ -1,0 +1,31 @@
+{
+  "metadata": {
+    "slotId": "snow_white_v1",
+    "customName": "Vor dem Zwergenbergwerk",
+    "savedAt": "2026-01-15T12:00:00Z",
+    "currentLabel": "chapter_4_cottage",
+    "dialoguePreview": "Die sieben Zwerge lauschten gespannt der Geschichte.",
+    "playtimeSeconds": 320.0,
+    "gameVersion": "1.0.0",
+    "thumbnailWidth": 0,
+    "thumbnailHeight": 0,
+    "thumbnailPng": ""
+  },
+  "variables": {
+    "courage": 18,
+    "hunter_trust": 22,
+    "cottage_cleaned": true
+  },
+  "scriptPosition": {
+    "currentLabel": "chapter_4_cottage",
+    "statementIndex": 3,
+    "callStack": [],
+    "statusName": "WAITING_DIALOGUE",
+    "activeSpeakerId": "snow_white",
+    "activeSpeakerName": "Schneewittchen",
+    "activeDialogueText": "Die sieben Zwerge lauschten gespannt der Geschichte.",
+    "nvlMode": false,
+    "nvlLines": []
+  },
+  "historyEntries": []
+}

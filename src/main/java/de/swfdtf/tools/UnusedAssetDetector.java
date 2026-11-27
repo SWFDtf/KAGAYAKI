@@ -86,6 +86,10 @@ public final class UnusedAssetDetector {
         }
 
         SortedSet<String> referenced = new TreeSet<>();
+        if (project.descriptor() != null && project.descriptor().getIconPath() != null
+                && !project.descriptor().getIconPath().isBlank()) {
+            referenced.add(normalizeAssetPath(project.descriptor().getIconPath()));
+        }
         collectImageDefAssets(project, referenced);
         collectLayeredImageAssets(project, referenced);
         collectScreenAssets(project, referenced);

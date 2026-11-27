@@ -899,7 +899,11 @@ public final class StudioWindowController implements StudioBridge {
             case STARTER -> ProjectTemplateGenerator.TemplateType.MINIMAL;
             case MINIMAL -> ProjectTemplateGenerator.TemplateType.ACTION_ADVENTURE_2D;
             case ACTION_ADVENTURE_2D -> ProjectTemplateGenerator.TemplateType.HYBRID_3D_EXPLORATION;
-            case HYBRID_3D_EXPLORATION -> ProjectTemplateGenerator.TemplateType.FULL_DEMO;
+            case HYBRID_3D_EXPLORATION -> ProjectTemplateGenerator.TemplateType.HYBRID_3D_MYSTERY;
+            case HYBRID_3D_MYSTERY -> ProjectTemplateGenerator.TemplateType.NVL_LITERARY;
+            case NVL_LITERARY -> ProjectTemplateGenerator.TemplateType.TUTORIAL_5_MIN;
+            case TUTORIAL_5_MIN -> ProjectTemplateGenerator.TemplateType.SANDBOX_2D_LAB;
+            case SANDBOX_2D_LAB -> ProjectTemplateGenerator.TemplateType.FULL_DEMO;
         };
         if (templateToggleButton != null) {
             templateToggleButton.setText(formatTemplateButtonText());
@@ -913,6 +917,10 @@ public final class StudioWindowController implements StudioBridge {
             case MINIMAL -> "Vorlage: Minimal (Grundgerüst)";
             case ACTION_ADVENTURE_2D -> "Vorlage: Action-Adventure 2D (WASD, Plattformen, Rätsel)";
             case HYBRID_3D_EXPLORATION -> "Vorlage: 3D-Erkundung Hybrid (Kamera3D, OBJ, Nebel)";
+            case HYBRID_3D_MYSTERY -> "Vorlage: 3D-Mystery & Verhör (Kamera3D, Indizien)";
+            case NVL_LITERARY -> "Vorlage: Literarische NVL-Erzählung";
+            case TUTORIAL_5_MIN -> "Vorlage: Tutorial — vJava in 5 Minuten";
+            case SANDBOX_2D_LAB -> "Vorlage: 2D-Sandbox-Labor (WASD & Physik)";
         };
     }
 

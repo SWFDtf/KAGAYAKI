@@ -270,7 +270,7 @@ class Wave2AuthoringToolsTest {
         assertTrue(brokenMeta.heightPx().isEmpty());
 
         List<AssetMetadataInspector.AssetMetadata> all = inspector.inspectAll(projectDir);
-        assertEquals(22, all.size());
+        assertEquals(23, all.size());
         assertThrows(UnsupportedOperationException.class, all::clear);
         for (int i = 1; i < all.size(); i++) {
             assertTrue(all.get(i - 1).relativePath().compareTo(all.get(i).relativePath()) <= 0);

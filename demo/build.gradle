@@ -131,3 +131,11 @@ tasks.register('runDemoShowcase', JavaExec) {
     mainClass = 'de.swfdtf.demo.Main'
     args '--showcase', layout.buildDirectory.dir('showcase').get().asFile.absolutePath, '--project', file('project').absolutePath
 }
+
+tasks.register('packageDemo', JavaExec) {
+    group = 'demo'
+    description = 'Exportiert die Schneewittchen-Demo als eigenständiges .vpak/.kagayaki Release-Paket nach demo/build/dist.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.swfdtf.demo.Main'
+    args '--export', layout.buildDirectory.dir('dist').get().asFile.absolutePath, '--project', file('project').absolutePath
+}

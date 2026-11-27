@@ -43,7 +43,15 @@ public final class ProjectTemplateGenerator {
         /** Walkable 2D action-adventure template with platforms, NPCs, dialog zones, and key puzzle. */
         ACTION_ADVENTURE_2D,
         /** Hybrid 3D exploration template with 3D hall/pillar meshes, WASD3D camera, fog, and 2D backdrop fallback. */
-        HYBRID_3D_EXPLORATION
+        HYBRID_3D_EXPLORATION,
+        /** Hybrid 3D mystery interrogation template combining 3D scene clues with ADV questioning (#0867). */
+        HYBRID_3D_MYSTERY,
+        /** Literary NVL narrative preset with full-screen prose, epigraphs, and glossary cards (#0868). */
+        NVL_LITERARY,
+        /** Five-minute interactive walkthrough covering say, menu, show, move, WASD, collide &amp; Java (#0869). */
+        TUTORIAL_5_MIN,
+        /** Open 2D WASD + physics playground laboratory for rapid DSL prototyping (#0900). */
+        SANDBOX_2D_LAB
     }
 
     private ProjectTemplateGenerator() {
@@ -120,6 +128,30 @@ public final class ProjectTemplateGenerator {
             String renderMode,
             TemplateType templateType
     ) throws IOException {
+        return generate(targetDir, title, author, renderMode, templateType, "deutsch");
+    }
+
+    /**
+     * Generates a KAGAYAKI project in {@code targetDir} with custom author and starter language
+     * ({@code "deutsch"} or {@code "english"}) ({@code #0909}).
+     *
+     * @param targetDir       destination project root directory
+     * @param title           project display title (falls back to default if null or blank)
+     * @param author          project author metadata (falls back to Studio default if null or blank)
+     * @param renderMode      render backend mode ({@code "2D"} or {@code "3D"})
+     * @param templateType    scaffolding preset
+     * @param starterLanguage base script language ({@code "deutsch"} or {@code "english"})
+     * @return normalized path to the generated project root directory
+     * @throws IOException if writing project files or assets fails
+     */
+    public static Path generate(
+            Path targetDir,
+            String title,
+            String author,
+            String renderMode,
+            TemplateType templateType,
+            String starterLanguage
+    ) throws IOException {
         Objects.requireNonNull(targetDir, "targetDir must not be null");
         TemplateType effectiveType = templateType != null ? templateType : TemplateType.STARTER;
         Path root = targetDir.toAbsolutePath().normalize();
@@ -129,21 +161,33 @@ public final class ProjectTemplateGenerator {
         String effectiveAuthor = (author == null || author.isBlank())
                 ? "KAGAYAKI Studio (" + EngineVersion.VERSION + ")"
                 : author.trim();
+        boolean englishStarter = starterLanguage != null && "english".equalsIgnoreCase(starterLanguage.trim());
         ProjectDescriptor descriptor = ProjectDescriptor.createDefault(effectiveTitle);
         if (renderMode != null && !renderMode.isBlank()) {
             descriptor.setRenderMode(renderMode);
         }
-        if (effectiveType == TemplateType.HYBRID_3D_EXPLORATION) {
+        if (effectiveType == TemplateType.HYBRID_3D_EXPLORATION || effectiveType == TemplateType.HYBRID_3D_MYSTERY) {
             descriptor.setRenderMode("3D");
         }
+        if (effectiveType == TemplateType.NVL_LITERARY) {
+            descriptor.setDialogueMode("NVL");
+        }
+        descriptor.setDefaultLanguage(englishStarter ? "english" : "deutsch");
         descriptor.setAuthor(effectiveAuthor);
         descriptor.setVersion(EngineVersion.VERSION);
+        descriptor.setIconPath("assets/icon.png");
+        descriptor.setAccentColorHex(deriveTitleAccentHex(effectiveTitle));
         descriptor.normalizeDefaults();
         ProjectDescriptor.save(root, descriptor);
 
+        TextureManager.writePng(root.resolve("assets/icon.png"), 32, 32, renderGoalStarSprite(32, 32));
+        writeUtf8(root.resolve(".gitignore"), "saves/\ndist/\nbuild/\n.kagayaki-cache/\n");
+        writeUtf8(root.resolve("README.md"), buildTemplateReadme(effectiveTitle, effectiveType));
+
         switch (effectiveType) {
             case MINIMAL -> {
-                writeUtf8(root.resolve("main.vjava"), buildMinimalMainScript());
+                writeUtf8(root.resolve("main.vjava"),
+                        englishStarter ? buildEnglishMinimalMainScript() : buildMinimalMainScript());
                 writeUtf8(root.resolve("ui/screens.vjava"), buildMinimalScreensScript(effectiveTitle));
                 generateMinimalImages(root);
                 generateMinimalAudio(root);
@@ -174,6 +218,32 @@ public final class ProjectTemplateGenerator {
                 writeUtf8(root.resolve("ui/screens.vjava"), buildHybrid3dScreensScript(effectiveTitle));
                 writeUtf8(root.resolve("tl/english/translations.vjava"), buildHybrid3dEnglishScript());
                 generateHybrid3dAssets(root);
+            }
+            case HYBRID_3D_MYSTERY -> {
+                writeUtf8(root.resolve("main.vjava"), buildHybrid3dMysteryMainScript());
+                writeUtf8(root.resolve("ui/screens.vjava"), buildHybrid3dScreensScript(effectiveTitle));
+                writeUtf8(root.resolve("tl/english/translations.vjava"), buildHybrid3dEnglishScript());
+                generateHybrid3dAssets(root);
+            }
+            case NVL_LITERARY -> {
+                writeUtf8(root.resolve("main.vjava"), buildNvlLiteraryMainScript());
+                writeUtf8(root.resolve("ui/screens.vjava"), buildMinimalScreensScript(effectiveTitle));
+                generateMinimalImages(root);
+                generateMinimalAudio(root);
+            }
+            case TUTORIAL_5_MIN -> {
+                writeUtf8(root.resolve("main.vjava"), buildTutorial5MinMainScript());
+                writeUtf8(root.resolve("ui/screens.vjava"), buildMinimalScreensScript(effectiveTitle));
+                generateMinimalImages(root);
+                generateMinimalAudio(root);
+                generateSandboxArenaSprites(root);
+            }
+            case SANDBOX_2D_LAB -> {
+                writeUtf8(root.resolve("main.vjava"), buildSandbox2dLabMainScript());
+                writeUtf8(root.resolve("ui/screens.vjava"), buildMinimalScreensScript(effectiveTitle));
+                generateMinimalImages(root);
+                generateMinimalAudio(root);
+                generateSandboxArenaSprites(root);
             }
         }
 
@@ -1292,5 +1362,171 @@ public final class ProjectTemplateGenerator {
 
     private static int clampByte(int value) {
         return Math.clamp(value, 0, 255);
+    }
+
+    private static String deriveTitleAccentHex(String title) {
+        String[] palette = {"#58a6ff", "#3fb950", "#d29922", "#a371f7", "#f0883e"};
+        int idx = Math.floorMod(title.hashCode(), palette.length);
+        return palette[idx];
+    }
+
+    private static String buildTemplateReadme(String title, TemplateType type) {
+        return "# " + title + "\n\n"
+                + "Erzeugt mit KAGAYAKI " + EngineVersion.VERSION + " (`" + type.name() + "`).\n\n"
+                + "## Struktur\n"
+                + "- `main.vjava`: Einstiegspunkt, Labels, Dialoge und WASD-Befehle\n"
+                + "- `ui/screens.vjava`: Eigene HUD- & Menü-Screens\n"
+                + "- `tl/`: Sprachdateien\n"
+                + "- `assets/`: Bilder, Audio und 3D-Modelle\n"
+                + "- `saves/`: Spielstände (in `.gitignore`)\n";
+    }
+
+    private static String buildEnglishMinimalMainScript() {
+        return """
+                // File: main.vjava (English Minimal Template)
+                define narrator = Character("Narrator", color="#e6edf3")
+
+                image bg_night = "assets/images/bg/bg_akademie_nacht.png"
+
+                label start:
+                    scene bg_night
+                    play music "assets/audio/nachtwind.wav" loop
+                    narrator "Welcome to KAGAYAKI! Your English starter project is ready."
+                    return
+                """;
+    }
+
+    private static String buildHybrid3dMysteryMainScript() {
+        return """
+                // Datei: main.vjava (Hybrid 3D Mystery Vorlage)
+                define hero = Character("Kira", color="#58a6ff")
+
+                default area_name = "Tatort-Halle"
+                default clue_found = false
+
+                image bg_hall_2d = "assets/images/bg/bg_hall_2d.png"
+
+                label start:
+                    $ area_name = "Tatort-Halle (3D)"
+                    scene3d "assets/models/hall.obj"
+                    spawn3d pillar "assets/models/pillar.obj" at 2.0 0.0 -4.0
+                    material3d pillar tint "#ffd166" roughness 0.35 metallic 0.15
+                    fog3d "#111827" density 0.02 falloff 0.2
+                    camera3d look_at 0.0 1.4 -4.0 duration 0.4
+                    wasd3d_init speed 4.2 fov 70.0
+                    play sound "assets/audio/chime.wav"
+                    hero "Ein rätselhafter Schatten umgibt diesen Pfeiler. Verhör oder Erkundung?"
+                    menu:
+                        "Indiz am Pfeiler untersuchen":
+                            $ clue_found = true
+                            hero "Notiz gefunden: Die Tür war nie abgeschlossen!"
+                            return
+                        "In 2D-Archivansicht wechseln":
+                            scene bg_hall_2d with fade(0.3)
+                            hero "Die Befragung läuft nun in klassischer 2D-ADV-Ansicht."
+                            return
+                """;
+    }
+
+    private static String buildNvlLiteraryMainScript() {
+        return """
+                // Datei: main.vjava (Literarische NVL-Vorlage)
+                define narrator = Character("Erzähler", color="#e6edf3")
+
+                image bg_night = "assets/images/bg/bg_akademie_nacht.png"
+
+                label start:
+                    scene bg_night with fade(0.5)
+                    play music "assets/audio/nachtwind.wav" loop
+                    narrator "Kapitel I — Epigraph: Der Spiegel kennt keine Eile."
+                    narrator "In ruhiger Vollbild-NVL-Erzählung entfalten sich die Sätze Absatz für Absatz."
+                    return
+                """;
+    }
+
+    private static String buildTutorial5MinMainScript() {
+        return """
+                // Datei: main.vjava (Interaktives Tutorial: vJava in 5 Minuten)
+                define guide = Character("Tutor", color="#58a6ff")
+
+                default steps_done = 0
+
+                image bg_night = "assets/images/bg/bg_akademie_nacht.png"
+                image hero_badge = "assets/images/sprites/player.png"
+                image star_goal = "assets/images/sprites/goal_star.png"
+
+                label start:
+                    scene bg_night
+                    play music "assets/audio/nachtwind.wav" loop
+                    guide "Schritt 1: say, show & move in Aktion!"
+                    show hero_badge at center
+                    move hero_badge to 420 680 duration 0.4 ease ease_out
+                    show star_goal
+                    move star_goal to 1200 680
+                    @->{
+                        state.set("steps_done", 1);
+                    }<<
+                    menu:
+                        "WASD + on_collide testen":
+                            wasd_init hero_badge speed 260
+                            on_collide hero_badge star_goal jump tutorial_done
+                            guide "Bewege das Emblem mit WASD oder drücke direkt weiter!"
+                            wasd_stop hero_badge
+                            jump tutorial_done
+                        "Direkt abschließen":
+                            jump tutorial_done
+
+                label tutorial_done:
+                    $ steps_done = 2
+                    guide "Tutorial komplett! Fortschritt: [steps_done] Schritte."
+                    return
+                """;
+    }
+
+    private static String buildSandbox2dLabMainScript() {
+        return """
+                // Datei: main.vjava (Leeres 2D-Sandbox-Labor)
+                define lab = Character("Labor", color="#3fb950")
+
+                image bg_grid = "assets/images/bg/bg_akademie_nacht.png"
+                image player_avatar = "assets/images/sprites/player.png"
+                image beacon = "assets/images/sprites/goal_star.png"
+
+                label start:
+                    scene bg_grid
+                    play music "assets/audio/nachtwind.wav" loop
+                    show player_avatar
+                    move player_avatar to 400 600
+                    show beacon
+                    move beacon to 1300 600
+                    physics_init player_avatar gravity 980 jump_force 440 ground_y 880
+                    wasd_init player_avatar speed 320
+                    on_collide player_avatar beacon jump lab_goal
+                    lab "Willkommen im 2D-Sandbox-Labor! Teste WASD und Physik frei."
+                    physics_stop player_avatar
+                    wasd_stop player_avatar
+                    return
+
+                label lab_goal:
+                    physics_stop player_avatar
+                    wasd_stop player_avatar
+                    lab "Zielpunkt im 2D-Sandbox-Labor erreicht!"
+                    return
+                """;
+    }
+
+    private static void generateSandboxArenaSprites(Path root) {
+        TextureManager.writePng(
+                root.resolve("assets/images/sprites/player.png"),
+                SPRITE_SIZE,
+                SPRITE_SIZE,
+                renderPlayerBadgeSprite(SPRITE_SIZE, SPRITE_SIZE)
+        );
+        TextureManager.writePng(
+                root.resolve("assets/images/sprites/goal_star.png"),
+                SPRITE_SIZE,
+                SPRITE_SIZE,
+                renderGoalStarSprite(SPRITE_SIZE, SPRITE_SIZE)
+        );
     }
 }
