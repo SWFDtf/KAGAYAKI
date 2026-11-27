@@ -35,6 +35,7 @@ LWJGL-3-/OpenAL-Audio-, DSP-, Lip-Sync- und Accessibility-TTS-Subsystem von KAGA
 | `AudioCueRegistry` | `final class` | Logische `AudioCue`-Registry mit Kanal-Filterung, `Optional`-Lookup und Gson-JSON-Serialisierung. |
 | `VoicePlaybackBookmark` | `final class` | Begrenzter Verlauf zuletzt abgespielter Voice-Clips (`VoiceClipRecord`) mit Lookup nach `lineId` und Sprecher sowie aktivem Playback-Offset-Tracking. |
 | `OggVorbisStream` | `final class` | Chunk-basierter Streaming-Decoder für Ogg Vorbis (`STBVorbis`) mit konstant kleinem Puffer, Seeking und Rolling-RMS-/Spektrumanalyse. |
+| `AudioRuntimeServices` | `final class` | Wave-P2-6-Laufzeitdienste: `OpenAlErrorTranslator`, `SourcePoolManager`, `LocalizedVoiceResolver`, `SpatialVoicePanner`, `AdaptiveStemMixer`, `BeatSyncClock`, `AmbientRandomScheduler`, `HeartbeatPulseController`, `ReverbZoneController`, `MultiTrackVoiceManager`, `SfxCooldownGuard`, `BleepSynthesisCache`, `SubtitleAndLyricExporter`, `HeadlessAudioController`. |
 
 ## Öffentliche API-Signaturen
 
@@ -267,3 +268,9 @@ public final class TextToSpeechService implements AutoCloseable {
     @Override public void close()
 }
 ```
+
+### Erweiterte Wave P2-6 Audio-APIs
+- `AudioDecoder`: 24-Bit-PCM-WAV-Support, `downmixToMono`, `probeDuration`, `probeDurationBytes`, `probeWavLoopRegion` (`smpl`), `Waveform` + `synthesizeAdsr`, `resampleTo48kHzIfAbove`, `detectActiveSpeechBounds`, Schutz gegen 0-Byte-Dateien.
+- `AudioDsp`: `applySoftLimiter`, `EqPreset` + `applyEqPreset`, `createRadioTelephoneFilter`, `applyRadioTelephoneEffect`, `applyMicroFadeOut`, `measureIntegratedLufs`, `normalizeToTargetLufs`.
+- `LipSyncAnalyzer`: `computeZeroCrossingRate`, `BakedLipSync`, `bakeLipSync`, `toJson`/`fromJson`/`loadOrFallback`.
+- `ClosedCaptionQueue`: `Priority { AMBIENT, STORY, CRITICAL }` mit prioritätsbewusster Verdrängung.

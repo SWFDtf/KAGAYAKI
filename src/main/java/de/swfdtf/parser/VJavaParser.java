@@ -1313,11 +1313,14 @@ public final class VJavaParser {
                     loop = false;
                     i++;
                 }
-                case "fadein" -> {
+                case "fadein", "crossfade" -> {
                     if (i + 1 >= parts.size()) {
-                        throw error(token, "Expected duration after 'fadein'");
+                        throw error(token, "Expected duration after '" + opt + "'");
                     }
-                    fadeInSeconds = parseDoubleStrict(parts.get(i + 1), token, "fadein");
+                    fadeInSeconds = parseDoubleStrict(parts.get(i + 1), token, opt);
+                    if (!Double.isFinite(fadeInSeconds) || fadeInSeconds < 0.0) {
+                        throw error(token, "Invalid negative '" + opt + "' value: " + fadeInSeconds);
+                    }
                     i += 2;
                 }
                 case "volume" -> {

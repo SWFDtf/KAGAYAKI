@@ -56,6 +56,11 @@ public final class PreferencesState {
     private String textBackdropMode = "BOX";
     private boolean safeLetterboxUltrawide = false;
     private boolean choiceNumberHotkeysEnabled = true;
+    private float uiVolume = 0.9f;
+    private boolean muteOnFocusLoss = false;
+    private boolean stopVoiceOnAdvance = true;
+    private boolean monoAudio = false;
+    private boolean accessibilityAudioCues = false;
 
     /**
      * Creates a {@code PreferencesState} initialized with engine defaults.
@@ -170,6 +175,7 @@ public final class PreferencesState {
             textBackdropMode = ("DARK_STRIP".equals(upper) || "NONE".equals(upper))
                     ? upper : "BOX";
         }
+        uiVolume = clampVolume(uiVolume, 0.9f);
     }
 
     private static float clampVolume(float value, float fallback) {
@@ -637,6 +643,108 @@ public final class PreferencesState {
         this.choiceNumberHotkeysEnabled = choiceNumberHotkeysEnabled;
     }
 
+    /**
+     * Converts a normalized linear volume slider value {@code [0, 1]} to a perceptual gain curve
+     * ({@code v^2}) for smooth low-volume control ({@code #0442}).
+     *
+     * @param linear linear slider value in {@code [0, 1]}
+     * @return perceptual gain multiplier in {@code [0, 1]}
+     */
+    public static float toPerceptualGain(float linear) {
+        float c = clampVolume(linear, 0.0f);
+        return c * c;
+    }
+
+    /**
+     * Returns UI sound effect volume in {@code [0, 1]}.
+     *
+     * @return UI SFX volume
+     */
+    public synchronized float getUiVolume() {
+        return uiVolume;
+    }
+
+    /**
+     * Sets UI sound effect volume in {@code [0, 1]}.
+     *
+     * @param uiVolume UI SFX volume
+     */
+    public synchronized void setUiVolume(float uiVolume) {
+        this.uiVolume = clampVolume(uiVolume, 0.9f);
+    }
+
+    /**
+     * Returns whether audio mutes smoothly when the window loses focus.
+     *
+     * @return {@code true} if focus-loss mute is enabled
+     */
+    public synchronized boolean isMuteOnFocusLoss() {
+        return muteOnFocusLoss;
+    }
+
+    /**
+     * Enables or disables smooth muting when the window loses focus.
+     *
+     * @param muteOnFocusLoss focus-loss mute flag
+     */
+    public synchronized void setMuteOnFocusLoss(boolean muteOnFocusLoss) {
+        this.muteOnFocusLoss = muteOnFocusLoss;
+    }
+
+    /**
+     * Returns whether active voice clips stop when advancing dialogue.
+     *
+     * @return {@code true} to interrupt active voice on advance
+     */
+    public synchronized boolean isStopVoiceOnAdvance() {
+        return stopVoiceOnAdvance;
+    }
+
+    /**
+     * Configures whether active voice clips stop when advancing dialogue.
+     *
+     * @param stopVoiceOnAdvance interrupt flag
+     */
+    public synchronized void setStopVoiceOnAdvance(boolean stopVoiceOnAdvance) {
+        this.stopVoiceOnAdvance = stopVoiceOnAdvance;
+    }
+
+    /**
+     * Returns whether stereo audio is folded down to mono for accessibility.
+     *
+     * @return {@code true} when mono downmix is active
+     */
+    public synchronized boolean isMonoAudio() {
+        return monoAudio;
+    }
+
+    /**
+     * Enables or disables accessibility mono audio downmix.
+     *
+     * @param monoAudio mono downmix flag
+     */
+    public synchronized void setMonoAudio(boolean monoAudio) {
+        this.monoAudio = monoAudio;
+    }
+
+    /**
+     * Returns whether accessibility screen-reader navigation sound cues are enabled.
+     *
+     * @return {@code true} when accessibility audio cues are enabled
+     */
+    public synchronized boolean isAccessibilityAudioCues() {
+        return accessibilityAudioCues;
+    }
+
+    /**
+     * Enables or disables accessibility screen-reader navigation sound cues.
+     *
+     * @param accessibilityAudioCues accessibility audio cue flag
+     */
+    public synchronized void setAccessibilityAudioCues(boolean accessibilityAudioCues) {
+        this.accessibilityAudioCues = accessibilityAudioCues;
+    }
+
     @Override
     public synchronized boolean equals(Object obj) {
         if (this == obj) {
@@ -664,6 +772,11 @@ public final class PreferencesState {
                 && safezoneMarginPx == other.safezoneMarginPx
                 && safeLetterboxUltrawide == other.safeLetterboxUltrawide
                 && choiceNumberHotkeysEnabled == other.choiceNumberHotkeysEnabled
+                && Float.compare(uiVolume, other.uiVolume) == 0
+                && muteOnFocusLoss == other.muteOnFocusLoss
+                && stopVoiceOnAdvance == other.stopVoiceOnAdvance
+                && monoAudio == other.monoAudio
+                && accessibilityAudioCues == other.accessibilityAudioCues
                 && Objects.equals(renderMode, other.renderMode)
                 && Objects.equals(language, other.language)
                 && Objects.equals(dialogueMode, other.dialogueMode)
@@ -680,7 +793,8 @@ public final class PreferencesState {
                 selfVoicing, highContrastDyslexiaFont, uiTextScale, gamepadDeadzone,
                 textboxOpacity, reduceMotion, safezoneMarginPx,
                 accessibilityCursorStyle, textBackdropMode,
-                safeLetterboxUltrawide, choiceNumberHotkeysEnabled
+                safeLetterboxUltrawide, choiceNumberHotkeysEnabled,
+                uiVolume, muteOnFocusLoss, stopVoiceOnAdvance, monoAudio, accessibilityAudioCues
         );
     }
 }

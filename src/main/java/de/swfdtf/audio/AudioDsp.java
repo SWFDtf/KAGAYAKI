@@ -527,4 +527,149 @@ public final class AudioDsp {
             );
         }
     }
+
+    /**
+     * Configurable equalizer presets for listening comfort and vocal intelligibility ({@code #0468}).
+     */
+    public enum EqPreset {
+        /** Unmodified neutral pass-through. */
+        FLAT,
+        /** Night listening curve attenuating sub-bass rumble and gently lifting 1-4 kHz presence. */
+        NIGHT_MODE,
+        /** Crisp speech presence emphasizing 1-4 kHz voice band. */
+        VOICE_CLARITY
+    }
+
+    /**
+     * Applies a smooth {@code tanh}-based soft limiter clamping output peaks strictly within
+     * {@code [-1.0, +1.0]} to prevent clipping distortion across stacked sounds ({@code #0445}).
+     *
+     * @param samples mutable sample buffer modified in place
+     */
+    public static void applySoftLimiter(float[] samples) {
+        Objects.requireNonNull(samples, "samples must not be null");
+        for (int i = 0; i < samples.length; i++) {
+            float x = samples[i];
+            if (!Float.isFinite(x)) {
+                samples[i] = 0.0f;
+            } else if (Math.abs(x) > 0.85f) {
+                samples[i] = (float) Math.clamp(Math.tanh(x * 0.9), -1.0, 1.0);
+            }
+        }
+    }
+
+    /**
+     * Applies a scene equalizer preset in place using stateful IIR biquad filters ({@code #0468}).
+     *
+     * @param samples    mutable mono float sample buffer
+     * @param sampleRate sample rate in Hz
+     * @param preset     equalizer preset
+     */
+    public static void applyEqPreset(float[] samples, float sampleRate, EqPreset preset) {
+        Objects.requireNonNull(samples, "samples must not be null");
+        Objects.requireNonNull(preset, "preset must not be null");
+        if (preset == EqPreset.FLAT || samples.length == 0) {
+            return;
+        }
+        float hpfCutoff = preset == EqPreset.NIGHT_MODE ? 140.0f : 90.0f;
+        BiquadFilter hpf = BiquadFilter.createHighpass(sampleRate, hpfCutoff, 0.7f);
+        BiquadFilter presenceBp = BiquadFilter.createBandpass(sampleRate, 2400.0f, 1.2f);
+        float boost = preset == EqPreset.VOICE_CLARITY ? 0.45f : 0.25f;
+        for (int i = 0; i < samples.length; i++) {
+            float hp = hpf.processSample(samples[i]);
+            float pr = presenceBp.processSample(hp);
+            samples[i] = Math.clamp(hp + pr * boost, -1.0f, 1.0f);
+        }
+    }
+
+    /**
+     * Creates a band-limiting telephone/radio filter tuned for {@code 300-3400 Hz} vocal character ({@code #0493}).
+     *
+     * @param sampleRate stream sample rate in Hz
+     * @return configured bandpass {@link BiquadFilter}
+     */
+    public static BiquadFilter createRadioTelephoneFilter(float sampleRate) {
+        return BiquadFilter.createBandpass(sampleRate, 1350.0f, 1.1f);
+    }
+
+    /**
+     * Applies the radio/telephone {@code 300-3400 Hz} bandpass effect in place ({@code #0493}).
+     *
+     * @param samples    mutable float sample buffer
+     * @param sampleRate sample rate in Hz
+     */
+    public static void applyRadioTelephoneEffect(float[] samples, float sampleRate) {
+        Objects.requireNonNull(samples, "samples must not be null");
+        BiquadFilter hpf = BiquadFilter.createHighpass(sampleRate, 300.0f, 0.707f);
+        BiquadFilter lpf = BiquadFilter.createLowpass(sampleRate, 3400.0f, 0.707f);
+        hpf.processBuffer(samples);
+        lpf.processBuffer(samples);
+    }
+
+    /**
+     * Applies a micro fade-out over the trailing {@code fadeMs} milliseconds (minimum 15 ms if long enough)
+     * to avoid audible DC-step clicks on sudden stop ({@code #0500}).
+     *
+     * @param samples    mutable float sample buffer
+     * @param sampleRate sample rate in Hz
+     * @param fadeMs     fade duration in milliseconds (e.g. {@code 15})
+     */
+    public static void applyMicroFadeOut(float[] samples, int sampleRate, int fadeMs) {
+        Objects.requireNonNull(samples, "samples must not be null");
+        if (samples.length == 0 || fadeMs <= 0 || sampleRate <= 0) {
+            return;
+        }
+        int fadeSamples = Math.min(samples.length, Math.max(1, (sampleRate * fadeMs) / 1000));
+        int start = samples.length - fadeSamples;
+        for (int i = 0; i < fadeSamples; i++) {
+            float gain = fadeSamples > 1 ? 1.0f - ((float) i / (fadeSamples - 1)) : 0.0f;
+            samples[start + i] *= gain;
+        }
+    }
+
+    /**
+     * Estimates integrated LUFS loudness of an audio buffer relative to full scale ({@code #0473}).
+     *
+     * @param audio decoded audio buffer
+     * @return loudness in LUFS (typically negative, or {@code -70.0} for silence)
+     */
+    public static double measureIntegratedLufs(AudioDecoder.DecodedAudio audio) {
+        Objects.requireNonNull(audio, "audio must not be null");
+        float rms = computeRms(audio.toMonoFloat());
+        if (rms <= 1e-6f) {
+            return -70.0;
+        }
+        return -0.691 + 20.0 * Math.log10(rms);
+    }
+
+    /**
+     * Normalizes {@code source} to {@code targetLufs} (e.g., {@code -16.0 LUFS}) using two-pass RMS
+     * measurement plus peak soft limiting ({@code #0473}).
+     *
+     * @param source     source decoded audio
+     * @param targetLufs desired integrated loudness in LUFS (e.g. {@code -16.0})
+     * @return normalized {@link AudioDecoder.DecodedAudio}
+     */
+    public static AudioDecoder.DecodedAudio normalizeToTargetLufs(
+            AudioDecoder.DecodedAudio source,
+            double targetLufs
+    ) {
+        Objects.requireNonNull(source, "source must not be null");
+        double currentLufs = measureIntegratedLufs(source);
+        if (currentLufs <= -69.5) {
+            return source;
+        }
+        double gainDb = Math.clamp(targetLufs - currentLufs, -24.0, 24.0);
+        float gainLinear = (float) Math.pow(10.0, gainDb / 20.0);
+        float[] src = source.monoOrInterleavedFloat();
+        float[] scaled = new float[src.length];
+        for (int i = 0; i < src.length; i++) {
+            scaled[i] = src[i] * gainLinear;
+        }
+        applySoftLimiter(scaled);
+        return new AudioDecoder.DecodedAudio(
+                scaled, AudioDecoder.floatToPcm16(scaled),
+                source.channels(), source.sampleRate(), source.durationSeconds()
+        );
+    }
 }

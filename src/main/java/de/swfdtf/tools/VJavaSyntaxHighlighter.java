@@ -42,10 +42,54 @@ public final class VJavaSyntaxHighlighter {
     public record TokenRun(int startOffset, int endOffset, TokenType type, String colorHex) {
     }
 
+    private static final String COLOR_DEFAULT = ThemePalette.TEXT_PRIMARY;
+    private static final String COLOR_JAVA_BLOCK = ThemePalette.ACCENT_HOVER;
+    private static final String COLOR_COMMENT = ThemePalette.TEXT_MUTED;
+    private static final String COLOR_STRING = ThemePalette.SUCCESS;
+    private static final String COLOR_VARIABLE = ThemePalette.ACTIVE_SELECTED;
+    private static final String COLOR_NUMBER = ThemePalette.WARNING;
+    private static final String COLOR_KEYWORD = ThemePalette.ACCENT_IDLE;
+
+    private static final byte CC_OTHER = 0;
+    private static final byte CC_DIGIT = 1;
+    private static final byte CC_IDENT_START = 2;
+    private static final byte CC_SPECIAL = 3;
+    private static final byte[] CHAR_CLASS = buildCharClassTable();
+
+    static {
+        // Pre-warm the lexer briefly so editor keystroke latency stays sub-millisecond on first open.
+        VJavaSyntaxHighlighter warmup = new VJavaSyntaxHighlighter();
+        String sample = "label l:\n  $ x = \"a\" // c\n  :: b @->{ int y = 1; }<<\n  return\n";
+        for (int i = 0; i < 64; i++) {
+            warmup.tokenize(sample);
+        }
+    }
+
     /**
      * Creates a new {@code VJavaSyntaxHighlighter}.
      */
     public VJavaSyntaxHighlighter() {
+    }
+
+    private static byte[] buildCharClassTable() {
+        byte[] table = new byte[128];
+        for (int c = '0'; c <= '9'; c++) {
+            table[c] = CC_DIGIT;
+        }
+        for (int c = 'a'; c <= 'z'; c++) {
+            table[c] = CC_IDENT_START;
+        }
+        for (int c = 'A'; c <= 'Z'; c++) {
+            table[c] = CC_IDENT_START;
+        }
+        table['_'] = CC_IDENT_START;
+        table['@'] = CC_SPECIAL;
+        table['#'] = CC_SPECIAL;
+        table['/'] = CC_SPECIAL;
+        table['"'] = CC_SPECIAL;
+        table['\''] = CC_SPECIAL;
+        table['$'] = CC_SPECIAL;
+        return table;
     }
 
     /**
@@ -59,94 +103,65 @@ public final class VJavaSyntaxHighlighter {
             return List.of();
         }
         int len = source.length();
-        List<TokenRun> runs = new ArrayList<>(Math.max(32, len / 6));
+        List<TokenRun> runs = new ArrayList<>(Math.max(32, len / 4));
+        byte[] classes = CHAR_CLASS;
         int defaultStart = -1;
         int i = 0;
 
         while (i < len) {
             char c = source.charAt(i);
+            byte cls = c < 128 ? classes[c] : CC_OTHER;
 
-            // Embedded @->{ ... }<< Java block
-            if (c == '@' && i + 3 < len
-                    && source.charAt(i + 1) == '-'
-                    && source.charAt(i + 2) == '>'
-                    && source.charAt(i + 3) == '{') {
-                if (defaultStart >= 0) {
-                    runs.add(new TokenRun(defaultStart, i, TokenType.DEFAULT, ThemePalette.TEXT_PRIMARY));
-                    defaultStart = -1;
+            if (cls == CC_SPECIAL) {
+                if (c == '@' && i + 3 < len
+                        && source.charAt(i + 1) == '-'
+                        && source.charAt(i + 2) == '>'
+                        && source.charAt(i + 3) == '{') {
+                    defaultStart = flushDefault(runs, defaultStart, i);
+                    int end = scanJavaBlockEnd(source, i + 4, len);
+                    runs.add(new TokenRun(i, end, TokenType.JAVA_BLOCK, COLOR_JAVA_BLOCK));
+                    i = end;
+                    continue;
                 }
-                int end = scanJavaBlockEnd(source, i + 4, len);
-                runs.add(new TokenRun(i, end, TokenType.JAVA_BLOCK, ThemePalette.ACCENT_HOVER));
-                i = end;
-                continue;
-            }
-
-            // Line comments: // or #
-            if (c == '#' || (c == '/' && i + 1 < len && source.charAt(i + 1) == '/')) {
-                if (defaultStart >= 0) {
-                    runs.add(new TokenRun(defaultStart, i, TokenType.DEFAULT, ThemePalette.TEXT_PRIMARY));
-                    defaultStart = -1;
+                if (c == '#' || (c == '/' && i + 1 < len && source.charAt(i + 1) == '/')) {
+                    defaultStart = flushDefault(runs, defaultStart, i);
+                    int end = scanToLineEnd(source, i, len);
+                    runs.add(new TokenRun(i, end, TokenType.COMMENT, COLOR_COMMENT));
+                    i = end;
+                    continue;
                 }
-                int end = scanToLineEnd(source, i, len);
-                runs.add(new TokenRun(i, end, TokenType.COMMENT, ThemePalette.TEXT_MUTED));
-                i = end;
-                continue;
-            }
-
-            // String literals "..." or '...' (unterminated terminates safely at EOL/EOF)
-            if (c == '"' || c == '\'') {
-                if (defaultStart >= 0) {
-                    runs.add(new TokenRun(defaultStart, i, TokenType.DEFAULT, ThemePalette.TEXT_PRIMARY));
-                    defaultStart = -1;
+                if (c == '"' || c == '\'') {
+                    defaultStart = flushDefault(runs, defaultStart, i);
+                    int end = scanStringEnd(source, i, len, c);
+                    runs.add(new TokenRun(i, end, TokenType.STRING, COLOR_STRING));
+                    i = end;
+                    continue;
                 }
-                int end = scanStringEnd(source, i, len, c);
-                runs.add(new TokenRun(i, end, TokenType.STRING, ThemePalette.SUCCESS));
-                i = end;
-                continue;
-            }
-
-            // $ variable marker / identifier
-            if (c == '$') {
-                if (defaultStart >= 0) {
-                    runs.add(new TokenRun(defaultStart, i, TokenType.DEFAULT, ThemePalette.TEXT_PRIMARY));
-                    defaultStart = -1;
+                if (c == '$') {
+                    defaultStart = flushDefault(runs, defaultStart, i);
+                    int end = scanIdentEnd(source, i + 1, len, classes);
+                    runs.add(new TokenRun(i, end, TokenType.VARIABLE, COLOR_VARIABLE));
+                    i = end;
+                    continue;
                 }
+            } else if (cls == CC_DIGIT) {
+                defaultStart = flushDefault(runs, defaultStart, i);
                 int end = i + 1;
-                while (end < len && isIdentPart(source.charAt(end))) {
-                    end++;
-                }
-                runs.add(new TokenRun(i, end, TokenType.VARIABLE, ThemePalette.ACTIVE_SELECTED));
-                i = end;
-                continue;
-            }
-
-            // Numeric literal
-            if (isAsciiDigit(c)) {
-                if (defaultStart >= 0) {
-                    runs.add(new TokenRun(defaultStart, i, TokenType.DEFAULT, ThemePalette.TEXT_PRIMARY));
-                    defaultStart = -1;
-                }
-                int end = i + 1;
-                while (end < len && (isAsciiDigit(source.charAt(end)) || source.charAt(end) == '.')) {
-                    end++;
-                }
-                runs.add(new TokenRun(i, end, TokenType.NUMBER, ThemePalette.WARNING));
-                i = end;
-                continue;
-            }
-
-            // Identifier / keyword
-            if (isIdentStart(c)) {
-                int end = i + 1;
-                while (end < len && isIdentPart(source.charAt(end))) {
-                    end++;
-                }
-                if (isKeyword(source, i, end)) {
-                    if (defaultStart >= 0) {
-                        runs.add(new TokenRun(defaultStart, i, TokenType.DEFAULT, ThemePalette.TEXT_PRIMARY));
-                        defaultStart = -1;
+                while (end < len) {
+                    char dc = source.charAt(end);
+                    if ((dc < '0' || dc > '9') && dc != '.') {
+                        break;
                     }
-                    runs.add(new TokenRun(i, end, TokenType.KEYWORD, ThemePalette.ACCENT_IDLE));
+                    end++;
+                }
+                runs.add(new TokenRun(i, end, TokenType.NUMBER, COLOR_NUMBER));
+                i = end;
+                continue;
+            } else if (cls == CC_IDENT_START) {
+                int end = scanIdentEnd(source, i + 1, len, classes);
+                if (isKeyword(source, i, end)) {
+                    defaultStart = flushDefault(runs, defaultStart, i);
+                    runs.add(new TokenRun(i, end, TokenType.KEYWORD, COLOR_KEYWORD));
                 } else if (defaultStart < 0) {
                     defaultStart = i;
                 }
@@ -154,24 +169,39 @@ public final class VJavaSyntaxHighlighter {
                 continue;
             }
 
-            // Plain whitespace / punctuation chunk coalesced into DEFAULT run
             if (defaultStart < 0) {
                 defaultStart = i;
             }
             i++;
             while (i < len) {
                 char next = source.charAt(i);
-                if (next == '@' || next == '#' || next == '/' || next == '"' || next == '\''
-                        || next == '$' || isAsciiDigit(next) || isIdentStart(next)) {
+                if (next < 128 && classes[next] != CC_OTHER) {
                     break;
                 }
                 i++;
             }
         }
-        if (defaultStart >= 0) {
-            runs.add(new TokenRun(defaultStart, len, TokenType.DEFAULT, ThemePalette.TEXT_PRIMARY));
-        }
+        flushDefault(runs, defaultStart, len);
         return runs;
+    }
+
+    private static int flushDefault(List<TokenRun> runs, int defaultStart, int end) {
+        if (defaultStart >= 0) {
+            runs.add(new TokenRun(defaultStart, end, TokenType.DEFAULT, COLOR_DEFAULT));
+        }
+        return -1;
+    }
+
+    private static int scanIdentEnd(String source, int pos, int len, byte[] classes) {
+        int end = pos;
+        while (end < len) {
+            char ch = source.charAt(end);
+            if (ch >= 128 || (classes[ch] != CC_IDENT_START && classes[ch] != CC_DIGIT)) {
+                break;
+            }
+            end++;
+        }
+        return end;
     }
 
     private static int scanToLineEnd(String source, int start, int len) {
@@ -239,14 +269,6 @@ public final class VJavaSyntaxHighlighter {
             i++;
         }
         return len;
-    }
-
-    private static boolean isAsciiDigit(char ch) {
-        return ch >= '0' && ch <= '9';
-    }
-
-    private static boolean isIdentStart(char ch) {
-        return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_';
     }
 
     private static boolean isKeyword(String source, int start, int end) {
@@ -356,9 +378,5 @@ public final class VJavaSyntaxHighlighter {
 
     private static boolean matches(String source, int start, String keyword, int len) {
         return source.regionMatches(start, keyword, 0, len);
-    }
-
-    private static boolean isIdentPart(char ch) {
-        return isIdentStart(ch) || isAsciiDigit(ch);
     }
 }

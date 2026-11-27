@@ -245,4 +245,4 @@ public final class StudioWindowController implements StudioBridge {
 ### Wave P2-4 3D-Studio-Werkzeuge & Template
 - `Studio3DInspectorService`: Studio-exklusiver 3D-Inspektor (`GizmoAxis { X, Y, Z }`, `CameraSnapshot`, `PropDragResult`, `DebugLine3D`, `inspectCamera`, `applyCameraEdit`, `dragNodeAlongAxis`, `updateNodeMaterial`, `exportMaterialsJson`, `buildNavPathLines`).
 - `ProjectTemplateGenerator.TemplateType.HYBRID_3D_EXPLORATION`: Generiert 3D-Erkundungs-Projekt (`renderMode = "3D"`, `hall.obj`/`hall.mtl`/`pillar.obj`, `bg_hall_2d.png`, `WASD3D`, Material & Nebel).
-- `VJavaLinter`: Prüft `Scene3DStatement` und `Spawn3DStatement` auf `MISSING_ASSET` sowie `.obj`/`.glb`-Meshes > 100.000 Vertices auf `HIGH_POLY_MESH`-Warnung.
+- `VJavaLinter`: Prüft `Scene3DStatement` und `Spawn3DStatement` auf `MISSING_ASSET` sowie `.obj`/`.glb`-Meshes > 100.000 Vertices auf `HIGH_POLY_MESH`-Warnung; prüft Audio-Referenzen zusätzlich auf `UNSUPPORTED_AUDIO_FORMAT` und `NEGATIVE_FADE_DURATION`.

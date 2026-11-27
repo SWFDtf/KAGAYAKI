@@ -1,5 +1,15 @@
 package de.swfdtf.audio;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * Envelope-following lip-sync analyzer converting real-time voice RMS amplitude into smoothed
  * mouth openness in {@code [0, 1]} and discrete {@link MouthShape} states for character sprite
@@ -343,5 +353,140 @@ public final class LipSyncAnalyzer {
                     "openThreshold must be in [halfOpenThreshold (" + halfOpen + "), 1], got: " + open
             );
         }
+    }
+
+    /**
+     * Offline pre-baked {@code *.lipsync.json} envelope sequence ({@code #0474}).
+     *
+     * @param fps    sample rate of mouth frames per second
+     * @param frames ordered mouth shape sequence
+     */
+    public record BakedLipSync(int fps, List<MouthShape> frames) {
+        /** Validates positive frame rate and immutable frame list. */
+        public BakedLipSync {
+            if (fps <= 0) {
+                throw new IllegalArgumentException("fps must be > 0");
+            }
+            frames = frames != null ? List.copyOf(frames) : List.of();
+        }
+
+        /**
+         * Resolves mouth shape at playback timestamp {@code seconds}.
+         *
+         * @param seconds voice playback position in seconds
+         * @return baked {@link MouthShape} or {@link MouthShape#CLOSED} when out of range
+         */
+        public MouthShape sampleAt(double seconds) {
+            if (frames.isEmpty() || seconds < 0.0) {
+                return MouthShape.CLOSED;
+            }
+            int idx = (int) Math.floor(seconds * fps);
+            return idx < frames.size() ? frames.get(idx) : MouthShape.CLOSED;
+        }
+    }
+
+    /**
+     * Computes normalized Zero-Crossing Rate in {@code [0, 1]} to help distinguish consonants from
+     * vowels alongside RMS envelope smoothing ({@code #0439}).
+     *
+     * @param samples mono float sample window
+     * @return zero-crossing rate in {@code [0, 1]}
+     */
+    public static float computeZeroCrossingRate(float[] samples) {
+        Objects.requireNonNull(samples, "samples must not be null");
+        if (samples.length < 2) {
+            return 0.0f;
+        }
+        int crossings = 0;
+        for (int i = 1; i < samples.length; i++) {
+            if ((samples[i - 1] < 0.0f && samples[i] >= 0.0f)
+                    || (samples[i - 1] >= 0.0f && samples[i] < 0.0f)) {
+                crossings++;
+            }
+        }
+        return (float) crossings / (samples.length - 1);
+    }
+
+    /**
+     * Pre-bakes discrete {@link MouthShape} frames for an entire decoded voice track ({@code #0474}).
+     *
+     * @param audio decoded voice audio
+     * @param fps   target envelope frame rate (e.g., {@code 30})
+     * @return baked lip-sync timeline
+     */
+    public static BakedLipSync bakeLipSync(AudioDecoder.DecodedAudio audio, int fps) {
+        Objects.requireNonNull(audio, "audio must not be null");
+        if (fps <= 0) {
+            throw new IllegalArgumentException("fps must be > 0");
+        }
+        float[] mono = audio.toMonoFloat();
+        int stepSamples = Math.max(1, audio.sampleRate() / fps);
+        double dt = 1.0 / fps;
+        LipSyncAnalyzer analyzer = new LipSyncAnalyzer();
+        List<MouthShape> frames = new ArrayList<>();
+        for (int i = 0; i < mono.length; i += stepSamples) {
+            int len = Math.min(stepSamples, mono.length - i);
+            float[] window = new float[len];
+            System.arraycopy(mono, i, window, 0, len);
+            float rms = AudioDsp.computeRms(window);
+            float zcr = computeZeroCrossingRate(window);
+            // Boost consonant transitions slightly via mild ZCR weighting when audible
+            float weightedRms = rms > analyzer.getNoiseFloorRms() ? rms * (1.0f + zcr * 0.25f) : rms;
+            frames.add(analyzer.updateFromRms(weightedRms, dt));
+        }
+        return new BakedLipSync(fps, frames);
+    }
+
+    /**
+     * Serializes a {@link BakedLipSync} timeline to JSON ({@code #0474}).
+     *
+     * @param baked baked lip-sync sequence
+     * @return formatted JSON string
+     */
+    public static String toJson(BakedLipSync baked) {
+        Objects.requireNonNull(baked, "baked must not be null");
+        StringBuilder sb = new StringBuilder("{\"fps\":").append(baked.fps()).append(",\"frames\":[");
+        for (int i = 0; i < baked.frames().size(); i++) {
+            if (i > 0) {
+                sb.append(',');
+            }
+            sb.append('"').append(baked.frames().get(i).name()).append('"');
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+
+    /**
+     * Parses a serialized {@link BakedLipSync} JSON string ({@code #0474}).
+     *
+     * @param json JSON string
+     * @return parsed {@link BakedLipSync}
+     */
+    public static BakedLipSync fromJson(String json) {
+        Objects.requireNonNull(json, "json must not be null");
+        Matcher fpsM = Pattern.compile("\"fps\"\\s*:\\s*(\\d+)").matcher(json);
+        int fps = fpsM.find() ? Integer.parseInt(fpsM.group(1)) : 30;
+        List<MouthShape> shapes = new ArrayList<>();
+        Matcher shapeM = Pattern.compile("\"(CLOSED|HALF_OPEN|OPEN)\"").matcher(json);
+        while (shapeM.find()) {
+            shapes.add(MouthShape.valueOf(shapeM.group(1)));
+        }
+        return new BakedLipSync(fps, shapes);
+    }
+
+    /**
+     * Loads a pre-baked {@code *.lipsync.json} file if present, falling back cleanly when absent ({@code #0474}).
+     *
+     * @param jsonPath optional baked file path
+     * @param fallbackAudio decoded audio used for real-time baking fallback if file missing
+     * @return loaded or freshly computed {@link BakedLipSync}
+     * @throws IOException if file exists but is unreadable
+     */
+    public static BakedLipSync loadOrFallback(Path jsonPath, AudioDecoder.DecodedAudio fallbackAudio)
+            throws IOException {
+        if (jsonPath != null && Files.isRegularFile(jsonPath)) {
+            return fromJson(Files.readString(jsonPath, StandardCharsets.UTF_8));
+        }
+        return bakeLipSync(fallbackAudio, 30);
     }
 }

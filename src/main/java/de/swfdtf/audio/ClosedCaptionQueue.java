@@ -67,7 +67,35 @@ public final class ClosedCaptionQueue {
         }
     }
 
+    /**
+     * Accessibility caption priority tier preventing ambient descriptions from hiding story alerts ({@code #0467}).
+     */
+    public enum Priority {
+        /** Subtle background ambience cue. */
+        AMBIENT(0),
+        /** Standard story dialogue or SFX caption. */
+        STORY(1),
+        /** High-priority warning or critical alert kept at front of queue. */
+        CRITICAL(2);
+
+        private final int weight;
+
+        Priority(int weight) {
+            this.weight = weight;
+        }
+
+        /**
+         * Returns numeric sorting weight.
+         *
+         * @return priority weight
+         */
+        public int getWeight() {
+            return weight;
+        }
+    }
+
     private final Deque<CaptionEntry> entries = new ArrayDeque<>();
+    private final java.util.Map<String, Priority> prioritiesById = new java.util.HashMap<>();
     private int maxVisibleEntries;
     private long nextSequence = 1L;
 
@@ -106,17 +134,35 @@ public final class ClosedCaptionQueue {
             String text,
             double durationSeconds
     ) {
+        return push(category, source, text, durationSeconds, Priority.STORY);
+    }
+
+    /**
+     * Appends a caption with an explicit {@link Priority}, ordering higher-priority alerts at the
+     * front so ambient cues never displace critical warnings ({@code #0467}).
+     *
+     * @param category        caption category (must not be {@code null})
+     * @param source          source or speaker label (must not be {@code null})
+     * @param text            caption text (must not be {@code null} or blank)
+     * @param durationSeconds display duration in seconds ({@code > 0})
+     * @param priority        caption priority tier
+     * @return newly created {@link CaptionEntry}
+     */
+    public synchronized CaptionEntry push(
+            CaptionCategory category,
+            String source,
+            String text,
+            double durationSeconds,
+            Priority priority
+    ) {
         Objects.requireNonNull(category, "category must not be null");
         Objects.requireNonNull(source, "source must not be null");
+        Objects.requireNonNull(priority, "priority must not be null");
         String validText = requireNonBlank(text, "text");
         if (!Double.isFinite(durationSeconds) || durationSeconds <= 0.0) {
             throw new IllegalArgumentException(
                     "durationSeconds must be finite and > 0, got: " + durationSeconds
             );
-        }
-
-        while (entries.size() >= maxVisibleEntries) {
-            entries.removeFirst();
         }
 
         String id = "caption-" + nextSequence++;
@@ -128,7 +174,29 @@ public final class ClosedCaptionQueue {
                 durationSeconds,
                 durationSeconds
         );
-        entries.addLast(entry);
+        prioritiesById.put(id, priority);
+
+        List<CaptionEntry> sorted = new ArrayList<>(entries);
+        sorted.add(entry);
+        sorted.sort((a, b) -> Integer.compare(
+                prioritiesById.getOrDefault(b.id(), Priority.STORY).getWeight(),
+                prioritiesById.getOrDefault(a.id(), Priority.STORY).getWeight()
+        ));
+        while (sorted.size() > maxVisibleEntries) {
+            int lowestIdx = 0;
+            int lowestWeight = prioritiesById.getOrDefault(sorted.get(0).id(), Priority.STORY).getWeight();
+            for (int i = 1; i < sorted.size(); i++) {
+                int w = prioritiesById.getOrDefault(sorted.get(i).id(), Priority.STORY).getWeight();
+                if (w < lowestWeight) {
+                    lowestWeight = w;
+                    lowestIdx = i;
+                }
+            }
+            CaptionEntry removed = sorted.remove(lowestIdx);
+            prioritiesById.remove(removed.id());
+        }
+        entries.clear();
+        entries.addAll(sorted);
         return entry;
     }
 

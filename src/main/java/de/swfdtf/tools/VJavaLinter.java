@@ -783,13 +783,19 @@ public final class VJavaLinter {
                 );
             } else if (stmt instanceof VJavaAst.PlayStatement play) {
                 verifyAssetExists(project, knownAssets, play.assetPath(), play.sourceFile(), play.lineNumber(), issues);
+                verifyAudioFormatAndDuration(project, play.assetPath(), play.fadeInSeconds(),
+                        play.sourceFile(), play.lineNumber(), issues);
             } else if (stmt instanceof VJavaAst.QueueStatement queue) {
                 for (String path : queue.assetPaths()) {
                     verifyAssetExists(project, knownAssets, path, queue.sourceFile(), queue.lineNumber(), issues);
+                    verifyAudioFormatAndDuration(project, path, 0.0,
+                            queue.sourceFile(), queue.lineNumber(), issues);
                 }
             } else if (stmt instanceof VJavaAst.VoiceStatement voice) {
                 verifyAssetExists(
                         project, knownAssets, voice.assetPath(), voice.sourceFile(), voice.lineNumber(), issues);
+                verifyAudioFormatAndDuration(project, voice.assetPath(), 0.0,
+                        voice.sourceFile(), voice.lineNumber(), issues);
             } else if (stmt instanceof VJavaAst.OnCollideStatement collide) {
                 checkResolvedTarget(project, currentLabel, collide.targetLabel(), "MISSING_COLLIDE_TARGET",
                         "Collision target label", collide.sourceFile(), collide.lineNumber(),
@@ -950,6 +956,84 @@ public final class VJavaLinter {
             }
         }
         return rawPositions;
+    }
+
+    private static void verifyAudioFormatAndDuration(
+            VJavaAst.ProjectAst project,
+            String rawAudioPath,
+            double fadeDurationSeconds,
+            String sourceFile,
+            int lineNumber,
+            List<LintIssue> issues
+    ) {
+        if (!Double.isFinite(fadeDurationSeconds) || fadeDurationSeconds < 0.0) {
+            issues.add(new LintIssue(
+                    Severity.ERROR,
+                    "NEGATIVE_FADE_DURATION",
+                    "Audio fade/crossfade duration must be >= 0, got: " + fadeDurationSeconds,
+                    sourceFile,
+                    lineNumber
+            ));
+        }
+        if (rawAudioPath == null || rawAudioPath.isBlank()) {
+            return;
+        }
+        String normalized = normalizeAssetPath(stripQuotes(rawAudioPath));
+        String lower = normalized.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".mp3") || lower.endsWith(".flac") || lower.endsWith(".aac") || lower.endsWith(".m4a")) {
+            issues.add(new LintIssue(
+                    Severity.ERROR,
+                    "UNSUPPORTED_AUDIO_FORMAT",
+                    "Unsupported audio format '" + normalized + "'. Please convert to Ogg Vorbis (.ogg) or WAV (.wav).",
+                    sourceFile,
+                    lineNumber
+            ));
+            return;
+        }
+        if (project.projectRoot() == null) {
+            return;
+        }
+        try {
+            Path audioFile = project.projectRoot().resolve(normalized).normalize();
+            if (!Files.isRegularFile(audioFile)) {
+                return;
+            }
+            byte[] header = Files.readAllBytes(audioFile);
+            if (header.length == 0) {
+                issues.add(new LintIssue(
+                        Severity.ERROR,
+                        "UNSUPPORTED_AUDIO_FORMAT",
+                        "Empty (0-byte) audio file: '" + normalized + "'.",
+                        sourceFile,
+                        lineNumber
+                ));
+            } else if ((lower.endsWith(".wav") || lower.endsWith(".wave")) && header.length >= 12) {
+                boolean isRiffWave = header[0] == 'R' && header[1] == 'I' && header[2] == 'F' && header[3] == 'F'
+                        && header[8] == 'W' && header[9] == 'A' && header[10] == 'V' && header[11] == 'E';
+                if (!isRiffWave) {
+                    issues.add(new LintIssue(
+                            Severity.ERROR,
+                            "UNSUPPORTED_AUDIO_FORMAT",
+                            "File '" + normalized + "' does not have a valid RIFF/WAVE header.",
+                            sourceFile,
+                            lineNumber
+                    ));
+                }
+            } else if ((lower.endsWith(".ogg") || lower.endsWith(".oga")) && header.length >= 12) {
+                boolean isOgg = header[0] == 'O' && header[1] == 'g' && header[2] == 'g' && header[3] == 'S';
+                if (!isOgg) {
+                    issues.add(new LintIssue(
+                            Severity.ERROR,
+                            "UNSUPPORTED_AUDIO_FORMAT",
+                            "File '" + normalized + "' does not have a valid OggS Vorbis header.",
+                            sourceFile,
+                            lineNumber
+                    ));
+                }
+            }
+        } catch (IOException | IllegalArgumentException ignored) {
+            // File accessibility errors are handled by asset inspection passes.
+        }
     }
 
     private static void checkUnreachableLabels(
