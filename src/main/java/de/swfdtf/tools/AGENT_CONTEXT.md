@@ -248,7 +248,9 @@ public final class StudioWindowController implements StudioBridge {
   - `ACTION_ADVENTURE_2D`: Begehbare 2D-Räume mit Plattformen, NPCs, Dialogzonen (`on_collide`) und Schlüssel-Rätsel mit `0 Errors, 0 Warnings`.
 - `StudioWindowController`:
   - `StudioView { MAIN_MENU, WORKSPACE }` (`MAIN_MENU_SCREEN_NAME = "studio_main_menu"`, `WORKSPACE_SCREEN_NAME = "studio_workspace"`).
-  - Neue Methoden: `createNewProject(Path, String, TemplateType)`, `showMainMenu()`, `showWorkspace()`, `getActiveView()`, `getSelectedTemplateType()`, `setSelectedTemplateType(TemplateType)`, `getEngineVersionBanner()`, `getActiveProjectVersion()`, `getActiveProjectRoot()`, `getRecentProjects()`, `getStudioInput()`.
+  - Neue Methoden: `createNewProject(Path, String, TemplateType)`, `openProject(Path)`, `openRecentProject(int)`, `getRecentProjectButtons()`, `getLivePreviewReloadCount()`, `setWorkspaceStateFile(Path)`, `getWorkspaceStateFile()`, `saveWorkspaceState()`, `getWorkspaceState()`, `showMainMenu()`, `showWorkspace()`, `getActiveView()`, `getSelectedTemplateType()`, `setSelectedTemplateType(TemplateType)`, `getEngineVersionBanner()`, `getActiveProjectVersion()`, `getActiveProjectRoot()`, `getRecentProjects()`, `getStudioInput()`, `undockPanel(...)`, `redockPanel(...)`, `getUndockedWindowManager()`.
+- `StudioWorkspaceState`:
+  - Persistenz unter `~/.kagayaki/studio.json` (`defaultPersistencePath()`, `DEFAULT_TEMPLATE_TYPE = "FULL_DEMO"`, `getSelectedTemplateType()` / `setSelectedTemplateType(String)`).
 - `VJavaLinter`: Prüft zusätzlich `OnCollideStatement` (`MISSING_COLLIDE_TARGET`), `MoveStatement` (`INVALID_MOVE_DURATION`, `UNKNOWN_EASING`), `WasdInitStatement` (`INVALID_WASD_SPEED`, `INVALID_WASD_BOUNDS`) und `PhysicsInitStatement` (`INVALID_PHYSICS_CONFIG`).
 
 ### Wave P2-4 3D-Studio-Werkzeuge & Template

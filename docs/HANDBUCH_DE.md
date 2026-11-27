@@ -28,9 +28,10 @@ Siehe die vollständige Syntax-Referenz in [VJAVA_SPEZIFIKATION.md](VJAVA_SPEZIF
 
 ## 3. Dual-Window Studio (Window A + Window B)
 
-1. Studio (`./gradlew run`) startet im Project Hub mit Version-Banner (`EngineVersion`), Vorlagen-Generator (`FULL_DEMO`, `STARTER`, `MINIMAL`, `ACTION_ADVENTURE_2D`, `HYBRID_3D_EXPLORATION`, `HYBRID_3D_MYSTERY`, `NVL_LITERARY`, `TUTORIAL_5_MIN`, `SANDBOX_2D_LAB`) und Live-Inspektoren.
+1. Studio (`./gradlew run`) startet im Project Hub mit Version-Banner (`EngineVersion`: `KAGAYAKI v1.0.0 (vJava 1.1)`), Vorlagen-Generator (`FULL_DEMO`, `STARTER`, `MINIMAL`, `ACTION_ADVENTURE_2D`, `HYBRID_3D_EXPLORATION`, `HYBRID_3D_MYSTERY`, `NVL_LITERARY`, `TUTORIAL_5_MIN`, `SANDBOX_2D_LAB`), persistenter Workspace-Speicherung (`~/.kagayaki/studio.json` über `StudioWorkspaceState`), klickbarer Recent-Projects-Liste inkl. Live-Reload auf Window B, `ProjectDescriptor.useCustomMainMenuScreen`-Umschaltung (`template_main_menu` vs. Dark-Slate-Hauptmenü) und Live-Inspektoren.
 2. Vorlagen-Walkthrough: [TUTORIAL_ERSTES_PROJEKT.md](TUTORIAL_ERSTES_PROJEKT.md).
 3. Release-Smoke-Prüfung: [GUI_SMOKE_CHECKLIST.md](GUI_SMOKE_CHECKLIST.md).
+4. Architektur- & Build-Guards (`ArchitectureGuardTest`): Automatisierte Import-Audits sichern schichtsaubere Pakete (`0` Imports aus `parser`/`ui`/`tools` in `de.swfdtf.state`) und verbieten `java.awt.*`/`javax.imageio.*` im Produktivcode (Roadmap `1.021 / 1.021` Ziele abgeschlossen).
 
 ## 4. Packaging, Save-System, 3D & Cloud/WASM-Ausbau
 

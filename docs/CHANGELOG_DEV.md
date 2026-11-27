@@ -4,6 +4,17 @@ Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architekt
 
 ---
 
+## [Roadmap-Abschluss: Wave P0-Final & `#1021` — `1.021 / 1.021` Ziele abgeschlossen] Studio-Persistenz, Custom-Main-Menu-Switch & Gesamtdokumentation
+
+* **Wave P0-Final (`67b20da`, `#0086`, `#0087`, `#0341` + `WaveP0FinalGoalsTest`)**:
+  * **Persistente Studio-Workspace-Speicherung (`#0086`)**: `StudioWorkspaceState` (`DEFAULT_TEMPLATE_TYPE = "FULL_DEMO"`, `selectedTemplateType`, `defaultPersistencePath()` unter `~/.kagayaki/studio.json`) wird in `StudioWindowController` beim Initialisieren geladen und beim Beenden (`dispose()` / `saveWorkspaceState()`) automatisch auf Disk gesichert.
+  * **Klickbare „Recent Projects“-Buttons (`#0087`)**: `StudioWindowController` rendert alle Recent-Einträge als interaktive `TextButton`s (`openProject(Path)`, `openRecentProject(int)`, `getRecentProjectButtons()`, `getLivePreviewReloadCount()`), wechselt `activeProjectRoot` und triggert den Live-Reload von Window B.
+  * **Custom-`.vjava`-Hauptmenü-Umschaltung (`#0341`)**: `ProjectDescriptor` (`useCustomMainMenuScreen`, `customMainMenuScreenName = "template_main_menu"`) und `GameRuntimeCoordinator` (`resolvePrimaryMainMenuScreenName()`, `showPrimaryMainMenu()`, `setUseCustomMainMenuScreen(boolean)`, `hideAllMainMenus()`) schalten überlappungsfrei zwischen Dark-Slate-`MainMenuScreen` und projektspezifischem `.vjava`-Screen um.
+* **Architektur- & Build-Guards (`#0936`, `#0937`)**: Verifiziert über `ArchitectureGuardTest` (0 zirkuläre Imports aus `parser`/`ui`/`tools` in `de.swfdtf.state`, 0 `java.awt.*`/`javax.imageio.*` im Produktivcode).
+* **Gesamtdokumentation & HTML-Sync (`#1021`)**: Abschlussabgleich von `README.md`, `docs/` (`ARCHITEKTUR.md`, `API_REFERENZ.md`, `VJAVA_SPEZIFIKATION.md`, `getting-started.md`/`.html`, `sprachreferenz.md`/`.html`, `HANDBUCH_DE.md`, `GUIDE_EN.md`, `CHANGELOG_DEV.md`), betroffenen `AGENT_CONTEXT.md`-Signaturen und [ZIELE.md](../ZIELE.md) (`1.021 / 1.021` `[x]`).
+
+---
+
 ## [Roadmap `[P1]` (128), `[P2]` (853) & `[P3]` (24) — Abgeschlossen] Vollpipeline 2D/3D, Studio-IDE, Cloud-Sync & Node-Graph
 
 * **Waves P3-1 bis P3-4 (24 / 24 `[P3]`-Ziele abgeschlossen, Commits `bb1924e`..`4385617`):**

@@ -155,7 +155,10 @@ public String getDefaultLanguage() / public void setDefaultLanguage(String defau
 public String getDialogueMode() / public void setDialogueMode(String dialogueMode)
 public String getWindowTitle() / public void setWindowTitle(String windowTitle)
 public String getIconPath() / public void setIconPath(String iconPath)
+public String getVpakEncryptionKey() / public void setVpakEncryptionKey(String vpakEncryptionKey)
 public String getAccentColorHex() / public void setAccentColorHex(String accentColorHex)
+public boolean isUseCustomMainMenuScreen() / public void setUseCustomMainMenuScreen(boolean useCustomMainMenuScreen)
+public String getCustomMainMenuScreenName() / public void setCustomMainMenuScreenName(String customMainMenuScreenName)
 ```
 
 ### `GameClock`

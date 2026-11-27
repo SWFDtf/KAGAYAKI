@@ -1,6 +1,6 @@
-# `.vjava` Sprach- und Projekt-Spezifikation (M7-Stand)
+# `.vjava` Sprach- und Projekt-Spezifikation (`vJava 1.1` / `KAGAYAKI v1.0.0`)
 
-> **Implementierungsstand (Meilenstein M7 abgeschlossen — Gesamtlieferung)**: Alle in diesem Dokument beschriebenen `.vjava`-Sprachkonstrukte, Projektscan-Regeln, Ausdrucks- und Bedingungsgrammatiken, die In-Memory-Java-21-Kompilierung, das 4-Tier-State-/Rollback-/Save-/Lokalisierungssystem, die Audio-, ATL-Animations-, Transitions-, Partikel-, Video- und TTS-Subsysteme, `LayeredImage`, das deklarative Dark-Slate-UI-Subsystem (`de.swfdtf.ui`) sowie die komplette Studio-/Tooling-/Packager-Pipeline (`de.swfdtf.tools`) sind implementiert und verifiziert:
+> **Implementierungsstand (Roadmap `1.021 / 1.021` Ziele abgeschlossen)**: Alle in diesem Dokument beschriebenen `.vjava`-Sprachkonstrukte (`73` ausführbare `VJavaAst.Statement`-Typen, vollständige Referenz in [sprachreferenz.md](sprachreferenz.md)), Projektscan-Regeln, Ausdrucks- und Bedingungsgrammatiken, die In-Memory-Java-21-Kompilierung, das 4-Tier-State-/Rollback-/Save-/Lokalisierungssystem, die Audio-, ATL-Animations-, Transitions-, Partikel-, Video-, TTS-, 2D-Motion-/A*- und 3D-Subsysteme (`RenderPipeline3D`), `LayeredImage`, das deklarative Dark-Slate-UI-Subsystem (`de.swfdtf.ui`) sowie die komplette Studio-/Tooling-/Packager-Pipeline (`de.swfdtf.tools`) sind implementiert und verifiziert:
 > * **M1**: Projekt-Metadaten (`ProjectDescriptor` für `project.vjava.json`), Laufzeit-Konfiguration (`EngineConfig`) und Java-Skript-Fassade (`EngineAPI`, Binding `engine`).
 > * **M2**: Komplette Inline-Rich-Text-Syntax inklusive Variableninterpolation, Flow-Control-Cues, Furigana, Inline-Bildern, Hyperlinks und Text-Animationstags (`TextTagParser`, `StyledTextLayout`, `TypewriterController`, `FontAtlas`, `FontManager`) sowie `CustomDisplayable`.
 > * **M3**: Vollständiger Lexer (`VJavaLexer`), rekursiv-absteigender AST-Parser (`VJavaParser` / `VJavaAst`), rekursiver Projektscanner (`ProjectScanner`), In-Memory-Java-21-Compiler (`JavaBlockCompiler` / `VJavaExecutable`), Ausdrucks-Evaluator (`ConditionEvaluator`), nicht-blockierende Skript-Laufzeit (`ScriptRuntime`), Bühnensteuerung (`SceneController`, Binding `scene`) sowie State-Verträge (`StateStore` als `state`, `PersistentAccess` als `persistent`).
@@ -51,6 +51,10 @@ mein_vn_projekt/
 | `dialogueMode` | `String` | `"ADV"` | Standard-Dialogmodus (`"ADV"`, `"NVL"`, `"BUBBLE"`) |
 | `windowTitle` | `String` | entspricht `title` | Fenstertitel-Override |
 | `iconPath` | `String` | `""` | Relativer Pfad zum Fenster-Icon |
+| `vpakEncryptionKey` | `String` | `""` | Optionaler AES-256-CTR-Schlüssel für verschlüsselte `.vpak`-Distributionen (`VpakArchiver`) |
+| `accentColorHex` | `String` | `""` | Optionaler Projekt-Akzentfarbe-Hex-Override für `ThemePalette.resolveProjectAccentHex(...)` |
+| `useCustomMainMenuScreen` | `boolean` | `false` | Schaltet überlappungsfrei zwischen Dark-Slate-`MainMenuScreen` (`false`) und projektspezifischem `.vjava`-Screen (`true`, `#0341`) |
+| `customMainMenuScreenName` | `String` | `"template_main_menu"` | Name des `.vjava`-Hauptmenü-Screens (Fallback auf `"main_menu"`, wenn `useCustomMainMenuScreen = true`) |
 
 ---
 
@@ -442,3 +446,7 @@ label start:
   * **`DeveloperInspectors`**: `Shift+R` (Live-Reload mit Erhalt von Label, Statement-Index und `StateStore`), `Shift+I` (Style-Inspektor), `Shift+C` (Koordinaten-Picker für `xpos/ypos` & `xalign/yalign`), `Shift+O` (Live-Java-Konsole gegen `VJavaUserTypes` und Label-Warp).
 * **`.vpak`-Archiv & Standalone-Export (`VpakArchiver`, `StandaloneBuilder`)**:
   * `StandaloneBuilder.build(...)` verweigert den Export bei Lint-Fehlern und bündelt `project.vjava.json`, `**/*.vjava`, `assets/**` und `tl/**` (ohne `saves/`, `.git/`, `build/`, `dist/`) in ein Deflate-/CRC32-geprüftes `game.vpak` samt `run_game.sh`, `run_game.bat`, optionalem `kagayaki-standalone.jar` (`de.swfdtf.StandaloneMain --standalone .`) und `standalone-packaging.json`.
+* **vJava-1.1-Ausbau & Studio-Erweiterungen (`[P0]`–`[P3]`)**:
+  * **73 ausführbare Statement-Typen**: Vollständige Syntax für 2D-/3D-Bewegung (`move`, `move_by`, `move_path`, `wasd_init`/`wasd3d_init`, `physics_init`, `on_collide`, `scene3d`, `spawn3d`, `camera3d`, `fog3d`, `material3d`), Kontrollfluss (`match`, `repeat`, `while`, `parallel`, `after`) und A*-/`GridPathfinder2D` in [sprachreferenz.md](sprachreferenz.md).
+  * **Vorkompilierte Skript-Bundles & Node-Graph**: `CompiledScriptBundle` (`META-INF/compiled-scripts.vjc`) für schnelle `.vpak`-Starts sowie verlustfreier `VisualNodeGraphEditor`-Round-Trip unter Erhalt eingebetteter `@->{ ... }<<`-Java-Blöcke.
+  * **Pacing-Linter & Hauptmenü-Flag**: `DialogPacingLinter` ergänzt optionale `Severity.INFO`-Monologhinweise ab 15 Sätzen; `ProjectDescriptor.useCustomMainMenuScreen` steuert die überlappungsfreie Umschaltung auf `template_main_menu`.

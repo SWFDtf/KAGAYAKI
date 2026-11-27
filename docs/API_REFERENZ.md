@@ -1,4 +1,4 @@
-# KAGAYAKI — Öffentliche API-Referenz (M1–M7)
+# KAGAYAKI — Öffentliche API-Referenz (v1.0.0 / vJava 1.1)
 
 Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen aller abgeschlossenen KAGAYAKI-Pakete (`de.swfdtf`, `de.swfdtf.core`, `de.swfdtf.graphics`, `de.swfdtf.math`, `de.swfdtf.git`, `de.swfdtf.parser`, `de.swfdtf.state`, `de.swfdtf.audio`, `de.swfdtf.ui`, `de.swfdtf.tools`) sowie die Gradle-Tasks aus `build.gradle`.
 
@@ -9,11 +9,18 @@ Diese Referenz dokumentiert die verifizierten öffentlichen Java-Schnittstellen 
 | Task | Gruppe | Beschreibung |
 | :--- | :--- | :--- |
 | `./gradlew build` | `build` | Kompiliert Java 21 Quellen, führt JUnit-6-Tests aus und paketiert das Standard-JAR. |
-| `./gradlew test` | `verification` | Führt alle JUnit-Jupiter-Tests (`6.0.0`) mit ausführlichem Event-Logging aus (M1–M6-Basis: **157** Tests in **43** Suites, ergänzt um die M7-Suites `DirectorAndInspectorsTest`, `ToolsPackagerAndTemplateTest` und `EndToEndEngineTest` unter `de.swfdtf.tools`). |
+| `./gradlew check` | `verification` | Führt Unit-Tests und Checkstyle (main + test, 0 Verstöße) aus. |
+| `./gradlew javadoc` | `documentation` | Prüft alle öffentlichen Javadoc-Kommentare strikt (`-Xdoclint:all -Werror`). |
+| `./gradlew test` | `verification` | Führt alle Unit-Suites unter `src/test/java` (`JUnit Jupiter 6.0.0` + Mockito) inklusive `ArchitectureGuardTest` (`#0936`/`#0937`) und `WaveP0FinalGoalsTest` aus. |
+| `./gradlew e2eTest` | `verification` | Führt isolierte End-to-End-Tests aus `src/e2eTest/java` aus. |
+| `./gradlew jacocoTestReport` | `verification` | Erzeugt JaCoCo XML-/HTML-Coverage-Berichte auf Basis von `test`. |
 | `./gradlew run` | `application` | Startet `de.swfdtf.Main` (unter macOS automatisch mit `-XstartOnFirstThread`). |
 | `./gradlew runStudio` | `kagayaki` | Startet `de.swfdtf.Main` mit `--studio` (optional `-PkagayakiProject=<pfad>` ergänzt `--project <pfad>`). |
 | `./gradlew runStandalone` | `kagayaki` | Startet `de.swfdtf.StandaloneMain` (optional `-PkagayakiProject=<pfad>` ergänzt `--standalone <pfad>`). |
 | `./gradlew packageStandalone` | `kagayaki` | Erstellt ein ausführbares Fat-JAR `build/dist/kagayaki-standalone-<version>.jar` mit `Main-Class: de.swfdtf.StandaloneMain` und schließt `de/swfdtf/tools/StudioWindowController*` sowie `**/AGENT_CONTEXT.md` aus. |
+| `./gradlew jpackageBundle` | `kagayaki` | Paketiert ein natives OS-App-Bundle (macOS `.app`, Windows `.msi`, Linux `.AppImage`) via `jpackage`. |
+| `./gradlew releaseDryRun` | `kagayaki` | Führt den vollständigen Release-Dry-Run (`check`, `javadoc`, `packageStandalone` und `demo:check/lintDemo/packageDemo`) aus. |
+| `./gradlew -p demo check test lintDemo` | `verification` | Prüft und lintet die Schneewittchen-Demo (`demo:lintDemo` mit 0 Fehlern/Warnungen). |
 
 ---
 
@@ -187,9 +194,12 @@ Top-Level-Laufzeitkoordinator (`implements AutoCloseable`) für Initialisierung,
   * `public GameHost getGameHost()`
 
 ### Weitere Typen in `de.swfdtf.core`
+* `EngineVersion`: Zentrale Versionskonstanten (`ENGINE_NAME = "KAGAYAKI"`, `VERSION = "1.0.0"`, `VJAVA_SPEC_VERSION = "1.1"`) sowie `formatBanner()`, `formatProjectHeader(String, String)` und `formatProjectHeader(ProjectDescriptor)`.
+* `ProjectDescriptor` (erweitert): `getVpakEncryptionKey()`/`setVpakEncryptionKey(String)`, `getAccentColorHex()`/`setAccentColorHex(String)`, `isUseCustomMainMenuScreen()`/`setUseCustomMainMenuScreen(boolean)`, `getCustomMainMenuScreenName()`/`setCustomMainMenuScreenName(String)` (Standard `"template_main_menu"`).
 * `EngineLogger`: Thread-sicherer Ringpuffer-Logger (`DEFAULT_CAPACITY = 2000`, `Level`, `LogEntry`, `addListener`, `getRecentEntries`, `setMinimumLevel`).
 * `StudioBridge`: Entkopplungsinterface (`init`, `update`, `render`, `onReload`, `dispose`) für `StudioWindowController`.
 * `GameHost`: Lebenszyklus-Interface (`init(EngineApplication, boolean)`, `update(double, InputManager)`, `renderUi(double)`, `onReload()`, `dispose()`) zur Entkopplung von `GameRuntimeCoordinator`.
+* `EngineEventBus`, `CommandStack`, `PluginRegistry`/`PluginLoader`, `ResourceProvider`, `KeybindingRemapper`, `GamepadNavigationRouter`, `KagayakiException`/`SaveCorruptionException`, `RuntimeQualityAndDiagnosticsServices` und `WebAssemblyFeasibilityAnalyzer`: Infrastruktur-, Input-, Plugin- und Diagnose-APIs (vollständige Signaturen in [core/AGENT_CONTEXT.md](../src/main/java/de/swfdtf/core/AGENT_CONTEXT.md)).
 
 ---
 
@@ -675,7 +685,7 @@ Nicht-blockierender Self-Voicing-TTS-Dienst auf einem Java-21-Virtual-Thread mit
 * **`EndingsTreeScreen`** (`SCREEN_NAME = "endings_tree"`): Record `TreeNodeView(EndingsManager.EndingDef, int depth, boolean unlocked, TextWidget titleLabel, TextWidget statusLabel)`; `EndingsTreeScreen(ScriptSession, ScreenManager)`, `refreshTree()`, `getNodeViews()`, `getCompletionBar()`, `getCompletionLabel()`.
 * **`AchievementsScreen`** (`SCREEN_NAME = "achievements"`): Record `AchievementRowView(AchievementManager.AchievementDef, boolean unlocked, TextWidget titleLabel, TextWidget descriptionLabel, TextWidget statusLabel)`; `AchievementsScreen(ScriptSession, ScreenManager)`, `refreshAchievements()`, `getRows()`, `getSummaryLabel()`, `getProgressBar()`.
 * **`NotificationToastOverlay`** (`SCREEN_NAME = "notification_toast"`, `DEFAULT_TOAST_DURATION = 4.0`): Record `ToastPayload(String title, String subtitle)`; `NotificationToastOverlay(ScriptSession, ScreenManager)`, `pushToast(String, String)`, `setSkipPillActive(boolean)`, `setAutoPillActive(boolean)`, `isToastVisible()`, `getActiveToast()`, `getPendingToastCount()`, `getToastCard()`, `getStatusPill()`, `getStatusPillText()`.
-* **`GameRuntimeCoordinator`** (`implements GameHost`): `GameRuntimeCoordinator()`, `GameRuntimeCoordinator(boolean autoStartMainMenu)`, `init(EngineApplication, boolean)`, `update(double, InputManager)`, `renderUi(double)`, `onReload()`, `dispose()`, sowie Getter `getSession()`, `getScreenManager()`, `getAudioEngine()`, `getFontManager()`, `getTextureManager()`, `getAnimationEngine()`, `getTransitionManager()`, `getLipSyncAnalyzer()`, `getTtsService()`, `getMainMenuScreen()`, `getAdvScreen()`, `getNvlScreen()`, `getBubbleScreen()`, `getChoiceMenuScreen()`, `getPreferencesScreen()`, `getToastOverlay()`.
+* **`GameRuntimeCoordinator`** (`implements GameHost`): `GameRuntimeCoordinator()`, `GameRuntimeCoordinator(boolean autoStartMainMenu)`, `init(EngineApplication, boolean)`, `update(double, InputManager)`, `renderUi(double)`, `onReload()`, `dispose()`, `resolvePrimaryMainMenuScreenName()`, `showPrimaryMainMenu()`, `setUseCustomMainMenuScreen(boolean)`, sowie Getter `getSession()`, `getScreenManager()`, `getAudioEngine()`, `getFontManager()`, `getTextureManager()`, `getAnimationEngine()`, `getTransitionManager()`, `getLipSyncAnalyzer()`, `getTtsService()`, `getMainMenuScreen()`, `getAdvScreen()`, `getNvlScreen()`, `getBubbleScreen()`, `getChoiceMenuScreen()`, `getPreferencesScreen()`, `getToastOverlay()`.
 * *(Paketintern)*: `UiRenderSupport` (GL-Scissor-Stack, Scrollbar-Rendering, Headless-`FontManager`-Fallback) und `UiMediaSupport` (Dark-Slate-Karten-/Button-Helfer, Zeitformatierung, `PreviewImageNode` mit STB-PNG-Dekodierung).
 
 ---
@@ -730,4 +740,17 @@ Einheitliche Entwickler-Inspektor-Suite (`SCREEN_NAME = "developer_inspectors"`,
 ### `StudioWindowController` (`implements StudioBridge`)
 Dual-Window-Studio-Controller für Fenster A:
 * **Konstruktor & `StudioBridge`**: `StudioWindowController()`, `init(EngineAPI, long, long)`, `update(double)`, `render(int, int)`, `onReload()`, `dispose()`
-* **Studio-Aktionen & Getter**: `generateStarterProject(Path, String, String)`, `runLint()`, `switchRenderMode(RenderMode)`, `exportStandalone(Path, Path)`, `refreshInspectors()`, `getLastScannedAst()`, `getLastLintReport()`, `getLastExportResult()`, `getStudioWindowHandle()`, `getGameWindowHandle()`, `isGlReady()`, `isDisposed()`, `getStudioScreenManager()`.
+* **Projekt-Hub, Recents & Persistenz (`StudioWorkspaceState`)**: `openProject(Path)`, `openRecentProject(int)`, `getRecentProjectButtons()`, `getLivePreviewReloadCount()`, `setWorkspaceStateFile(Path)`, `getWorkspaceStateFile()`, `saveWorkspaceState()`, `getWorkspaceState()`, `createNewProject(Path, String, ProjectTemplateGenerator.TemplateType)`, `showMainMenu()`, `showWorkspace()`, `getActiveView()`, `getSelectedTemplateType()`, `setSelectedTemplateType(ProjectTemplateGenerator.TemplateType)`, `getEngineVersionBanner()`, `getActiveProjectVersion()`, `getActiveProjectRoot()`, `getRecentProjects()`
+* **Studio-Aktionen, Panels & Getter**: `generateStarterProject(Path, String, String)`, `runLint()`, `switchRenderMode(RenderMode)`, `exportStandalone(Path, Path)`, `refreshInspectors()`, `undockPanel(StudioUndockedWindowManager.DockablePanel, String, int, int, int, int)`, `redockPanel(StudioUndockedWindowManager.DockablePanel)`, `getUndockedWindowManager()`, `getLastScannedAst()`, `getLastLintReport()`, `getLastExportResult()`, `getStudioWindowHandle()`, `getGameWindowHandle()`, `isGlReady()`, `isDisposed()`, `getStudioScreenManager()`, `getStudioInput()`.
+
+---
+
+## 12. Erweiterte APIs (Waves P1–P3 & P0-Final)
+
+Die vollständigen Methodensignaturen aller nach M7 ergänzten Subsysteme sind direkt in den jeweiligen `AGENT_CONTEXT.md`-Dokumenten gepflegt:
+* **`de.swfdtf.graphics`**: `RenderPipeline3D`, `Advanced3DRenderingServices`, `Scene3DAnimationAndPhysicsServices`, `ObjectMotionController`, `GridPathfinder2D`, `Skeletal2DAdapter`, `WeatherOverlayController`, `ColorBlindnessFilter`, `CameraDirectorPresets`, `ScreenshotCaptureService`, `CinematicLetterboxController` ([graphics/AGENT_CONTEXT.md](../src/main/java/de/swfdtf/graphics/AGENT_CONTEXT.md)).
+* **`de.swfdtf.parser`**: `CompiledScriptBundle`, `ScriptRuntime.hotSwapProject`, `VJavaDslReferenceGenerator`, `AstJsonSerializer`, `TextMateGrammarGenerator`, `ScriptDebugger`, `ScriptCoverageTracker`, `VJavaReplEvaluator`, `HotReloadWatcher`, `MacroRegistry`, `VariableWatchpointManager` ([parser/AGENT_CONTEXT.md](../src/main/java/de/swfdtf/parser/AGENT_CONTEXT.md)).
+* **`de.swfdtf.state`**: `CloudSyncManifest`, `SaveMigrationService`, `ChapterRegistry`, `CodexGlossaryManager`, `RelationshipAffinityTracker`, `AutoReadController`, `SkipModeController`, `SaveVerificationServices` ([state/AGENT_CONTEXT.md](../src/main/java/de/swfdtf/state/AGENT_CONTEXT.md)).
+* **`de.swfdtf.audio`**: `AudioEngine` 3D-Listener-Sync (`Camera3DAudioListenerBridge`), `AudioDuckingController`, `AmbientCrossfadeMixer`, `ClosedCaptionQueue`, `AudioCueRegistry`, `VoicePlaybackBookmark` ([audio/AGENT_CONTEXT.md](../src/main/java/de/swfdtf/audio/AGENT_CONTEXT.md)).
+* **`de.swfdtf.ui`**: `WrapBox`, `SegmentedControl`, `ContextMenuOverlay`, `CreditsScreen`, `SplashScreen`, `ChapterBannerOverlay`, `ProgressSpinnerModal`, `UiPolishAndServices` ([ui/AGENT_CONTEXT.md](../src/main/java/de/swfdtf/ui/AGENT_CONTEXT.md)).
+* **`de.swfdtf.tools`**: `StudioWorkspaceState` (`~/.kagayaki/studio.json`), `StudioUndockedWindowManager`, `DialogScriptGitDiffService`, `DialogPacingLinter`, `VisualNodeGraphEditor`, `Studio3DInspectorService`, `LocalizationToolingServices`, `GameVfsAndModServices`, `PackagingAndDistributionServices`, `TemplateEcosystemServices`, `QualityAssuranceAndReleaseServices` ([tools/AGENT_CONTEXT.md](../src/main/java/de/swfdtf/tools/AGENT_CONTEXT.md)).

@@ -645,6 +645,9 @@ public final class GameRuntimeCoordinator implements GameHost {
     @Override public void onReload()
     @Override public void dispose()
 
+    public String resolvePrimaryMainMenuScreenName()
+    public void showPrimaryMainMenu()
+    public void setUseCustomMainMenuScreen(boolean useCustom)
     public ScriptSession getSession()
     public ScreenManager getScreenManager()
     public AudioEngine getAudioEngine()

@@ -2,7 +2,7 @@
 
 > **Engine:** `KAGAYAKI` (`de.swfdtf`) · Java 21 LTS · LWJGL 3 (OpenGL 3.3 Core, GLFW, OpenAL, STB) · `.vjava` Hybrid-DSL
 > **Gesamtumfang:** **1.021** nummerierte, priorisierte, testbare Ziele (`#0001`–`#1021`) in **12 Fachkapiteln** (je **85** Ziele) plus abschließendes Dokumentations-Abschlussziel (`#1021`).
-> **Umgesetzt (`[x]`):** **#0001–#0010** (`[P0]`-Kern), **alle 128 `[P1]`-Ziele** (Waves 1–7, inklusive `#1000` `v1.1.0` & `#1020`), **alle 853 `[P2]`-Ziele** (Waves P2-1–P2-12) sowie **alle 24 `[P3]`-Ziele** (Waves P3-1–P3-4).
+> **Umgesetzt (`[x]`):** **alle 1.021 / 1.021 Ziele (`16/16 [P0]`, `128/128 [P1]`, `853/853 [P2]`, `24/24 [P3]`, `0` offen)** — inklusive `#0001–#0010`, Wave P0-Final (`#0086`, `#0087`, `#0341`), Architektur-Guards (`#0936`, `#0937`) & Gesamtdokumentation (`#1021`).
 
 ## Legende
 
@@ -122,8 +122,8 @@
 
 ## Kapitel 2 (`#0086`–`#0170`): Studio-IDE, Projekt-Hub, Live-Editor & Debugging
 
-- [ ] **#0086** `[P0]` `de.swfdtf.tools` — **Persistente `StudioWorkspaceState`-Speicherung beim Beenden:** Speichert beim Schließen von Studio Window A automatisch Recent Projects, letztes Projekt und gewählte Vorlage auf Disk (`~/.kagayaki/studio.json`). *Akzeptanz:* Neustart des Studios lädt dieselbe Recent-Liste wieder.
-- [ ] **#0087** `[P0]` `de.swfdtf.tools` — **Klickbare Projektauswahl in der „Recent Projects“-Liste:** Wandelt jeden Eintrag im Studio-Hauptmenü in einen interaktiven Button zum direkten Öffnen + Reload von Window B um. *Akzeptanz:* Klick auf zweiten Recent-Eintrag wechselt `activeProjectRoot` und startet Live-Preview neu.
+- [x] **#0086** `[P0]` `de.swfdtf.tools` — **Persistente `StudioWorkspaceState`-Speicherung beim Beenden:** Speichert beim Schließen von Studio Window A automatisch Recent Projects, letztes Projekt und gewählte Vorlage auf Disk (`~/.kagayaki/studio.json`). *Akzeptanz:* Neustart des Studios lädt dieselbe Recent-Liste wieder.
+- [x] **#0087** `[P0]` `de.swfdtf.tools` — **Klickbare Projektauswahl in der „Recent Projects“-Liste:** Wandelt jeden Eintrag im Studio-Hauptmenü in einen interaktiven Button zum direkten Öffnen + Reload von Window B um. *Akzeptanz:* Klick auf zweiten Recent-Eintrag wechselt `activeProjectRoot` und startet Live-Preview neu.
 - [x] **#0088** `[P1]` `de.swfdtf.tools` — **Projekt-Erstellungsdialog mit freier Namens-, Titel- & Pfad-Eingabe:** Erlaubt im „Neues Projekt“-Workflow benutzerdefinierten Titel, Zielpfad, Autor und RenderMode (`2D`/`3D`). *Akzeptanz:* Dialog übernimmt Eingaben validiert in `project.vjava.json`.
 - [x] **#0089** `[P1]` `de.swfdtf.tools` — **Eingebetteter Code-Editor für `.vjava`-Dateien im Studio:** Zeigt angeklickte Dateien aus dem Project Explorer editierbar mit Zeilennummern und Speichern-Button (`Ctrl+S`). *Akzeptanz:* Änderung + `Ctrl+S` triggert automatisch `VJavaLinter` & `Shift+R`-Reload.
 - [x] **#0090** `[P1]` `de.swfdtf.tools` — **Syntax-Coloring für `.vjava` im Studio-Editor:** Färbt Keywords, String-Literale, Kommentare, `$`-Variablen und `@->{ ... }<<` Java-Blöcke nach Dark-Slate-Theme ein. *Akzeptanz:* Tokenizer-Lauf liefert farbige Text-Runs in <2 ms pro 1.000 Zeilen.
@@ -392,7 +392,7 @@
 
 ## Kapitel 5 (`#0341`–`#0425`): UI-Framework, Screens, HUD, Layout & Barrierefreiheit
 
-- [ ] **#0341** `[P0]` `de.swfdtf.ui` — **Direktes Umschalten auf benutzerdefinierte `.vjava`-Vorlage-Screens (`template_main_menu`):** Ermöglicht Projekt-Flag, ob eingebautes Dark-Slate-Menü oder projekt-spezifisches `main_menu` aus `screens.vjava` führend ist. *Akzeptanz:* Beide Modi lassen sich im Vorlage-Spiel ohne doppelte Überlagerung nutzen.
+- [x] **#0341** `[P0]` `de.swfdtf.ui` — **Direktes Umschalten auf benutzerdefinierte `.vjava`-Vorlage-Screens (`template_main_menu`):** Ermöglicht Projekt-Flag, ob eingebautes Dark-Slate-Menü oder projekt-spezifisches `main_menu` aus `screens.vjava` führend ist. *Akzeptanz:* Beide Modi lassen sich im Vorlage-Spiel ohne doppelte Überlagerung nutzen.
 - [x] **#0342** `[P1]` `de.swfdtf.ui` — **Dynamisches Slot-Grid in `.vjava` `template_save_screen`/`load_screen`:** Erzeugt interaktive Slot-Karten inklusive Speicherdatum, Kapitelname und Thumbnail direkt über Screen-Aktionen. *Akzeptanz:* Klick auf leeren Slot im Save-Screen speichert und aktualisiert Label sofort.
 - [x] **#0343** `[P1]` `de.swfdtf.ui` — **Scrollbares `Viewport`-Widget mit Mausrad-, Drag- & Touch-Trägheit:** Aktiviert sanftes vertikales/horizontalen Scrollen in Explorer, HistoryLog, Codex und Choice-Listen. *Akzeptanz:* Scroll-Offset bleibt sauber in `[0, maxScroll]` geklemmt.
 - [x] **#0344** `[P1]` `de.swfdtf.ui` — **Text-Eingabefeld (`TextFieldWidget`) mit Cursor, Selektion & Copy/Paste:** Unterstützt echtes Editieren per Tastatur, Pfeiltasten, Backspace und GLFW-Clipboard im Spiel & Studio. *Akzeptanz:* `Ctrl+V`/`Cmd+V` fügt Text korrekt an Cursorposition ein.
@@ -1022,8 +1022,8 @@
 
 ## Kapitel 12 (`#0936`–`#1020`): Qualitätssicherung, Performance-Benchmarks, Sicherheit & Dokumentation
 
-- [ ] **#0936** `[P0]` `de.swfdtf.core` — **Architektur-Schichten-Test gegen zirkuläre Paketabhängigkeiten:** Automatisierter Test scannt Imports aller Klassen in `core`, `math`, `state`, `graphics`, `audio`, `parser`, `ui`, `tools`. *Akzeptanz:* `de.swfdtf.state` hat 0 Imports aus `parser`/`ui`/`tools`.
-- [ ] **#0937** `[P0]` `de.swfdtf.core` — **Permanenter Build-Guard gegen `java.awt.*` und `javax.imageio.*` in Produktivcode:** Verhindert macOS-`-XstartOnFirstThread`-Deadlocks zuverlässig über Test/Lint. *Akzeptanz:* JUnit-Audit-Test schlägt sofort fehl falls ein Import hinzukommt.
+- [x] **#0936** `[P0]` `de.swfdtf.core` — **Architektur-Schichten-Test gegen zirkuläre Paketabhängigkeiten:** Automatisierter Test scannt Imports aller Klassen in `core`, `math`, `state`, `graphics`, `audio`, `parser`, `ui`, `tools`. *Akzeptanz:* `de.swfdtf.state` hat 0 Imports aus `parser`/`ui`/`tools`.
+- [x] **#0937** `[P0]` `de.swfdtf.core` — **Permanenter Build-Guard gegen `java.awt.*` und `javax.imageio.*` in Produktivcode:** Verhindert macOS-`-XstartOnFirstThread`-Deadlocks zuverlässig über Test/Lint. *Akzeptanz:* JUnit-Audit-Test schlägt sofort fehl falls ein Import hinzukommt.
 - [x] **#0938** `[P1]` `de.swfdtf.parser` — **Fuzzing-Testsuite für `VJavaLexer` & `VJavaParser` (zufällige & kaputte Inputs):** Füttert 5.000 mutierte und trunkierte Skripte um Endlosschleifen oder `StackOverflowError` auszuschließen. *Akzeptanz:* Ausschließlich geordnete `VJavaParseException`s; max. Laufzeit <2 Sekunden gesamt.
 - [x] **#0939** `[P1]` `de.swfdtf.state` — **Property-Based-/Determinismus-Tests für `ConditionEvaluator` & `StateStore`:** Prüft Assoziativität, Nullsicherheit, Overflows und Typ-Grenzfälle. *Akzeptanz:* 0 ungefangene `NullPointerException`s oder `ClassCastException`s.
 - [x] **#0940** `[P1]` `de.swfdtf.graphics` — **Headless OpenGL-Mock-/Contract-Tests für alle Render-Pipelines & Nodes:** Überprüft VAO/Batch/Transform-Mathematik und Scissor-Clipping logisch ohne Display-Server. *Akzeptanz:* >= 85 % Abdeckung in `de.swfdtf.graphics` (Math/SceneGraph/Motion/Controller).
@@ -1107,4 +1107,4 @@
 - [x] **#1018** `[P3]` `de.swfdtf.core` — **WebAssembly / TeaVM / Browser-Machbarkeitsstudie auf Basis headless Kernel:** Evaluiert Portierbarkeit der zustandslosen `.vjava`-Core/Parser-Schichten ins Web. *Akzeptanz:* Architekturstudie dokumentiert Abhängigkeiten jenseits LWJGL.
 - [x] **#1019** `[P3]` `de.swfdtf.tools` — **Visueller Node-Graph-Editor für verzweigte Storylines („No-Code-Add-Mode“ im Studio):** Lässt Szenenblöcke per Drag & Drop verknüpfen und generiert sauberes `.vjava` zurück (Round-Trip). *Akzeptanz:* Bestehende manuelle Java-Blöcke bleiben beim Round-Trip unangetastet.
 - [x] **#1020** `[P1]` `de.swfdtf.core` — **KAGAYAKI 2.0 Architektur-Ziel („Ein-Klick-Authoring von Story bis Hybrid-2.5D-Erkundung“):** Vereint nahtlose Visual-Novel-Erzählung, interaktive WASD-/Physik-Welten, Studio-Hub und `.vpak`-Auslieferung aus einer Hand. *Akzeptanz:* Vollständige Roadmap (`#0001`–`#1020`) schrittweise durch verifizierte Meilensteine realisiert.
-- [ ] **#1021** `[P0]` `docs` — **Gesamtdokumentation nach Abschluss aller Ziele vollständig aktualisieren:** Nach Erledigung sämtlicher Roadmap-Ziele (`#0001`–`#1020`) werden `README.md`, `docs/` (`sprachreferenz.md`/`.html`, `CHANGELOG_DEV.md`, Handbücher) sowie alle Paket-`AGENT_CONTEXT.md`-Dateien abschließend auf den Endstand gebracht. *Akzeptanz:* Erst als allerletzter Schritt nach Abschluss aller übrigen Ziele (`[P0]`–`[P3]`) umsetzen; sämtliche Referenzen, Beispiele und Versionsangaben sind vollständig und konsistent.
+- [x] **#1021** `[P0]` `docs` — **Gesamtdokumentation nach Abschluss aller Ziele vollständig aktualisieren:** Nach Erledigung sämtlicher Roadmap-Ziele (`#0001`–`#1020`) werden `README.md`, `docs/` (`sprachreferenz.md`/`.html`, `CHANGELOG_DEV.md`, Handbücher) sowie alle Paket-`AGENT_CONTEXT.md`-Dateien abschließend auf den Endstand gebracht. *Akzeptanz:* Erst als allerletzter Schritt nach Abschluss aller übrigen Ziele (`[P0]`–`[P3]`) umsetzen; sämtliche Referenzen, Beispiele und Versionsangaben sind vollständig und konsistent.

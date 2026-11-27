@@ -93,7 +93,7 @@ Mit `-PkagayakiProject=<pfad>` wählst du das Projekt aus (Pfad zum Ordner mit `
 ./gradlew runStandalone -PkagayakiProject=/pfad/zu/meinem_projekt
 ```
 
-Ohne `-PkagayakiProject` sucht die Engine automatisch ein Projekt: zuerst `./project.vjava.json` im aktuellen Ordner, dann `./demo/project/project.vjava.json`.
+Ohne `-PkagayakiProject` sucht die Engine automatisch ein Projekt: zuerst `./project.vjava.json` im aktuellen Ordner, dann `./demo/project/project.vjava.json`. Im **Studio-Modus** öffnet sich zudem der integrierte Project Hub; Recent Projects, zuletzt geöffnetes Projekt und gewählte Vorlage werden automatisch beim Beenden unter `~/.kagayaki/studio.json` gespeichert und sind direkt klickbar (öffnet das Projekt und lädt das Vorschaufenster neu).
 
 ### 3.2 Direkt über die Java-Klassen
 
@@ -168,6 +168,10 @@ Alle Felder (alle optional):
 | `dialogueMode` | String | `"ADV"` | `"ADV"`, `"NVL"` oder `"BUBBLE"` |
 | `windowTitle` | String | = `title` | Fenstertitel |
 | `iconPath` | String | `""` | Pfad zum Fenster-Icon |
+| `vpakEncryptionKey` | String | `""` | Optionaler AES-256-CTR-Schlüssel für verschlüsselte `.vpak`-Pakete |
+| `accentColorHex` | String | `""` | Optionaler Projekt-Akzentfarbe-Hex-Override (`#RRGGBB`) |
+| `useCustomMainMenuScreen` | boolean | `false` | Schaltet überlappungsfrei auf ein projektspezifisches `.vjava`-Hauptmenü (`true`) um |
+| `customMainMenuScreenName` | String | `"template_main_menu"` | Name des `.vjava`-Hauptmenü-Screens (Fallback auf `"main_menu"`) |
 
 ### 4.3 `main.vjava` schreiben
 
