@@ -455,6 +455,9 @@ public final class ScriptRuntime {
         }
     }
 
+    /** Maximum supported nested {@code call} stack depth before aborting infinite recursion ({@code #0960}). */
+    public static final int MAX_CALL_STACK_DEPTH = 128;
+
     private final VJavaAst.ProjectAst projectAst;
     private final EngineAPI engineApi;
     private final StateStore stateStore;
@@ -1338,7 +1341,7 @@ public final class ScriptRuntime {
                 }
                 stateStore.set("_call_args", List.copyOf(evaluated));
             }
-            callStack.add(new StackFrame(currentLabel, statementIndex + 1, currentStatements, List.of(), true));
+            pushCallStackFrame(new StackFrame(currentLabel, statementIndex + 1, currentStatements, List.of(), true));
             enterLabel(resolveLabelName(call.targetLabel().trim()));
             return false;
         }
@@ -2016,7 +2019,7 @@ public final class ScriptRuntime {
         InputPrompt prevInput = this.activeInput;
 
         int baseDepth = callStack.size();
-        callStack.add(new StackFrame(currentLabel, statementIndex, currentStatements, List.of(), true));
+        pushCallStackFrame(new StackFrame(currentLabel, statementIndex, currentStatements, List.of(), true));
         enterLabel(trimmed);
         this.status = Status.READY;
 
@@ -2634,6 +2637,16 @@ public final class ScriptRuntime {
             }
         }
         return Collections.unmodifiableList(labels);
+    }
+
+    private void pushCallStackFrame(StackFrame frame) {
+        if (callStack.size() >= MAX_CALL_STACK_DEPTH) {
+            throw new IllegalStateException(
+                    "Call stack overflow: maximum recursion depth " + MAX_CALL_STACK_DEPTH
+                            + " exceeded at label '" + currentLabel + "'"
+            );
+        }
+        callStack.add(frame);
     }
 
     /**

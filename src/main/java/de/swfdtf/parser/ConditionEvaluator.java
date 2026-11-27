@@ -247,7 +247,8 @@ public final class ConditionEvaluator {
             if (i + 1 < len) {
                 String two = expr.substring(i, i + 2);
                 if ("&&".equals(two) || "||".equals(two) || "==".equals(two)
-                        || "!=".equals(two) || ">=".equals(two) || "<=".equals(two)) {
+                        || "!=".equals(two) || ">=".equals(two) || "<=".equals(two)
+                        || "..".equals(two)) {
                     tokens.add(new Token(TokenKind.OP, two, null, i));
                     i += 2;
                     continue;
@@ -351,7 +352,7 @@ public final class ConditionEvaluator {
         while (i < len && (Character.isDigit(expr.charAt(i)) || expr.charAt(i) == '_')) {
             i++;
         }
-        if (i < len && expr.charAt(i) == '.') {
+        if (i < len && expr.charAt(i) == '.' && !(i + 1 < len && expr.charAt(i + 1) == '.')) {
             isFloat = true;
             i++;
             while (i < len && (Character.isDigit(expr.charAt(i)) || expr.charAt(i) == '_')) {
@@ -473,6 +474,23 @@ public final class ConditionEvaluator {
                     left = new BinaryOpNode(">", left, parseAdditive());
                 } else if (matchOp(">=")) {
                     left = new BinaryOpNode(">=", left, parseAdditive());
+                } else if (peek().kind() == TokenKind.IDENT && "in".equalsIgnoreCase(peek().text())) {
+                    advance();
+                    ExprNode low = parseAdditive();
+                    if (!matchOp("..")) {
+                        throw syntaxError("Expected '..' in range expression '<value> in <low>..<high>'", peek());
+                    }
+                    ExprNode high = parseAdditive();
+                    left = new RangeCheckNode(left, low, high);
+                } else if (peek().kind() == TokenKind.IDENT && "between".equalsIgnoreCase(peek().text())) {
+                    advance();
+                    ExprNode low = parseAdditive();
+                    if (!matchOp("&&")) {
+                        throw syntaxError("Expected 'and' in range expression '<value> between <low> and <high>'",
+                                peek());
+                    }
+                    ExprNode high = parseAdditive();
+                    left = new RangeCheckNode(left, low, high);
                 } else {
                     return left;
                 }
@@ -658,6 +676,7 @@ public final class ConditionEvaluator {
             UnaryOpNode,
             BinaryOpNode,
             TernaryNode,
+            RangeCheckNode,
             MemberAccessNode,
             MethodCallNode,
             IndexAccessNode {
@@ -776,6 +795,19 @@ public final class ConditionEvaluator {
         @Override
         public Object eval(EvalContext ctx) {
             return isTruthy(cond.eval(ctx)) ? ifTrue.eval(ctx) : ifFalse.eval(ctx);
+        }
+    }
+
+    private record RangeCheckNode(ExprNode target, ExprNode low, ExprNode high) implements ExprNode {
+        @Override
+        public Object eval(EvalContext ctx) {
+            Object val = target.eval(ctx);
+            Object lo = low.eval(ctx);
+            Object hi = high.eval(ctx);
+            if (val == null || lo == null || hi == null) {
+                return Boolean.FALSE;
+            }
+            return compareValues(val, lo) >= 0 && compareValues(val, hi) <= 0;
         }
     }
 

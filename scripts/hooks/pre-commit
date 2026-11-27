@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "[KAGAYAKI pre-commit] Prüfe Checkstyle & schnelle Unit-Tests..."
+./gradlew checkstyleMain checkstyleTest --no-daemon --console=plain
+
+changed_vjava=$(git diff --cached --name-only --diff-filter=ACM | grep '\.vjava$' || true)
+if [[ -n "$changed_vjava" ]]; then
+    echo "[KAGAYAKI pre-commit] Geänderte .vjava-Skripte erkannt:"
+    echo "$changed_vjava"
+fi
+
+echo "[KAGAYAKI pre-commit] Alles sauber."

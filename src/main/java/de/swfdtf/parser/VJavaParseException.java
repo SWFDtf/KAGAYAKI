@@ -1,10 +1,12 @@
 package de.swfdtf.parser;
 
+import de.swfdtf.core.KagayakiException;
+
 /**
  * Unchecked exception thrown when lexical analysis, indentation validation,
  * or syntax parsing of a {@code .vjava} script fails.
  */
-public class VJavaParseException extends RuntimeException {
+public class VJavaParseException extends KagayakiException {
 
     private static final long serialVersionUID = 1L;
 
@@ -30,7 +32,7 @@ public class VJavaParseException extends RuntimeException {
      * @param message    human-readable diagnostic description
      */
     public VJavaParseException(String sourceFile, int lineNumber, String message) {
-        super(formatMessage(sourceFile, lineNumber, message));
+        super("VJAVA_PARSE_ERROR", formatMessage(sourceFile, lineNumber, message));
         this.sourceFile = normalizeSourceFile(sourceFile);
         this.lineNumber = lineNumber;
     }
@@ -44,9 +46,24 @@ public class VJavaParseException extends RuntimeException {
      * @param cause      underlying cause
      */
     public VJavaParseException(String sourceFile, int lineNumber, String message, Throwable cause) {
-        super(formatMessage(sourceFile, lineNumber, message), cause);
+        super("VJAVA_PARSE_ERROR", formatMessage(sourceFile, lineNumber, message), cause);
         this.sourceFile = normalizeSourceFile(sourceFile);
         this.lineNumber = lineNumber;
+    }
+
+    /**
+     * Formats the parse error together with the source snippet line and a {@code ^} column pointer
+     * ({@code #0988}).
+     *
+     * @param sourceLine source text of the failing line (nullable)
+     * @param column     1-based column position on the line ({@code >= 1})
+     * @return multi-line diagnostic with file, line, source snippet, and {@code ^} pointer
+     */
+    public String formatDiagnosticWithCaret(String sourceLine, int column) {
+        String safeLine = sourceLine != null ? sourceLine : "";
+        int clampedCol = Math.max(1, column);
+        String pointer = " ".repeat(clampedCol - 1) + "^";
+        return getMessage() + "\n  " + safeLine + "\n  " + pointer;
     }
 
     /**

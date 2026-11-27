@@ -57,7 +57,7 @@ Vollständige 4-Schichten-State-, Rollback-, Save/Load-, Verlaufs-, Meta-Progres
 | `AchievementBackend` | `interface` | Schlankes SPI-Interface (ohne `I`-Präfix) zur Entkopplung von Achievement-Backends (Steamworks/Epic/Offline via `OfflineAchievementBackend`). |
 | `SaveRepository` | `interface` | Storage-SPI-Interface (ohne `I`-Präfix) für `.ksav`-Persistenz (`InMemorySaveRepository`, `FileSaveRepository` mit `validateSlotId`, `.tmp`-Cleanup und `.bak`-Rotation). |
 | `StateCoreEnhancements` | `final class` | Enthält `TypeSafeStateView`, `ObservableStateBus` (mit Audit-Verlauf), `DeltaRollbackBuffer` (Delta-Replay & `history_clear`) und `ChapterEntryCheckpointService`. |
-| `SaveWorkflowServices` | `final class` | Enthält `SaveIntegrityAndCodec` (HMAC-SHA256, GZIP-Magie-Erkennung, `.vsave`-Pakete, `.corrupt`-Repair, Snapshot-Diff), `CloudSyncAndProfileManager` und `SaveWorkflowController`. |
+| `SaveWorkflowServices` | `final class` | Enthält `SaveIntegrityAndCodec` (HMAC-SHA256, GZIP-Magie-Erkennung, `.vsave`-Pakete, `.corrupt`-Repair, Snapshot-Diff), `CloudSyncAndProfileManager`, `SaveWorkflowController`, `formatWasdArenaBadge` und `SessionResetCoordinator`. |
 | `LocalizationAdvancedServices` | `final class` | Regionale Fallback-Ketten (`de_AT -> de -> default`), kulturabhängige Zeitstempel-Formatierung, Drop-In-`tl/<lang>/`-Packs, lokalisierte Asset-Swaps, idempotente Kontext-Extraktion, BOM/Windows-1252-Decode, Glossary-Consistency-Audit und `LocalizedMetadataRegistry`. |
 
 ## Öffentliche API-Signaturen

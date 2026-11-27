@@ -78,6 +78,7 @@ public final class PreferencesState {
     private float letterSpacing = 0.0f;
     private boolean textCharFadeInEnabled = true;
     private boolean sharedReadLinesAcrossLanguages = true;
+    private float displayGamma = 1.0f;
 
     /**
      * Creates a {@code PreferencesState} initialized with engine defaults.
@@ -1189,6 +1190,28 @@ public final class PreferencesState {
         this.sharedReadLinesAcrossLanguages = sharedReadLinesAcrossLanguages;
     }
 
+    /**
+     * Returns calibrated display gamma in {@code [0.5, 2.2]} ({@code #1007}).
+     *
+     * @return calibrated display gamma
+     */
+    public synchronized float getDisplayGamma() {
+        return displayGamma;
+    }
+
+    /**
+     * Sets calibrated display gamma clamped to {@code [0.5, 2.2]} ({@code #1007}).
+     *
+     * @param displayGamma display gamma value
+     */
+    public synchronized void setDisplayGamma(float displayGamma) {
+        if (!Float.isFinite(displayGamma)) {
+            this.displayGamma = 1.0f;
+        } else {
+            this.displayGamma = Math.max(0.5f, Math.min(2.2f, displayGamma));
+        }
+    }
+
     @Override
     public synchronized boolean equals(Object obj) {
         if (this == obj) {
@@ -1236,6 +1259,7 @@ public final class PreferencesState {
                 && Float.compare(letterSpacing, other.letterSpacing) == 0
                 && textCharFadeInEnabled == other.textCharFadeInEnabled
                 && sharedReadLinesAcrossLanguages == other.sharedReadLinesAcrossLanguages
+                && Float.compare(displayGamma, other.displayGamma) == 0
                 && Objects.equals(saveSlotSortMode, other.saveSlotSortMode)
                 && Objects.equals(rightClickBehavior, other.rightClickBehavior)
                 && Objects.equals(renderMode, other.renderMode)
@@ -1260,7 +1284,8 @@ public final class PreferencesState {
                 invertCameraY, cameraSensitivity, scrollWheelRollbackEnabled, rightClickBehavior,
                 touchControlsEnabled, simplifyHoldInputs, toggleSkipSprintMode,
                 hideCursorOnGamepad, minClickIntervalMs, disableBackspaceTrigger,
-                lineSpacing, letterSpacing, textCharFadeInEnabled, sharedReadLinesAcrossLanguages
+                lineSpacing, letterSpacing, textCharFadeInEnabled, sharedReadLinesAcrossLanguages,
+                displayGamma
         );
     }
 }

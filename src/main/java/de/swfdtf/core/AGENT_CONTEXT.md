@@ -41,6 +41,9 @@ Zentrales Laufzeit-Fundament von KAGAYAKI: Ausführungsmodi (`STUDIO_DUAL_WINDOW
 | `InputDeviceAndAccessibilityServices` | `final class` | Input-Puffering (120 ms), Key-Repeat (400/80 ms), Touch-Gesten, Ein-Hand-Profile, QWERTZ/AZERTY/DVORAK-Scancode-Maps, Gamepad-Profile/Haptik, Cursor- & Fokus-Policy sowie `ClipboardBridge`. |
 | `InputWorkflowAndMacroServices` | `final class` | Input-Prioritäts-Stack, `.vinput`-Makro-Rekorder/Replay-Player, UI-/Dialog-Input-Guards, Konami-Sequenzdetektor, Radial-Wheel und `VirtualKeyboardState`. |
 | `PluginAndRuntimeLifecycleServices` | `final class` | `plugin.json`-Manifest- & Berechtigungsprüfung, fehlertoleranter `PluginLifecycleDispatcher`, DSL-`PluginCommandRouter`, `PluginSerializerRegistry`, UI-Slot-Registry, rotierender Log-Writer (`5 x 5 MiB`), `ShutdownResourceCoordinator` und `ProjectExtensionsPreserver`. |
+| `KagayakiException` | `class` | Gemeinsame ungeprüfte Engine-Basisklasse mit Fehlercode für UI-Crash-Grenzen und Subsystem-Ausnahmen. |
+| `SaveCorruptionException` | `class` | Spezialisierte `KagayakiException` bei defekten oder schema-inkompatiblen Speicherständen. |
+| `RuntimeQualityAndDiagnosticsServices` | `final class` | OpenGL-3.3-Treiber-Diagnose (`NativeDriverDiagnostics`), `--smoke-test`-Watchdog (`SmokeTestWatchdog`), statische Menü-Idle-Wait-Policy, `GameClock`-Modal-Pause-Schutz und SemVer-Deprecation-Policy. |
 
 ## Öffentliche API-Signaturen
 

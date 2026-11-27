@@ -1,0 +1,40 @@
+# KAGAYAKI Entwickler-Handbuch (Deutsch)
+
+> **Engine:** KAGAYAKI (`de.swfdtf`) · Java 21 LTS · LWJGL 3 (OpenGL 3.3 Core, GLFW, OpenAL, STB) · `.vjava` 1.1 Hybrid-DSL
+
+## 1. Architektur-Überblick
+
+```mermaid
+flowchart TD
+    Core["de.swfdtf.core (Config, Clock, Input, Exceptions, Diagnostics)"] --> Math["de.swfdtf.math (Vec2f, Rect2f, Transform2D)"]
+    State["de.swfdtf.state (RevertableStateStore, SaveManager, Localization, Progression)"] --> Math
+    Graphics["de.swfdtf.graphics (OpenGL 3.3, SceneGraph, ATL, WASD/Physics Motion, Text)"] --> Core
+    Audio["de.swfdtf.audio (OpenAL, WAV/OGG Decoder, DSP, LipSync)"] --> Core
+    Parser["de.swfdtf.parser (VJavaLexer, VJavaParser, ScriptRuntime, JavaBlockCompiler)"] --> State
+    Ui["de.swfdtf.ui (16 Screens, ScreenManager, Widgets, Accessibility)"] --> Graphics
+    Tools["de.swfdtf.tools (Studio Window A, VJavaLinter, Templates, Packager, QA)"] --> Ui
+```
+
+Details zu den Paketgrenzen liegen in [ARCHITEKTUR.md](ARCHITEKTUR.md) und in den jeweiligen `AGENT_CONTEXT.md`-Dateien (z. B. [core/AGENT_CONTEXT.md](../src/main/java/de/swfdtf/core/AGENT_CONTEXT.md)).
+
+## 2. `.vjava` 1.1 DSL & Interaktive Steuerung
+
+- **Visual Novel Basis:** `define`, `image`, `layeredimage`, `label`, `jump`, `call`, `menu`, `if`/`else`/`elif`, `match`, `pause`, `return`.
+- **Bewegung & Physik:** `move <tag> to <x> <y>`, `move_by`, `move_path`, `rotate`, `scale`, `wasd_init`, `wasd_stop`, `physics_init`, `physics_stop`, `solid_platform`, `on_collide`, `on_overlap`, `camera follow`.
+- **Bedingungen:** `==`, `!=`, `<`, `<=`, `>`, `>=`, `and`, `or`, `not`, `in <low>..<high>`, `between <low> and <high>`.
+- **Eingebettetes Java 21:** `@->{ ... }<<` kompiliert im Arbeitsspeicher gegen `engine`, `state`, `persistent` und `scene`.
+
+Siehe die vollständige Syntax-Referenz in [VJAVA_SPEZIFIKATION.md](VJAVA_SPEZIFIKATION.md) und [sprachreferenz.md](sprachreferenz.md).
+
+## 3. Dual-Window Studio (Window A + Window B)
+
+1. Studio (`./gradlew run`) startet im Project Hub mit Version-Banner (`EngineVersion`), Vorlagen-Generator (`FULL_DEMO`, `STARTER`, `MINIMAL`, `ACTION_ADVENTURE_2D`, `HYBRID_3D_EXPLORATION`, `HYBRID_3D_MYSTERY`, `NVL_LITERARY`, `TUTORIAL_5_MIN`, `SANDBOX_2D_LAB`) und Live-Inspektoren.
+2. Vorlagen-Walkthrough: [TUTORIAL_ERSTES_PROJEKT.md](TUTORIAL_ERSTES_PROJEKT.md).
+3. Release-Smoke-Prüfung: [GUI_SMOKE_CHECKLIST.md](GUI_SMOKE_CHECKLIST.md).
+
+## 4. Packaging, Save-System & Modding
+
+- Speicherstände (`saves/slot_*.ksav`, `saves/persistent.dat`, `saves/preferences.json`): dokumentiert in [SAVE_SCHEMA.md](SAVE_SCHEMA.md).
+- `.vpak`-Bundles, VFS-Prioritäten (`Mods > DLC > Base > Classpath`) und Ed25519-Prüfsummen: dokumentiert in [PACKAGING_AND_MODDING.md](PACKAGING_AND_MODDING.md).
+- Performance-Baselines: [BENCHMARKS.md](BENCHMARKS.md).
+- Englische Dokumentation: [GUIDE_EN.md](GUIDE_EN.md) · Sicherheit: [SECURITY.md](../SECURITY.md) · Mitwirken: [CONTRIBUTING.md](../CONTRIBUTING.md).

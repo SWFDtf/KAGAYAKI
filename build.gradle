@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'application'
     id 'checkstyle'
+    id 'jacoco'
 }
 
 group = 'de.swfdtf'
@@ -211,4 +212,24 @@ tasks.register('jpackageBundle', Exec) {
         }
         commandLine argsList
     }
+}
+
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+tasks.named('jacocoTestReport', JacocoReport) {
+    dependsOn tasks.named('test')
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+tasks.register('releaseDryRun', Exec) {
+    group = 'kagayaki'
+    description = 'Runs the full Wave P2-12 release dry-run pipeline (#0999): check, javadoc, packageStandalone and demo:packageDemo.'
+    dependsOn tasks.named('check'), tasks.named('javadoc'), tasks.named('packageStandalone')
+    def wrapper = osName.contains('win') ? 'gradlew.bat' : './gradlew'
+    commandLine wrapper, '-p', 'demo', 'check', 'lintDemo', 'packageDemo', '--no-daemon', '--console=plain'
 }

@@ -1658,4 +1658,44 @@ public final class SaveWorkflowServices {
             }
         }
     }
+
+    /**
+     * Formats descriptive WASD arena save metadata subtitles showing current coordinates ({@code #1003}).
+     *
+     * @param arenaLabel optional arena label (nullable)
+     * @param x          player X coordinate
+     * @param y          player Y coordinate
+     * @return formatted save badge string
+     */
+    public static String formatWasdArenaBadge(String arenaLabel, float x, float y) {
+        String name = (arenaLabel == null || arenaLabel.isBlank()) ? "WASD-Arena" : arenaLabel.trim();
+        return name + " (x=" + Math.round(x) + ", y=" + Math.round(y) + ")";
+    }
+
+    /**
+     * Resets active session variables, WASD motion controllers, and audio state cleanly when
+     * returning to the title screen so repeated runs behave identically ({@code #1012}).
+     */
+    public static final class SessionResetCoordinator {
+
+        /**
+         * Creates a {@code SessionResetCoordinator}.
+         */
+        public SessionResetCoordinator() {
+        }
+
+        /**
+         * Clears transient campaign state and runs optional subsystem cleanup ({@code #1012}).
+         *
+         * @param store              campaign state store (must not be {@code null})
+         * @param clearMotionAndAudio optional motion/tween/audio reset hook (nullable)
+         */
+        public static void resetToTitle(StateStore store, Runnable clearMotionAndAudio) {
+            Objects.requireNonNull(store, "store must not be null");
+            store.clear();
+            if (clearMotionAndAudio != null) {
+                clearMotionAndAudio.run();
+            }
+        }
+    }
 }

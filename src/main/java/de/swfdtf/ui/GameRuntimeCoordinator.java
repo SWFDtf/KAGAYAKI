@@ -473,6 +473,16 @@ public final class GameRuntimeCoordinator implements GameHost {
         }
     }
 
+    /**
+     * Dispatches a declarative screen action expression ({@code Start()}, {@code ShowMenu(...)},
+     * {@code Jump(...)}, {@code QuickSave()}, {@code QuickLoad()}, {@code Return()}, {@code Quit()}).
+     *
+     * @param action action expression string (nullable)
+     */
+    public void dispatchScreenAction(String action) {
+        handleAstScreenAction(action);
+    }
+
     private void handleAstScreenAction(String action) {
         if (action == null || action.isBlank()) {
             return;

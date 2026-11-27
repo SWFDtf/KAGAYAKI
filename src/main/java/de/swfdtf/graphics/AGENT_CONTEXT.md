@@ -58,6 +58,7 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- 
 | `WebpVp8lDecoder` | `final class` | Reiner Java-Decoder für verlustfreie `RIFF/WEBP/VP8L`-Bilder (`DecodedRgba`) ohne `java.awt`. |
 | `ParticleEmitterNode` | `class` | Szenengraph-Knoten (`extends SpriteNode`) für Schnee-, Regen-, Glühwürmchen-, Sakura- und Funken-Partikel inklusive Dialogbox-Kollision und Intensitäts-Fade. |
 | `Lighting2DSystem` | `final class` | 2D-Punktlicht- und Normal-Map-(`*_n.png`)-Beleuchtungssystem mit Flacker-Modulation sowie CPU-/Shader-Auswertung. |
+| `GraphicsQualityAndFramingServices` | `final class` | `TransformSanitizer`, `ViewportSanitizer`, `ColorBlendMath`, `DualWindowLayoutPlanner`, `TransitionConvergenceVerifier`, `DialogCameraFramingPresets`, `DisplayCalibrationAssistant` und `HudFadeController`. |
 | `CustomShaderRegistry` | `final class` | Sicherer GLSL-Loader (`assets/shaders/`, `define shader`), Syntax-Validator mit Zeilennummer, Hot-Reload mit Fallback auf vorherigen gültigen Shader und Core-Shader-Manifestprüfung. |
 | `RenderCacheNode` | `class` | Statischer UI-Unterbaum-Cache (`extends SceneNode`), der unveränderte UI-Hierarchien auf einen einzelnen Draw-Call reduziert bis Kinder oder Zustand invalidieren. |
 | `GlResourceAuditor` | `final class` | OpenGL-Lebenszyklus-Auditor (`VAO`, `VBO`, `FBO`, `TEXTURE`, `SHADER`) zur Leck-Prüfung bei `dispose()` sowie Pass-Timer-Speicher mit `0.0 ms`-Headless-Fallback. |

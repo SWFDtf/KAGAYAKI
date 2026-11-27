@@ -1,5 +1,7 @@
 package de.swfdtf.parser;
 
+import de.swfdtf.core.KagayakiException;
+
 import java.util.List;
 import java.util.Objects;
 
@@ -10,7 +12,7 @@ import java.util.Objects;
  * and structured {@code javac} diagnostic messages for editor error highlighting and Studio console
  * reporting.</p>
  */
-public class VJavaCompileException extends RuntimeException {
+public class VJavaCompileException extends KagayakiException {
 
     /**
      * Structured diagnostic entry captured from {@code javax.tools.DiagnosticCollector}.
@@ -157,7 +159,7 @@ public class VJavaCompileException extends RuntimeException {
             String generatedSource,
             Throwable cause
     ) {
-        super(Objects.requireNonNullElse(message, "VJava compilation failed"), cause);
+        super("VJAVA_COMPILE_ERROR", Objects.requireNonNullElse(message, "VJava compilation failed"), cause);
         this.blockId = blockId != null ? blockId : "";
         this.sourceFile = sourceFile != null ? sourceFile : "";
         this.lineNumber = lineNumber;

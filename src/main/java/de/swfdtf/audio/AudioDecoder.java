@@ -899,4 +899,34 @@ public final class AudioDecoder {
         double endSec = (double) lastActive / audio.sampleRate();
         return new SpeechBounds(startSec, endSec, Math.max(0.0, endSec - startSec), audio.durationSeconds());
     }
+
+    /**
+     * Applies a smooth micro fade-in ramp (default {@code 0.15 s} / 150 ms) at the start of an
+     * interleaved float buffer to eliminate audible DC clicks or pops upon menu launch ({@code #1008}).
+     *
+     * @param samples     interleaved PCM float samples (mutated in place)
+     * @param sampleRate  sample rate in Hz ({@code > 0})
+     * @param channels    channel count ({@code >= 1})
+     * @param fadeSeconds ramp duration in seconds ({@code <= 0} is a no-op)
+     * @return mutated {@code samples} array
+     */
+    public static float[] applyNoPopFadeIn(float[] samples, int sampleRate, int channels, double fadeSeconds) {
+        Objects.requireNonNull(samples, "samples must not be null");
+        if (sampleRate <= 0 || channels <= 0) {
+            throw new IllegalArgumentException("sampleRate and channels must be positive");
+        }
+        if (fadeSeconds <= 0.0 || samples.length == 0) {
+            return samples;
+        }
+        int totalFrames = samples.length / channels;
+        int fadeFrames = Math.min(totalFrames, Math.max(1, (int) Math.round(fadeSeconds * sampleRate)));
+        for (int f = 0; f < fadeFrames; f++) {
+            float gain = fadeFrames == 1 ? 1.0f : (float) f / (fadeFrames - 1);
+            int base = f * channels;
+            for (int c = 0; c < channels; c++) {
+                samples[base + c] *= gain;
+            }
+        }
+        return samples;
+    }
 }

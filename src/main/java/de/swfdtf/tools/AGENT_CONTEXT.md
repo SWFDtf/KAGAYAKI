@@ -66,6 +66,7 @@ Entwickler-Werkzeuge, Dual-Window-Studio-UI und Standalone-Build-Pipeline von KA
 | `GameVfsAndModServices` | `final class` | Zentrales `GameVfs` (`Mods > DLC-.vpak > Base > Classpath`) mit Traversal-Schutz, `ModManager` (Konflikte, Zyklen, Quarantäne, Starter-Mod), `PluginHotReloader` (`URLClassLoader.close`) und Multi-Modul-Resolver. |
 | `PackagingAndDistributionServices` | `final class` | `.vpak`-Store-/Parallel-/Dedup-/Delta-/Ed25519-/Bomb-Utilities, `PlatformTarget`, Launcher-Generator (`-XstartOnFirstThread`, Java-21-Guard), Notice/HTML/Store-Manifeste sowie `build.gradle`-Versions-/Natives-Audit. |
 | `TemplateEcosystemServices` | `final class` | Community-Template-Validator (`validateTemplate`), HTML-Showcase-Report-Exporter, Offline-Studio-Changelog, sichere OS-Explorer-Kommandos, Fallback-Auflösung und prozedurales WAV-Sound-Kit. |
+| `QualityAssuranceAndReleaseServices` | `final class` | `RoadmapProgressReporter`, `RepositoryLinkChecker`, `ProjectVersionCompatibilityBadge`, `LiveSpriteInspectorModel`, `ArenaScenarioCollisionWarper`, `StudioNewProjectAutoLayoutState`, `ScreenshotFormatExporter`, `ChangelogReleaseValidator` und `PlaytestSuiteAggregator`. |
 
 ## Öffentliche API-Signaturen
 

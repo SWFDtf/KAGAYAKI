@@ -1,6 +1,7 @@
 package de.swfdtf.ui;
 
 import de.swfdtf.core.EngineVersion;
+import de.swfdtf.core.KeybindingRemapper;
 import de.swfdtf.graphics.NineSliceDrawable;
 import de.swfdtf.graphics.SceneController;
 import de.swfdtf.graphics.SpriteNode;
@@ -1090,5 +1091,74 @@ public final class UiPolishAndServices {
         float x = Math.max(m, Math.min(logicalWidth - m - baseBounds.width(), baseBounds.x()));
         float y = Math.max(m, Math.min(logicalHeight - m - baseBounds.height(), baseBounds.y()));
         return new Rect2f(x, y, baseBounds.width(), baseBounds.height());
+    }
+
+    /**
+     * Generates live keyboard &amp; controller binding legend strings for About/Help overlays
+     * reflecting custom remappings ({@code #1004}).
+     */
+    public static final class ControlLegendFormatter {
+
+        /**
+         * Creates a {@code ControlLegendFormatter}.
+         */
+        public ControlLegendFormatter() {
+        }
+
+        /**
+         * Formats ordered legend rows from {@code remapper} ({@code #1004}).
+         *
+         * @param remapper keybinding remapper (must not be {@code null})
+         * @param language locale language code ({@code "de"} or {@code "en"})
+         * @return immutable list of {@code "action: keyName"} legend lines
+         */
+        public static List<String> formatBindings(KeybindingRemapper remapper, String language) {
+            Objects.requireNonNull(remapper, "remapper must not be null");
+            Map<String, Integer> bindings = remapper.snapshotBindings();
+            List<String> lines = new ArrayList<>(bindings.size());
+            for (Map.Entry<String, Integer> entry : bindings.entrySet()) {
+                String localizedKey = KeybindingRemapper.localizeKeyName(entry.getValue(), language);
+                lines.add(entry.getKey() + ": " + localizedKey);
+            }
+            return List.copyOf(lines);
+        }
+    }
+
+    /**
+     * Walks a {@link Screen} UI tree to verify keyboard focus/Tab reachability across visible
+     * focusable widgets ({@code #0981}).
+     */
+    public static final class TabOrderAuditor {
+
+        /**
+         * Creates a {@code TabOrderAuditor}.
+         */
+        public TabOrderAuditor() {
+        }
+
+        /**
+         * Collects IDs of all visible, enabled, focusable widgets in pre-order traversal ({@code #0981}).
+         *
+         * @param screen UI screen to audit (must not be {@code null})
+         * @return immutable list of focusable node identifiers
+         */
+        public static List<String> collectFocusableIds(Screen screen) {
+            Objects.requireNonNull(screen, "screen must not be null");
+            List<String> ids = new ArrayList<>();
+            collectRecursive(screen.getRoot(), ids);
+            return List.copyOf(ids);
+        }
+
+        private static void collectRecursive(UiNode node, List<String> ids) {
+            if (node == null || !node.isVisible()) {
+                return;
+            }
+            if (node.isFocusable() && node.isEnabled()) {
+                ids.add(node.getId() != null ? node.getId() : node.getClass().getSimpleName());
+            }
+            for (UiNode child : node.getChildren()) {
+                collectRecursive(child, ids);
+            }
+        }
     }
 }

@@ -58,8 +58,10 @@ Optionally pass a project directory:
 ## Documentation
 
 - [Erste Schritte mit vjava](docs/getting-started.md) — Setup, CLI, Hello World, Quellcode-Struktur
+- [Entwickler-Handbuch (DE)](docs/HANDBUCH_DE.md) · [Developer Guide (EN)](docs/GUIDE_EN.md)
 - [vjava-Sprachreferenz](docs/sprachreferenz.md) — alle Befehle, Argumente und Beispiele
 - [vjava-Spezifikation](docs/VJAVA_SPEZIFIKATION.md) — technische Detailspezifikation
+- [Contributing](CONTRIBUTING.md) · [Security Policy](SECURITY.md)
 
 ## License
 

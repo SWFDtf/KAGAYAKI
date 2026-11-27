@@ -248,6 +248,8 @@ public final class VJavaLinter {
         checkUnreachableLabels(project, entryLabel, callGraph, issues);
         checkStrictTypes(project, issues);
         checkJavaBlocks(project, issues);
+        checkDuplicateCollisionTriggers(project, issues);
+        checkDeprecatedLabelTargets(project, issues);
         checkUnusedSymbols(project, issues);
 
         List<LintIssue> effectiveIssues = applyProjectRuleOverrides(project.projectRoot(), issues);
@@ -1103,6 +1105,7 @@ public final class VJavaLinter {
         if (blocks.isEmpty()) {
             return;
         }
+        checkBlockingCallsInJavaBlocks(blocks, issues);
 
         JavaBlockCompiler compiler = new JavaBlockCompiler();
         try {
@@ -1142,6 +1145,193 @@ public final class VJavaLinter {
                         first.lineNumber()
                 ));
             }
+        }
+    }
+
+    private static void checkBlockingCallsInJavaBlocks(
+            List<VJavaAst.JavaBlockNode> blocks,
+            List<LintIssue> issues
+    ) {
+        for (VJavaAst.JavaBlockNode block : blocks) {
+            if (block.code() != null && block.code().contains("Thread.sleep(")) {
+                issues.add(new LintIssue(
+                        Severity.WARNING,
+                        "BLOCKING_CALL_IN_JAVA_BLOCK",
+                        "Blocking call 'Thread.sleep(...)' in Java block stalls the render thread; "
+                                + "prefer DSL 'pause <sec>'.",
+                        block.sourceFile(),
+                        block.lineNumber()
+                ));
+            }
+        }
+    }
+
+    private static void checkDuplicateCollisionTriggers(VJavaAst.ProjectAst project, List<LintIssue> issues) {
+        for (VJavaAst.LabelNode label : project.labels().values()) {
+            Map<String, VJavaAst.OnCollideStatement> seenPairs = new LinkedHashMap<>();
+            collectCollisionDuplicates(label.statements(), seenPairs, issues);
+        }
+    }
+
+    private static void collectCollisionDuplicates(
+            List<VJavaAst.Statement> statements,
+            Map<String, VJavaAst.OnCollideStatement> seenPairs,
+            List<LintIssue> issues
+    ) {
+        if (statements == null || statements.isEmpty()) {
+            return;
+        }
+        for (VJavaAst.Statement stmt : statements) {
+            if (stmt instanceof VJavaAst.OnCollideStatement collide) {
+                String a = collide.tagA() != null ? collide.tagA().trim().toLowerCase(Locale.ROOT) : "";
+                String b = collide.tagB() != null ? collide.tagB().trim().toLowerCase(Locale.ROOT) : "";
+                String pairKey = a.compareTo(b) <= 0 ? (a + "|" + b) : (b + "|" + a);
+                VJavaAst.OnCollideStatement first = seenPairs.putIfAbsent(pairKey, collide);
+                if (first != null) {
+                    issues.add(new LintIssue(
+                            Severity.WARNING,
+                            "DUPLICATE_COLLISION_TRIGGER",
+                            "Duplicate on_collide trigger for sprite pair '" + collide.tagA() + "' / '"
+                                    + collide.tagB() + "' (first declared at line " + first.lineNumber()
+                                    + ", duplicated at line " + collide.lineNumber() + ").",
+                            collide.sourceFile(),
+                            collide.lineNumber()
+                    ));
+                }
+            } else {
+                for (List<VJavaAst.Statement> nested : childStatementLists(stmt)) {
+                    collectCollisionDuplicates(nested, seenPairs, issues);
+                }
+            }
+        }
+    }
+
+    private static List<List<VJavaAst.Statement>> childStatementLists(VJavaAst.Statement stmt) {
+        List<List<VJavaAst.Statement>> lists = new ArrayList<>();
+        if (stmt instanceof VJavaAst.MenuStatement menu) {
+            for (VJavaAst.MenuChoice choice : menu.choices()) {
+                lists.add(choice.body());
+            }
+        } else if (stmt instanceof VJavaAst.IfStatement ifs) {
+            for (VJavaAst.IfBranch branch : ifs.branches()) {
+                lists.add(branch.body());
+            }
+        } else if (stmt instanceof VJavaAst.MatchStatement ms) {
+            for (VJavaAst.MatchCase mc : ms.cases()) {
+                lists.add(mc.body());
+            }
+            if (ms.defaultBody() != null) {
+                lists.add(ms.defaultBody());
+            }
+        } else if (stmt instanceof VJavaAst.ParallelStatement ps) {
+            lists.add(ps.statements());
+        } else if (stmt instanceof VJavaAst.RepeatStatement rs) {
+            lists.add(rs.body());
+        } else if (stmt instanceof VJavaAst.WhileStatement ws) {
+            lists.add(ws.body());
+        } else if (stmt instanceof VJavaAst.RandomStatement rndStmt) {
+            for (VJavaAst.RandomBranch rb : rndStmt.branches()) {
+                lists.add(rb.body());
+            }
+        }
+        return lists;
+    }
+
+    private static void checkDeprecatedLabelTargets(VJavaAst.ProjectAst project, List<LintIssue> issues) {
+        if (project.projectRoot() == null) {
+            return;
+        }
+        Map<String, List<String>> fileLines = new HashMap<>();
+        Map<String, String> deprecatedReasons = new LinkedHashMap<>();
+        for (VJavaAst.LabelNode label : project.labels().values()) {
+            String comment = readPrecedingDeprecatedNote(project.projectRoot(), label, fileLines);
+            if (comment != null) {
+                deprecatedReasons.put(label.name(), comment);
+            }
+        }
+        if (deprecatedReasons.isEmpty()) {
+            return;
+        }
+        for (VJavaAst.LabelNode label : project.labels().values()) {
+            checkDeprecatedJumps(project, label.name(), label.statements(), deprecatedReasons, issues);
+        }
+    }
+
+    private static String readPrecedingDeprecatedNote(
+            Path projectRoot,
+            VJavaAst.LabelNode label,
+            Map<String, List<String>> fileCache
+    ) {
+        if (label.sourceFile() == null || label.lineNumber() <= 1) {
+            return null;
+        }
+        List<String> lines = fileCache.computeIfAbsent(label.sourceFile(), rel -> {
+            try {
+                Path p = projectRoot.resolve(rel).normalize();
+                return Files.isRegularFile(p) ? Files.readAllLines(p, StandardCharsets.UTF_8) : List.of();
+            } catch (IOException | InvalidPathException ignored) {
+                return List.of();
+            }
+        });
+        int idx = label.lineNumber() - 2;
+        if (idx >= 0 && idx < lines.size()) {
+            String prev = lines.get(idx).trim();
+            if (prev.toLowerCase(Locale.ROOT).contains("@deprecated")) {
+                return prev;
+            }
+        }
+        return null;
+    }
+
+    private static void checkDeprecatedJumps(
+            VJavaAst.ProjectAst project,
+            String currentLabel,
+            List<VJavaAst.Statement> statements,
+            Map<String, String> deprecatedReasons,
+            List<LintIssue> issues
+    ) {
+        if (statements == null || statements.isEmpty()) {
+            return;
+        }
+        for (VJavaAst.Statement stmt : statements) {
+            if (stmt instanceof VJavaAst.JumpStatement jump && !jump.isExpression()) {
+                emitDeprecatedWarningIfMatched(
+                        project, currentLabel, jump.targetLabel(), jump.sourceFile(),
+                        jump.lineNumber(), deprecatedReasons, issues);
+            } else if (stmt instanceof VJavaAst.CallStatement call) {
+                emitDeprecatedWarningIfMatched(
+                        project, currentLabel, call.targetLabel(), call.sourceFile(),
+                        call.lineNumber(), deprecatedReasons, issues);
+            } else {
+                for (List<VJavaAst.Statement> nested : childStatementLists(stmt)) {
+                    checkDeprecatedJumps(project, currentLabel, nested, deprecatedReasons, issues);
+                }
+            }
+        }
+    }
+
+    private static void emitDeprecatedWarningIfMatched(
+            VJavaAst.ProjectAst project,
+            String currentLabel,
+            String rawTarget,
+            String sourceFile,
+            int lineNumber,
+            Map<String, String> deprecatedReasons,
+            List<LintIssue> issues
+    ) {
+        if (rawTarget == null) {
+            return;
+        }
+        String resolved = resolveNamespaceLabel(project, currentLabel, rawTarget.trim());
+        if (resolved != null && deprecatedReasons.containsKey(resolved)) {
+            issues.add(new LintIssue(
+                    Severity.INFO,
+                    "DEPRECATED_LABEL_TARGET",
+                    "Target label '" + resolved + "' is marked @deprecated ("
+                            + deprecatedReasons.get(resolved) + ").",
+                    sourceFile,
+                    lineNumber
+            ));
         }
     }
 
