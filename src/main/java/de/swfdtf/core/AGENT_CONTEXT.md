@@ -40,6 +40,7 @@ Zentrales Laufzeit-Fundament von KAGAYAKI: Ausführungsmodi (`STUDIO_DUAL_WINDOW
 | `GamepadNavigationRouter` | `final class` | Übersetzt `InputManager`-D-Pad-/Stick-Eingaben inklusive Deadzone und Wiederholungsrate in diskrete `NavigationDirection`-Ereignisse. |
 | `InputDeviceAndAccessibilityServices` | `final class` | Input-Puffering (120 ms), Key-Repeat (400/80 ms), Touch-Gesten, Ein-Hand-Profile, QWERTZ/AZERTY/DVORAK-Scancode-Maps, Gamepad-Profile/Haptik, Cursor- & Fokus-Policy sowie `ClipboardBridge`. |
 | `InputWorkflowAndMacroServices` | `final class` | Input-Prioritäts-Stack, `.vinput`-Makro-Rekorder/Replay-Player, UI-/Dialog-Input-Guards, Konami-Sequenzdetektor, Radial-Wheel und `VirtualKeyboardState`. |
+| `PluginAndRuntimeLifecycleServices` | `final class` | `plugin.json`-Manifest- & Berechtigungsprüfung, fehlertoleranter `PluginLifecycleDispatcher`, DSL-`PluginCommandRouter`, `PluginSerializerRegistry`, UI-Slot-Registry, rotierender Log-Writer (`5 x 5 MiB`), `ShutdownResourceCoordinator` und `ProjectExtensionsPreserver`. |
 
 ## Öffentliche API-Signaturen
 

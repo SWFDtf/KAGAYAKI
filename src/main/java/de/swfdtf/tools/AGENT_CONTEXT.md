@@ -63,6 +63,8 @@ Entwickler-Werkzeuge, Dual-Window-Studio-UI und Standalone-Build-Pipeline von KA
 | `StudioCliRunner` | `final class` | Headless CI/CD CLI-Runner für `lint`, `preflight`, `flow-graph`, `standalone-build`, `release-check` und `html-report` mit Exit-Codes. |
 | `Studio3DInspectorService` | `final class` | Studio-exklusiver 3D-Autoring-Inspektor für Live-`Camera3D`-Parameter, X/Y/Z-Achsen-Gizmo-Drag mit Snap & `.vjava`-Snippet, Laufzeit-`Material3D`-JSON-Export und Studio-only-Nav-Pfad-Visualisierung. |
 | `LocalizationToolingServices` | `final class` | Pseudo-Lokalisierungs-Generator, kapitelweise Übersetzer-Worklists, fehlende Quellwort-Statistik (Dialog vs. UI), 130%-Längen-Ampel, `## LQA Note:`-Extraktion, statischer Tag-/Escape-Validator, zweisprachige Suche und DE/EN-Komplettheitsaudit. |
+| `GameVfsAndModServices` | `final class` | Zentrales `GameVfs` (`Mods > DLC-.vpak > Base > Classpath`) mit Traversal-Schutz, `ModManager` (Konflikte, Zyklen, Quarantäne, Starter-Mod), `PluginHotReloader` (`URLClassLoader.close`) und Multi-Modul-Resolver. |
+| `PackagingAndDistributionServices` | `final class` | `.vpak`-Store-/Parallel-/Dedup-/Delta-/Ed25519-/Bomb-Utilities, `PlatformTarget`, Launcher-Generator (`-XstartOnFirstThread`, Java-21-Guard), Notice/HTML/Store-Manifeste sowie `build.gradle`-Versions-/Natives-Audit. |
 
 ## Öffentliche API-Signaturen
 
