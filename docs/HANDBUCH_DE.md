@@ -32,9 +32,11 @@ Siehe die vollständige Syntax-Referenz in [VJAVA_SPEZIFIKATION.md](VJAVA_SPEZIF
 2. Vorlagen-Walkthrough: [TUTORIAL_ERSTES_PROJEKT.md](TUTORIAL_ERSTES_PROJEKT.md).
 3. Release-Smoke-Prüfung: [GUI_SMOKE_CHECKLIST.md](GUI_SMOKE_CHECKLIST.md).
 
-## 4. Packaging, Save-System & Modding
+## 4. Packaging, Save-System, 3D & Cloud/WASM-Ausbau
 
-- Speicherstände (`saves/slot_*.ksav`, `saves/persistent.dat`, `saves/preferences.json`): dokumentiert in [SAVE_SCHEMA.md](SAVE_SCHEMA.md).
-- `.vpak`-Bundles, VFS-Prioritäten (`Mods > DLC > Base > Classpath`) und Ed25519-Prüfsummen: dokumentiert in [PACKAGING_AND_MODDING.md](PACKAGING_AND_MODDING.md).
+- Speicherstände (`saves/slot_*.ksav`, `saves/persistent.dat`, `saves/preferences.json`) und plattformneutrale Cloud-Sync-Manifeste (`CloudSyncManifest`): dokumentiert in [SAVE_SCHEMA.md](SAVE_SCHEMA.md).
+- `.vpak`-Bundles inkl. vorkompilierter `.vjava`-Bytecode-Bundles (`META-INF/compiled-scripts.vjc`), VFS-Prioritäten (`Mods > DLC > Base > Classpath`) und Ed25519-Prüfsummen: dokumentiert in [PACKAGING_AND_MODDING.md](PACKAGING_AND_MODDING.md).
+- Erweiterte 3D- & Studio-Funktionen (`[P3]` Waves P3-1–P3-4): 2D-A*-Pfadfindung (`GridPathfinder2D`), 2D-Skeletal-Adapter (`Skeletal2DAdapter`), Label-Hot-Swap ohne State-Reset, 3D-IBL/SSAO/DoF/God-Rays/SSS/Panorama-Baking/RenderDoc-Marker, glTF-Skinning, `InstancedMeshNode`, OpenAL-3D-Hörer-Kopplung, Git-`HEAD`-Dialogdiff, Multi-Window-Abdocken, `DialogPacingLinter` sowie `VisualNodeGraphEditor`.
+- Browser-/WASM-Machbarkeitsstudie: [WEBASSEMBLY_FEASIBILITY.md](WEBASSEMBLY_FEASIBILITY.md).
 - Performance-Baselines: [BENCHMARKS.md](BENCHMARKS.md).
 - Englische Dokumentation: [GUIDE_EN.md](GUIDE_EN.md) · Sicherheit: [SECURITY.md](../SECURITY.md) · Mitwirken: [CONTRIBUTING.md](../CONTRIBUTING.md).

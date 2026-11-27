@@ -45,14 +45,14 @@ Optionally pass a project directory:
 
 ### Run Tests
 ```bash
-./gradlew test
+./gradlew check javadoc test e2eTest
 ```
 
 ## Project Structure
 
 - `src/` — Engine, Studio, and runtime source code (`de.swfdtf.*`)
 - `demo/` — Demo project assets and scenes
-- `docs/` — Architecture and design documentation
+- `docs/` — Architecture, `.vjava` DSL specs, handbooks, and design documentation
 - `build.gradle` — Gradle build configuration and custom `kagayaki` tasks
 
 ## Documentation
@@ -60,7 +60,8 @@ Optionally pass a project directory:
 - [Erste Schritte mit vjava](docs/getting-started.md) — Setup, CLI, Hello World, Quellcode-Struktur
 - [Entwickler-Handbuch (DE)](docs/HANDBUCH_DE.md) · [Developer Guide (EN)](docs/GUIDE_EN.md)
 - [vjava-Sprachreferenz](docs/sprachreferenz.md) — alle Befehle, Argumente und Beispiele
-- [vjava-Spezifikation](docs/VJAVA_SPEZIFIKATION.md) — technische Detailspezifikation
+- [vjava-Spezifikation](docs/VJAVA_SPEZIFIKATION.md) · [Architektur](docs/ARCHITEKTUR.md) · [API-Referenz](docs/API_REFERENZ.md)
+- [Save Schema](docs/SAVE_SCHEMA.md) · [Packaging & Modding](docs/PACKAGING_AND_MODDING.md) · [WebAssembly Study](docs/WEBASSEMBLY_FEASIBILITY.md)
 - [Contributing](CONTRIBUTING.md) · [Security Policy](SECURITY.md)
 
 ## License

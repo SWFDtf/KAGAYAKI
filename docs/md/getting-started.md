@@ -72,7 +72,10 @@ Der erste Lauf lädt Gradle und alle Abhängigkeiten (LWJGL 3.3.6, JOML 1.10.8, 
 | `./gradlew runStudio` | Startet den **Studio-Modus** (zwei Fenster: Werkzeug + Live-Vorschau). |
 | `./gradlew runStandalone` | Startet nur das **Spielfenster** ohne Studio-Werkzeuge. |
 | `./gradlew packageStandalone` | Baut ein ausführbares JAR: `build/dist/kagayaki-standalone-<version>.jar`. |
+| `./gradlew jpackageBundle` | Erzeugt ein natives App-Bundle (macOS `.app`, Windows `.msi`, Linux `.AppImage`) via `jpackage`. |
 | `./gradlew test` | Führt alle JUnit-Tests aus. |
+| `./gradlew e2eTest` | Führt isolierte End-to-End-Tests aus `src/e2eTest/java` aus. |
+| `./gradlew check javadoc` | Führt Tests, Checkstyle (0 Fehler/Warnungen) und Javadoc-Prüfung (`-Xdoclint:all -Werror`) aus. |
 
 Mit `-PkagayakiProject=<pfad>` wählst du das Projekt aus (Pfad zum Ordner mit `project.vjava.json`).
 
@@ -111,6 +114,7 @@ Ohne `-PkagayakiProject` sucht die Engine automatisch ein Projekt: zuerst `./pro
 | `--width <n>`, `--height <n>` | positive Ganzzahl | Logische Auflösung (Standard 1920×1080). |
 | `--fps <n>` (Alias `--target-fps`) | positive Ganzzahl | Ziel-Bildrate. |
 | `--vsync` / `--no-vsync` (auch `--vsync=true\|false`) | – | VSync an/aus. |
+| `--vpak-key <key>` / `--vpak-key=<key>` | Schlüssel | Entschlüsselungsschlüssel für verschlüsselte `.vpak`-Archive (AES-CTR). |
 | `--headless` | – | Ohne sichtbares Fenster. |
 | `--smoke-test` | – | Kurzer Startdurchlauf zur Prüfung. |
 
@@ -244,7 +248,7 @@ Alle Bausteine – Bilder, Audio, Transitions, Animationen, UI, Java-Blöcke –
 
 > Hinweis: Die Gradle-Aufgabe `run` startet `de.swfdtf.Main` (Studio-Modus) und wird vom `application`-Plugin bereitgestellt. Alternativ startest du `de.swfdtf.Main` mit `--create-template <dir>` in deiner IDE.
 
-Der Generator (`ProjectTemplateGenerator`) erzeugt `project.vjava.json`, `main.vjava` (mit Java-Klassen, `layeredimage`, Verzweigung), `ui/screens.vjava`, `tl/english/translations.vjava` sowie prozedurale PNG- und WAV-Assets.
+Der Generator (`ProjectTemplateGenerator`) unterstützt 9 Vorlagen (`FULL_DEMO`, `STARTER`, `MINIMAL`, `ACTION_ADVENTURE_2D`, `HYBRID_3D_EXPLORATION`, `HYBRID_3D_MYSTERY`, `NVL_LITERARY`, `TUTORIAL_5_MIN`, `SANDBOX_2D_LAB`) und erzeugt `project.vjava.json`, `main.vjava` (mit Java-Klassen, `layeredimage`, Verzweigung), `ui/screens.vjava`, `tl/english/translations.vjava` sowie prozedurale PNG- und WAV-Assets.
 
 ### 5.2 Demo „Schneewittchen“
 
@@ -351,7 +355,9 @@ flowchart LR
 | `ScriptRuntime` | Nicht blockierende State-Machine, die die Statements ausführt (`if (stmt instanceof …)`-Kette in `execute…`). |
 | `ScriptSession` | Sitzungskoordinator: Rollback, Save/Load, Persistenz, Lokalisierung, Verlauf. |
 | `HotReloadWatcher` | Beobachtet Dateiänderungen für Live-Reload. |
-| `MacroRegistry`, `ScriptProfiler`, `VariableWatchpointManager`, `TypeSafeStateView` | Zusatzwerkzeuge (Makros, Profiling, Watchpoints, typsicherer State). |
+| `VJavaDslReferenceGenerator`, `AstJsonSerializer`, `TextMateGrammarGenerator` | Generiert DSL-Referenz, JSON-AST-Exporte und TextMate-Syntaxgrammatiken. |
+| `ScriptDebugger`, `ScriptCoverageTracker`, `VJavaReplEvaluator`, `VJavaLocalizationBridge` | Breakpoints/Debugger, Testabdeckung, REPL-Auswertung und Übersetzungsbrücke. |
+| `MacroRegistry`, `ScriptProfiler`, `VariableWatchpointManager`, `TypeSafeStateView`, `CompiledScriptBundle`, `ScriptExecutionException` | Makros, Profiling, Watchpoints, typsicherer State, kompilierte Skript-Bundles und Laufzeitfehler. |
 
 Weitere Anlaufstellen: `ui/ScreenAstBuilder` (baut `screen`-ASTs zu Widgets), `graphics/ATLTransform` und `AnimationEngine` (Animationen), `graphics/Transition` (Transition-Ausdrücke), `graphics/TextTagParser` (Inline-Tags), `graphics/ObjectMotionController` (`move`, `wasd_*`, `physics_*`, `on_collide`), `state/LocalizationManager` (`translate`), `tools/VJavaLinter`. Jedes Paket enthält eine `AGENT_CONTEXT.md` mit einer Typenübersicht.
 
@@ -434,4 +440,4 @@ Danach: Test in `src/test/java/de/swfdtf/parser/` ergänzen (Vorbild: `VJavaMove
 | Bild/Audio fehlt | Falscher Pfad | Pfade relativ zum Projektordner (`assets/…`); Linter `MISSING_ASSET` beachten. |
 | Gradle lädt nichts | Kein Internet / Proxy | Erstlauf benötigt Netzwerk (Abhängigkeiten). |
 
-**Weiterführend:** [Sprachreferenz](sprachreferenz.md) · [VJAVA_SPEZIFIKATION.md](VJAVA_SPEZIFIKATION.md) · [ARCHITEKTUR.md](ARCHITEKTUR.md) · [API_REFERENZ.md](API_REFERENZ.md)
+**Weiterführend:** [Sprachreferenz](sprachreferenz.md) · [Entwickler-Handbuch (DE)](HANDBUCH_DE.md) · [Developer Guide (EN)](GUIDE_EN.md) · [VJAVA_SPEZIFIKATION.md](VJAVA_SPEZIFIKATION.md) · [ARCHITEKTUR.md](ARCHITEKTUR.md) · [SAVE_SCHEMA.md](SAVE_SCHEMA.md) · [PACKAGING_AND_MODDING.md](PACKAGING_AND_MODDING.md) · [BENCHMARKS.md](BENCHMARKS.md) · [API_REFERENZ.md](API_REFERENZ.md)

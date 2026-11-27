@@ -21,6 +21,11 @@ See [ARCHITEKTUR.md](ARCHITEKTUR.md), [SAVE_SCHEMA.md](SAVE_SCHEMA.md), and [PAC
 - Run Snow White showcase & linter: `./gradlew -p demo check lintDemo packageDemo`
 - Beginner tutorial: [TUTORIAL_ERSTES_PROJEKT.md](TUTORIAL_ERSTES_PROJEKT.md) · German handbook: [HANDBUCH_DE.md](HANDBUCH_DE.md)
 
+- **Tests, 3D & Cloud/WASM Tooling (`[P3]` Waves P3-1–P3-4):**
+  - 2D A* pathfinding (`GridPathfinder2D`), 2D skeletal adapter (`Skeletal2DAdapter`), live label hot-swap, `.vpak`-embedded `CompiledScriptBundle`, cross-device `CloudSyncManifest`, and [WEBASSEMBLY_FEASIBILITY.md](WEBASSEMBLY_FEASIBILITY.md).
+  - Advanced 3D rendering (`IblEnvironment3D`, `SsaoPass`, `DepthOfField3D`, `VolumetricGodRaysPass`, `AmbientLightProbeGrid`, `SubsurfaceScatteringModel`, `Scene3DPanoramaBaker`, `RenderDocMarkerScope`), 64-bone `Skeletal3DAnimator`, `InstancedMeshNode`, OpenAL 3D listener sync, vertex wind & rigid-body drop physics.
+  - Studio Git `HEAD` dialog diff, multi-monitor undocking (`StudioUndockedWindowManager`), `DialogPacingLinter`, and lossless `VisualNodeGraphEditor` round-trip.
+
 ## 3. Quality, Testing & Security
 
 - Style checks & tests: `./gradlew check javadoc test e2eTest`

@@ -10,11 +10,11 @@ Vollständige Referenz aller Schlüsselwörter, Anweisungen, Operatoren und Inli
 
 1. [Allgemeine Syntaxregeln](#1-allgemeine-syntaxregeln)
 2. [Top-Level-Deklarationen](#2-top-level-deklarationen)
-   `define` · `default` · `$` · `image` · `layeredimage` · `transform` · `screen` · `translate` · `label` · `@->{ }<<`
+   `define` · `default` · `$` · `image` · `layeredimage` · `transform` · `screen` · `translate` · `label` · `config` · `include` · `@->{ }<<`
 3. [Label-Anweisungen](#3-label-anweisungen)
-   Dialog · `nvl` · `window` · `scene` · `show` · `hide` · `with` · `pause` · `play` · `queue` · `stop` · `voice` · `menu` · `if` · `$` · `jump` · `call` · `return` · `input` · `block_rollback` · `pass`
-4. [Bewegung, Steuerung & Physik](#4-bewegung-steuerung--physik)
-   `move` · `move_by` · `wasd_init` · `wasd_stop` · `physics_init` · `physics_stop` · `on_collide`
+   Dialog · `nvl` · `window` · `scene` · `show` · `hide` · `with` · `pause` · `play` · `queue` · `stop` · `voice` · `menu` · `if` · `match` · `repeat` · `while` · `random` · `set` · `local` · `parallel` · `after` · `on_event` · `spawn_cutscene` · `$` · `jump` · `call` · `return` · `input` · `block_rollback` · `pass`
+4. [Bewegung, Steuerung, Physik & 3D](#4-bewegung-steuerung-physik--3d)
+   `move` · `move_by` · `move_path` · `rotate` · `scale` · `wait_move` · `on_tween_end` · `wasd_init` · `wasd_stop` · `point_click_init` · `physics_init` · `physics_stop` · `on_collide` · `on_overlap` · `on_interact` · `collision_mask` · `hitbox` · `trigger_zone` · `solid_platform` · `moving_platform` · `collider` · `climb_zone` · `surface_friction` · `knockback` · `impulse` · `attract` · `camera` · `shake` · `anim_state` · `patrol` · `follow` · `spawn` · `despawn` · `attach` · `ysort` · `time_scale` · `scene3d` · `spawn3d` · `camera3d` · `wasd3d_init` · `fog3d` · `material3d`
 5. [Ausdrücke & Operatoren](#5-ausdrücke--operatoren)
 6. [Eingebettetes Java](#6-eingebettetes-java----)
 7. [Transitions](#7-transitions)
@@ -35,7 +35,7 @@ Vollständige Referenz aller Schlüsselwörter, Anweisungen, Operatoren und Inli
 | Leerzeilen | Leerzeilen und reine Kommentarzeilen sind bedeutungslos. |
 | Geschweifte Klammern | Auf Skriptebene gibt es **keine** `{}`-Blöcke. `{…}` in Dialogtexten sind Text-Tags (siehe [Abschnitt 8](#8-inline-text-tags)). |
 | Strings | In doppelten Anführungszeichen: `"Text"`. |
-| Zugelassene Top-Level-Schlüsselwörter | `define`, `default`, `$`, `image`, `layeredimage`, `transform`, `screen`, `translate`, `label` sowie `@->{ … }<<`. Alles andere auf Ebene 0 ist ein Parserfehler. |
+| Zugelassene Top-Level-Schlüsselwörter | `define`, `default`, `$`, `image`, `layeredimage`, `transform`, `screen`, `translate`, `label`, `config`, `include` sowie `@->{ … }<<`. Alles andere auf Ebene 0 ist ein Parserfehler. |
 | Dateien | Alle `*.vjava` unter dem Projektordner werden rekursiv gefunden und in lexikografischer Pfadreihenfolge zu **einem** Projekt zusammengeführt. Ausgeschlossen: `.git`, `build`, `.gradle`, `saves`, `out`, `dist`. |
 | Doppelte Definitionen | Spätere Definitionen überschreiben frühere (*Last-Wins*) und erzeugen eine Warnung. |
 
@@ -331,6 +331,22 @@ label kapitel_2:
 
 Siehe [Abschnitt 6](#6-eingebettetes-java----). Top-Level-Blöcke laufen **einmal beim Start** in Deklarationsreihenfolge und eignen sich für Klassen, Records und Hilfsmethoden.
 
+### 2.11 `config` – Projektkonfiguration
+
+**Syntax:** `config:` mit eingerückten Schlüssel-Wert-Zuweisungen (`schluessel = wert`). Erlaubt projektweite Einstellungen (z. B. Fenster- oder Textvorgaben) direkt im Skript.
+
+```vjava
+config:
+    title = "Mein Winter-Abenteuer"
+    rollback_enabled = true
+```
+
+### 2.12 `include` – Skript-Einbindung
+
+**Syntax:** `include "<relativer_pfad.vjava>"`
+
+Deklariert eine explizite Modul-Abhängigkeit auf eine weitere `.vjava`-Datei im Projekt. `ProjectScanner` lädt alle `.vjava`-Dateien des Projektordners und prüft `include`-Ziele über `VJavaLinter`.
+
 ---
 
 ## 3. Label-Anweisungen
@@ -498,7 +514,7 @@ label start:
 
 ### 3.9 `play`
 
-**Syntax:** `play <kanal> "<asset>" [loop | noloop] [fadein <sek>] [volume <wert>]`
+**Syntax:** `play <kanal> "<asset>" [loop | noloop] [fadein <sek>] [volume <wert>] [loop_start <sek>]`
 
 | Argument | Typ | Standard | Beschreibung |
 | :--- | :--- | :--- | :--- |
@@ -507,6 +523,7 @@ label start:
 | `loop` / `noloop` | Flag | `loop` für `music`/`ambient`, sonst `noloop` | Wiederholung. |
 | `fadein <sek>` | Zahl | 0 | Einblenddauer. |
 | `volume <wert>` | Zahl | 1.0 | Kanal-Lautstärke (0.0–1.0). |
+| `loop_start <sek>` | Zahl | 0 | Einsprungzeitpunkt in Sekunden beim nahtlosen Musik-Loop nach dem Intro. |
 
 Unbekannte Optionen erzeugen einen Parserfehler. Auf `music` wird der Titel automatisch im Musikraum freigeschaltet.
 
@@ -772,9 +789,86 @@ label start:
 
 Siehe [Abschnitt 6](#6-eingebettetes-java----).
 
+### 3.23 `match` – Pattern Matching
+
+**Syntax:** `match <ausdruck>:` mit eingerückten `case <muster>:`-Zweigen und optionalem `default:`-Zweig.
+
+```vjava
+label bewertung:
+    match rank:
+        case 1:
+            "Gold"
+        case 2:
+            "Silber"
+        default:
+            "Teilnahme"
+    return
+```
+
+### 3.24 `repeat` & `while` – Schleifen
+
+**Syntax:** `repeat <anzahl>:` bzw. `while <bedingung>:` mit eingerücktem Rumpf. `while` ist gegen Endlosschleifen mit einem Iterationslimit abgesichert (`ScriptExecutionException`).
+
+```vjava
+label runde:
+    repeat 3:
+        $ punkte += 10
+    while $hp > 0:
+        $ hp -= 50
+    return
+```
+
+### 3.25 `random` – Gewichtete Zufallszweige
+
+**Syntax:** `random:` mit eingerückten `weight <gewicht>:`-Blöcken.
+
+```vjava
+label schatz:
+    random:
+        weight 70:
+            $ fund = "Münze"
+        weight 30:
+            $ fund = "Rubin"
+    return
+```
+
+### 3.26 `set` & `local` – Block- und Lokalvariablen
+
+**Syntax:** `set:` weist mehrere Variablen in einem eingerückten Block (`name = ausdruck`) kompakt zu. `local $<name> = <ausdruck>` deklariert eine auf den aktuellen `call`-Stackframe begrenzte Variable.
+
+```vjava
+label helfer:
+    set:
+        gold = 100
+        rang = "A"
+    local $tmp = 42
+    "Temporär: [tmp], Gold: [gold]"
+    return
+```
+
+### 3.27 `parallel`, `after`, `on_event` & `spawn_cutscene` – Nebenläufigkeit & Ereignisse
+
+| Befehl | Syntax | Beschreibung |
+| :--- | :--- | :--- |
+| `parallel:` | `parallel:` + Block | Führt Kind-Anweisungen gleichzeitig aus (z. B. parallele `move`/`scale`-Tweens). |
+| `after` | `after <sek> jump\|call <label>` | Startet einen Timer und springt bzw. ruft `<label>` nach Ablauf auf. |
+| `on_event` | `on_event "<name>" call\|jump <label>` | Bindet einen Listener am `EngineEventBus` an eine `.vjava`-Subroutine. |
+| `spawn_cutscene` | `spawn_cutscene <label>` | Führt `<label>` nicht-blockierend als Hintergrund-Coroutine aus. |
+
+```vjava
+label cutscene_start:
+    on_event "tor_offen" call reaktion
+    after 2.5 jump weiter
+    parallel:
+        move tor to 400 200 duration 0.8
+        scale tor to 1.2 duration 0.8
+    spawn_cutscene wolken_zug
+    return
+```
+
 ---
 
-## 4. Bewegung, Steuerung & Physik
+## 4. Bewegung, Steuerung, Physik & 3D
 
 Diese Anweisungen steuern **Sprites** auf der Bühne (Koordinaten im logischen Raster **1920×1080**, Ursprung links oben). Sie sind **nicht blockierend**: Die Anweisung startet die Bewegung, das Skript läuft sofort weiter. Der zugehörige Sprite muss vorher mit `show` angezeigt worden sein.
 
@@ -924,6 +1018,73 @@ label sieg:
     return
 ```
 
+### 4.8 Erweiterte Tweens & Synchronisation
+
+| Befehl | Syntax | Beschreibung |
+| :--- | :--- | :--- |
+| `move_path` | `move_path <tag> <x1> <y1> <x2> <y2> <x3> <y3> [duration <sek>] [ease <kurve>]` | Bewegt einen Sprite entlang einer kubischen Bézier-Kurve. |
+| `rotate` | `rotate <tag> to <grad> [duration <sek>] [ease <kurve>]` | Rotiert über den kürzesten Winkelweg (`spring`, `ease_in_out` u. a.). |
+| `scale` | `scale <tag> to <zx> <zy> [duration <sek>] [ease <kurve>]` | Skaliert einen Sprite (optional nicht-uniform in X/Y). |
+| `wait_move` | `wait_move <tag>` | Wartet bis zum Abschluss der aktiven Bewegung von `<tag>`. |
+| `on_tween_end` | `on_tween_end <tag> jump\|call <label>` | Löst bei Abschluss einer Tween-Animation ein Ziel-Label aus. |
+
+### 4.9 Steuerung, Kollision, Plattformen & Physik-Zonen
+
+| Befehl | Syntax | Beschreibung |
+| :--- | :--- | :--- |
+| `point_click_init` | `point_click_init <tag> [speed <px>]` | Aktiviert Klick-zum-Gehen-Steuerung per Mausziel. |
+| `on_overlap` | `on_overlap <a> <b> enter\|stay\|exit <label>` | Überwacht Lebenszyklus-Phasen (`enter`, `stay`, `exit`) zweier Hitboxen. |
+| `on_interact` | `on_interact <tag> <dist> jump\|call <label>` | Löst bei `E`/`Enter` in Reichweite `<dist>` eine Interaktion aus. |
+| `collision_mask` | `collision_mask <tag> <layer> collides_with <l1> ...` | Filtert Kollisionspaare nach logischen Schichten. |
+| `hitbox` | `hitbox <tag> circle <r> \| rect <w> <h>` | Überschreibt die Standard-Bounding-Box durch Kreis- oder Rechteck-Hitbox. |
+| `trigger_zone` | `trigger_zone <id> rect <x> <y> <w> <h> call\|jump <label>` | Definiert eine unsichtbare Auslösezone. |
+| `solid_platform` | `solid_platform <tag> [one_way]` | Markiert ein Sprite als begehbare oder einseitig durchlässige Plattform. |
+| `moving_platform` | `moving_platform <tag> between <x1> <y1> <x2> <y2> [speed <px>]` | Bewegliche Plattform, die darauf stehende Spieler mitführt. |
+| `collider` | `collider wall <id> <x> <y> <w> <h>` | Erzeugt ein statisches blockierendes Rechteck-Hindernis. |
+| `climb_zone` | `climb_zone <id> rect <x> <y> <w> <h>` | Schaltet in Leiter-/Kletterzonen Schwerkraft zugunsten von `W`/`S` aus. |
+| `surface_friction` | `surface_friction <id> rect <x> <y> <w> <h> factor <f>` | Skaliert Reibung/Trägheit (z. B. Eisfläche `0.4`). |
+| `knockback` | `knockback <tag> vx <x> vy <y> [invuln <sek>]` | Verleiht Rückstoß-Impuls mit abklingender Unverwundbarkeitsphase. |
+| `impulse` | `impulse <tag> vx <x> vy <y>` | Setzt eine sofortige Geschwindigkeits-Impulskraft. |
+| `attract` | `attract <tag> target <ziel> radius <r> [speed <px>]` | Zieht Collectibles magnetisch ab Radius `<r>` an `<ziel>` heran. |
+
+### 4.10 Kamera, Effekte, KI & Dynamische Sprites
+
+| Befehl | Syntax | Beschreibung |
+| :--- | :--- | :--- |
+| `camera` | `camera follow <tag> [smooth <f>]` / `camera clamp <x1> <y1> <x2> <y2>` | Verfolgt ein Sprite weich und begrenzt den sichtbaren Kamerabereich. |
+| `shake` | `shake <ebene> amp <px> dur <sek>` | Schüttelt eine Szene-Ebene rein visuell ohne Hitbox-Versatz. |
+| `anim_state` | `anim_state <tag> idle <a> walk <b> jump <c>` | Koppelt Bewegungszustand automatisch an Sprite-Attribute. |
+| `patrol` | `patrol <tag> between <x1> <y1> <x2> <y2> [speed <px>]` | Lässt NPCs/Wachen kontinuierlich zwischen zwei Punkten patrouillieren. |
+| `follow` | `follow <tag> target <ziel> [speed <px>] [stop_radius <r>]` | Lässt Begleiter mit Hysterese (und 2D-A* in `GridPathfinder2D`) folgen. |
+| `spawn` / `despawn` | `spawn <tag> "<asset>" [at <x> <y>]` / `despawn <tag>` | Erzeugt oder entfernt dynamische Instanzen ohne `define`. |
+| `attach` | `attach <kind> to <eltern> [offset <x> <y>]` | Verknüpft Kind-Sprites relativ zu einem Eltern-Sprite. |
+| `ysort` | `ysort <true\|false>` | Sortiert Master-Sprites automatisch anhand ihrer Y-Fußkoordinate. |
+| `time_scale` | `time_scale <faktor>` | Zeitlupe bzw. Zeitraffer auf Bewegung, Physik und Timer. |
+
+### 4.11 3D-Bühne & Hybrid-Szenen
+
+Aktiviert bzw. steuert die `RenderPipeline3D` innerhalb hybrider VN-/Erkundungsszenen (`Sky2D -> World3D -> Billboards -> Foreground2D -> UI`):
+
+| Befehl | Syntax | Beschreibung |
+| :--- | :--- | :--- |
+| `scene3d` | `scene3d <prefab>` | Lädt eine definierte 3D-Bühnenkonfiguration (`Scene3DWorld`). |
+| `spawn3d` | `spawn3d [<id>] "<mesh.obj\|glb>" at <x> <y> <z>` | Platziert ein `.obj`- oder `.glb`-3D-Modell im Raum. |
+| `camera3d` | `camera3d move\|look_at <x> <y> <z> [duration <sek>]` | Interpoliert Kameraposition oder LookAt-Fokus im 3D-Raum. |
+| `wasd3d_init` | `wasd3d_init [speed <wert>] [fov <grad>]` | Aktiviert First-Person-/Orbit-Steuerung mit `±89°`-Gimbal-Schutz. |
+| `fog3d` | `fog3d "<hex>" [density <d>] [falloff <f>]` | Konfiguriert exponentiellen Distanz- und Höhen-Nebel. |
+| `material3d` | `material3d <id> tint "<hex>" [roughness <r>] [metallic <m>]` | Überschreibt PBR-/Toon-Materialeigenschaften eines `Node3D`. |
+
+```vjava
+label schloss_3d:
+    scene3d throne_room
+    spawn3d desk "assets/models/desk.obj" at 0 0 -4
+    material3d desk tint "#ffd700" roughness 0.25 metallic 0.85
+    fog3d "#1a2438" density 0.04
+    camera3d move 0 2 6 duration 1.0
+    wasd3d_init speed 5.0 fov 75
+    return
+```
+
 ---
 
 ## 5. Ausdrücke & Operatoren
@@ -948,7 +1109,7 @@ Ausdrücke werden von `ConditionEvaluator` ausgewertet (in `if`/`elif`, Menü-`i
 | 2 | `!`, `not`, `-`, `+` (unär) | Negation, Vorzeichen |
 | 3 | `*`, `/`, `%` | Multiplikation, Division, Rest |
 | 4 | `+`, `-` | Addition/Subtraktion; `+` verkettet Strings |
-| 5 | `<`, `<=`, `>`, `>=` | Vergleich |
+| 5 | `<`, `<=`, `>`, `>=`, `in <a..b>`, `between <a> and <b>` | Vergleich sowie geschlossene Bereichsprüfung (`x in 1..10`) |
 | 6 | `==`, `!=` | Gleichheit (mit numerischer Typ-Angleichung) |
 | 7 | `&&`, `and` | Logisches UND (Short-Circuit) |
 | 8 | `\|\|`, `or` | Logisches ODER (Short-Circuit) |
@@ -1080,6 +1241,7 @@ Gelten in Dialogen, Menütexten, Prompts und Screen-Texten.
 | Syntax | Wirkung |
 | :--- | :--- |
 | `[variable]` | Wert aus `state`/`persistent`; auch Ausdrücke mit `.`, `[`, `(`. Unbekannte Namen bleiben wörtlich stehen. |
+| `[variable:<format>]` | Format-Spezifizierer wie `[gold:03d]`, `[hp:.1f]` oder `[quote:.0%]`. |
 | `[[` | Wörtliches `[`. |
 | `{{` | Wörtliches `{`. |
 
@@ -1316,8 +1478,10 @@ label ende:
 | :--- | :--- | :--- |
 | `Unknown statement: '…'` | Unbekanntes Schlüsselwort oder Sprecher ohne `"…"`. | Schreibweise prüfen; Sprecher als `id "Text"`. |
 | `Orphaned 'elif'/'else' without preceding 'if'` | `elif`/`else` ohne `if`. | Einrückung und Reihenfolge prüfen. |
-| `Unknown option in 'play' statement` | Ungültige Option. | Erlaubt: `loop`, `noloop`, `fadein`, `volume`. |
+| `Unknown option in 'play' statement` | Ungültige Option. | Erlaubt: `loop`, `noloop`, `fadein`, `volume`, `loop_start`. |
 | `Expected 'on_collide <tagA> <tagB> jump <label>'` | Falsche Wortanzahl. | Genau vier Wörter. |
 | `VJavaParseException` (Einrückung) | Rücksprung passt zu keiner Ebene / Tabs-Mix. | Einheitlich 4 Leerzeichen. |
-| `MISSING_JUMP_TARGET`, `MISSING_ASSET`, `UNDEFINED_SPEAKER`, `UNREACHABLE_LABEL` | Lint-Befunde. | Ziel/Asset/Sprecher anlegen bzw. Label verlinken. |
+| `MISSING_JUMP_TARGET`, `MISSING_ASSET`, `UNDEFINED_SPEAKER`, `UNREACHABLE_LABEL` | Lint-Befunde (`ERROR`/`WARNING`). | Ziel/Asset/Sprecher anlegen bzw. Label verlinken. |
+| `PACING_LONG_MONOLOGUE` | Optionaler Pacing-Hinweis (`INFO`) ab 15 Sätzen ohne Choice/Szenenwechsel. | Ggf. Choice, Pause oder Szenenwechsel einstreuen (`DialogPacingLinter`). |
+| `ScriptExecutionException` (`MAX_CALL_STACK_DEPTH` / Schleifenlimit) | Endlos-`call` (`> 128` Ebenen) oder unbegrenzte `while`-Schleife. | Abbruchbedingung bzw. `return` prüfen. |
 | `VJavaCompileException` | Fehler in `@->{ }<<`. | Fehlerzeile bezieht sich auf die `.vjava`-Datei; Java-21-Syntax prüfen, JDK (nicht JRE) verwenden. |

@@ -4,6 +4,18 @@ Dieses Dokument protokolliert chronologisch abgeschlossene Teilmodule, Architekt
 
 ---
 
+## [Roadmap `[P1]` (128), `[P2]` (853) & `[P3]` (24) — Abgeschlossen] Vollpipeline 2D/3D, Studio-IDE, Cloud-Sync & Node-Graph
+
+* **Waves P3-1 bis P3-4 (24 / 24 `[P3]`-Ziele abgeschlossen, Commits `bb1924e`..`4385617`):**
+  * **Wave P3-1 (`bb1924e`, `#0056`, `#0079`, `#0080`, `#0213`, `#0530`, `#1018`):** `GridPathfinder2D` (2D-A*), `ScriptRuntime`/`ScriptSession` `hotSwapProject`, `CompiledScriptBundle` & `.vpak`-Vorcompilierung (`META-INF/compiled-scripts.vjc`), `Skeletal2DAdapter`/`Skeletal2DDisplayable`, `CloudSyncManifest` sowie `WebAssemblyFeasibilityAnalyzer` + [WEBASSEMBLY_FEASIBILITY.md](WEBASSEMBLY_FEASIBILITY.md).
+  * **Wave P3-2 (`c760810`, `#0268`–`#0339`):** `Advanced3DRenderingServices` (`IblEnvironment3D`, `SsaoPass`, `DepthOfField3D`, `Scene3DPanoramaBaker`, `VolumetricGodRaysPass`, `AmbientLightProbeGrid`, `SubsurfaceScatteringModel`, `RenderDocMarkerScope` in `RenderPipeline3D`).
+  * **Wave P3-3 (`3b3d96b`, `#0276`–`#0328`):** `Skeletal3DAnimator` (bis 64 Bones), `ParticleSystem3D`, `InstancedMeshNode`, `AudioEngine`-3D-Listener + `Camera3DAudioListenerBridge`, `VertexWindSystem` und `RigidBody3DPropSimulator`.
+  * **Wave P3-4 (`36dfe8e`, `#0128`, `#0163`, `#0169`, `#1019`):** `DialogScriptGitDiffService`, `StudioUndockedWindowManager` + `StudioWindowController`-Anbindung, `DialogPacingLinter` in `VJavaLinter` (`Severity.INFO`) und `VisualNodeGraphEditor` mit verlustfreiem `.vjava`-Round-Trip.
+* **Waves P2-1 bis P2-12 (`853 / 853` `[P2]`-Ziele) & Waves 1–7 (`128 / 128` `[P1]`-Ziele):**
+  * Vollständiger Ausbau von vJava 1.1 DSL (`VJavaDslReferenceGenerator`, 73 Statement-Typen), 3D-Renderpipeline, OpenAL/DSP, 4-Tier-Saves & Cloud/LQA-Werkzeugen, 9 Projektvorlagen (inkl. Schneewittchen-Demo), `.vpak`/VFS/Modding, Checkstyle/Javadoc/`e2eTest`-Compliance-Suite sowie Handbüchern ([HANDBUCH_DE.md](HANDBUCH_DE.md), [GUIDE_EN.md](GUIDE_EN.md)).
+
+---
+
 ## [Ziele #0001–#0010 & `ZIELE.md` Roadmap — Abgeschlossen] Objektbewegung, WASD, Physik, Studio-Hauptmenü & Demo-Vorlage
 
 * **Roadmap [`ZIELE.md`](../ZIELE.md)**:
