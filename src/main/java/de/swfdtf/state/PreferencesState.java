@@ -61,6 +61,9 @@ public final class PreferencesState {
     private boolean stopVoiceOnAdvance = true;
     private boolean monoAudio = false;
     private boolean accessibilityAudioCues = false;
+    private boolean autosaveOnQuit = true;
+    private double autoReadVoiceWaitSeconds = 0.75;
+    private String saveSlotSortMode = "LAST_SAVED";
 
     /**
      * Creates a {@code PreferencesState} initialized with engine defaults.
@@ -176,6 +179,67 @@ public final class PreferencesState {
                     ? upper : "BOX";
         }
         uiVolume = clampVolume(uiVolume, 0.9f);
+        if (!Double.isFinite(autoReadVoiceWaitSeconds) || autoReadVoiceWaitSeconds < 0.0) {
+            autoReadVoiceWaitSeconds = 0.75;
+        } else if (autoReadVoiceWaitSeconds > 10.0) {
+            autoReadVoiceWaitSeconds = 10.0;
+        }
+        if (saveSlotSortMode == null || saveSlotSortMode.isBlank()) {
+            saveSlotSortMode = "LAST_SAVED";
+        } else {
+            String upper = saveSlotSortMode.trim().toUpperCase(Locale.ROOT);
+            saveSlotSortMode = "SLOT_NUMBER".equals(upper) ? "SLOT_NUMBER" : "LAST_SAVED";
+        }
+    }
+
+    /**
+     * Resets all user preferences back to clean engine factory defaults ({@code #0552}).
+     */
+    public synchronized void resetToDefaults() {
+        PreferencesState defaults = new PreferencesState();
+        masterVolume = defaults.masterVolume;
+        musicVolume = defaults.musicVolume;
+        soundVolume = defaults.soundVolume;
+        voiceVolume = defaults.voiceVolume;
+        ambientVolume = defaults.ambientVolume;
+        textSpeedCps = defaults.textSpeedCps;
+        autoForwardDelaySeconds = defaults.autoForwardDelaySeconds;
+        skipUnread = defaults.skipUnread;
+        skipAfterChoices = defaults.skipAfterChoices;
+        fullscreen = defaults.fullscreen;
+        renderMode = defaults.renderMode;
+        language = defaults.language;
+        dialogueMode = defaults.dialogueMode;
+        selfVoicing = defaults.selfVoicing;
+        highContrastDyslexiaFont = defaults.highContrastDyslexiaFont;
+        uiTextScale = defaults.uiTextScale;
+        gamepadDeadzone = defaults.gamepadDeadzone;
+        textboxOpacity = defaults.textboxOpacity;
+        reduceMotion = defaults.reduceMotion;
+        safezoneMarginPx = defaults.safezoneMarginPx;
+        accessibilityCursorStyle = defaults.accessibilityCursorStyle;
+        textBackdropMode = defaults.textBackdropMode;
+        safeLetterboxUltrawide = defaults.safeLetterboxUltrawide;
+        choiceNumberHotkeysEnabled = defaults.choiceNumberHotkeysEnabled;
+        uiVolume = defaults.uiVolume;
+        muteOnFocusLoss = defaults.muteOnFocusLoss;
+        stopVoiceOnAdvance = defaults.stopVoiceOnAdvance;
+        monoAudio = defaults.monoAudio;
+        accessibilityAudioCues = defaults.accessibilityAudioCues;
+        autosaveOnQuit = defaults.autosaveOnQuit;
+        autoReadVoiceWaitSeconds = defaults.autoReadVoiceWaitSeconds;
+        saveSlotSortMode = defaults.saveSlotSortMode;
+    }
+
+    /**
+     * Resets all user preferences to defaults and atomically persists them to {@code savesDir}.
+     *
+     * @param savesDir saves directory where {@code preferences.json} is written
+     * @throws IOException if writing the reset file fails
+     */
+    public synchronized void resetToDefaults(Path savesDir) throws IOException {
+        resetToDefaults();
+        save(savesDir);
     }
 
     private static float clampVolume(float value, float fallback) {
@@ -745,6 +809,68 @@ public final class PreferencesState {
         this.accessibilityAudioCues = accessibilityAudioCues;
     }
 
+    /**
+     * Returns whether automatic saving on quit / close is enabled ({@code #0526}).
+     *
+     * @return {@code true} if autosave-on-quit is enabled
+     */
+    public synchronized boolean isAutosaveOnQuit() {
+        return autosaveOnQuit;
+    }
+
+    /**
+     * Enables or disables automatic saving on normal game exit.
+     *
+     * @param autosaveOnQuit autosave-on-quit toggle
+     */
+    public synchronized void setAutosaveOnQuit(boolean autosaveOnQuit) {
+        this.autosaveOnQuit = autosaveOnQuit;
+    }
+
+    /**
+     * Returns extra auto-read wait time in seconds after a voice clip finishes ({@code #0553}).
+     *
+     * @return post-voice wait seconds in {@code [0, 10]}
+     */
+    public synchronized double getAutoReadVoiceWaitSeconds() {
+        return autoReadVoiceWaitSeconds;
+    }
+
+    /**
+     * Sets extra auto-read wait time in seconds after a voice clip finishes.
+     *
+     * @param autoReadVoiceWaitSeconds wait duration clamped to {@code [0, 10]}
+     */
+    public synchronized void setAutoReadVoiceWaitSeconds(double autoReadVoiceWaitSeconds) {
+        if (!Double.isFinite(autoReadVoiceWaitSeconds) || autoReadVoiceWaitSeconds < 0.0) {
+            this.autoReadVoiceWaitSeconds = 0.0;
+        } else {
+            this.autoReadVoiceWaitSeconds = Math.min(10.0, autoReadVoiceWaitSeconds);
+        }
+    }
+
+    /**
+     * Returns save-slot sorting mode ({@code "LAST_SAVED"} or {@code "SLOT_NUMBER"}) ({@code #0580}).
+     *
+     * @return save-slot sort mode
+     */
+    public synchronized String getSaveSlotSortMode() {
+        return saveSlotSortMode;
+    }
+
+    /**
+     * Sets save-slot sorting mode ({@code "LAST_SAVED"} or {@code "SLOT_NUMBER"}).
+     *
+     * @param saveSlotSortMode sort mode identifier
+     */
+    public synchronized void setSaveSlotSortMode(String saveSlotSortMode) {
+        if (saveSlotSortMode != null && "SLOT_NUMBER".equalsIgnoreCase(saveSlotSortMode.trim())) {
+            this.saveSlotSortMode = "SLOT_NUMBER";
+        } else {
+            this.saveSlotSortMode = "LAST_SAVED";
+        }
+    }
+
     @Override
     public synchronized boolean equals(Object obj) {
         if (this == obj) {
@@ -777,6 +903,9 @@ public final class PreferencesState {
                 && stopVoiceOnAdvance == other.stopVoiceOnAdvance
                 && monoAudio == other.monoAudio
                 && accessibilityAudioCues == other.accessibilityAudioCues
+                && autosaveOnQuit == other.autosaveOnQuit
+                && Double.compare(autoReadVoiceWaitSeconds, other.autoReadVoiceWaitSeconds) == 0
+                && Objects.equals(saveSlotSortMode, other.saveSlotSortMode)
                 && Objects.equals(renderMode, other.renderMode)
                 && Objects.equals(language, other.language)
                 && Objects.equals(dialogueMode, other.dialogueMode)
@@ -794,7 +923,8 @@ public final class PreferencesState {
                 textboxOpacity, reduceMotion, safezoneMarginPx,
                 accessibilityCursorStyle, textBackdropMode,
                 safeLetterboxUltrawide, choiceNumberHotkeysEnabled,
-                uiVolume, muteOnFocusLoss, stopVoiceOnAdvance, monoAudio, accessibilityAudioCues
+                uiVolume, muteOnFocusLoss, stopVoiceOnAdvance, monoAudio, accessibilityAudioCues,
+                autosaveOnQuit, autoReadVoiceWaitSeconds, saveSlotSortMode
         );
     }
 }

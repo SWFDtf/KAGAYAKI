@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "slotId": "fixture_v1",
+    "customName": "Vor dem Ball-Entscheid",
+    "savedAt": "2026-01-15T12:00:00Z",
+    "currentLabel": "chapter_1_ballroom",
+    "dialoguePreview": "Schneewittchen betrat vorsichtig den gläsernen Saal.",
+    "playtimeSeconds": 600.0,
+    "gameVersion": "1.0.0",
+    "thumbnailWidth": 0,
+    "thumbnailHeight": 0,
+    "thumbnailPng": ""
+  },
+  "variables": {
+    "chapter_progress": 1,
+    "inventory": [
+      "lantern",
+      "mirror_shard"
+    ],
+    "randomSeed": 987654321
+  },
+  "scriptPosition": {
+    "currentLabel": "chapter_1_ballroom",
+    "statementIndex": 4,
+    "callStack": [],
+    "statusName": "WAITING_DIALOGUE",
+    "activeSpeakerId": "narrator",
+    "activeSpeakerName": "Erzähler",
+    "activeDialogueText": "Schneewittchen betrat vorsichtig den gläsernen Saal.",
+    "nvlMode": false,
+    "nvlLines": []
+  },
+  "historyEntries": []
+}

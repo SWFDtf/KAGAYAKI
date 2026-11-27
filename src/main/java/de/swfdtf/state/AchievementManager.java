@@ -73,6 +73,7 @@ public class AchievementManager {
     private final Map<String, AchievementDef> definitions = new LinkedHashMap<>();
     private final Deque<AchievementToast> toastQueue = new ArrayDeque<>();
     private Consumer<AchievementToast> onUnlockListener;
+    private AchievementBackend backend = new AchievementBackend.OfflineAchievementBackend();
 
     /**
      * Creates an {@link AchievementManager} backed by the specified persistent store.
@@ -81,6 +82,24 @@ public class AchievementManager {
      */
     public AchievementManager(PersistentAccess persistentAccess) {
         this.persistentAccess = Objects.requireNonNull(persistentAccess, "persistentAccess must not be null");
+    }
+
+    /**
+     * Attaches an optional external or offline {@link AchievementBackend} ({@code #0554}).
+     *
+     * @param backend backend implementation (null resets to offline default)
+     */
+    public synchronized void setBackend(AchievementBackend backend) {
+        this.backend = backend != null ? backend : new AchievementBackend.OfflineAchievementBackend();
+    }
+
+    /**
+     * Returns the currently configured {@link AchievementBackend}.
+     *
+     * @return active achievement backend
+     */
+    public synchronized AchievementBackend getBackend() {
+        return backend;
     }
 
     /**
@@ -110,6 +129,7 @@ public class AchievementManager {
         }
         AchievementToast toast;
         Consumer<AchievementToast> listenerSnapshot;
+        AchievementBackend backendSnapshot;
         synchronized (this) {
             if (persistentAccess.isAchievementUnlocked(id)) {
                 return false;
@@ -122,6 +142,10 @@ public class AchievementManager {
             toast = new AchievementToast(def, Instant.now());
             toastQueue.addLast(toast);
             listenerSnapshot = this.onUnlockListener;
+            backendSnapshot = this.backend;
+        }
+        if (backendSnapshot != null && backendSnapshot.isAvailable()) {
+            backendSnapshot.syncUnlock(id, toast.unlockedAt());
         }
         if (listenerSnapshot != null) {
             listenerSnapshot.accept(toast);

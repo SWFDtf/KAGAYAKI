@@ -1,7 +1,9 @@
 package de.swfdtf.state;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Contract for the mutable Visual Novel variable store exposed as {@code state} inside
@@ -121,6 +123,24 @@ public interface StateStore {
      * @return {@code true} if rollback is blocked
      */
     boolean isRollbackBlocked();
+
+    /**
+     * Executes a multi-variable mutation block atomically against this store ({@code #0532}).
+     * If {@code block} throws a {@link RuntimeException}, all intermediate changes made inside
+     * the transaction are rolled back using a pre-transaction snapshot before rethrowing.
+     *
+     * @param block batch operation receiving this store (must not be {@code null})
+     */
+    default void transaction(Consumer<StateStore> block) {
+        Objects.requireNonNull(block, "block must not be null");
+        Map<String, Object> before = snapshotMap();
+        try {
+            block.accept(this);
+        } catch (RuntimeException ex) {
+            restoreMap(before);
+            throw ex;
+        }
+    }
 
     /**
      * Clears all stored variables.

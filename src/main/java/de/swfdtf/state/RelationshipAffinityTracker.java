@@ -2,10 +2,12 @@ package de.swfdtf.state;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -122,6 +124,10 @@ public class RelationshipAffinityTracker {
     private final StateStore backingStore;
     private final Map<String, Integer> inMemoryAffinities;
     private final List<Consumer<AffinityChangeEvent>> listeners = new ArrayList<>();
+    private final List<Consumer<AffinityChangeEvent>> tierThresholdListeners = new ArrayList<>();
+    private final Map<String, Set<RelationshipTier>> triggeredTiersByChar = new LinkedHashMap<>();
+    private int minPoints = Integer.MIN_VALUE;
+    private int maxPoints = Integer.MAX_VALUE;
 
     /**
      * Creates a standalone in-memory {@link RelationshipAffinityTracker}.
@@ -153,30 +159,38 @@ public class RelationshipAffinityTracker {
     public int addPoints(String characterId, int delta) {
         String id = requireNonBlank(characterId, "characterId");
         AffinityChangeEvent event = null;
+        AffinityChangeEvent tierEvent = null;
         List<Consumer<AffinityChangeEvent>> listenersSnapshot = null;
+        List<Consumer<AffinityChangeEvent>> tierSnapshot = null;
         int updated;
         synchronized (this) {
             int previous = readPoints(id);
             long sum = (long) previous + delta;
-            updated = (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, sum));
+            updated = (int) Math.max(minPoints, Math.min(maxPoints, sum));
             writePoints(id, updated);
+            RelationshipTier prevTier = RelationshipTier.fromPoints(previous);
+            RelationshipTier nextTier = RelationshipTier.fromPoints(updated);
             if (updated != previous && !listeners.isEmpty()) {
-                event = new AffinityChangeEvent(
-                        id,
-                        previous,
-                        updated,
-                        RelationshipTier.fromPoints(previous),
-                        RelationshipTier.fromPoints(updated)
-                );
+                event = new AffinityChangeEvent(id, previous, updated, prevTier, nextTier);
                 listenersSnapshot = List.copyOf(listeners);
+            }
+            if (!tierThresholdListeners.isEmpty()) {
+                Set<RelationshipTier> seen = triggeredTiersByChar.computeIfAbsent(
+                        id, k -> EnumSet.noneOf(RelationshipTier.class));
+                if (seen.add(nextTier)) {
+                    tierEvent = new AffinityChangeEvent(id, previous, updated, prevTier, nextTier);
+                    tierSnapshot = List.copyOf(tierThresholdListeners);
+                }
             }
         }
         notifyListeners(event, listenersSnapshot);
+        notifyListeners(tierEvent, tierSnapshot);
         return updated;
     }
 
     /**
-     * Sets a character's affinity score to {@code points} and notifies listeners if the score changed.
+     * Sets a character's affinity score to {@code points} (clamped to active bounds) and notifies
+     * listeners if the score changed.
      *
      * @param characterId character identifier (must not be {@code null} or blank)
      * @param points      target affinity score
@@ -184,22 +198,56 @@ public class RelationshipAffinityTracker {
     public void setPoints(String characterId, int points) {
         String id = requireNonBlank(characterId, "characterId");
         AffinityChangeEvent event = null;
+        AffinityChangeEvent tierEvent = null;
         List<Consumer<AffinityChangeEvent>> listenersSnapshot = null;
+        List<Consumer<AffinityChangeEvent>> tierSnapshot = null;
         synchronized (this) {
+            int clamped = Math.max(minPoints, Math.min(maxPoints, points));
             int previous = readPoints(id);
-            writePoints(id, points);
-            if (points != previous && !listeners.isEmpty()) {
-                event = new AffinityChangeEvent(
-                        id,
-                        previous,
-                        points,
-                        RelationshipTier.fromPoints(previous),
-                        RelationshipTier.fromPoints(points)
-                );
+            writePoints(id, clamped);
+            RelationshipTier prevTier = RelationshipTier.fromPoints(previous);
+            RelationshipTier nextTier = RelationshipTier.fromPoints(clamped);
+            if (clamped != previous && !listeners.isEmpty()) {
+                event = new AffinityChangeEvent(id, previous, clamped, prevTier, nextTier);
                 listenersSnapshot = List.copyOf(listeners);
+            }
+            if (!tierThresholdListeners.isEmpty()) {
+                Set<RelationshipTier> seen = triggeredTiersByChar.computeIfAbsent(
+                        id, k -> EnumSet.noneOf(RelationshipTier.class));
+                if (seen.add(nextTier)) {
+                    tierEvent = new AffinityChangeEvent(id, previous, clamped, prevTier, nextTier);
+                    tierSnapshot = List.copyOf(tierThresholdListeners);
+                }
             }
         }
         notifyListeners(event, listenersSnapshot);
+        notifyListeners(tierEvent, tierSnapshot);
+    }
+
+    /**
+     * Configures inclusive min/max affinity point bounds (e.g. {@code [-100, 100]}) ({@code #0566}).
+     *
+     * @param minPoints minimum allowed points
+     * @param maxPoints maximum allowed points ({@code >= minPoints})
+     */
+    public synchronized void setBounds(int minPoints, int maxPoints) {
+        if (maxPoints < minPoints) {
+            throw new IllegalArgumentException("maxPoints must be >= minPoints");
+        }
+        this.minPoints = minPoints;
+        this.maxPoints = maxPoints;
+    }
+
+    /**
+     * Registers a listener fired at most once per reached {@link RelationshipTier} rank per character ({@code #0566}).
+     *
+     * @param listener tier threshold event consumer
+     */
+    public synchronized void addTierThresholdListener(Consumer<AffinityChangeEvent> listener) {
+        Objects.requireNonNull(listener, "listener must not be null");
+        if (!tierThresholdListeners.contains(listener)) {
+            tierThresholdListeners.add(listener);
+        }
     }
 
     /**
