@@ -8,7 +8,7 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- 
 - `de.swfdtf.core` (`EngineLogger` in `WindowManager`, `RenderPipeline3DStub`, `TextureManager`, `SceneController`, `VideoPlayer`)
 - `de.swfdtf.parser` (`VJavaAst` in `ATLTransform`, `LayeredImage`, `SceneController`; `ConditionEvaluator` in `LayeredImage`)
 - `de.swfdtf.state` (`StateStore`, `PersistentAccess` in `LayeredImage`, `SceneController`)
-- `de.swfdtf.audio` (`LipSyncAnalyzer` in `LayeredImage`)
+- `de.swfdtf.audio` (`LipSyncAnalyzer` in `LayeredImage`; `AudioEngine` in `Scene3DAnimationAndPhysicsServices`)
 - Externe Bibliotheken: `org.lwjgl.glfw.*`, `org.lwjgl.opengl.*`, `org.lwjgl.stb.*` (`STBImage`, `STBImageWrite`, `STBTruetype`, `STBTTFontinfo`), `org.lwjgl.system.*`, `org.joml.Matrix4f`.
 
 ## Enthaltene Typen
@@ -73,6 +73,8 @@ LWJGL-3 / OpenGL-3.3-Core-Grafik-, Animations-, Transitions-, Partikel-, Video- 
 | `Skeletal2DAdapter` | `interface` | Modulares 2D-Skeletal-/Bone-Plugin-Interface (Spine/DragonBones-kompatibel) inklusive eingebauter `SimpleRigAdapter`-Implementierung (`#0213`). |
 | `Skeletal2DDisplayable` | `final class` | `CustomDisplayable`-Brücke zur nahtlosen Einbindung beliebiger `Skeletal2DAdapter`-Rigs in `SpriteNode` (`#0213`). |
 | `Advanced3DRenderingServices` | `final class` | Wave-P3-2-3D-Render-Dienste: `IblEnvironment3D` (HDR Skybox/Irradiance), `SsaoPass`, `DepthOfField3D`, `VolumetricGodRaysPass`, `AmbientLightProbeGrid`, `SubsurfaceScatteringModel`, `Scene3DPanoramaBaker` und `RenderDocMarkerScope` (`#0268`–`#0339`). |
+| `InstancedMeshNode` | `final class` | Hardware-Instancing-Batch-Knoten für hunderte identische Bäume/Kerzen in einem einzigen `glDrawElementsInstanced`-Aufruf (`#0282`). |
+| `Scene3DAnimationAndPhysicsServices` | `final class` | Wave-P3-3-3D-Systeme: `Skeletal3DAnimator` (bis 64 Bones + Crossfade), `ParticleSystem3D`, `Camera3DAudioListenerBridge`, `VertexWindSystem` und `RigidBody3DPropSimulator` (`#0276`–`#0328`). |
 
 ## Öffentliche API-Signaturen
 

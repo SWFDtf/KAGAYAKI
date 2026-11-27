@@ -71,6 +71,9 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
     private ClosedCaptionQueue closedCaptionQueue = new ClosedCaptionQueue();
     private VoicePlaybackBookmark voiceBookmark = new VoicePlaybackBookmark();
     private long voiceSequence = 1L;
+    private final float[] listenerPosition = new float[] {0.0f, 0.0f, 0.0f};
+    private final float[] listenerForward = new float[] {0.0f, 0.0f, -1.0f};
+    private final float[] listenerUp = new float[] {0.0f, 1.0f, 0.0f};
 
     private Path projectRoot;
     private volatile ResourceProvider resourceProvider;
@@ -1028,6 +1031,123 @@ public final class AudioEngine implements AutoCloseable, ScriptRuntime.AudioBrid
      */
     public void setResourceProvider(ResourceProvider resourceProvider) {
         this.resourceProvider = resourceProvider;
+    }
+
+    /**
+     * Synchronizes the 3D OpenAL audio listener pose (world position plus forward and up vectors)
+     * with an active 3D camera ({@code #0283}).
+     *
+     * @param posX listener X position
+     * @param posY listener Y position
+     * @param posZ listener Z position
+     * @param fwdX camera forward X component
+     * @param fwdY camera forward Y component
+     * @param fwdZ camera forward Z component
+     * @param upX  camera up X component
+     * @param upY  camera up Y component
+     * @param upZ  camera up Z component
+     */
+    public synchronized void setListenerTransform(
+            float posX, float posY, float posZ,
+            float fwdX, float fwdY, float fwdZ,
+            float upX, float upY, float upZ
+    ) {
+        this.listenerPosition[0] = Float.isFinite(posX) ? posX : 0.0f;
+        this.listenerPosition[1] = Float.isFinite(posY) ? posY : 0.0f;
+        this.listenerPosition[2] = Float.isFinite(posZ) ? posZ : 0.0f;
+
+        float[] f = normalizeVector3(fwdX, fwdY, fwdZ, 0.0f, 0.0f, -1.0f);
+        float[] u = normalizeVector3(upX, upY, upZ, 0.0f, 1.0f, 0.0f);
+        System.arraycopy(f, 0, this.listenerForward, 0, 3);
+        System.arraycopy(u, 0, this.listenerUp, 0, 3);
+
+        if (openAlActive && !disposed) {
+            try {
+                AL10.alListener3f(
+                        AL10.AL_POSITION,
+                        listenerPosition[0],
+                        listenerPosition[1],
+                        listenerPosition[2]
+                );
+                AL10.alListenerfv(
+                        AL10.AL_ORIENTATION,
+                        new float[] {
+                            listenerForward[0], listenerForward[1], listenerForward[2],
+                            listenerUp[0], listenerUp[1], listenerUp[2]
+                        }
+                );
+            } catch (Throwable ignored) {
+                // Keep headless/virtual state consistent if device disconnects
+            }
+        }
+    }
+
+    /**
+     * Returns a copy of the active 3D listener world position {@code [x, y, z]}.
+     *
+     * @return listener position copy
+     */
+    public synchronized float[] getListenerPosition() {
+        return listenerPosition.clone();
+    }
+
+    /**
+     * Returns a copy of the active normalized 3D listener forward vector {@code [x, y, z]}.
+     *
+     * @return listener forward vector copy
+     */
+    public synchronized float[] getListenerForward() {
+        return listenerForward.clone();
+    }
+
+    /**
+     * Returns a copy of the active normalized 3D listener up vector {@code [x, y, z]}.
+     *
+     * @return listener up vector copy
+     */
+    public synchronized float[] getListenerUp() {
+        return listenerUp.clone();
+    }
+
+    /**
+     * Computes stereo pan in {@code [-1.0f (left), +1.0f (right)]} for a 3D sound source relative to
+     * the current listener position and orientation ({@code #0283}).
+     *
+     * @param sourceX sound source world X
+     * @param sourceY sound source world Y
+     * @param sourceZ sound source world Z
+     * @return stereo pan factor clamped to {@code [-1.0f, 1.0f]}
+     */
+    public synchronized float computeSpatialPan(float sourceX, float sourceY, float sourceZ) {
+        float dx = sourceX - listenerPosition[0];
+        float dy = sourceY - listenerPosition[1];
+        float dz = sourceZ - listenerPosition[2];
+        double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1e-6) {
+            return 0.0f;
+        }
+        float nx = (float) (dx / len);
+        float ny = (float) (dy / len);
+        float nz = (float) (dz / len);
+
+        // right = normalize(forward x up)
+        float rx = listenerForward[1] * listenerUp[2] - listenerForward[2] * listenerUp[1];
+        float ry = listenerForward[2] * listenerUp[0] - listenerForward[0] * listenerUp[2];
+        float rz = listenerForward[0] * listenerUp[1] - listenerForward[1] * listenerUp[0];
+        float[] right = normalizeVector3(rx, ry, rz, 1.0f, 0.0f, 0.0f);
+        float pan = nx * right[0] + ny * right[1] + nz * right[2];
+        return Math.clamp(pan, -1.0f, 1.0f);
+    }
+
+    private static float[] normalizeVector3(float x, float y, float z, float defX, float defY, float defZ) {
+        if (!Float.isFinite(x) || !Float.isFinite(y) || !Float.isFinite(z)) {
+            return new float[] {defX, defY, defZ};
+        }
+        double len = Math.sqrt((double) x * x + (double) y * y + (double) z * z);
+        if (len < 1e-6) {
+            return new float[] {defX, defY, defZ};
+        }
+        return new float[] {(float) (x / len), (float) (y / len), (float) (z / len)};
     }
 
     private AudioDecoder.DecodedAudio tryLoadFromResourceProvider(String assetPath) {
