@@ -20,6 +20,7 @@ import de.swfdtf.graphics.RenderMode;
 import de.swfdtf.graphics.RenderPipeline2D;
 import de.swfdtf.graphics.SceneLayer;
 import de.swfdtf.graphics.TextureManager;
+import de.swfdtf.graphics.WindowManager;
 import de.swfdtf.math.Rect2f;
 import de.swfdtf.parser.ConditionEvaluator;
 import de.swfdtf.parser.HotReloadWatcher;
@@ -137,6 +138,7 @@ public final class StudioWindowController implements StudioBridge {
     private final ProjectRefactorService refactorService = new ProjectRefactorService();
     private final StudioAuthoringToolkit authoringToolkit = new StudioAuthoringToolkit();
     private final StudioReportAndQaService reportAndQaService = new StudioReportAndQaService();
+    private final StudioUndockedWindowManager undockedWindowManager = new StudioUndockedWindowManager();
     private final Deque<List<String>> trashedAssetBatches = new ArrayDeque<>();
 
     // Wave P2-2 Studio state, filters, metrics & overlays (#0101-#0168)
@@ -2801,5 +2803,41 @@ public final class StudioWindowController implements StudioBridge {
         for (UiNode btn : buttons) {
             btn.setFocused(false);
         }
+    }
+
+    /**
+     * Undocks a Studio workspace box onto an optional secondary/tertiary display monitor while
+     * maintaining strict OpenGL context isolation from Window B ({@code #0163}).
+     *
+     * @param panel              Studio panel to detach
+     * @param monitors           available display monitors
+     * @param targetMonitorIndex zero-based target monitor index
+     * @return opened {@link StudioUndockedWindowManager.UndockedPanelWindow}
+     */
+    public StudioUndockedWindowManager.UndockedPanelWindow undockPanel(
+            StudioUndockedWindowManager.DockablePanel panel,
+            List<WindowManager.MonitorInfo> monitors,
+            int targetMonitorIndex
+    ) {
+        return undockedWindowManager.undock(panel, monitors, targetMonitorIndex, gameWindowHandle);
+    }
+
+    /**
+     * Re-docks a previously detached Studio panel window ({@code #0163}).
+     *
+     * @param panel Studio panel to reattach
+     * @return {@code true} if the panel was previously undocked
+     */
+    public boolean redockPanel(StudioUndockedWindowManager.DockablePanel panel) {
+        return undockedWindowManager.redock(panel);
+    }
+
+    /**
+     * Returns the multi-monitor undocking manager for Window A panels ({@code #0163}).
+     *
+     * @return {@link StudioUndockedWindowManager}
+     */
+    public StudioUndockedWindowManager getUndockedWindowManager() {
+        return undockedWindowManager;
     }
 }

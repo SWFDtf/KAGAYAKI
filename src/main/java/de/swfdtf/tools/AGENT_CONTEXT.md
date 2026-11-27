@@ -6,7 +6,7 @@ Entwickler-Werkzeuge, Dual-Window-Studio-UI und Standalone-Build-Pipeline von KA
 ## Abhängigkeiten zu anderen `de.swfdtf.*`-Paketen
 - `de.swfdtf.core` (`EngineAPI`, `EngineApplication`, `EngineLogger`, `ProjectDescriptor`, `StudioBridge`)
 - `de.swfdtf.audio` (`AudioDecoder`)
-- `de.swfdtf.graphics` (`FontManager`, `RenderMode`, `RenderPipeline2D`, `SceneController`, `SceneLayer`, `SpriteNode`, `TextureManager`)
+- `de.swfdtf.graphics` (`FontManager`, `RenderMode`, `RenderPipeline2D`, `SceneController`, `SceneLayer`, `SpriteNode`, `TextureManager`, `WindowManager`)
 - `de.swfdtf.math` (`Rect2f`, `Transform2D`)
 - `de.swfdtf.parser` (`JavaBlockCompiler`, `ProjectScanner`, `ScriptRuntime`, `ScriptSession`, `VJavaAst`, `VJavaCompileException`, `VJavaParseException`)
 - `de.swfdtf.state` (`HistoryLog`, `PersistentAccess`, `SaveSlotData`, `StateStore`)
@@ -67,6 +67,10 @@ Entwickler-Werkzeuge, Dual-Window-Studio-UI und Standalone-Build-Pipeline von KA
 | `PackagingAndDistributionServices` | `final class` | `.vpak`-Store-/Parallel-/Dedup-/Delta-/Ed25519-/Bomb-Utilities, `PlatformTarget`, Launcher-Generator (`-XstartOnFirstThread`, Java-21-Guard), Notice/HTML/Store-Manifeste sowie `build.gradle`-Versions-/Natives-Audit. |
 | `TemplateEcosystemServices` | `final class` | Community-Template-Validator (`validateTemplate`), HTML-Showcase-Report-Exporter, Offline-Studio-Changelog, sichere OS-Explorer-Kommandos, Fallback-Auflösung und prozedurales WAV-Sound-Kit. |
 | `QualityAssuranceAndReleaseServices` | `final class` | `RoadmapProgressReporter`, `RepositoryLinkChecker`, `ProjectVersionCompatibilityBadge`, `LiveSpriteInspectorModel`, `ArenaScenarioCollisionWarper`, `StudioNewProjectAutoLayoutState`, `ScreenshotFormatExporter`, `ChangelogReleaseValidator` und `PlaytestSuiteAggregator`. |
+| `DialogScriptGitDiffService` | `final class` | Dialog- und Choice-Diff gegen Git `HEAD` inklusive Seitennavigation für Story-Reviews unter Ausblendung unveränderter Labels (`#0128`). |
+| `StudioUndockedWindowManager` | `final class` | Multi-Monitor-Abdocken einzelner Studio-Panels (`FLOW_GRAPH`, `LIVE_VARIABLES`, `SCRIPT_LINTER`, `CONSOLE`) mit strikter OpenGL-Kontext-Isolation (`#0163`). |
+| `DialogPacingLinter` | `final class` | Optionaler Autoren-Stimmungs- & Pacing-Linter mit `Severity.INFO`-Hinweis ab 15 Sätzen ohne Interaktion oder Szenenwechsel (`#0169`). |
+| `VisualNodeGraphEditor` | `final class` | Visueller No-Code-Node-Graph-Editor mit Drag-&-Drop-Layout und verlustfreiem `.vjava`-Round-Trip unter Erhalt manueller Java-Blöcke (`#1019`). |
 
 ## Öffentliche API-Signaturen
 

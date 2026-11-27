@@ -251,6 +251,7 @@ public final class VJavaLinter {
         checkDuplicateCollisionTriggers(project, issues);
         checkDeprecatedLabelTargets(project, issues);
         checkUnusedSymbols(project, issues);
+        issues.addAll(DialogPacingLinter.analyze(project));
 
         List<LintIssue> effectiveIssues = applyProjectRuleOverrides(project.projectRoot(), issues);
         return createReport(effectiveIssues);
