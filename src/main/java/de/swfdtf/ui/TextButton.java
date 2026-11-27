@@ -26,6 +26,8 @@ public class TextButton extends UiNode {
     private boolean selected = false;
     private boolean armed = false;
     private float fontSize = DEFAULT_FONT_SIZE;
+    private float hoverScale = 1.0f;
+    private boolean reduceMotion = false;
 
     private StyledTextLayout cachedLabelLayout;
     private boolean labelDirty = true;
@@ -127,6 +129,62 @@ public class TextButton extends UiNode {
      */
     public float getFontSize() {
         return fontSize;
+    }
+
+    /**
+     * Enables or disables reduced motion for button hover scaling ({@code #0396}).
+     *
+     * @param reduceMotion {@code true} to keep hover scale pinned at {@code 1.0}
+     * @return {@code this}
+     */
+    public TextButton setReduceMotion(boolean reduceMotion) {
+        this.reduceMotion = reduceMotion;
+        if (reduceMotion) {
+            this.hoverScale = 1.0f;
+        }
+        return this;
+    }
+
+    /**
+     * Returns whether reduced-motion hover snap is enabled.
+     *
+     * @return {@code true} if reduced motion is active
+     */
+    public boolean isReduceMotion() {
+        return reduceMotion;
+    }
+
+    /**
+     * Returns current animated hover scale factor in {@code [1.0, 1.04]} ({@code #0396}).
+     *
+     * @return hover scale multiplier
+     */
+    public float getHoverScale() {
+        return hoverScale;
+    }
+
+    /**
+     * Advances hover scale interpolation over {@code dt} seconds.
+     *
+     * @param dt delta seconds
+     */
+    public void updateHoverAnimation(double dt) {
+        if (reduceMotion || !isEnabled()) {
+            hoverScale = 1.0f;
+            return;
+        }
+        float target = (isHovered() || isFocused()) ? 1.04f : 1.0f;
+        if (dt <= 0.0) {
+            return;
+        }
+        float alpha = Math.min(1.0f, (float) (dt * 12.0));
+        hoverScale += (target - hoverScale) * alpha;
+    }
+
+    @Override
+    public void update(double dt) {
+        updateHoverAnimation(dt);
+        super.update(dt);
     }
 
     /**

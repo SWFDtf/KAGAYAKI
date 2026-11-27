@@ -358,3 +358,6 @@ public class LocalizationManager {
     public synchronized Set<String> getAvailableLanguages()
 }
 ```
+
+### Erweiterte Wave P2-5 PreferencesState-Optionen
+- `textboxOpacity` (`[0.0, 1.0]`, Default `0.88`), `reduceMotion` (`boolean`), `safezoneMarginPx` (`[0..64]`), `accessibilityCursorStyle` (`DEFAULT`/`LARGE_YELLOW`/`INVERTED`), `textBackdropMode` (`BOX`/`DARK_STRIP`/`NONE`), `safeLetterboxUltrawide` (`boolean`), `choiceNumberHotkeysEnabled` (`boolean`).

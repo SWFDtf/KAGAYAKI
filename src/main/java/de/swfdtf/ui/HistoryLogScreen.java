@@ -257,6 +257,23 @@ public class HistoryLogScreen extends Screen {
         return jumped;
     }
 
+    /**
+     * Formats a history entry into clean copyable plain text ({@code "Speaker: Text"}) ({@code #0399}).
+     *
+     * @param entry history entry to format
+     * @return formatted clipboard string
+     */
+    public static String formatCopyableEntry(HistoryLog.HistoryEntry entry) {
+        if (entry == null) {
+            return "";
+        }
+        String cleanText = entry.text() != null
+                ? entry.text().replaceAll("\\{[^}]*\\}", "").trim()
+                : "";
+        String speaker = entry.speakerName() != null ? entry.speakerName().trim() : "";
+        return speaker.isEmpty() ? cleanText : speaker + ": " + cleanText;
+    }
+
     private void closeScreen() {
         if (screenManager != null) {
             screenManager.hideScreen(SCREEN_NAME);

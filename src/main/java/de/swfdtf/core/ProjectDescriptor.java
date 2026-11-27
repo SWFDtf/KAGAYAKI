@@ -41,6 +41,7 @@ public final class ProjectDescriptor {
     private String windowTitle = "";
     private String iconPath = "";
     private String vpakEncryptionKey = "";
+    private String accentColorHex = "";
 
     /**
      * Creates a descriptor initialized with default settings (used by Gson during deserialization).
@@ -438,6 +439,24 @@ public final class ProjectDescriptor {
      */
     public void setVpakEncryptionKey(String vpakEncryptionKey) {
         this.vpakEncryptionKey = vpakEncryptionKey != null ? vpakEncryptionKey : "";
+    }
+
+    /**
+     * Returns optional project UI accent color hex override ({@code #0409}).
+     *
+     * @return custom accent hex string or empty when default Dark Slate accent applies
+     */
+    public String getAccentColorHex() {
+        return accentColorHex != null ? accentColorHex : "";
+    }
+
+    /**
+     * Sets optional project UI accent color hex override ({@code #0409}).
+     *
+     * @param accentColorHex hex color string (empty or null restores default)
+     */
+    public void setAccentColorHex(String accentColorHex) {
+        this.accentColorHex = accentColorHex != null ? accentColorHex.trim() : "";
     }
 
     @Override

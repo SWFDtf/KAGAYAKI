@@ -90,6 +90,14 @@ Vollständiges Dark-Slate-UI-, Screen-Management-, Widget-, `screen`-AST-Builder
 | `AchievementsScreen.AchievementRowView` | `record` | View-Model einer einzelnen Achievement-Zeile. |
 | `NotificationToastOverlay` | `class` | Nicht-modales Toast-Overlay (`Z = 500`), das `AchievementManager.pollToast()` animiert ein-/ausblendet (`4.0s`) und eine `SKIPPING >>`/`AUTO >`-Status-Pill anzeigt. |
 | `NotificationToastOverlay.ToastPayload` | `record` | Toast-Nachrichten-Nutzlast `(title, subtitle)`. |
+| `WrapBox` | `class` | Responsiver Flexbox-ähnlicher Wrap-Container (`#0376`) für automatische Zeilenumbrüche über `horizontalSpacing`/`verticalSpacing`. |
+| `SegmentedControl` | `class` | Animiertes Segmented Control (`#0407`) für mehrstufige Optionen (`Windowed/Fullscreen`, `2D/3D`) mit `reduceMotion`-Support. |
+| `ContextMenuOverlay` | `class` | Rechtsklick-Kontextmenü-Overlay (`#0421`) innerhalb von `1920x1080` mit sofortiger Schließung bei Klick außerhalb oder `Escape`. |
+| `CreditsScreen` | `class` | Vertikal scrollender Credits-Screen (`#0374`) mit 4x-Fast-Forward und automatischem Rückkehr-Callback. |
+| `SplashScreen` | `class` | Kaltstart-Lade- und Splash-Overlay (`#0382`) mit KAGAYAKI-Banner, `EngineVersion`, Fortschrittsbalken und Skip-Option. |
+| `ChapterBannerOverlay` | `class` | Transiente Kapitel-Titel-Einblendung (`#0366`) mit automatischem Fade-Out und Skip-Abbruch. |
+| `ProgressSpinnerModal` | `class` | Modales Asynchron-Fortschritts-Overlay (`#0404`) für lange Export-/Scan-Aufgaben ohne Loop-Blockierung. |
+| `UiPolishAndServices` | `final class` | Gebündelte Wave-P2-5-UI-/Barrierefreiheits-Services (`UiSoundCueRouter`, `HudVisibilityController`, `SpeakerDimmingDirector`, `HotbarInventoryBinder`, `PromptGlyphMapper`, `UiSkinRegistry`, `DialoguePunctuationPacer`, `ChoiceHistoryTracker`, `WasdArenaHudGuide`, `UiWidgetTreeDumper`, `UiLayoutOverlapAuditor`, `SaveSlotMetaManager`, `GameplayStatsPresenter`, `AdaptiveDialogueBoxCalculator`, `BubbleCollisionResolver`, `HoverGlossaryPreview`, `GalleryViewerController`, `MusicRoomSeekController`). |
 | `UiTranslations` | `final class` | Fünfsprachiges UI-Übersetzungsbündel (`deutsch`, `english`, `french`, `spanish`, `japanese`) mit Projekt-Override und sicherem Fallback. |
 | `ClosedCaptionOverlayScreen` | `class` | Bodenverankertes Closed-Caption-Overlay (`Z = Z_TOAST - 10`) für bis zu 3 gleichzeitige Untertitel aus `ClosedCaptionQueue`. |
 | `ActionPromptOverlayScreen` | `class` | Kontextsensitives Interaktions-Badge (`[Key] Aktion`) neben interaktiven WASD-Objekten mit `KeybindingRemapper`-Synchronisation. |
@@ -655,3 +663,12 @@ public final class GameRuntimeCoordinator implements GameHost {
     public NotificationToastOverlay getToastOverlay()
 }
 ```
+
+### Erweiterte Wave P2-5 UI-APIs
+- `ScreenManager`: `pushSubScreen`, `popSubScreen`, `getBreadcrumbDepth`, `replaceScreen`, `resetFocusForReload`, `setFocusNarrator`, `setSoundCueListener` sowie automatisches Modal-Focus-Save/Restore.
+- `ChoiceMenuScreen`: `setNumericHotkeysEnabled`, `handleNumericHotkey`, `setDisabledReason`, `setChoiceBadge`, `bindChoiceHistory`, roter `<25%`-Timeout-Indikator.
+- `HistoryLogScreen`: `formatCopyableEntry(HistoryLog.HistoryEntry)`.
+- `DragGroup`: `cancelActiveDrag()` bei Rechtsklick/Outside-Drop.
+- `TextButton`: `setReduceMotion`, `isReduceMotion`, `getHoverScale`, `updateHoverAnimation`.
+- `ThemePalette`: `resolveProjectAccentHex(ProjectDescriptor)`.
+- `NotificationToastOverlay`: `StackedToast`, `pushStackedToast`, `getVisibleStackedToasts`.

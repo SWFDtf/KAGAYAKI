@@ -1,5 +1,6 @@
 package de.swfdtf.ui;
 
+import de.swfdtf.core.ProjectDescriptor;
 import de.swfdtf.graphics.SceneNode;
 
 /**
@@ -336,6 +337,21 @@ public final class ThemePalette {
      */
     public static boolean meetsWcagAA(String foregroundHex, String backgroundHex) {
         return contrastRatio(foregroundHex, backgroundHex) >= WCAG_AA_NORMAL_CONTRAST;
+    }
+
+    /**
+     * Resolves project accent hex from {@code descriptor}, falling back to
+     * {@link #ACCENT_HOVER} ({@code #58a6ff}) when unset or invalid ({@code #0409}).
+     *
+     * @param descriptor project descriptor (nullable)
+     * @return resolved {@code #RRGGBB} or {@code #RRGGBBAA} accent hex string
+     */
+    public static String resolveProjectAccentHex(ProjectDescriptor descriptor) {
+        if (descriptor != null && descriptor.getAccentColorHex() != null
+                && !descriptor.getAccentColorHex().isBlank()) {
+            return descriptor.getAccentColorHex().trim();
+        }
+        return ACCENT_HOVER;
     }
 
     private static double linearizeChannel(double c) {

@@ -49,6 +49,13 @@ public final class PreferencesState {
     private boolean highContrastDyslexiaFont = false;
     private float uiTextScale = 1.0f;
     private float gamepadDeadzone = 0.15f;
+    private float textboxOpacity = 0.88f;
+    private boolean reduceMotion = false;
+    private int safezoneMarginPx = 0;
+    private String accessibilityCursorStyle = "DEFAULT";
+    private String textBackdropMode = "BOX";
+    private boolean safeLetterboxUltrawide = false;
+    private boolean choiceNumberHotkeysEnabled = true;
 
     /**
      * Creates a {@code PreferencesState} initialized with engine defaults.
@@ -146,6 +153,22 @@ public final class PreferencesState {
             gamepadDeadzone = 0.15f;
         } else if (gamepadDeadzone > 0.95f) {
             gamepadDeadzone = 0.95f;
+        }
+        textboxOpacity = clampVolume(textboxOpacity, 0.88f);
+        safezoneMarginPx = Math.clamp(safezoneMarginPx, 0, 64);
+        if (accessibilityCursorStyle == null || accessibilityCursorStyle.isBlank()) {
+            accessibilityCursorStyle = "DEFAULT";
+        } else {
+            String upper = accessibilityCursorStyle.trim().toUpperCase(Locale.ROOT);
+            accessibilityCursorStyle = ("LARGE_YELLOW".equals(upper) || "INVERTED".equals(upper))
+                    ? upper : "DEFAULT";
+        }
+        if (textBackdropMode == null || textBackdropMode.isBlank()) {
+            textBackdropMode = "BOX";
+        } else {
+            String upper = textBackdropMode.trim().toUpperCase(Locale.ROOT);
+            textBackdropMode = ("DARK_STRIP".equals(upper) || "NONE".equals(upper))
+                    ? upper : "BOX";
         }
     }
 
@@ -484,6 +507,136 @@ public final class PreferencesState {
         }
     }
 
+    /**
+     * Returns dialogue textbox background opacity in {@code [0.0, 1.0]}.
+     *
+     * @return textbox opacity
+     */
+    public synchronized float getTextboxOpacity() {
+        return textboxOpacity;
+    }
+
+    /**
+     * Sets dialogue textbox background opacity in {@code [0.0, 1.0]}.
+     *
+     * @param textboxOpacity opacity in {@code [0.0, 1.0]}
+     */
+    public synchronized void setTextboxOpacity(float textboxOpacity) {
+        this.textboxOpacity = clampVolume(textboxOpacity, 0.88f);
+    }
+
+    /**
+     * Returns whether reduced-motion accessibility mode is enabled.
+     *
+     * @return {@code true} when reduced motion is active
+     */
+    public synchronized boolean isReduceMotion() {
+        return reduceMotion;
+    }
+
+    /**
+     * Sets reduced-motion accessibility mode.
+     *
+     * @param reduceMotion {@code true} to suppress flashes/shakes and snap UI hovers
+     */
+    public synchronized void setReduceMotion(boolean reduceMotion) {
+        this.reduceMotion = reduceMotion;
+    }
+
+    /**
+     * Returns edge HUD safezone margin in pixels {@code [0..64]}.
+     *
+     * @return safezone margin in pixels
+     */
+    public synchronized int getSafezoneMarginPx() {
+        return safezoneMarginPx;
+    }
+
+    /**
+     * Sets edge HUD safezone margin in pixels clamped to {@code [0..64]}.
+     *
+     * @param safezoneMarginPx safezone margin in pixels
+     */
+    public synchronized void setSafezoneMarginPx(int safezoneMarginPx) {
+        this.safezoneMarginPx = Math.clamp(safezoneMarginPx, 0, 64);
+    }
+
+    /**
+     * Returns accessibility cursor style ({@code DEFAULT}, {@code LARGE_YELLOW}, {@code INVERTED}).
+     *
+     * @return cursor style identifier
+     */
+    public synchronized String getAccessibilityCursorStyle() {
+        return accessibilityCursorStyle;
+    }
+
+    /**
+     * Sets accessibility cursor style ({@code DEFAULT}, {@code LARGE_YELLOW}, {@code INVERTED}).
+     *
+     * @param accessibilityCursorStyle cursor style identifier
+     */
+    public synchronized void setAccessibilityCursorStyle(String accessibilityCursorStyle) {
+        String upper = accessibilityCursorStyle == null ? "" : accessibilityCursorStyle.trim().toUpperCase(Locale.ROOT);
+        this.accessibilityCursorStyle = ("LARGE_YELLOW".equals(upper) || "INVERTED".equals(upper))
+                ? upper : "DEFAULT";
+    }
+
+    /**
+     * Returns dialogue text backdrop mode ({@code BOX}, {@code DARK_STRIP}, {@code NONE}).
+     *
+     * @return text backdrop mode
+     */
+    public synchronized String getTextBackdropMode() {
+        return textBackdropMode;
+    }
+
+    /**
+     * Sets dialogue text backdrop mode ({@code BOX}, {@code DARK_STRIP}, {@code NONE}).
+     *
+     * @param textBackdropMode backdrop mode name
+     */
+    public synchronized void setTextBackdropMode(String textBackdropMode) {
+        String upper = textBackdropMode == null ? "" : textBackdropMode.trim().toUpperCase(Locale.ROOT);
+        this.textBackdropMode = ("DARK_STRIP".equals(upper) || "NONE".equals(upper))
+                ? upper : "BOX";
+    }
+
+    /**
+     * Returns whether ultrawide safe-letterbox expansion is enabled.
+     *
+     * @return {@code true} when 21:9 expansion is permitted
+     */
+    public synchronized boolean isSafeLetterboxUltrawide() {
+        return safeLetterboxUltrawide;
+    }
+
+    /**
+     * Sets ultrawide safe-letterbox expansion toggle.
+     *
+     * @param safeLetterboxUltrawide expansion flag
+     */
+    public synchronized void setSafeLetterboxUltrawide(boolean safeLetterboxUltrawide) {
+        this.safeLetterboxUltrawide = safeLetterboxUltrawide;
+    }
+
+    /**
+     * Returns whether 1..9 numeric hotkeys are enabled in choice menus.
+     *
+     * @return {@code true} when numeric choice hotkeys are enabled
+     */
+    public synchronized boolean isChoiceNumberHotkeysEnabled() {
+        return choiceNumberHotkeysEnabled;
+    }
+
+    /**
+     * Sets whether 1..9 numeric hotkeys are enabled in choice menus.
+     *
+     * @param choiceNumberHotkeysEnabled numeric hotkeys toggle
+     */
+    public synchronized void setChoiceNumberHotkeysEnabled(boolean choiceNumberHotkeysEnabled) {
+        this.choiceNumberHotkeysEnabled = choiceNumberHotkeysEnabled;
+    }
+
     @Override
     public synchronized boolean equals(Object obj) {
         if (this == obj) {
@@ -506,9 +659,16 @@ public final class PreferencesState {
                 && highContrastDyslexiaFont == other.highContrastDyslexiaFont
                 && Float.compare(uiTextScale, other.uiTextScale) == 0
                 && Float.compare(gamepadDeadzone, other.gamepadDeadzone) == 0
+                && Float.compare(textboxOpacity, other.textboxOpacity) == 0
+                && reduceMotion == other.reduceMotion
+                && safezoneMarginPx == other.safezoneMarginPx
+                && safeLetterboxUltrawide == other.safeLetterboxUltrawide
+                && choiceNumberHotkeysEnabled == other.choiceNumberHotkeysEnabled
                 && Objects.equals(renderMode, other.renderMode)
                 && Objects.equals(language, other.language)
-                && Objects.equals(dialogueMode, other.dialogueMode);
+                && Objects.equals(dialogueMode, other.dialogueMode)
+                && Objects.equals(accessibilityCursorStyle, other.accessibilityCursorStyle)
+                && Objects.equals(textBackdropMode, other.textBackdropMode);
     }
 
     @Override
@@ -517,7 +677,10 @@ public final class PreferencesState {
                 masterVolume, musicVolume, soundVolume, voiceVolume, ambientVolume,
                 textSpeedCps, autoForwardDelaySeconds, skipUnread, skipAfterChoices,
                 fullscreen, renderMode, language, dialogueMode,
-                selfVoicing, highContrastDyslexiaFont, uiTextScale, gamepadDeadzone
+                selfVoicing, highContrastDyslexiaFont, uiTextScale, gamepadDeadzone,
+                textboxOpacity, reduceMotion, safezoneMarginPx,
+                accessibilityCursorStyle, textBackdropMode,
+                safeLetterboxUltrawide, choiceNumberHotkeysEnabled
         );
     }
 }

@@ -7,12 +7,15 @@ import de.swfdtf.graphics.RenderPipeline2D;
 import de.swfdtf.graphics.TextureManager;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * Manages the active stack of UI {@link Screen}s sorted by Z-order, handling modal input
@@ -26,11 +29,15 @@ public final class ScreenManager {
 
     private final Map<String, Screen> screens = new LinkedHashMap<>();
     private final GamepadNavigationRouter gamepadRouter = new GamepadNavigationRouter();
+    private final Deque<String> breadcrumbStack = new ArrayDeque<>();
+    private final Deque<UiNode> focusRestoreStack = new ArrayDeque<>();
     private float logicalWidth = RenderPipeline2D.DEFAULT_LOGICAL_WIDTH;
     private float logicalHeight = RenderPipeline2D.DEFAULT_LOGICAL_HEIGHT;
     private final boolean[] previousButtons = new boolean[InputManager.MOUSE_BUTTON_COUNT];
     private final boolean[] previousTrackedKeys = new boolean[512];
     private UiNode focusedNode;
+    private Consumer<String> focusNarrator;
+    private Consumer<UiPolishAndServices.UiCue> soundCueListener;
 
     private final Screen tooltipOverlayScreen;
     private final Fixed tooltipOverlayRoot;
@@ -105,9 +112,71 @@ public final class ScreenManager {
             focusedNode = null;
         }
         if (screen.isModal() && focusedNode != null) {
+            focusRestoreStack.push(focusedNode);
             focusedNode.setFocused(false);
             focusedNode = null;
         }
+    }
+
+    /**
+     * Pushes a sub-menu screen onto the LIFO navigation breadcrumb stack and shows it ({@code #0378}).
+     *
+     * @param subScreen sub-menu screen to show
+     */
+    public void pushSubScreen(Screen subScreen) {
+        Objects.requireNonNull(subScreen, "subScreen must not be null");
+        breadcrumbStack.push(subScreen.getName());
+        showScreen(subScreen);
+    }
+
+    /**
+     * Pops and hides the top sub-menu screen from the LIFO breadcrumb stack ({@code #0378}).
+     *
+     * @return {@code true} if a sub-screen was popped and hidden
+     */
+    public boolean popSubScreen() {
+        if (breadcrumbStack.isEmpty()) {
+            return false;
+        }
+        String name = breadcrumbStack.pop();
+        return hideScreenImmediate(name);
+    }
+
+    /**
+     * Returns current sub-screen breadcrumb stack depth.
+     *
+     * @return number of open sub-screens on stack
+     */
+    public int getBreadcrumbDepth() {
+        return breadcrumbStack.size();
+    }
+
+    /**
+     * Replaces an existing live-reloaded screen cleanly without duplicate entries ({@code #0395}).
+     *
+     * @param updatedScreen replacement screen instance
+     */
+    public void replaceScreen(Screen updatedScreen) {
+        Objects.requireNonNull(updatedScreen, "updatedScreen must not be null");
+        Screen prev = screens.get(updatedScreen.getName());
+        boolean wasVisible = prev != null && prev.isVisible();
+        resetFocusForReload();
+        screens.put(updatedScreen.getName(), updatedScreen);
+        if (wasVisible) {
+            showScreen(updatedScreen);
+        }
+    }
+
+    /**
+     * Clears any stale widget focus/hover pointers cleanly across live script reloads ({@code #0420}).
+     */
+    public void resetFocusForReload() {
+        if (focusedNode != null) {
+            focusedNode.setFocused(false);
+            focusedNode = null;
+        }
+        hoveredTooltipNode = null;
+        focusRestoreStack.clear();
     }
 
     /**
@@ -145,6 +214,12 @@ public final class ScreenManager {
                 s.setVisible(false);
                 s.onHide();
             }
+            if (s.isModal()) {
+                restoreSavedFocus();
+            }
+            if (soundCueListener != null) {
+                soundCueListener.accept(UiPolishAndServices.UiCue.BACK);
+            }
         }
         return true;
     }
@@ -165,8 +240,29 @@ public final class ScreenManager {
             s.clearTransition();
             s.setVisible(false);
             s.onHide();
+            if (s.isModal()) {
+                restoreSavedFocus();
+            }
+            if (soundCueListener != null) {
+                soundCueListener.accept(UiPolishAndServices.UiCue.BACK);
+            }
         }
         return true;
+    }
+
+    private void restoreSavedFocus() {
+        while (!focusRestoreStack.isEmpty()) {
+            UiNode candidate = focusRestoreStack.pop();
+            if (candidate != null && candidate.isVisible() && candidate.isEnabled() && candidate.isFocusable()) {
+                if (focusedNode != null) {
+                    focusedNode.setFocused(false);
+                }
+                focusedNode = candidate;
+                focusedNode.setFocused(true);
+                announceFocusedNode(focusedNode);
+                return;
+            }
+        }
     }
 
     private void clearFocusIfOwnedBy(Screen screen) {
@@ -611,6 +707,25 @@ public final class ScreenManager {
                 : (currentIndex + 1) % focusables.size();
         focusedNode = focusables.get(nextIndex);
         focusedNode.setFocused(true);
+        announceFocusedNode(focusedNode);
+        if (soundCueListener != null) {
+            soundCueListener.accept(UiPolishAndServices.UiCue.HOVER);
+        }
+    }
+
+    private void announceFocusedNode(UiNode node) {
+        if (focusNarrator == null || node == null) {
+            return;
+        }
+        String label = switch (node) {
+            case TextButton btn -> btn.getText();
+            case SegmentedControl seg -> seg.getSelectedOption();
+            case Slider sl -> String.format(java.util.Locale.ROOT, "Slider %.2f", sl.getValue());
+            default -> node.getId().isBlank() ? node.getClass().getSimpleName() : node.getId();
+        };
+        if (label != null && !label.isBlank()) {
+            focusNarrator.accept(label);
+        }
     }
 
     private static void collectFocusables(UiNode node, List<UiNode> out) {
@@ -728,6 +843,24 @@ public final class ScreenManager {
      */
     public float getLogicalWidth() {
         return logicalWidth;
+    }
+
+    /**
+     * Configures optional accessibility focus narration listener (e.g., wired to TTS interrupt) ({@code #0388}).
+     *
+     * @param focusNarrator consumer receiving newly focused widget descriptions
+     */
+    public void setFocusNarrator(Consumer<String> focusNarrator) {
+        this.focusNarrator = focusNarrator;
+    }
+
+    /**
+     * Configures optional UI sound cue listener for hover/back cues ({@code #0381}).
+     *
+     * @param soundCueListener listener notified on focus/back transitions
+     */
+    public void setSoundCueListener(Consumer<UiPolishAndServices.UiCue> soundCueListener) {
+        this.soundCueListener = soundCueListener;
     }
 
     /**

@@ -20,6 +20,8 @@ public class DragGroup extends UiNode {
     private DragItem activeDraggedItem;
     private float dragOffsetX = 0.0f;
     private float dragOffsetY = 0.0f;
+    private float dragOriginX = 0.0f;
+    private float dragOriginY = 0.0f;
 
     /**
      * Creates an empty {@code DragGroup}.
@@ -189,11 +191,17 @@ public class DragGroup extends UiNode {
         if (!isVisible() || !isEnabled() || !getBounds().contains(lx, ly)) {
             return false;
         }
+        if (button == 1 && activeDraggedItem != null) {
+            cancelActiveDrag();
+            return true;
+        }
         if (button == 0) {
             for (int i = items.size() - 1; i >= 0; i--) {
                 DragItem item = items.get(i);
                 if (item.isVisible() && item.isEnabled() && item.isDraggable() && item.getBounds().contains(lx, ly)) {
                     activeDraggedItem = item;
+                    dragOriginX = item.getBounds().x();
+                    dragOriginY = item.getBounds().y();
                     item.setDragging(true);
                     item.setSnappedTo(null);
                     dragOffsetX = lx - item.getBounds().x();
@@ -206,12 +214,33 @@ public class DragGroup extends UiNode {
         return super.dispatchMouseDown(lx, ly, button);
     }
 
+    /**
+     * Cancels the currently active drag and snaps the item cleanly back to its pre-drag origin ({@code #0365}).
+     *
+     * @return {@code true} if an active drag was cancelled
+     */
+    public boolean cancelActiveDrag() {
+        if (activeDraggedItem == null) {
+            return false;
+        }
+        Rect2f prev = activeDraggedItem.getBounds();
+        activeDraggedItem.setDragging(false);
+        activeDraggedItem.layout(new Rect2f(dragOriginX, dragOriginY, prev.width(), prev.height()));
+        activeDraggedItem = null;
+        return true;
+    }
+
     @Override
     public boolean dispatchMouseUp(float lx, float ly, int button) {
         if (!isVisible()) {
             return false;
         }
         if (button == 0 && activeDraggedItem != null) {
+            if (!getBounds().contains(lx, ly)) {
+                cancelActiveDrag();
+                super.dispatchMouseUp(lx, ly, button);
+                return true;
+            }
             DragItem dragged = activeDraggedItem;
             activeDraggedItem = null;
             dragged.setDragging(false);

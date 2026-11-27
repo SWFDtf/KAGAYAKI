@@ -3,10 +3,13 @@ package de.swfdtf.ui;
 import de.swfdtf.graphics.SceneLayer;
 import de.swfdtf.parser.ScriptRuntime;
 import de.swfdtf.parser.ScriptSession;
+import de.swfdtf.state.PersistentAccess;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -27,8 +30,13 @@ public class ChoiceMenuScreen extends Screen {
     private final Bar timeoutBar;
     private final VBox optionsContainer;
     private final List<TextButton> optionButtons = new ArrayList<>();
+    private final Map<Integer, String> disabledReasons = new HashMap<>();
+    private final Map<Integer, String> choiceBadges = new HashMap<>();
 
     private ScriptRuntime.MenuPrompt lastPrompt;
+    private boolean numericHotkeysEnabled = true;
+    private PersistentAccess choiceHistoryStore;
+    private String currentHistoryLabel = "";
 
     /**
      * Creates a {@code ChoiceMenuScreen} bound to {@code session}.
@@ -103,8 +111,11 @@ public class ChoiceMenuScreen extends Screen {
 
         if (prompt.timeoutSeconds() != null && prompt.timeoutSeconds() > 0.0) {
             timeoutBar.setVisible(true);
-            timeoutBar.setRange(prompt.timeoutSeconds().floatValue());
-            timeoutBar.setValue((float) Math.max(0.0, prompt.remainingSeconds()));
+            float maxSec = prompt.timeoutSeconds().floatValue();
+            float remSec = (float) Math.max(0.0, prompt.remainingSeconds());
+            timeoutBar.setRange(maxSec);
+            timeoutBar.setValue(remSec);
+            timeoutBar.setFillColorHex((remSec / maxSec) <= 0.25f ? ThemePalette.ERROR : ThemePalette.WARNING);
         } else {
             timeoutBar.setVisible(false);
         }
@@ -133,21 +144,37 @@ public class ChoiceMenuScreen extends Screen {
             if (!opt.visible()) {
                 continue;
             }
-            TextButton btn = new TextButton(opt.text(), () -> {
+            String badge = choiceBadges.get(opt.index());
+            String displayText = (badge != null && !badge.isBlank()) ? badge + " " + opt.text() : opt.text();
+            TextButton btn = new TextButton(displayText, () -> {
                 if (opt.enabled()) {
+                    if (choiceHistoryStore != null) {
+                        UiPolishAndServices.ChoiceHistoryTracker.recordChoice(
+                                choiceHistoryStore, currentHistoryLabel, opt.text());
+                    }
                     session.choose(opt.index());
                     syncFromRuntime(true);
                 }
             });
             btn.setPreferredSize(850.0f, 54.0f);
             btn.setEnabled(opt.enabled());
-            btn.setBackgroundColorHex(opt.enabled() ? ThemePalette.ELEVATED : ThemePalette.PANEL_SURFACE);
-            btn.setBorderColorHex(opt.enabled() ? ThemePalette.ACCENT_IDLE : ThemePalette.BORDER);
+            boolean previouslyPicked = choiceHistoryStore != null
+                    && UiPolishAndServices.ChoiceHistoryTracker.wasPreviouslyChosen(
+                            choiceHistoryStore, currentHistoryLabel, opt.text());
+            if (!opt.enabled()) {
+                btn.setBackgroundColorHex(ThemePalette.PANEL_SURFACE);
+                btn.setBorderColorHex(ThemePalette.BORDER);
+                String reason = disabledReasons.get(opt.index());
+                if (reason != null && !reason.isBlank()) {
+                    btn.setTooltipText(reason);
+                }
+                btn.setAlpha(0.55f);
+            } else {
+                btn.setBackgroundColorHex(previouslyPicked ? ThemePalette.PANEL_SURFACE : ThemePalette.ELEVATED);
+                btn.setBorderColorHex(ThemePalette.ACCENT_IDLE);
+            }
             btn.setBorderThickness(1.5f);
             btn.setCornerRadius(8.0f);
-            if (!opt.enabled()) {
-                btn.setAlpha(0.55f);
-            }
             optionButtons.add(btn);
             optionsContainer.addChild(btn);
         }
@@ -178,5 +205,84 @@ public class ChoiceMenuScreen extends Screen {
      */
     public TextWidget getCaptionLabel() {
         return captionLabel;
+    }
+
+    /**
+     * Enables or disables {@code 1..9} numeric hotkeys for selecting visible options ({@code #0406}).
+     *
+     * @param enabled {@code true} to allow numeric choice shortcuts
+     */
+    public void setNumericHotkeysEnabled(boolean enabled) {
+        this.numericHotkeysEnabled = enabled;
+    }
+
+    /**
+     * Returns whether numeric choice hotkeys are enabled.
+     *
+     * @return {@code true} if enabled
+     */
+    public boolean isNumericHotkeysEnabled() {
+        return numericHotkeysEnabled;
+    }
+
+    /**
+     * Attempts to activate option {@code digit1To9} (1-based) via numeric hotkey ({@code #0406}).
+     *
+     * @param digit1To9 key digit in {@code [1..9]}
+     * @return {@code true} if a matching enabled option was triggered
+     */
+    public boolean handleNumericHotkey(int digit1To9) {
+        if (!numericHotkeysEnabled || digit1To9 < 1 || digit1To9 > 9) {
+            return false;
+        }
+        int idx = digit1To9 - 1;
+        if (idx >= optionButtons.size()) {
+            return false;
+        }
+        TextButton btn = optionButtons.get(idx);
+        if (!btn.isEnabled()) {
+            return false;
+        }
+        btn.click();
+        return true;
+    }
+
+    /**
+     * Configures an explanatory tooltip displayed on a disabled choice option ({@code #0390}).
+     *
+     * @param optionIndex original 0-based choice option index
+     * @param reason      human-readable lock explanation (e.g., {@code "Requires Courage >= 20"})
+     */
+    public void setDisabledReason(int optionIndex, String reason) {
+        if (reason == null || reason.isBlank()) {
+            disabledReasons.remove(optionIndex);
+        } else {
+            disabledReasons.put(optionIndex, reason.trim());
+        }
+    }
+
+    /**
+     * Configures an optional prefix badge icon/label next to a choice option ({@code #0405}).
+     *
+     * @param optionIndex original 0-based choice option index
+     * @param badge       badge token (e.g., {@code "[♥]"} or {@code "[★]"})
+     */
+    public void setChoiceBadge(int optionIndex, String badge) {
+        if (badge == null || badge.isBlank()) {
+            choiceBadges.remove(optionIndex);
+        } else {
+            choiceBadges.put(optionIndex, badge.trim());
+        }
+    }
+
+    /**
+     * Binds persistent choice history tracking for visual marking of previously chosen options ({@code #0422}).
+     *
+     * @param persistent  persistent storage
+     * @param labelScope  logical menu scope label
+     */
+    public void bindChoiceHistory(PersistentAccess persistent, String labelScope) {
+        this.choiceHistoryStore = persistent;
+        this.currentHistoryLabel = labelScope != null ? labelScope : "";
     }
 }

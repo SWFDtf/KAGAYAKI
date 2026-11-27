@@ -148,6 +148,7 @@ public String getDefaultLanguage() / public void setDefaultLanguage(String defau
 public String getDialogueMode() / public void setDialogueMode(String dialogueMode)
 public String getWindowTitle() / public void setWindowTitle(String windowTitle)
 public String getIconPath() / public void setIconPath(String iconPath)
+public String getAccentColorHex() / public void setAccentColorHex(String accentColorHex)
 ```
 
 ### `GameClock`

@@ -5,7 +5,11 @@ import de.swfdtf.parser.ScriptSession;
 import de.swfdtf.state.AchievementManager;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -34,6 +38,26 @@ public class NotificationToastOverlay extends Screen {
     public record ToastPayload(String title, String subtitle) {
     }
 
+    /**
+     * Stacked multi-toast entry with icon badge, progress bar ratio, and computed vertical Y slot ({@code #0373}).
+     *
+     * @param title         headline text
+     * @param subtitle      body description
+     * @param progressRatio normalized progress in {@code [0, 1]}
+     * @param iconBadge     optional icon tag
+     * @param slotY         non-overlapping logical Y position
+     * @param ageSeconds    elapsed display seconds
+     */
+    public record StackedToast(
+            String title,
+            String subtitle,
+            float progressRatio,
+            String iconBadge,
+            float slotY,
+            double ageSeconds
+    ) {
+    }
+
     private final ScriptSession session;
     private final ScreenManager screenManager;
     private final Fixed rootContainer;
@@ -45,6 +69,7 @@ public class NotificationToastOverlay extends Screen {
     private final TextWidget statusPillText;
 
     private final Deque<ToastPayload> pendingToasts = new ArrayDeque<>();
+    private final List<StackedToast> stackedToasts = new ArrayList<>();
     private ToastPayload activeToast;
     private double activeToastElapsed = 0.0;
     private boolean manualSkipStatus = false;
@@ -104,6 +129,7 @@ public class NotificationToastOverlay extends Screen {
             return;
         }
         pollAchievementToasts();
+        advanceStackedToasts(Math.max(0.0, dt));
         updateActiveToastAnimation(dt);
         updateStatusPill();
         super.update(dt);
@@ -262,5 +288,60 @@ public class NotificationToastOverlay extends Screen {
      */
     public TextWidget getStatusPillText() {
         return statusPillText;
+    }
+
+    /**
+     * Pushes a toast onto the non-overlapping vertical toast stack ({@code #0373}).
+     *
+     * @param title         toast headline
+     * @param subtitle      toast subtitle
+     * @param progressRatio progress indicator ratio {@code [0..1]}
+     * @param iconBadge     optional icon tag
+     */
+    public void pushStackedToast(String title, String subtitle, float progressRatio, String iconBadge) {
+        float y = 24.0f + stackedToasts.size() * 104.0f;
+        stackedToasts.add(new StackedToast(
+                title != null ? title : "",
+                subtitle != null ? subtitle : "",
+                Float.isFinite(progressRatio) ? Math.clamp(progressRatio, 0.0f, 1.0f) : 1.0f,
+                iconBadge != null ? iconBadge : "",
+                y,
+                0.0
+        ));
+    }
+
+    /**
+     * Returns immutable snapshot of active non-overlapping stacked toasts ({@code #0373}).
+     *
+     * @return currently visible stacked toasts
+     */
+    public List<StackedToast> getVisibleStackedToasts() {
+        return Collections.unmodifiableList(stackedToasts);
+    }
+
+    private void advanceStackedToasts(double dt) {
+        if (stackedToasts.isEmpty() || dt <= 0.0) {
+            return;
+        }
+        Iterator<StackedToast> it = stackedToasts.iterator();
+        List<StackedToast> updated = new ArrayList<>();
+        int slotIdx = 0;
+        while (it.hasNext()) {
+            StackedToast item = it.next();
+            double nextAge = item.ageSeconds() + dt;
+            if (nextAge < DEFAULT_TOAST_DURATION) {
+                updated.add(new StackedToast(
+                        item.title(),
+                        item.subtitle(),
+                        item.progressRatio(),
+                        item.iconBadge(),
+                        24.0f + slotIdx * 104.0f,
+                        nextAge
+                ));
+                slotIdx++;
+            }
+        }
+        stackedToasts.clear();
+        stackedToasts.addAll(updated);
     }
 }
