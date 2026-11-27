@@ -64,6 +64,16 @@ public final class PreferencesState {
     private boolean autosaveOnQuit = true;
     private double autoReadVoiceWaitSeconds = 0.75;
     private String saveSlotSortMode = "LAST_SAVED";
+    private boolean invertCameraY = false;
+    private float cameraSensitivity = 1.0f;
+    private boolean scrollWheelRollbackEnabled = true;
+    private String rightClickBehavior = "MENU";
+    private boolean touchControlsEnabled = false;
+    private boolean simplifyHoldInputs = false;
+    private boolean toggleSkipSprintMode = false;
+    private boolean hideCursorOnGamepad = true;
+    private int minClickIntervalMs = 0;
+    private boolean disableBackspaceTrigger = false;
 
     /**
      * Creates a {@code PreferencesState} initialized with engine defaults.
@@ -190,6 +200,18 @@ public final class PreferencesState {
             String upper = saveSlotSortMode.trim().toUpperCase(Locale.ROOT);
             saveSlotSortMode = "SLOT_NUMBER".equals(upper) ? "SLOT_NUMBER" : "LAST_SAVED";
         }
+        if (!Float.isFinite(cameraSensitivity) || cameraSensitivity < 0.2f) {
+            cameraSensitivity = Float.isFinite(cameraSensitivity) ? 0.2f : 1.0f;
+        } else if (cameraSensitivity > 3.0f) {
+            cameraSensitivity = 3.0f;
+        }
+        if (rightClickBehavior == null || rightClickBehavior.isBlank()) {
+            rightClickBehavior = "MENU";
+        } else {
+            String upper = rightClickBehavior.trim().toUpperCase(Locale.ROOT);
+            rightClickBehavior = "ROLLBACK".equals(upper) ? "ROLLBACK" : "MENU";
+        }
+        minClickIntervalMs = Math.clamp(minClickIntervalMs, 0, 80);
     }
 
     /**
@@ -229,6 +251,16 @@ public final class PreferencesState {
         autosaveOnQuit = defaults.autosaveOnQuit;
         autoReadVoiceWaitSeconds = defaults.autoReadVoiceWaitSeconds;
         saveSlotSortMode = defaults.saveSlotSortMode;
+        invertCameraY = defaults.invertCameraY;
+        cameraSensitivity = defaults.cameraSensitivity;
+        scrollWheelRollbackEnabled = defaults.scrollWheelRollbackEnabled;
+        rightClickBehavior = defaults.rightClickBehavior;
+        touchControlsEnabled = defaults.touchControlsEnabled;
+        simplifyHoldInputs = defaults.simplifyHoldInputs;
+        toggleSkipSprintMode = defaults.toggleSkipSprintMode;
+        hideCursorOnGamepad = defaults.hideCursorOnGamepad;
+        minClickIntervalMs = defaults.minClickIntervalMs;
+        disableBackspaceTrigger = defaults.disableBackspaceTrigger;
     }
 
     /**
@@ -871,6 +903,194 @@ public final class PreferencesState {
         }
     }
 
+    /**
+     * Returns whether camera Y axis is inverted for 3D / pan controls ({@code #0622}).
+     *
+     * @return {@code true} if Y axis is inverted
+     */
+    public synchronized boolean isInvertCameraY() {
+        return invertCameraY;
+    }
+
+    /**
+     * Sets whether camera Y axis is inverted for 3D / pan controls.
+     *
+     * @param invertCameraY invert Y flag
+     */
+    public synchronized void setInvertCameraY(boolean invertCameraY) {
+        this.invertCameraY = invertCameraY;
+    }
+
+    /**
+     * Returns camera mouse/stick sensitivity multiplier in {@code [0.2, 3.0]} ({@code #0623}).
+     *
+     * @return sensitivity multiplier
+     */
+    public synchronized float getCameraSensitivity() {
+        return cameraSensitivity;
+    }
+
+    /**
+     * Sets camera mouse/stick sensitivity multiplier clamped to {@code [0.2, 3.0]}.
+     *
+     * @param cameraSensitivity sensitivity multiplier
+     */
+    public synchronized void setCameraSensitivity(float cameraSensitivity) {
+        if (!Float.isFinite(cameraSensitivity)) {
+            this.cameraSensitivity = 1.0f;
+        } else {
+            this.cameraSensitivity = Math.max(0.2f, Math.min(3.0f, cameraSensitivity));
+        }
+    }
+
+    /**
+     * Returns whether scroll-wheel up triggers rollback ({@code #0602}).
+     *
+     * @return {@code true} when mouse wheel rollback is enabled
+     */
+    public synchronized boolean isScrollWheelRollbackEnabled() {
+        return scrollWheelRollbackEnabled;
+    }
+
+    /**
+     * Enables or disables scroll-wheel rollback/roll-forward.
+     *
+     * @param scrollWheelRollbackEnabled toggle flag
+     */
+    public synchronized void setScrollWheelRollbackEnabled(boolean scrollWheelRollbackEnabled) {
+        this.scrollWheelRollbackEnabled = scrollWheelRollbackEnabled;
+    }
+
+    /**
+     * Returns right-click behavior ({@code "MENU"} or {@code "ROLLBACK"}) ({@code #0638}).
+     *
+     * @return right-click mode
+     */
+    public synchronized String getRightClickBehavior() {
+        return rightClickBehavior;
+    }
+
+    /**
+     * Sets right-click behavior ({@code "MENU"} or {@code "ROLLBACK"}).
+     *
+     * @param rightClickBehavior mode string
+     */
+    public synchronized void setRightClickBehavior(String rightClickBehavior) {
+        if (rightClickBehavior != null && "ROLLBACK".equalsIgnoreCase(rightClickBehavior.trim())) {
+            this.rightClickBehavior = "ROLLBACK";
+        } else {
+            this.rightClickBehavior = "MENU";
+        }
+    }
+
+    /**
+     * Returns whether optional on-screen touch controls overlay is enabled ({@code #0607}).
+     *
+     * @return {@code true} if enabled
+     */
+    public synchronized boolean isTouchControlsEnabled() {
+        return touchControlsEnabled;
+    }
+
+    /**
+     * Enables or disables optional on-screen touch controls overlay.
+     *
+     * @param touchControlsEnabled touch controls flag
+     */
+    public synchronized void setTouchControlsEnabled(boolean touchControlsEnabled) {
+        this.touchControlsEnabled = touchControlsEnabled;
+    }
+
+    /**
+     * Returns whether mash inputs are replaced with accessibility hold actions ({@code #0609}).
+     *
+     * @return {@code true} if simplified hold mode is enabled
+     */
+    public synchronized boolean isSimplifyHoldInputs() {
+        return simplifyHoldInputs;
+    }
+
+    /**
+     * Enables or disables simplified accessibility hold mode for timed mash prompts.
+     *
+     * @param simplifyHoldInputs hold accessibility flag
+     */
+    public synchronized void setSimplifyHoldInputs(boolean simplifyHoldInputs) {
+        this.simplifyHoldInputs = simplifyHoldInputs;
+    }
+
+    /**
+     * Returns whether skip/sprint uses toggle mode instead of holding keys ({@code #0627}).
+     *
+     * @return {@code true} for toggle mode
+     */
+    public synchronized boolean isToggleSkipSprintMode() {
+        return toggleSkipSprintMode;
+    }
+
+    /**
+     * Sets toggle vs hold mode for skip and sprint inputs.
+     *
+     * @param toggleSkipSprintMode toggle flag
+     */
+    public synchronized void setToggleSkipSprintMode(boolean toggleSkipSprintMode) {
+        this.toggleSkipSprintMode = toggleSkipSprintMode;
+    }
+
+    /**
+     * Returns whether the cursor hides automatically when using gamepad navigation ({@code #0614}).
+     *
+     * @return {@code true} to hide cursor on gamepad inactivity
+     */
+    public synchronized boolean isHideCursorOnGamepad() {
+        return hideCursorOnGamepad;
+    }
+
+    /**
+     * Enables or disables cursor hiding after mouse inactivity on gamepad input.
+     *
+     * @param hideCursorOnGamepad hide flag
+     */
+    public synchronized void setHideCursorOnGamepad(boolean hideCursorOnGamepad) {
+        this.hideCursorOnGamepad = hideCursorOnGamepad;
+    }
+
+    /**
+     * Returns mouse switch debounce interval in milliseconds {@code [0, 80]} ({@code #0628}).
+     *
+     * @return minimum interval between clicks in milliseconds
+     */
+    public synchronized int getMinClickIntervalMs() {
+        return minClickIntervalMs;
+    }
+
+    /**
+     * Sets mouse switch debounce interval clamped to {@code [0, 80]} ms.
+     *
+     * @param minClickIntervalMs minimum click interval ms
+     */
+    public synchronized void setMinClickIntervalMs(int minClickIntervalMs) {
+        this.minClickIntervalMs = Math.clamp(minClickIntervalMs, 0, 80);
+    }
+
+    /**
+     * Returns whether Backspace rollback trigger is disabled to prevent accidental triggers ({@code #0676}).
+     *
+     * @return {@code true} if Backspace trigger is disabled
+     */
+    public synchronized boolean isDisableBackspaceTrigger() {
+        return disableBackspaceTrigger;
+    }
+
+    /**
+     * Enables or disables disabling Backspace rollback trigger.
+     *
+     * @param disableBackspaceTrigger disable flag
+     */
+    public synchronized void setDisableBackspaceTrigger(boolean disableBackspaceTrigger) {
+        this.disableBackspaceTrigger = disableBackspaceTrigger;
+    }
+
     @Override
     public synchronized boolean equals(Object obj) {
         if (this == obj) {
@@ -905,7 +1125,17 @@ public final class PreferencesState {
                 && accessibilityAudioCues == other.accessibilityAudioCues
                 && autosaveOnQuit == other.autosaveOnQuit
                 && Double.compare(autoReadVoiceWaitSeconds, other.autoReadVoiceWaitSeconds) == 0
+                && invertCameraY == other.invertCameraY
+                && Float.compare(cameraSensitivity, other.cameraSensitivity) == 0
+                && scrollWheelRollbackEnabled == other.scrollWheelRollbackEnabled
+                && touchControlsEnabled == other.touchControlsEnabled
+                && simplifyHoldInputs == other.simplifyHoldInputs
+                && toggleSkipSprintMode == other.toggleSkipSprintMode
+                && hideCursorOnGamepad == other.hideCursorOnGamepad
+                && minClickIntervalMs == other.minClickIntervalMs
+                && disableBackspaceTrigger == other.disableBackspaceTrigger
                 && Objects.equals(saveSlotSortMode, other.saveSlotSortMode)
+                && Objects.equals(rightClickBehavior, other.rightClickBehavior)
                 && Objects.equals(renderMode, other.renderMode)
                 && Objects.equals(language, other.language)
                 && Objects.equals(dialogueMode, other.dialogueMode)
@@ -924,7 +1154,10 @@ public final class PreferencesState {
                 accessibilityCursorStyle, textBackdropMode,
                 safeLetterboxUltrawide, choiceNumberHotkeysEnabled,
                 uiVolume, muteOnFocusLoss, stopVoiceOnAdvance, monoAudio, accessibilityAudioCues,
-                autosaveOnQuit, autoReadVoiceWaitSeconds, saveSlotSortMode
+                autosaveOnQuit, autoReadVoiceWaitSeconds, saveSlotSortMode,
+                invertCameraY, cameraSensitivity, scrollWheelRollbackEnabled, rightClickBehavior,
+                touchControlsEnabled, simplifyHoldInputs, toggleSkipSprintMode,
+                hideCursorOnGamepad, minClickIntervalMs, disableBackspaceTrigger
         );
     }
 }

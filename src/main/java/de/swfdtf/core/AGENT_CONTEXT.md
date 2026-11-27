@@ -36,8 +36,10 @@ Zentrales Laufzeit-Fundament von KAGAYAKI: Ausführungsmodi (`STUDIO_DUAL_WINDOW
 | `PluginRegistry` | `final class` | Registrierungs- und Lebenszyklus-Manager für `EnginePlugin`-Instanzen mit `Optional`-Suche und unveränderlichen Listen. |
 | `PluginLoader` | `final class` | Lädt Laufzeit-Plugins dynamisch aus `plugins/*.jar` per `ServiceLoader<EnginePlugin>` mit Fehlerisolation pro JAR. |
 | `ResourceProvider` | `interface` | Schreibgeschützte Schnittstelle für datei- oder `.vpak`-gestützten Projektressourcenzugriff (`contains`, `readBytes`, `listPaths`, `verifyIntegrity`). |
-| `KeybindingRemapper` | `final class` | Konfigurierbares Action-zu-GLFW-Tastenzuordnungssystem mit Konflikterkennung, Swap-Unterstützung und Gson-JSON-Persistenz. |
+| `KeybindingRemapper` | `final class` | Konfigurierbares Action-zu-GLFW-Tastenzuordnungssystem mit Sekundär-/Maus-Belegungen, Kontext-Konflikten, Einzeltasten-Reset und lokalisierter Tastenanzeige. |
 | `GamepadNavigationRouter` | `final class` | Übersetzt `InputManager`-D-Pad-/Stick-Eingaben inklusive Deadzone und Wiederholungsrate in diskrete `NavigationDirection`-Ereignisse. |
+| `InputDeviceAndAccessibilityServices` | `final class` | Input-Puffering (120 ms), Key-Repeat (400/80 ms), Touch-Gesten, Ein-Hand-Profile, QWERTZ/AZERTY/DVORAK-Scancode-Maps, Gamepad-Profile/Haptik, Cursor- & Fokus-Policy sowie `ClipboardBridge`. |
+| `InputWorkflowAndMacroServices` | `final class` | Input-Prioritäts-Stack, `.vinput`-Makro-Rekorder/Replay-Player, UI-/Dialog-Input-Guards, Konami-Sequenzdetektor, Radial-Wheel und `VirtualKeyboardState`. |
 
 ## Öffentliche API-Signaturen
 
@@ -335,3 +337,8 @@ public final class EngineVersion {
     public static String formatProjectHeader(ProjectDescriptor descriptor)
 }
 ```
+
+### Input-, WASD-, Physik- & Modal-Architekturvertrag (Wave P2-8)
+1. **Zentraler Input-Zyklus (`InputManager`)**: `beginFrame()` pollt verbundene Gamepads -> Events (`onKey`, `onMouseButtonWithTimestampNanos`, `onCursorPos`, `onScroll`, `onGamepadHotPlug`, `onWindowFocus`) puffern in `frameInputEvents` -> Konsumenten fragen Zustände über `KeybindingRemapper` (`isActionDown`, `isActionJustPressed`) ab -> `endFrame()` setzt flüchtige Edge-Flags & Event-Log zurück.
+2. **Prioritäts-Routing (`InputWorkflowAndMacroServices.InputPriorityStack`)**: Strenge Schichtung `SCREEN_MODAL > DEBUG_OVERLAY > ARENA > DIALOGUE`. Geöffnete Modals blockieren WASD-Arena (`wasd_init` / `ObjectMotionController`) und Dialog-Hotkeys vollständig. Ausgeblendetes HUD wird per `Escape`/Rechtsklick zuerst wieder eingeblendet (`RESTORE_HIDDEN_HUD`), Widget-Hitboxen konsumieren Klicks vor Canvas-Advance.
+3. **Barrierefreiheit & Multi-Device (`InputDeviceAndAccessibilityServices`)**: 120-ms-Action-Puffer vor Bodenlandung/Übergängen, 400/80-ms-Repeat-Timer, 0,7-s-Hold-to-Confirm, Toggle-vs-Hold-Skip, 300-ms-Gamepad-Skip-Guard, proportionale Links-Stick-Skalierung, D-Pad/Stick-Edge-Entprellung und `.vinput`-Makro-Regressionstests.

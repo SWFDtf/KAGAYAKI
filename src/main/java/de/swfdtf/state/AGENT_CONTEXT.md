@@ -363,8 +363,8 @@ public class LocalizationManager {
 }
 ```
 
-### Erweiterte Wave P2-5..P2-7 State- & Save-APIs
-- `PreferencesState`: `textboxOpacity` (`[0.0, 1.0]`, Default `0.88`), `reduceMotion` (`boolean`), `safezoneMarginPx` (`[0..64]`), `accessibilityCursorStyle` (`DEFAULT`/`LARGE_YELLOW`/`INVERTED`), `textBackdropMode` (`BOX`/`DARK_STRIP`/`NONE`), `safeLetterboxUltrawide` (`boolean`), `choiceNumberHotkeysEnabled` (`boolean`), Wave P2-6 `uiVolume` (`toPerceptualGain`), `muteOnFocusLoss`, `stopVoiceOnAdvance`, `monoAudio`, `accessibilityAudioCues`, sowie Wave P2-7 `autosaveOnQuit`, `autoReadVoiceWaitSeconds` (`[0.0, 10.0]`), `saveSlotSortMode` (`LAST_SAVED` / `SLOT_NUMBER`), `resetToDefaults()` / `resetToDefaults(Path)`.
+### Erweiterte Wave P2-5..P2-8 State- & Save-APIs
+- `PreferencesState`: Wave P2-5/6/7 Optionen sowie Wave P2-8 Input-/Kamera-/Barrierefreiheits-Felder (`invertCameraY`, `cameraSensitivity` `[0.2, 3.0]`, `scrollWheelRollbackEnabled`, `rightClickBehavior` `MENU`/`ROLLBACK`, `touchControlsEnabled`, `simplifyHoldInputs`, `toggleSkipSprintMode`, `hideCursorOnGamepad`, `minClickIntervalMs` `[0, 80]`, `disableBackspaceTrigger`).
 - `StateStore`: atomare `transaction(Consumer<StateStore>)`-Methode; `RelationshipAffinityTracker.setBounds(min, max)` und `addTierThresholdListener`.
 - `AchievementBackend` (`OfflineAchievementBackend`) sowie `SaveRepository` (`InMemorySaveRepository`, `FileSaveRepository` mit `cleanupOrphanedTempFiles` & `validateSlotId`).
 - `StateCoreEnhancements` & `SaveWorkflowServices`: Typsichere Nested Views, `BigDecimal`-Währungsarithmetik, `ObservableStateBus`, `DeltaRollbackBuffer`, HMAC-SHA256-Integrität, `.vsave`-Pakete, Cloud-Sync-Union-Merge, Profil-Trennung, Quick-Save-Ring `quick-1..quick-3`, Trash-Undo, Batch-Migration-QA sowie JSON-Schema in `docs/SAVE_SCHEMA.md`.

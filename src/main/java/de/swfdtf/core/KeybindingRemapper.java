@@ -6,13 +6,17 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Rebindable registry mapping logical action names to GLFW key codes with conflict detection,
@@ -26,6 +30,9 @@ public final class KeybindingRemapper {
 
     private final Map<String, Integer> defaults = new LinkedHashMap<>();
     private final Map<String, Integer> activeBindings = new LinkedHashMap<>();
+    private final Map<String, Set<Integer>> alternateKeys = new LinkedHashMap<>();
+    private final Map<String, Set<Integer>> mouseBindings = new LinkedHashMap<>();
+    private final Map<String, String> actionContexts = new LinkedHashMap<>();
 
     /** Creates a new empty {@code KeybindingRemapper}. */
     public KeybindingRemapper() {
@@ -180,9 +187,182 @@ public final class KeybindingRemapper {
      */
     public boolean isActionDown(String action, InputManager input) {
         Objects.requireNonNull(input, "input must not be null");
-        return getKeyCode(action)
-                .map(input::isKeyDown)
-                .orElse(false);
+        String validAction = requireValidAction(action);
+        Integer primary = activeBindings.get(validAction);
+        if (primary != null && input.isKeyDown(primary)) {
+            return true;
+        }
+        Set<Integer> alts = alternateKeys.get(validAction);
+        if (alts != null) {
+            for (int key : alts) {
+                if (input.isKeyDown(key)) {
+                    return true;
+                }
+            }
+        }
+        Set<Integer> buttons = mouseBindings.get(validAction);
+        if (buttons != null) {
+            for (int btn : buttons) {
+                if (input.isMouseButtonDown(btn)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns whether primary, alternate keys, or mouse buttons bound to {@code action}
+     * were pressed this frame ({@code #0626}, {@code #0645}).
+     *
+     * @param action logical action name
+     * @param input  input manager to query
+     * @return {@code true} if just pressed on any bound input source
+     */
+    public boolean isActionJustPressed(String action, InputManager input) {
+        Objects.requireNonNull(input, "input must not be null");
+        String validAction = requireValidAction(action);
+        Integer primary = activeBindings.get(validAction);
+        if (primary != null && input.wasKeyJustPressed(primary)) {
+            return true;
+        }
+        Set<Integer> alts = alternateKeys.get(validAction);
+        if (alts != null) {
+            for (int key : alts) {
+                if (input.wasKeyJustPressed(key)) {
+                    return true;
+                }
+            }
+        }
+        Set<Integer> buttons = mouseBindings.get(validAction);
+        if (buttons != null) {
+            for (int btn : buttons) {
+                if (input.wasMouseButtonJustPressed(btn)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Adds secondary or tertiary keyboard key bindings for {@code action} ({@code #0626}).
+     *
+     * @param action  registered action name
+     * @param keyCode GLFW key code
+     */
+    public void addAlternateKeyBinding(String action, int keyCode) {
+        String validAction = requireRegisteredAction(action);
+        requireValidKeyCode(keyCode);
+        alternateKeys.computeIfAbsent(validAction, k -> new LinkedHashSet<>()).add(keyCode);
+    }
+
+    /**
+     * Adds a mouse button binding (including side buttons {@code BUTTON_4}..{@code BUTTON_8}) ({@code #0645}).
+     *
+     * @param action      registered action name
+     * @param mouseButton GLFW mouse button index in {@code [0, InputManager.MOUSE_BUTTON_COUNT)}
+     */
+    public void addMouseBinding(String action, int mouseButton) {
+        String validAction = requireRegisteredAction(action);
+        if (mouseButton < 0 || mouseButton >= InputManager.MOUSE_BUTTON_COUNT) {
+            throw new IllegalArgumentException("Invalid mouseButton: " + mouseButton);
+        }
+        mouseBindings.computeIfAbsent(validAction, k -> new LinkedHashSet<>()).add(mouseButton);
+    }
+
+    /**
+     * Assigns an input context (e.g., {@code "UI"}, {@code "GAMEPLAY"}, {@code "ARENA"}) so actions in
+     * distinct contexts can share keys cleanly ({@code #0670}).
+     *
+     * @param action  action name
+     * @param context context identifier
+     */
+    public void setActionContext(String action, String context) {
+        String validAction = requireRegisteredAction(action);
+        actionContexts.put(validAction, context != null && !context.isBlank()
+                ? context.trim().toUpperCase(Locale.ROOT) : "GLOBAL");
+    }
+
+    /**
+     * Checks whether assigning {@code keyCode} to {@code action} conflicts with another action inside the
+     * SAME input context ({@code #0670}).
+     *
+     * @param action  candidate action name
+     * @param keyCode candidate GLFW key code
+     * @return conflicting action name inside the same context, or {@link Optional#empty()}
+     */
+    public Optional<String> findContextConflict(String action, int keyCode) {
+        String validAction = requireRegisteredAction(action);
+        requireValidKeyCode(keyCode);
+        String targetCtx = actionContexts.getOrDefault(validAction, "GLOBAL");
+        for (Map.Entry<String, Integer> entry : activeBindings.entrySet()) {
+            String other = entry.getKey();
+            if (!other.equals(validAction) && entry.getValue() == keyCode) {
+                String otherCtx = actionContexts.getOrDefault(other, "GLOBAL");
+                if (targetCtx.equals(otherCtx)) {
+                    return Optional.of(other);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Resets only {@code action} back to its default key binding while preserving all other actions ({@code #0643}).
+     *
+     * @param action registered action name
+     */
+    public void resetAction(String action) {
+        String validAction = requireRegisteredAction(action);
+        activeBindings.put(validAction, defaults.get(validAction));
+        alternateKeys.remove(validAction);
+        mouseBindings.remove(validAction);
+    }
+
+    /**
+     * Applies project-defined default keybindings from {@code project.vjava.json} without overwriting any
+     * player-customized bindings already modified from defaults ({@code #0637}).
+     *
+     * @param projectDefaults map of action name to GLFW key code
+     */
+    public void applyProjectDefaults(Map<String, Integer> projectDefaults) {
+        Objects.requireNonNull(projectDefaults, "projectDefaults must not be null");
+        for (Map.Entry<String, Integer> entry : projectDefaults.entrySet()) {
+            String validAction = requireValidAction(entry.getKey());
+            int keyCode = entry.getValue();
+            requireValidKeyCode(keyCode);
+            boolean customized = activeBindings.containsKey(validAction)
+                    && defaults.containsKey(validAction)
+                    && !Objects.equals(activeBindings.get(validAction), defaults.get(validAction));
+            defaults.put(validAction, keyCode);
+            if (!customized) {
+                activeBindings.put(validAction, keyCode);
+            }
+        }
+    }
+
+    /**
+     * Returns localized display name for common GLFW key caps ({@code DE} vs {@code EN}) ({@code #0653}).
+     *
+     * @param keyCode  GLFW key constant
+     * @param language locale name (e.g. {@code "deutsch"}, {@code "english"})
+     * @return human-readable localized key label
+     */
+    public static String localizeKeyName(int keyCode, String language) {
+        boolean de = language != null && language.toLowerCase(Locale.ROOT).startsWith("de");
+        return switch (keyCode) {
+            case GLFW.GLFW_KEY_SPACE -> de ? "Leertaste" : "Space";
+            case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> de ? "Eingabe" : "Enter";
+            case GLFW.GLFW_KEY_DELETE -> de ? "Entf" : "Del";
+            case GLFW.GLFW_KEY_ESCAPE -> "Esc";
+            case GLFW.GLFW_KEY_BACKSPACE -> de ? "Rücktaste" : "Backspace";
+            case GLFW.GLFW_KEY_LEFT_SHIFT, GLFW.GLFW_KEY_RIGHT_SHIFT -> de ? "Umschalt" : "Shift";
+            case GLFW.GLFW_KEY_LEFT_CONTROL, GLFW.GLFW_KEY_RIGHT_CONTROL -> de ? "Strg" : "Ctrl";
+            default -> keyCode >= GLFW.GLFW_KEY_A && keyCode <= GLFW.GLFW_KEY_Z
+                    ? String.valueOf((char) ('A' + (keyCode - GLFW.GLFW_KEY_A)))
+                    : "Key " + keyCode;
+        };
     }
 
     /**
@@ -191,6 +371,8 @@ public final class KeybindingRemapper {
     public void resetToDefaults() {
         activeBindings.clear();
         activeBindings.putAll(defaults);
+        alternateKeys.clear();
+        mouseBindings.clear();
     }
 
     /**

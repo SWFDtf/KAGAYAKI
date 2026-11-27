@@ -13,7 +13,10 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.nio.DoubleBuffer;
 import java.nio.IntBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Centralized GLFW input tracker supporting keyboard states, modifiers, Unicode text input,
@@ -51,6 +54,34 @@ public final class InputManager {
 
     private static final int MAX_TYPED_BUFFER_CHARS = 1024;
     private static final float DEFAULT_GAMEPAD_DEADZONE = 0.15f;
+    private static final long DOUBLE_CLICK_WINDOW_NANOS = 350_000_000L;
+    private static final double DOUBLE_CLICK_RADIUS_PX = 6.0;
+
+    /**
+     * Sub-frame input event stamped for deterministic ordering and telemetry ({@code #0675}).
+     *
+     * @param kind           event category ({@code "KEY"}, {@code "MOUSE"}, {@code "GAMEPAD"})
+     * @param code           key/button/slot code
+     * @param action         GLFW action code
+     * @param timestampNanos monotonic timestamp in nanoseconds
+     */
+    public record TimestampedInputEvent(String kind, int code, int action, long timestampNanos) {
+    }
+
+    /**
+     * Callback receiving gamepad hot-plug connect/disconnect notifications ({@code #0600}).
+     */
+    @FunctionalInterface
+    public interface GamepadConnectionListener {
+        /**
+         * Invoked when a gamepad is connected or disconnected.
+         *
+         * @param joystickId slot index
+         * @param connected  {@code true} when connected
+         * @param deviceName resolved controller name
+         */
+        void onConnectionChanged(int joystickId, boolean connected, String deviceName);
+    }
 
     private final boolean[] keysDown = new boolean[KEY_COUNT];
     private final boolean[] keysJustPressed = new boolean[KEY_COUNT];
@@ -89,6 +120,18 @@ public final class InputManager {
     private float gamepadDeadzone = DEFAULT_GAMEPAD_DEADZONE;
     private int activeGamepadId = -1;
     private boolean frameEnded = true;
+
+    private final boolean[] bootSuppressedKeys = new boolean[KEY_COUNT];
+    private final boolean[] mouseDoubleClicked = new boolean[MOUSE_BUTTON_COUNT];
+    private final long[] lastClickNanos = new long[MOUSE_BUTTON_COUNT];
+    private final double[] lastClickX = new double[MOUSE_BUTTON_COUNT];
+    private final double[] lastClickY = new double[MOUSE_BUTTON_COUNT];
+    private final long[] lastDebouncePressNanos = new long[MOUSE_BUTTON_COUNT];
+    private int minClickIntervalMs = 0;
+    private final List<TimestampedInputEvent> frameInputEvents = new ArrayList<>();
+    private GamepadConnectionListener gamepadConnectionListener;
+    private boolean traceEnabled = false;
+    private Consumer<String> traceSink;
 
     private long attachedWindowHandle = MemoryUtil.NULL;
     private GLFWKeyCallback keyCallback;
@@ -277,6 +320,13 @@ public final class InputManager {
         if (key < 0 || key >= KEY_COUNT) {
             return;
         }
+        long nowNanos = System.nanoTime();
+        if (bootSuppressedKeys[key]) {
+            if (action == GLFW.GLFW_RELEASE) {
+                bootSuppressedKeys[key] = false;
+            }
+            return;
+        }
         if (action == GLFW.GLFW_PRESS) {
             if (!keysDown[key]) {
                 keysJustPressed[key] = true;
@@ -288,6 +338,7 @@ public final class InputManager {
             }
             keysDown[key] = false;
         }
+        recordEvent("KEY", key, action, nowNanos);
     }
 
     /**
@@ -312,12 +363,42 @@ public final class InputManager {
      * @param mods   modifier bitmask
      */
     public void onMouseButton(int button, int action, int mods) {
+        onMouseButtonWithTimestampNanos(button, action, mods, System.nanoTime());
+    }
+
+    /**
+     * Processes a GLFW mouse button event with an explicit monotonic timestamp for deterministic
+     * double-click ({@code <= 350 ms}, {@code <= 6 px}) and mechanical debounce filtering
+     * ({@code #0612}, {@code #0628}, {@code #0675}).
+     *
+     * @param button         button index ({@code 0..7})
+     * @param action         {@link GLFW#GLFW_PRESS} or {@link GLFW#GLFW_RELEASE}
+     * @param mods           modifier bitmask
+     * @param timestampNanos monotonic event timestamp in nanoseconds
+     */
+    public void onMouseButtonWithTimestampNanos(int button, int action, int mods, long timestampNanos) {
         if (button < 0 || button >= MOUSE_BUTTON_COUNT) {
             return;
         }
         if (action == GLFW.GLFW_PRESS) {
+            if (minClickIntervalMs > 0 && lastDebouncePressNanos[button] != 0L
+                    && (timestampNanos - lastDebouncePressNanos[button]) < (minClickIntervalMs * 1_000_000L)) {
+                return;
+            }
+            lastDebouncePressNanos[button] = timestampNanos;
             if (!mouseButtonsDown[button]) {
                 mouseButtonsJustPressed[button] = true;
+                long prevNanos = lastClickNanos[button];
+                double dx = logicalMouseX - lastClickX[button];
+                double dy = logicalMouseY - lastClickY[button];
+                if (prevNanos != 0L
+                        && (timestampNanos - prevNanos) <= DOUBLE_CLICK_WINDOW_NANOS
+                        && ((dx * dx) + (dy * dy)) <= (DOUBLE_CLICK_RADIUS_PX * DOUBLE_CLICK_RADIUS_PX)) {
+                    mouseDoubleClicked[button] = true;
+                }
+                lastClickNanos[button] = timestampNanos;
+                lastClickX[button] = logicalMouseX;
+                lastClickY[button] = logicalMouseY;
             }
             mouseButtonsDown[button] = true;
         } else if (action == GLFW.GLFW_RELEASE) {
@@ -326,6 +407,7 @@ public final class InputManager {
             }
             mouseButtonsDown[button] = false;
         }
+        recordEvent("MOUSE", button, action, timestampNanos);
     }
 
     /**
@@ -477,6 +559,9 @@ public final class InputManager {
      * @param vpH viewport height in window coordinates
      */
     public void setViewport(double vpX, double vpY, double vpW, double vpH) {
+        if (vpW <= 0.0 || vpH <= 0.0) {
+            return;
+        }
         this.viewportX = vpX;
         this.viewportY = vpY;
         this.viewportWidth = vpW;
@@ -844,12 +929,138 @@ public final class InputManager {
         Arrays.fill(keysJustReleased, false);
         Arrays.fill(mouseButtonsJustPressed, false);
         Arrays.fill(mouseButtonsJustReleased, false);
+        Arrays.fill(mouseDoubleClicked, false);
         for (int jid = 0; jid < MAX_JOYSTICKS; jid++) {
             Arrays.fill(gamepadButtonsJustPressed[jid], false);
             Arrays.fill(gamepadButtonsJustReleased[jid], false);
         }
+        frameInputEvents.clear();
         scrollX = 0.0;
         scrollY = 0.0;
+    }
+
+    /**
+     * Returns whether a double-click occurred on {@code button} in the current frame
+     * (within 350 ms and 6 px radius) ({@code #0612}).
+     *
+     * @param button mouse button index ({@code 0..7})
+     * @return {@code true} if double-clicked this frame
+     */
+    public boolean isMouseDoubleClicked(int button) {
+        return button >= 0 && button < MOUSE_BUTTON_COUNT && mouseDoubleClicked[button];
+    }
+
+    /**
+     * Sets minimum click interval for mechanical switch debounce in {@code [0, 80]} ms ({@code #0628}).
+     *
+     * @param minClickIntervalMs debounce interval in milliseconds
+     */
+    public void setMinClickIntervalMs(int minClickIntervalMs) {
+        this.minClickIntervalMs = Math.clamp(minClickIntervalMs, 0, 80);
+    }
+
+    /**
+     * Returns active mouse debounce threshold in milliseconds ({@code #0628}).
+     *
+     * @return debounce interval ms
+     */
+    public int getMinClickIntervalMs() {
+        return minClickIntervalMs;
+    }
+
+    /**
+     * Suppresses keys currently held at engine boot (such as launch-command {@code Enter})
+     * until released ({@code #0656}).
+     *
+     * @param heldKeys optional extra keys considered held at launch
+     */
+    public void armBootGhostSuppression(int... heldKeys) {
+        for (int k = 0; k < KEY_COUNT; k++) {
+            if (keysDown[k]) {
+                bootSuppressedKeys[k] = true;
+                keysDown[k] = false;
+                keysJustPressed[k] = false;
+            }
+        }
+        if (heldKeys != null) {
+            for (int key : heldKeys) {
+                if (key >= 0 && key < KEY_COUNT) {
+                    bootSuppressedKeys[key] = true;
+                    keysDown[key] = false;
+                    keysJustPressed[key] = false;
+                }
+            }
+        }
+    }
+
+    /**
+     * Processes a GLFW joystick hot-plug connect/disconnect notification ({@code #0600}).
+     *
+     * @param joystickId slot index ({@code 0..MAX_JOYSTICKS-1})
+     * @param connected  {@code true} when connected, {@code false} when disconnected
+     * @param deviceName optional device display name
+     */
+    public void onGamepadHotPlug(int joystickId, boolean connected, String deviceName) {
+        if (joystickId < 0 || joystickId >= MAX_JOYSTICKS) {
+            return;
+        }
+        if (connected) {
+            gamepadConnected[joystickId] = true;
+        } else {
+            disconnectGamepadSlot(joystickId);
+        }
+        recomputeActiveGamepad();
+        recordEvent("GAMEPAD", joystickId, connected ? GLFW.GLFW_CONNECTED : GLFW.GLFW_DISCONNECTED,
+                System.nanoTime());
+        if (gamepadConnectionListener != null) {
+            String safeName = deviceName != null && !deviceName.isBlank() ? deviceName : "Controller " + joystickId;
+            gamepadConnectionListener.onConnectionChanged(joystickId, connected, safeName);
+        }
+    }
+
+    /**
+     * Registers a listener notified on gamepad hot-plug connect/disconnect ({@code #0600}).
+     *
+     * @param listener connection callback (nullable to clear)
+     */
+    public void setGamepadConnectionListener(GamepadConnectionListener listener) {
+        this.gamepadConnectionListener = listener;
+    }
+
+    /**
+     * Enables or disables zero-overhead input trace logging for {@code --trace-input} ({@code #0639}).
+     *
+     * @param enabled {@code true} to emit timestamped traces
+     * @param sink    output consumer receiving formatted lines (nullable)
+     */
+    public void setTraceEnabled(boolean enabled, Consumer<String> sink) {
+        this.traceEnabled = enabled;
+        this.traceSink = sink;
+    }
+
+    /**
+     * Returns whether input tracing is currently enabled.
+     *
+     * @return {@code true} if tracing is enabled
+     */
+    public boolean isTraceEnabled() {
+        return traceEnabled;
+    }
+
+    /**
+     * Returns immutable list of sub-frame timestamped events recorded during the active frame ({@code #0675}).
+     *
+     * @return timestamped frame input events
+     */
+    public List<TimestampedInputEvent> getFrameInputEvents() {
+        return List.copyOf(frameInputEvents);
+    }
+
+    private void recordEvent(String kind, int code, int action, long timestampNanos) {
+        frameInputEvents.add(new TimestampedInputEvent(kind, code, action, timestampNanos));
+        if (traceEnabled && traceSink != null) {
+            traceSink.accept("[" + timestampNanos + "] " + kind + " code=" + code + " action=" + action);
+        }
     }
 
     private void recomputeLogicalMouse() {
