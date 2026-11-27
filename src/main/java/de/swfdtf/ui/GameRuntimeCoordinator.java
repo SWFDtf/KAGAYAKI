@@ -209,7 +209,7 @@ public final class GameRuntimeCoordinator implements GameHost {
         }
 
         if (autoStartMainMenu && mainMenuScreen != null) {
-            screenManager.showScreen(mainMenuScreen);
+            showPrimaryMainMenu();
         }
 
         this.initialized = true;
@@ -495,7 +495,7 @@ public final class GameRuntimeCoordinator implements GameHost {
         } else if (trimmed.startsWith("hide_screen:")) {
             screenManager.hideScreen(trimmed.substring("hide_screen:".length()).trim());
         } else if ("start".equalsIgnoreCase(trimmed) || "Start()".equalsIgnoreCase(trimmed)) {
-            screenManager.hideScreen(MainMenuScreen.SCREEN_NAME);
+            hideAllMainMenus();
             session.start();
         } else if ("quit".equalsIgnoreCase(trimmed) || "Quit()".equalsIgnoreCase(trimmed)) {
             api.requestQuit();
@@ -518,7 +518,7 @@ public final class GameRuntimeCoordinator implements GameHost {
         } else {
             String targetArg = extractQuotedScreenArg(trimmed);
             if (trimmed.startsWith("Jump(") && targetArg != null) {
-                screenManager.hideScreen(MainMenuScreen.SCREEN_NAME);
+                hideAllMainMenus();
                 session.getRuntime().jumpToLabel(targetArg);
             } else if (trimmed.startsWith("ShowMenu(") && targetArg != null) {
                 String resolved = resolveBuiltinScreenAlias(targetArg);
@@ -549,6 +549,87 @@ public final class GameRuntimeCoordinator implements GameHost {
             case "preferences_screen" -> PreferencesScreen.SCREEN_NAME;
             default -> screenName;
         };
+    }
+
+    /**
+     * Resolves which main menu screen leads ({@code MainMenuScreen.SCREEN_NAME} or a custom
+     * {@code .vjava} screen such as {@code template_main_menu}) according to
+     * {@link de.swfdtf.core.ProjectDescriptor#isUseCustomMainMenuScreen()} ({@code #0341}).
+     *
+     * @return leading main menu screen identifier
+     */
+    public String resolvePrimaryMainMenuScreenName() {
+        de.swfdtf.core.ProjectDescriptor desc = api != null ? api.getProjectDescriptor() : null;
+        if (desc != null && desc.isUseCustomMainMenuScreen() && screenManager != null) {
+            String configured = desc.getCustomMainMenuScreenName();
+            if (screenManager.getScreen(configured) != null) {
+                return configured;
+            }
+            if (screenManager.getScreen("template_main_menu") != null) {
+                return "template_main_menu";
+            }
+            if (screenManager.getScreen("main_menu") != null) {
+                return "main_menu";
+            }
+        }
+        return MainMenuScreen.SCREEN_NAME;
+    }
+
+    /**
+     * Displays the leading main menu screen while ensuring any alternative built-in or custom
+     * main menu screen stays hidden so both never overlap ({@code #0341}).
+     */
+    public void showPrimaryMainMenu() {
+        if (screenManager == null) {
+            return;
+        }
+        String primary = resolvePrimaryMainMenuScreenName();
+        hideAllMainMenus();
+        screenManager.showScreen(primary);
+    }
+
+    /**
+     * Toggles live between the built-in Dark Slate main menu and custom {@code .vjava}
+     * {@code template_main_menu} without double overlap ({@code #0341}).
+     *
+     * @param useCustom {@code true} to let custom {@code .vjava} main menu lead
+     */
+    public void setUseCustomMainMenuScreen(boolean useCustom) {
+        if (api != null && api.getProjectDescriptor() != null) {
+            api.getProjectDescriptor().setUseCustomMainMenuScreen(useCustom);
+        }
+        if (screenManager == null) {
+            return;
+        }
+        boolean anyMenuVisible = isMainMenuCurrentlyVisible();
+        if (anyMenuVisible) {
+            showPrimaryMainMenu();
+        }
+    }
+
+    private void hideAllMainMenus() {
+        if (screenManager == null) {
+            return;
+        }
+        screenManager.hideScreenImmediate(MainMenuScreen.SCREEN_NAME);
+        screenManager.hideScreenImmediate("template_main_menu");
+        screenManager.hideScreenImmediate("main_menu");
+        de.swfdtf.core.ProjectDescriptor desc = api != null ? api.getProjectDescriptor() : null;
+        if (desc != null) {
+            screenManager.hideScreenImmediate(desc.getCustomMainMenuScreenName());
+        }
+    }
+
+    private boolean isMainMenuCurrentlyVisible() {
+        Screen builtin = screenManager.getScreen(MainMenuScreen.SCREEN_NAME);
+        Screen tmpl = screenManager.getScreen("template_main_menu");
+        Screen customMain = screenManager.getScreen("main_menu");
+        de.swfdtf.core.ProjectDescriptor desc = api != null ? api.getProjectDescriptor() : null;
+        Screen configured = desc != null ? screenManager.getScreen(desc.getCustomMainMenuScreenName()) : null;
+        return (builtin != null && builtin.isVisible())
+                || (tmpl != null && tmpl.isVisible())
+                || (customMain != null && customMain.isVisible())
+                || (configured != null && configured.isVisible());
     }
 
     @Override

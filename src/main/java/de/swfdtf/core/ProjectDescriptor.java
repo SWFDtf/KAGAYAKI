@@ -42,6 +42,8 @@ public final class ProjectDescriptor {
     private String iconPath = "";
     private String vpakEncryptionKey = "";
     private String accentColorHex = "";
+    private boolean useCustomMainMenuScreen = false;
+    private String customMainMenuScreenName = "template_main_menu";
 
     /**
      * Creates a descriptor initialized with default settings (used by Gson during deserialization).
@@ -222,6 +224,11 @@ public final class ProjectDescriptor {
         }
         if (vpakEncryptionKey == null) {
             vpakEncryptionKey = "";
+        }
+        if (customMainMenuScreenName == null || customMainMenuScreenName.isBlank()) {
+            customMainMenuScreenName = "template_main_menu";
+        } else {
+            customMainMenuScreenName = customMainMenuScreenName.trim();
         }
     }
 
@@ -459,6 +466,50 @@ public final class ProjectDescriptor {
         this.accentColorHex = accentColorHex != null ? accentColorHex.trim() : "";
     }
 
+    /**
+     * Returns whether a custom {@code .vjava} screen (such as {@code template_main_menu}) takes
+     * precedence over the built-in Dark Slate main menu ({@code #0341}).
+     *
+     * @return {@code true} when custom {@code .vjava} main menu screen leads
+     */
+    public boolean isUseCustomMainMenuScreen() {
+        return useCustomMainMenuScreen;
+    }
+
+    /**
+     * Sets whether a custom {@code .vjava} screen takes precedence over the built-in Dark Slate
+     * main menu ({@code #0341}).
+     *
+     * @param useCustomMainMenuScreen {@code true} to use custom {@code .vjava} main menu
+     */
+    public void setUseCustomMainMenuScreen(boolean useCustomMainMenuScreen) {
+        this.useCustomMainMenuScreen = useCustomMainMenuScreen;
+    }
+
+    /**
+     * Returns the custom {@code .vjava} main menu screen identifier ({@code "template_main_menu"} by
+     * default) used when {@link #isUseCustomMainMenuScreen()} is {@code true} ({@code #0341}).
+     *
+     * @return custom main menu screen name
+     */
+    public String getCustomMainMenuScreenName() {
+        return (customMainMenuScreenName == null || customMainMenuScreenName.isBlank())
+                ? "template_main_menu"
+                : customMainMenuScreenName;
+    }
+
+    /**
+     * Sets the custom {@code .vjava} main menu screen identifier ({@code #0341}).
+     *
+     * @param customMainMenuScreenName screen identifier (null/blank resets to {@code "template_main_menu"})
+     */
+    public void setCustomMainMenuScreenName(String customMainMenuScreenName) {
+        this.customMainMenuScreenName = (customMainMenuScreenName == null
+                || customMainMenuScreenName.isBlank())
+                ? "template_main_menu"
+                : customMainMenuScreenName.trim();
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (this == obj) {
@@ -469,6 +520,7 @@ public final class ProjectDescriptor {
         }
         return logicalWidth == other.logicalWidth
                 && logicalHeight == other.logicalHeight
+                && useCustomMainMenuScreen == other.useCustomMainMenuScreen
                 && Objects.equals(title, other.title)
                 && Objects.equals(version, other.version)
                 && Objects.equals(author, other.author)
@@ -477,7 +529,8 @@ public final class ProjectDescriptor {
                 && Objects.equals(defaultLanguage, other.defaultLanguage)
                 && Objects.equals(dialogueMode, other.dialogueMode)
                 && Objects.equals(windowTitle, other.windowTitle)
-                && Objects.equals(iconPath, other.iconPath);
+                && Objects.equals(iconPath, other.iconPath)
+                && Objects.equals(customMainMenuScreenName, other.customMainMenuScreenName);
     }
 
     @Override
@@ -493,7 +546,9 @@ public final class ProjectDescriptor {
                 defaultLanguage,
                 dialogueMode,
                 windowTitle,
-                iconPath
+                iconPath,
+                useCustomMainMenuScreen,
+                customMainMenuScreenName
         );
     }
 

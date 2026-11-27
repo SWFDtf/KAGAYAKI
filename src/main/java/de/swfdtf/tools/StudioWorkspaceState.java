@@ -59,6 +59,9 @@ public final class StudioWorkspaceState {
     /** Default Studio UI scale factor ({@code 100%}). */
     public static final float DEFAULT_UI_SCALE = 1.0f;
 
+    /** Default scaffolding template preset name ({@code #0086}). */
+    public static final String DEFAULT_TEMPLATE_TYPE = "FULL_DEMO";
+
     private static final Gson GSON = new GsonBuilder()
             .setPrettyPrinting()
             .create();
@@ -75,11 +78,24 @@ public final class StudioWorkspaceState {
     private List<String> userTemplatePaths = new ArrayList<>();
     private int windowWidth = DEFAULT_WINDOW_WIDTH;
     private int windowHeight = DEFAULT_WINDOW_HEIGHT;
+    private String selectedTemplateType = DEFAULT_TEMPLATE_TYPE;
 
     /**
      * Creates a {@code StudioWorkspaceState} initialized with default preferences.
      */
     public StudioWorkspaceState() {
+    }
+
+    /**
+     * Returns the canonical user-home persistence path ({@code ~/.kagayaki/studio.json})
+     * used when Studio Window A exits ({@code #0086}).
+     *
+     * @return normalized path to {@code ~/.kagayaki/studio.json}
+     */
+    public static Path defaultPersistencePath() {
+        return Path.of(System.getProperty("user.home", "."), ".kagayaki", "studio.json")
+                .toAbsolutePath()
+                .normalize();
     }
 
     private StudioWorkspaceState(Builder builder) {
@@ -97,6 +113,7 @@ public final class StudioWorkspaceState {
         this.userTemplatePaths = new ArrayList<>(builder.userTemplatePaths);
         this.windowWidth = builder.windowWidth;
         this.windowHeight = builder.windowHeight;
+        this.selectedTemplateType = builder.selectedTemplateType;
         normalizeDefaults();
     }
 
@@ -136,7 +153,8 @@ public final class StudioWorkspaceState {
                 .onboardingTourCompleted(onboardingTourCompleted)
                 .userTemplatePaths(getUserTemplatePaths())
                 .windowWidth(windowWidth)
-                .windowHeight(windowHeight);
+                .windowHeight(windowHeight)
+                .selectedTemplateType(selectedTemplateType);
     }
 
     /**
@@ -515,6 +533,31 @@ public final class StudioWorkspaceState {
         return this;
     }
 
+    /**
+     * Returns the persisted New-Project template preset name ({@code #0086}).
+     *
+     * @return template preset name (never {@code null} or blank)
+     */
+    public String getSelectedTemplateType() {
+        if (selectedTemplateType == null || selectedTemplateType.isBlank()) {
+            return DEFAULT_TEMPLATE_TYPE;
+        }
+        return selectedTemplateType;
+    }
+
+    /**
+     * Sets the persisted New-Project template preset name ({@code #0086}).
+     *
+     * @param templateType template preset identifier (blank resets to default)
+     * @return {@code this} for fluent chaining
+     */
+    public StudioWorkspaceState setSelectedTemplateType(String templateType) {
+        this.selectedTemplateType = (templateType == null || templateType.isBlank())
+                ? DEFAULT_TEMPLATE_TYPE
+                : templateType.trim().toUpperCase(java.util.Locale.ROOT);
+        return this;
+    }
+
     private static Map<String, Boolean> defaultPanelVisibility() {
         Map<String, Boolean> map = new LinkedHashMap<>();
         map.put("explorer", Boolean.TRUE);
@@ -567,6 +610,11 @@ public final class StudioWorkspaceState {
         if (windowHeight <= 0) {
             windowHeight = DEFAULT_WINDOW_HEIGHT;
         }
+        if (selectedTemplateType == null || selectedTemplateType.isBlank()) {
+            selectedTemplateType = DEFAULT_TEMPLATE_TYPE;
+        } else {
+            selectedTemplateType = selectedTemplateType.trim().toUpperCase(java.util.Locale.ROOT);
+        }
     }
 
     private static List<String> sanitizeRecentPaths(List<String> input) {
@@ -612,7 +660,8 @@ public final class StudioWorkspaceState {
                 && Objects.equals(layoutPreset, other.layoutPreset)
                 && Objects.equals(panelVisibility, other.panelVisibility)
                 && Objects.equals(themeVariant, other.themeVariant)
-                && Objects.equals(userTemplatePaths, other.userTemplatePaths);
+                && Objects.equals(userTemplatePaths, other.userTemplatePaths)
+                && Objects.equals(selectedTemplateType, other.selectedTemplateType);
     }
 
     @Override
@@ -629,7 +678,8 @@ public final class StudioWorkspaceState {
                 onboardingTourCompleted,
                 userTemplatePaths,
                 windowWidth,
-                windowHeight
+                windowHeight,
+                selectedTemplateType
         );
     }
 
@@ -646,6 +696,7 @@ public final class StudioWorkspaceState {
                 + ", onboardingTourCompleted=" + onboardingTourCompleted
                 + ", windowWidth=" + windowWidth
                 + ", windowHeight=" + windowHeight
+                + ", selectedTemplateType='" + selectedTemplateType + '\''
                 + '}';
     }
 
@@ -667,6 +718,7 @@ public final class StudioWorkspaceState {
         private List<String> userTemplatePaths = List.of();
         private int windowWidth = DEFAULT_WINDOW_WIDTH;
         private int windowHeight = DEFAULT_WINDOW_HEIGHT;
+        private String selectedTemplateType = DEFAULT_TEMPLATE_TYPE;
 
         private Builder() {
         }
@@ -810,6 +862,17 @@ public final class StudioWorkspaceState {
                 throw new IllegalArgumentException("windowHeight must be > 0, got " + windowHeight);
             }
             this.windowHeight = windowHeight;
+            return this;
+        }
+
+        /**
+         * Sets the preferred New-Project template preset name.
+         *
+         * @param selectedTemplateType template preset name
+         * @return {@code this}
+         */
+        public Builder selectedTemplateType(String selectedTemplateType) {
+            this.selectedTemplateType = selectedTemplateType;
             return this;
         }
 

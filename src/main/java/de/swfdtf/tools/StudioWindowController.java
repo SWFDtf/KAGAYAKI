@@ -120,7 +120,11 @@ public final class StudioWindowController implements StudioBridge {
     private StudioView activeView = StudioView.MAIN_MENU;
     private ProjectTemplateGenerator.TemplateType selectedTemplateType =
             ProjectTemplateGenerator.TemplateType.FULL_DEMO;
-    private final StudioWorkspaceState workspaceState = StudioWorkspaceState.defaults();
+    private StudioWorkspaceState workspaceState = StudioWorkspaceState.defaults();
+    private Path workspaceStateFile;
+    private VBox mainMenuRecentListBox;
+    private final List<TextButton> recentProjectButtons = new ArrayList<>();
+    private int livePreviewReloadCount = 0;
     private final VJavaSyntaxHighlighter syntaxHighlighter = new VJavaSyntaxHighlighter();
     private final VariableWatchpointManager watchpointManager = new VariableWatchpointManager();
     private final ScriptDebugger scriptDebugger = new ScriptDebugger();
@@ -242,6 +246,7 @@ public final class StudioWindowController implements StudioBridge {
 
         Path projectRoot = api.getConfig().projectDir().toAbsolutePath().normalize();
         this.activeProjectRoot = projectRoot;
+        loadPersistedWorkspaceState();
         if (Files.isDirectory(projectRoot)) {
             workspaceState.recordOpenedProject(projectRoot);
         }
@@ -336,9 +341,12 @@ public final class StudioWindowController implements StudioBridge {
         recentBox.setPreferredSize(900.0f, 560.0f);
         themedWindowBoxes.add(recentBox);
         Viewport recentVp = new Viewport();
+        mainMenuRecentListBox = new VBox();
+        mainMenuRecentListBox.setSpacing(8.0f).setFillWidth(true);
         mainMenuRecentWidget = new TextWidget("(noch keine Projekte)");
         mainMenuRecentWidget.setFontSize(18.0f).setColorHex(ThemePalette.TEXT_PRIMARY);
-        recentVp.addChild(mainMenuRecentWidget);
+        mainMenuRecentListBox.addChild(mainMenuRecentWidget);
+        recentVp.addChild(mainMenuRecentListBox);
         recentBox.addChild(recentVp);
 
         WindowBox templateBox = new WindowBox("Vorlage & Engine-Funktionen (" + EngineVersion.VERSION + ")");
@@ -928,18 +936,78 @@ public final class StudioWindowController implements StudioBridge {
 
     private void loadBundledDemoProject() {
         Path demoDir = Path.of("demo/project").toAbsolutePath().normalize();
-        if (!Files.isDirectory(demoDir)) {
+        if (!openProject(demoDir)) {
             api.getLogger().warn("Studio", "Bundled demo project not found at: " + demoDir);
             return;
         }
-        this.activeProjectRoot = demoDir;
-        workspaceState.recordOpenedProject(demoDir);
+        showWorkspace();
+    }
+
+    /**
+     * Switches {@link #getActiveProjectRoot()} to {@code projectDir}, reloads Window B Live
+     * Preview, and updates Recent Projects buttons in the Studio Main Menu ({@code #0087}).
+     *
+     * @param projectDir target project directory containing {@code project.vjava.json}
+     * @return {@code true} if the directory exists and was opened
+     */
+    public boolean openProject(Path projectDir) {
+        if (projectDir == null) {
+            return false;
+        }
+        Path normalized = projectDir.toAbsolutePath().normalize();
+        if (!Files.isDirectory(normalized)) {
+            if (api != null) {
+                api.getLogger().warn("Studio", "Project directory does not exist: " + normalized);
+            }
+            return false;
+        }
+        this.activeProjectRoot = normalized;
+        workspaceState.recordOpenedProject(normalized);
         refreshProjectAndLint();
-        if (lastScannedAst != null && lastScannedAst.descriptor() != null) {
+        if (api != null && lastScannedAst != null && lastScannedAst.descriptor() != null) {
             api.setProjectDescriptor(lastScannedAst.descriptor());
         }
-        showWorkspace();
+        refreshGitStatusBadge();
+        livePreviewReloadCount++;
+        if (api != null) {
+            api.requestLiveReload();
+            api.getLogger().info("Studio", "Opened project & reloaded preview: " + normalized);
+        }
         refreshInspectors();
+        return true;
+    }
+
+    /**
+     * Clicks the {@code index}-th clickable Recent Project button in the Studio Main Menu
+     * ({@code #0087}).
+     *
+     * @param index zero-based index in the recent project button list
+     * @return {@code true} if a valid button existed and was clicked
+     */
+    public boolean openRecentProject(int index) {
+        if (index < 0 || index >= recentProjectButtons.size()) {
+            return false;
+        }
+        recentProjectButtons.get(index).click();
+        return true;
+    }
+
+    /**
+     * Returns the interactive Recent Project buttons rendered in the Studio Main Menu ({@code #0087}).
+     *
+     * @return unmodifiable list of clickable {@link TextButton}s
+     */
+    public List<TextButton> getRecentProjectButtons() {
+        return List.copyOf(recentProjectButtons);
+    }
+
+    /**
+     * Returns the number of live-preview reloads triggered when switching projects ({@code #0087}).
+     *
+     * @return live preview reload count
+     */
+    public int getLivePreviewReloadCount() {
+        return livePreviewReloadCount;
     }
 
     /**
@@ -1073,6 +1141,7 @@ public final class StudioWindowController implements StudioBridge {
                 mainMenuRecentWidget.setText(sb.toString());
             }
         }
+        rebuildRecentProjectButtons();
         if (templateToggleButton != null) {
             templateToggleButton.setText(formatTemplateButtonText());
         }
@@ -1617,6 +1686,7 @@ public final class StudioWindowController implements StudioBridge {
             return;
         }
         disposed = true;
+        saveWorkspaceState();
         if (eventBusSnifferSub != null) {
             eventBusSnifferSub.unsubscribe();
             eventBusSnifferSub = null;
@@ -1662,8 +1732,113 @@ public final class StudioWindowController implements StudioBridge {
      */
     public void setSelectedTemplateType(ProjectTemplateGenerator.TemplateType templateType) {
         this.selectedTemplateType = Objects.requireNonNull(templateType, "templateType must not be null");
+        workspaceState.setSelectedTemplateType(templateType.name());
         if (templateToggleButton != null) {
             templateToggleButton.setText(formatTemplateButtonText());
+        }
+    }
+
+    /**
+     * Overrides the JSON file path used to persist {@link StudioWorkspaceState} on Studio exit
+     * and reload ({@code #0086}). Primarily intended for isolated automated testing.
+     *
+     * @param workspaceStateFile custom path to {@code studio.json} (or {@code null} to restore default)
+     */
+    public void setWorkspaceStateFile(Path workspaceStateFile) {
+        this.workspaceStateFile = workspaceStateFile != null
+                ? workspaceStateFile.toAbsolutePath().normalize()
+                : null;
+    }
+
+    /**
+     * Returns the configured override persistence path for {@link StudioWorkspaceState}, or the
+     * standard {@code ~/.kagayaki/studio.json} location when none is set ({@code #0086}).
+     *
+     * @return persistence file path
+     */
+    public Path getWorkspaceStateFile() {
+        return workspaceStateFile != null
+                ? workspaceStateFile
+                : StudioWorkspaceState.defaultPersistencePath();
+    }
+
+    /**
+     * Persists recent projects, active project, and selected template preset to disk ({@code #0086}).
+     *
+     * @return {@code true} if written to disk cleanly
+     */
+    public boolean saveWorkspaceState() {
+        Path target = resolveWorkspaceStateFile();
+        if (target == null) {
+            return false;
+        }
+        if (activeProjectRoot != null && Files.isDirectory(activeProjectRoot)) {
+            workspaceState.setLastProjectPath(activeProjectRoot.toString());
+        }
+        workspaceState.setSelectedTemplateType(selectedTemplateType.name());
+        try {
+            workspaceState.save(target);
+            return true;
+        } catch (IOException ex) {
+            if (api != null) {
+                api.getLogger().warn("Studio", "Failed saving workspace state to " + target + ": " + ex.getMessage());
+            }
+            return false;
+        }
+    }
+
+    private void loadPersistedWorkspaceState() {
+        Path source = resolveWorkspaceStateFile();
+        if (source == null || !Files.isRegularFile(source)) {
+            return;
+        }
+        try {
+            this.workspaceState = StudioWorkspaceState.load(source);
+            try {
+                this.selectedTemplateType = ProjectTemplateGenerator.TemplateType.valueOf(
+                        workspaceState.getSelectedTemplateType());
+            } catch (IllegalArgumentException ignored) {
+                this.selectedTemplateType = ProjectTemplateGenerator.TemplateType.FULL_DEMO;
+            }
+        } catch (IOException ex) {
+            if (api != null) {
+                api.getLogger().warn(
+                        "Studio",
+                        "Failed loading workspace state from " + source + ": " + ex.getMessage()
+                );
+            }
+        }
+    }
+
+    private Path resolveWorkspaceStateFile() {
+        if (workspaceStateFile != null) {
+            return workspaceStateFile;
+        }
+        if (api != null && api.getConfig() != null && !api.getConfig().headless()) {
+            return StudioWorkspaceState.defaultPersistencePath();
+        }
+        return null;
+    }
+
+    private void rebuildRecentProjectButtons() {
+        if (mainMenuRecentListBox == null) {
+            return;
+        }
+        mainMenuRecentListBox.clearChildren();
+        recentProjectButtons.clear();
+        List<String> recents = workspaceState.getRecentProjectPaths();
+        if (recents.isEmpty()) {
+            if (mainMenuRecentWidget != null) {
+                mainMenuRecentListBox.addChild(mainMenuRecentWidget);
+            }
+            return;
+        }
+        for (int i = 0; i < recents.size(); i++) {
+            final String pathStr = recents.get(i);
+            TextButton btn = new TextButton((i + 1) + ". " + pathStr, () -> openProject(Path.of(pathStr)));
+            btn.setPreferredSize(860.0f, 38.0f);
+            recentProjectButtons.add(btn);
+            mainMenuRecentListBox.addChild(btn);
         }
     }
 
